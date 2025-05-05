@@ -7,11 +7,25 @@ import React, { useState, useEffect } from "react";
 export default function AIToDoListApp() {
   const [todos, setTodos] = useState([]);
   const [newTodo, setNewTodo] = useState("");
-  const [categories, setCategories] = useState(["Work", "Personal", "Shopping", "Health", "Finance", "General"]);
+  const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [newCat, setNewCat] = useState("");
   const [activeCat, setActiveCat] = useState("All");
+
+  // Fetch categories from MongoDB
+  const fetchCategories = async () => {
+    try {
+      const response = await fetch('http://localhost:8000/categories');
+      if (!response.ok) {
+        throw new Error('Failed to fetch categories');
+      }
+      const data = await response.json();
+      setCategories(data);
+    } catch (err) {
+      setError('Error loading categories: ' + err.message);
+    }
+  };
 
   // Fetch todos from MongoDB
   const fetchTodos = async () => {
@@ -27,9 +41,10 @@ export default function AIToDoListApp() {
     }
   };
 
-  // Load todos on component mount
+  // Load todos and categories on component mount
   useEffect(() => {
     fetchTodos();
+    fetchCategories();
   }, []);
 
   // Classify task using AI
@@ -73,11 +88,56 @@ export default function AIToDoListApp() {
   }
 
   // Add new category
-  const handleAddCategory = () => {
+  const handleAddCategory = async () => {
     const name = newCat.trim();
-    if (!name || categories.includes(name)) return;
-    setCategories(prev => [...prev, name]);
-    setNewCat("");
+    if (!name) return;
+
+    try {
+      const response = await fetch('http://localhost:8000/categories', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ name }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to add category');
+      }
+
+      // Refresh categories
+      await fetchCategories();
+      setNewCat("");
+      setError('');
+    } catch (err) {
+      setError('Error adding category: ' + err.message);
+    }
+  };
+
+  // Delete category
+  const handleDeleteCategory = async (name) => {
+    try {
+      const response = await fetch(`http://localhost:8000/categories/${encodeURIComponent(name)}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to delete category');
+      }
+
+      // Reset active category if it was deleted
+      if (activeCat === name) {
+        setActiveCat("All");
+      }
+
+      // Refresh categories
+      await fetchCategories();
+      setError('');
+    } catch (err) {
+      setError('Error deleting category: ' + err.message);
+    }
   };
 
   // Add new todo
@@ -219,16 +279,22 @@ export default function AIToDoListApp() {
               </button>
             </li>
             {categories.map(cat => (
-              <li key={cat}>
+              <li key={cat} className="flex items-center">
                 <button
                   onClick={() => setActiveCat(cat)}
-                  className={`w-full text-left px-3 py-2 rounded ${
+                  className={`flex-grow text-left px-3 py-2 rounded ${
                     cat === activeCat
                       ? "bg-blue-500 text-white"
                       : "hover:bg-gray-100"
                   }`}
                 >
                   {cat}
+                </button>
+                <button
+                  onClick={() => handleDeleteCategory(cat)}
+                  className="ml-2 text-red-600 hover:text-red-800"
+                >
+                  ×
                 </button>
               </li>
             ))}
@@ -314,4 +380,4 @@ export default function AIToDoListApp() {
       </div>
     </div>
   );
-} 
+}

@@ -15,6 +15,13 @@ from todos import (
     complete_todo,
     health_check
 )
+from categories import (
+    Category,
+    get_categories,
+    add_category,
+    delete_category,
+    init_default_categories
+)
 
 # Set up logging with more detail
 logging.basicConfig(
@@ -98,6 +105,30 @@ async def api_complete_todo(todo_id: str):
 async def api_health_check():
     logger.info("Health check requested")
     return await health_check()
+
+@app.on_event("startup")
+async def startup_event():
+    """Initialize default categories on startup if they don't exist."""
+    await init_default_categories()
+
+# Category management endpoints
+@app.get("/categories", response_model=List[str])
+async def api_get_categories():
+    """Get all categories."""
+    logger.info("Fetching all categories")
+    return await get_categories()
+
+@app.post("/categories")
+async def api_add_category(category: Category):
+    """Add a new category."""
+    logger.info(f"Adding new category: {category.name}")
+    return await add_category(category)
+
+@app.delete("/categories/{name}")
+async def api_delete_category(name: str):
+    """Delete a category."""
+    logger.info(f"Deleting category: {name}")
+    return await delete_category(name)
 
 if __name__ == "__main__":
     import uvicorn
