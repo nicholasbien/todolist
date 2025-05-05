@@ -4,9 +4,13 @@ import logging
 from openai import OpenAI
 from dotenv import load_dotenv
 from typing import List, Dict, Any
+import time
 
 # Configure logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
 logger = logging.getLogger(__name__)
 
 # Load environment variables from .env file
@@ -16,9 +20,14 @@ load_dotenv()
 api_key = os.getenv("OPENAI_API_KEY")
 if not api_key:
     logger.error("OPENAI_API_KEY not found in environment variables!")
+    raise ValueError("OPENAI_API_KEY not found in environment variables!")
 
-# Initialize OpenAI client
-client = OpenAI(api_key=api_key)
+# Initialize OpenAI client with timeout
+client = OpenAI(
+    api_key=api_key,
+    timeout=5.0,  # 10 second timeout
+    max_retries=0
+)
 
 async def classify_task(text: str, categories: List[str] = None) -> Dict[str, Any]:
     """
@@ -41,9 +50,12 @@ async def classify_task(text: str, categories: List[str] = None) -> Dict[str, An
         logger.warning("Empty task text provided")
         return default_response
         
+    start_time = time.time()
     try:
         # Format categories for the prompt
         categories_str = ", ".join(categories)
+        
+        logger.info(f"Starting OpenAI API call for text: {text[:30]}...")
         
         # Make synchronous call since OpenAI client handles async internally
         completion = client.chat.completions.create(
@@ -61,14 +73,18 @@ async def classify_task(text: str, categories: List[str] = None) -> Dict[str, An
             temperature=0,
         )
         
+        logger.info(f"OpenAI API call completed in {time.time() - start_time:.2f} seconds")
+        
         try:
             # Safely parse JSON instead of using eval
             content = completion.choices[0].message.content
+            logger.info(f"OpenAI response content: {content}")
             result = json.loads(content)
             
             # Ensure the category is one of the available categories
             category = result.get("category", "General")
             if category not in categories:
+                logger.warning(f"Category {category} not in available categories, defaulting to General")
                 category = "General"
                 
             return {
@@ -77,8 +93,8 @@ async def classify_task(text: str, categories: List[str] = None) -> Dict[str, An
             }
         except json.JSONDecodeError as e:
             logger.error(f"Failed to parse OpenAI response as JSON: {e}")
-            logger.debug(f"Response content: {completion.choices[0].message.content}")
+            logger.error(f"Response content: {completion.choices[0].message.content}")
             return default_response
     except Exception as e:
-        logger.error(f"OpenAI API error: {str(e)}")
+        logger.error(f"OpenAI API error after {time.time() - start_time:.2f} seconds: {str(e)}")
         return default_response
