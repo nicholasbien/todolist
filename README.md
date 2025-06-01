@@ -9,6 +9,9 @@ A modern todo list application with AI-powered task classification. Built with N
 - Category management
 - Priority levels
 - Modern, responsive UI
+- **Progressive Web App (PWA)** - Install on iPhone/Android like a native app
+- **Offline functionality** - Works without internet connection
+- **Cross-platform** - Same codebase works on desktop, mobile web, and as installed app
 
 ## Prerequisites
 
@@ -84,12 +87,54 @@ npm run dev
 
 The frontend will be available at `http://localhost:3000`
 
+## PWA (Progressive Web App) Setup
+
+This application is configured as a PWA and can be installed on mobile devices like a native app.
+
+### Installing on iPhone/iPad
+
+1. **Deploy with HTTPS** (required for PWA):
+   ```bash
+   # Option 1: Quick testing with localtunnel
+   npx localtunnel --port 3000  # Frontend tunnel
+   npx localtunnel --port 8000  # Backend tunnel
+   
+   # Update frontend/.env.local with backend tunnel URL:
+   NEXT_PUBLIC_API_URL=https://your-backend-tunnel.loca.lt
+   ```
+
+2. **On iPhone**: Open Safari → Go to your HTTPS URL
+3. **Install**: Tap Share button → "Add to Home Screen"
+4. **App launches fullscreen** like a native app!
+
+### PWA Features Included
+
+- **App Manifest** (`public/manifest.json`) - Defines app metadata and icons
+- **Service Worker** (`public/sw.js`) - Enables offline functionality and caching
+- **App Icons** - Custom 192x192 and 512x512 icons with checkmark design
+- **iOS Safari optimization** - Proper meta tags for iOS home screen installation
+- **Offline support** - Basic caching allows app to load without internet
+
+### Production Deployment
+
+For permanent deployment, replace localtunnel with proper hosting:
+- **Frontend**: Vercel, Netlify, or GitHub Pages
+- **Backend**: Railway, Render, or DigitalOcean
+- **Database**: MongoDB Atlas (cloud) instead of local MongoDB
+
 ## Environment Variables
 
-Create a `.env` file in both the root directory (for frontend) and backend directory with:
-
-```
+### Frontend (.env.local)
+```bash
+NEXT_PUBLIC_API_URL=http://localhost:8000  # For local development
+# NEXT_PUBLIC_API_URL=https://your-backend-tunnel.loca.lt  # For PWA testing
 OPENAI_API_KEY=your_api_key_here
+```
+
+### Backend (.env)
+```bash
+OPENAI_API_KEY=your_api_key_here
+MONGODB_URL=mongodb://localhost:27017  # Optional, defaults to localhost
 ```
 
 Replace `your_api_key_here` with your actual OpenAI API key.

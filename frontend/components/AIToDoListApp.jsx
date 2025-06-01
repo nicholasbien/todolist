@@ -13,10 +13,16 @@ export default function AIToDoListApp() {
   const [newCat, setNewCat] = useState("");
   const [activeCat, setActiveCat] = useState("All");
 
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+  
+  // Debug logging
+  console.log('API_URL:', API_URL);
+  console.log('Environment:', process.env.NEXT_PUBLIC_API_URL);
+
   // Fetch categories from MongoDB
   const fetchCategories = async () => {
     try {
-      const response = await fetch('http://localhost:8000/categories');
+      const response = await fetch(`${API_URL}/categories`);
       if (!response.ok) {
         throw new Error('Failed to fetch categories');
       }
@@ -30,7 +36,7 @@ export default function AIToDoListApp() {
   // Fetch todos from MongoDB
   const fetchTodos = async () => {
     try {
-      const response = await fetch('http://localhost:8000/todos');
+      const response = await fetch(`${API_URL}/todos`);
       if (!response.ok) {
         throw new Error('Failed to fetch todos');
       }
@@ -56,7 +62,7 @@ export default function AIToDoListApp() {
         console.log('Classification request timed out after 5 seconds');
       }, 5000); // Reduced to 5 seconds to match backend timeout
 
-      const res = await fetch('http://localhost:8000/classify', {
+      const res = await fetch(`${API_URL}/classify`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
@@ -93,7 +99,7 @@ export default function AIToDoListApp() {
     if (!name) return;
 
     try {
-      const response = await fetch('http://localhost:8000/categories', {
+      const response = await fetch(`${API_URL}/categories`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -118,7 +124,7 @@ export default function AIToDoListApp() {
   // Delete category
   const handleDeleteCategory = async (name) => {
     try {
-      const response = await fetch(`http://localhost:8000/categories/${encodeURIComponent(name)}`, {
+      const response = await fetch(`${API_URL}/categories/${encodeURIComponent(name)}`, {
         method: 'DELETE',
       });
 
@@ -164,7 +170,7 @@ export default function AIToDoListApp() {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
 
-      const response = await fetch('http://localhost:8000/todos', {
+      const response = await fetch(`${API_URL}/todos`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -203,7 +209,7 @@ export default function AIToDoListApp() {
         return;
       }
 
-      const response = await fetch(`http://localhost:8000/todos/${id}`, {
+      const response = await fetch(`${API_URL}/todos/${id}`, {
         method: 'DELETE',
       });
 
@@ -229,7 +235,7 @@ export default function AIToDoListApp() {
         return;
       }
 
-      const response = await fetch(`http://localhost:8000/todos/${id}/complete`, {
+      const response = await fetch(`${API_URL}/todos/${id}/complete`, {
         method: 'PUT',
       });
 
