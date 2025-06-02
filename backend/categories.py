@@ -53,12 +53,28 @@ async def add_category(category: Category) -> dict:
         raise HTTPException(status_code=500, detail=f"Error adding category: {str(e)}")
 
 async def delete_category(name: str) -> dict:
-    """Delete a category from the database."""
+    """Delete a category from the database and reassign affected todos to General."""
     try:
-        result = await categories_collection.delete_one({"name": name})
-        if result.deleted_count == 0:
+        # First check if category exists
+        existing = await categories_collection.find_one({"name": name})
+        if not existing:
             raise HTTPException(status_code=404, detail="Category not found")
-        return {"message": f"Category {name} deleted successfully"}
+        
+        # Update todos that use this category to "General"
+        from todos import todos_collection
+        update_result = await todos_collection.update_many(
+            {"category": name},
+            {"$set": {"category": "General"}}
+        )
+        
+        # Delete the category
+        result = await categories_collection.delete_one({"name": name})
+        
+        message = f"Category {name} deleted successfully"
+        if update_result.modified_count > 0:
+            message += f" and {update_result.modified_count} todos moved to General"
+        
+        return {"message": message}
     except HTTPException as he:
         raise he
     except Exception as e:

@@ -13,6 +13,7 @@ export default function AIToDoListApp() {
   const [newCat, setNewCat] = useState("");
   const [activeCat, setActiveCat] = useState("All");
   const [showAddCategory, setShowAddCategory] = useState(false);
+  const [editingCategory, setEditingCategory] = useState(null);
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
   
@@ -254,6 +255,55 @@ export default function AIToDoListApp() {
     }
   };
 
+  // Update todo category
+  const handleUpdateCategory = async (todoId, newCategory) => {
+    try {
+      const response = await fetch(`${API_URL}/todos/${todoId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ category: newCategory }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to update category');
+      }
+
+      // Refresh todos list
+      await fetchTodos();
+      setEditingCategory(null);
+      setError('');
+    } catch (err) {
+      setError('Error updating category: ' + err.message);
+    }
+  };
+
+  // Update todo priority
+  const handleUpdatePriority = async (todoId, newPriority) => {
+    try {
+      const response = await fetch(`${API_URL}/todos/${todoId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ priority: newPriority }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to update priority');
+      }
+
+      // Refresh todos list
+      await fetchTodos();
+      setError('');
+    } catch (err) {
+      setError('Error updating priority: ' + err.message);
+    }
+  };
+
   // Filter todos by category
   const filteredTodos = activeCat === "All" 
     ? todos
@@ -314,7 +364,13 @@ export default function AIToDoListApp() {
           >
             All
           </button>
-          {categories.map(cat => (
+          {categories
+            .sort((a, b) => {
+              if (a === "General") return -1;
+              if (b === "General") return 1;
+              return a.localeCompare(b);
+            })
+            .map(cat => (
             <button
               key={cat}
               onClick={() => setActiveCat(cat)}
@@ -381,8 +437,51 @@ export default function AIToDoListApp() {
                   {todo.text}
                 </p>
                 <div className="text-xs mt-1">
-                  <span className={`px-2 py-1 rounded mr-2 ${todo.completed ? 'bg-gray-700 text-gray-500' : 'bg-gray-600 text-gray-200'}`}>{todo.category}</span>
-                  <span className={`px-2 py-1 rounded ${todo.completed ? 'bg-gray-700 text-gray-500' : 'bg-gray-600 text-gray-200'}`}>{todo.priority}</span>
+                  {editingCategory === todo._id ? (
+                    <select
+                      value={todo.category}
+                      onChange={(e) => handleUpdateCategory(todo._id, e.target.value)}
+                      onBlur={() => setEditingCategory(null)}
+                      className="px-2 py-1 rounded mr-2 bg-gray-800 text-white border border-gray-600 text-xs"
+                      autoFocus
+                      onClick={(e) => e.target.focus()}
+                    >
+                      {categories
+                        .sort((a, b) => {
+                          if (a === "General") return -1;
+                          if (b === "General") return 1;
+                          return a.localeCompare(b);
+                        })
+                        .map(cat => (
+                        <option key={cat} value={cat}>{cat}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <select
+                      value={todo.category}
+                      onChange={(e) => handleUpdateCategory(todo._id, e.target.value)}
+                      className={`px-2 py-1 rounded mr-2 cursor-pointer text-xs appearance-none ${todo.completed ? 'bg-gray-700 text-gray-500' : 'bg-gray-600 text-gray-200'}`}
+                    >
+                      {categories
+                        .sort((a, b) => {
+                          if (a === "General") return -1;
+                          if (b === "General") return 1;
+                          return a.localeCompare(b);
+                        })
+                        .map(cat => (
+                        <option key={cat} value={cat}>{cat}</option>
+                      ))}
+                    </select>
+                  )}
+                  <select
+                    value={todo.priority}
+                    onChange={(e) => handleUpdatePriority(todo._id, e.target.value)}
+                    className={`px-2 py-1 rounded cursor-pointer text-xs appearance-none min-w-16 ${todo.completed ? 'bg-gray-700 text-gray-500' : 'bg-gray-600 text-gray-200'}`}
+                  >
+                    <option value="High">High</option>
+                    <option value="Medium">Medium</option>
+                    <option value="Low">Low</option>
+                  </select>
                 </div>
               </div>
               <div className="flex space-x-2 ml-3">

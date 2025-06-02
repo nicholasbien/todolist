@@ -126,6 +126,32 @@ async def complete_todo(todo_id: str):
         logger.error(f"Error updating todo: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error updating todo: {str(e)}")
 
+async def update_todo_fields(todo_id: str, updates: dict):
+    try:
+        # Check if todo_id is valid
+        if not todo_id or todo_id == "None" or todo_id == "undefined":
+            raise HTTPException(status_code=400, detail="Invalid todo ID")
+            
+        try:
+            object_id = ObjectId(todo_id)
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Invalid todo ID format: {todo_id}")
+        
+        # Update the todo with provided fields
+        result = await todos_collection.update_one(
+            {"_id": object_id},
+            {"$set": updates}
+        )
+        if result.modified_count == 1:
+            updated_fields = ", ".join(f"{k} to {v}" for k, v in updates.items())
+            return {"message": f"Todo updated: {updated_fields}"}
+        raise HTTPException(status_code=404, detail="Todo not found")
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        logger.error(f"Error updating todo: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error updating todo: {str(e)}")
+
 async def health_check():
     try:
         await db.command("ping")

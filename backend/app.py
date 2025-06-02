@@ -13,6 +13,7 @@ from todos import (
     create_todo,
     delete_todo,
     complete_todo,
+    update_todo_fields,
     health_check
 )
 from categories import (
@@ -100,6 +101,27 @@ async def api_delete_todo(todo_id: str):
 async def api_complete_todo(todo_id: str):
     logger.info(f"Marking todo as complete with ID: {todo_id}")
     return await complete_todo(todo_id)
+
+@app.put("/todos/{todo_id}")
+async def api_update_todo(todo_id: str, request: Request):
+    try:
+        body = await request.json()
+        
+        # Build updates dict from request body
+        updates = {}
+        if "category" in body:
+            updates["category"] = body["category"]
+        if "priority" in body:
+            updates["priority"] = body["priority"]
+        
+        if not updates:
+            raise HTTPException(status_code=400, detail="No valid fields to update")
+        
+        logger.info(f"Updating todo {todo_id} with: {updates}")
+        return await update_todo_fields(todo_id, updates)
+    except Exception as e:
+        logger.error(f"Error updating todo: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error updating todo: {str(e)}")
 
 @app.get("/health")
 async def api_health_check():
