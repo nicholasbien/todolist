@@ -304,10 +304,22 @@ export default function AIToDoListApp() {
     }
   };
 
-  // Filter todos by category
-  const filteredTodos = activeCat === "All" 
+  // Filter and sort todos by category
+  const filteredTodos = (activeCat === "All" 
     ? todos
-    : todos.filter(todo => todo.category === activeCat);
+    : todos.filter(todo => todo.category === activeCat))
+    .sort((a, b) => {
+      // First sort by priority (High > Medium > Low)
+      const priorityOrder = { 'High': 3, 'Medium': 2, 'Low': 1 };
+      const priorityDiff = (priorityOrder[b.priority] || 0) - (priorityOrder[a.priority] || 0);
+      
+      if (priorityDiff !== 0) {
+        return priorityDiff;
+      }
+      
+      // Then sort by date (most recent first)
+      return new Date(b.dateAdded) - new Date(a.dateAdded);
+    });
 
   return (
     <div className="container mx-auto p-4 max-w-md">
@@ -476,12 +488,15 @@ export default function AIToDoListApp() {
                   <select
                     value={todo.priority}
                     onChange={(e) => handleUpdatePriority(todo._id, e.target.value)}
-                    className={`px-2 py-1 rounded cursor-pointer text-xs appearance-none min-w-16 ${todo.completed ? 'bg-gray-700 text-gray-500' : 'bg-gray-600 text-gray-200'}`}
+                    className={`px-2 py-1 rounded mr-2 cursor-pointer text-xs appearance-none min-w-16 ${todo.completed ? 'bg-gray-700 text-gray-500' : 'bg-gray-600 text-gray-200'}`}
                   >
                     <option value="High">High</option>
                     <option value="Medium">Medium</option>
                     <option value="Low">Low</option>
                   </select>
+                  <span className={`text-xs ${todo.completed ? 'text-gray-500' : 'text-gray-400'}`}>
+                    {todo.dateAdded}
+                  </span>
                 </div>
               </div>
               <div className="flex space-x-2 ml-3">
