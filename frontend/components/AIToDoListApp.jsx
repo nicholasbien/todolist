@@ -12,6 +12,7 @@ export default function AIToDoListApp() {
   const [error, setError] = useState("");
   const [newCat, setNewCat] = useState("");
   const [activeCat, setActiveCat] = useState("All");
+  const [showAddCategory, setShowAddCategory] = useState(false);
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
   
@@ -115,6 +116,7 @@ export default function AIToDoListApp() {
       // Refresh categories
       await fetchCategories();
       setNewCat("");
+      setShowAddCategory(false);
       setError('');
     } catch (err) {
       setError('Error adding category: ' + err.message);
@@ -258,8 +260,8 @@ export default function AIToDoListApp() {
     : todos.filter(todo => todo.category === activeCat);
 
   return (
-    <div className="container mx-auto p-4 max-w-4xl">
-      <h1 className="text-3xl font-bold mb-6">AI Todo List</h1>
+    <div className="container mx-auto p-4 max-w-md">
+      <h1 className="text-2xl font-bold mb-6 text-center">AI Todo List</h1>
       
       {error && (
         <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
@@ -267,122 +269,141 @@ export default function AIToDoListApp() {
         </div>
       )}
 
-      <div className="flex gap-8">
-        {/* Category Sidebar */}
-        <div className="w-64">
-          <h2 className="text-xl font-semibold mb-4">Categories</h2>
-          <ul className="space-y-2 mb-4">
-            <li>
-              <button
-                onClick={() => setActiveCat("All")}
-                className={`w-full text-left px-3 py-2 rounded ${
-                  activeCat === "All"
-                    ? "bg-blue-500 text-white"
-                    : "hover:bg-gray-100"
-                }`}
-              >
-                All
-              </button>
-            </li>
-            {categories.map(cat => (
-              <li key={cat} className="flex items-center">
-                <button
-                  onClick={() => setActiveCat(cat)}
-                  className={`flex-grow text-left px-3 py-2 rounded ${
-                    cat === activeCat
-                      ? "bg-blue-500 text-white"
-                      : "hover:bg-gray-100"
-                  }`}
-                >
-                  {cat}
-                </button>
-                <button
-                  onClick={() => handleDeleteCategory(cat)}
-                  className="ml-2 text-red-600 hover:text-red-800"
-                >
-                  ×
-                </button>
-              </li>
-            ))}
-          </ul>
-          
-          <div className="mt-4">
+      {/* Add new todo */}
+      <div className="mb-6">
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={newTodo}
+            onChange={(e) => setNewTodo(e.target.value)}
+            placeholder="Add a new task..."
+            className="flex-1 p-3 border border-gray-700 rounded bg-gray-800 text-white placeholder-gray-400"
+            onKeyPress={(e) => e.key === 'Enter' && handleAddTodo()}
+          />
+          <button
+            onClick={handleAddTodo}
+            disabled={loading}
+            className="bg-blue-500 text-white w-12 h-12 rounded hover:bg-blue-600 disabled:bg-blue-300 flex items-center justify-center"
+          >
+            {loading ? '...' : '+'}
+          </button>
+        </div>
+      </div>
+
+      {/* Categories - Horizontal wrapping pills */}
+      <div className="mb-6">
+        <div className="flex items-center mb-3">
+          <h2 className="text-lg font-semibold">{activeCat}</h2>
+          {activeCat !== "All" && (
+            <button
+              onClick={() => handleDeleteCategory(activeCat)}
+              className="ml-2 text-red-600 hover:text-red-800 text-lg"
+            >
+              ×
+            </button>
+          )}
+        </div>
+        <div className="flex flex-wrap gap-2 mb-4">
+          <button
+            onClick={() => setActiveCat("All")}
+            className={`px-3 py-1 rounded-full text-sm ${
+              activeCat === "All"
+                ? "bg-blue-500 text-white"
+                : "bg-gray-700 text-white hover:bg-gray-600"
+            }`}
+          >
+            All
+          </button>
+          {categories.map(cat => (
+            <button
+              key={cat}
+              onClick={() => setActiveCat(cat)}
+              className={`px-3 py-1 rounded-full text-sm ${
+                cat === activeCat
+                  ? "bg-blue-500 text-white"
+                  : "bg-gray-700 text-white hover:bg-gray-600"
+              }`}
+            >
+              {cat}
+            </button>
+          ))}
+          <button
+            onClick={() => setShowAddCategory(!showAddCategory)}
+            className="px-3 py-1 rounded-full text-sm bg-gray-700 text-white hover:bg-gray-600"
+          >
+            +
+          </button>
+        </div>
+        
+        {/* Add category input - expandable */}
+        {showAddCategory && (
+          <div className="flex gap-2 mt-2">
             <input
               type="text"
               placeholder="New category"
               value={newCat}
               onChange={e => setNewCat(e.target.value)}
               onKeyPress={e => e.key === 'Enter' && handleAddCategory()}
-              className="w-full p-2 border rounded mb-2"
+              className="flex-1 p-2 border border-gray-700 rounded text-sm bg-gray-800 text-white placeholder-gray-400"
+              autoFocus
             />
             <button
               onClick={handleAddCategory}
-              className="w-full bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600"
+              className="bg-gray-500 text-white px-3 py-2 rounded hover:bg-gray-600 text-sm"
             >
-              Add Category
+              Add
             </button>
-          </div>
-        </div>
-
-        {/* Main Content */}
-        <div className="flex-1">
-          <div className="mb-6">
-            <input
-              type="text"
-              value={newTodo}
-              onChange={(e) => setNewTodo(e.target.value)}
-              placeholder="Add a new task..."
-              className="w-full p-2 border rounded"
-              onKeyPress={(e) => e.key === 'Enter' && handleAddTodo()}
-            />
             <button
-              onClick={handleAddTodo}
-              disabled={loading}
-              className="mt-2 bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 disabled:bg-blue-300"
+              onClick={() => {
+                setShowAddCategory(false);
+                setNewCat("");
+              }}
+              className="bg-gray-300 text-gray-700 px-3 py-2 rounded hover:bg-gray-400 text-sm"
             >
-              {loading ? 'Adding...' : 'Add Task'}
+              Cancel
             </button>
           </div>
+        )}
+      </div>
 
-          <div className="space-y-4">
-            {filteredTodos.map((todo) => (
-              <div
-                key={todo._id}
-                className={`p-4 border rounded ${
-                  todo.completed ? 'bg-gray-100' : 'bg-white'
-                }`}
-              >
-                <div className="flex justify-between items-start">
-                  <div>
-                    <p className={`text-lg ${todo.completed ? 'line-through' : ''}`}>
-                      {todo.text}
-                    </p>
-                    <div className="text-sm text-gray-600 mt-1">
-                      <span className="mr-2">Category: {todo.category}</span>
-                      <span>Priority: {todo.priority}</span>
-                    </div>
-                  </div>
-                  <div className="flex space-x-2">
-                    {!todo.completed && (
-                      <button
-                        onClick={() => handleCompleteTodo(todo._id)}
-                        className="text-green-600 hover:text-green-800"
-                      >
-                        Complete
-                      </button>
-                    )}
-                    <button
-                      onClick={() => handleDeleteTodo(todo._id)}
-                      className="text-red-600 hover:text-red-800"
-                    >
-                      Delete
-                    </button>
-                  </div>
+      {/* Todo list */}
+      <div className="space-y-3">
+        {filteredTodos.map((todo) => (
+          <div
+            key={todo._id}
+            className={`p-4 border rounded-lg ${
+              todo.completed ? 'bg-gray-200 border-gray-200' : 'bg-gray-700 text-white border-gray-700'
+            }`}
+          >
+            <div className="flex justify-between items-start">
+              <div className="flex-1">
+                <p className={`text-base ${todo.completed ? 'line-through' : ''}`}>
+                  {todo.text}
+                </p>
+                <div className="text-xs mt-1">
+                  <span className={`px-2 py-1 rounded mr-2 ${todo.completed ? 'bg-gray-300 text-gray-700' : 'bg-gray-600 text-gray-200'}`}>{todo.category}</span>
+                  <span className={`px-2 py-1 rounded ${todo.completed ? 'bg-gray-300 text-gray-700' : 'bg-gray-600 text-gray-200'}`}>{todo.priority}</span>
                 </div>
               </div>
-            ))}
+              <div className="flex flex-col space-y-1 ml-3">
+                {!todo.completed && (
+                  <button
+                    onClick={() => handleCompleteTodo(todo._id)}
+                    className="text-green-600 hover:text-green-800 text-sm"
+                  >
+                    ✓
+                  </button>
+                )}
+                <button
+                  onClick={() => handleDeleteTodo(todo._id)}
+                  className="text-red-600 hover:text-red-800 text-sm"
+                >
+                  ×
+                </button>
+              </div>
+            </div>
           </div>
-        </div>
+        ))}
       </div>
     </div>
   );
