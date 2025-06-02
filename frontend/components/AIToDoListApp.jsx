@@ -165,7 +165,7 @@ export default function AIToDoListApp() {
         text: newTodo,
         category: category,
         priority: priority,
-        dateAdded: new Date().toISOString().split('T')[0],
+        dateAdded: new Date().toISOString(),
         completed: false
       };
 
@@ -495,7 +495,7 @@ export default function AIToDoListApp() {
                     <option value="Low">Low</option>
                   </select>
                   <span className={`text-xs ${todo.completed ? 'text-gray-500' : 'text-gray-400'}`}>
-                    {todo.dateAdded}
+                    {new Date(todo.dateAdded).toLocaleDateString()}
                   </span>
                 </div>
               </div>
