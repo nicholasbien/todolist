@@ -35,6 +35,7 @@ class Todo(BaseModel):
     class Config:
         arbitrary_types_allowed = True
         json_encoders = {ObjectId: str}
+        allow_population_by_field_name = True
 
 async def create_todo(todo: Todo):
     try:
@@ -64,7 +65,8 @@ async def get_todos():
         async for todo in cursor:
             # Ensure _id is properly converted to string
             todo["_id"] = str(todo["_id"])
-            todos.append(Todo(**todo))
+            todo_obj = Todo(**todo)
+            todos.append(todo_obj)
         return todos
     except Exception as e:
         logger.error(f"Error fetching todos: {str(e)}")
@@ -101,13 +103,22 @@ async def complete_todo(todo_id: str):
             object_id = ObjectId(todo_id)
         except Exception as e:
             raise HTTPException(status_code=400, detail=f"Invalid todo ID format: {todo_id}")
-            
+        
+        # First get the current todo to check its completion status
+        todo = await todos_collection.find_one({"_id": object_id})
+        if not todo:
+            raise HTTPException(status_code=404, detail="Todo not found")
+        
+        # Toggle the completion status
+        new_completed_status = not todo.get("completed", False)
+        
         result = await todos_collection.update_one(
             {"_id": object_id},
-            {"$set": {"completed": True}}
+            {"$set": {"completed": new_completed_status}}
         )
         if result.modified_count == 1:
-            return {"message": "Todo marked as complete"}
+            status = "complete" if new_completed_status else "incomplete"
+            return {"message": f"Todo marked as {status}"}
         raise HTTPException(status_code=404, detail="Todo not found")
     except HTTPException as he:
         raise he

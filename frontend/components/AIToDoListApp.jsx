@@ -17,8 +17,8 @@ export default function AIToDoListApp() {
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
   
   // Debug logging
-  console.log('API_URL:', API_URL);
-  console.log('Environment:', process.env.NEXT_PUBLIC_API_URL);
+  // console.log('API_URL:', API_URL);
+  // console.log('Environment:', process.env.NEXT_PUBLIC_API_URL);
 
   // Fetch categories from MongoDB
   const fetchCategories = async () => {
@@ -372,7 +372,7 @@ export default function AIToDoListApp() {
           <div
             key={todo._id}
             className={`p-4 border rounded-lg ${
-              todo.completed ? 'bg-gray-200 border-gray-200' : 'bg-gray-700 text-white border-gray-700'
+              todo.completed ? 'bg-gray-800 border-gray-800 text-gray-400' : 'bg-gray-700 text-white border-gray-700'
             }`}
           >
             <div className="flex justify-between items-start">
@@ -381,22 +381,29 @@ export default function AIToDoListApp() {
                   {todo.text}
                 </p>
                 <div className="text-xs mt-1">
-                  <span className={`px-2 py-1 rounded mr-2 ${todo.completed ? 'bg-gray-300 text-gray-700' : 'bg-gray-600 text-gray-200'}`}>{todo.category}</span>
-                  <span className={`px-2 py-1 rounded ${todo.completed ? 'bg-gray-300 text-gray-700' : 'bg-gray-600 text-gray-200'}`}>{todo.priority}</span>
+                  <span className={`px-2 py-1 rounded mr-2 ${todo.completed ? 'bg-gray-700 text-gray-500' : 'bg-gray-600 text-gray-200'}`}>{todo.category}</span>
+                  <span className={`px-2 py-1 rounded ${todo.completed ? 'bg-gray-700 text-gray-500' : 'bg-gray-600 text-gray-200'}`}>{todo.priority}</span>
                 </div>
               </div>
-              <div className="flex flex-col space-y-1 ml-3">
-                {!todo.completed && (
+              <div className="flex space-x-2 ml-3">
+                {!todo.completed ? (
                   <button
                     onClick={() => handleCompleteTodo(todo._id)}
-                    className="text-green-600 hover:text-green-800 text-sm"
+                    className="text-green-600 hover:text-green-800 text-lg w-8 h-8 flex items-center justify-center"
                   >
                     ✓
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => handleCompleteTodo(todo._id)}
+                    className="text-yellow-600 hover:text-yellow-800 text-lg w-8 h-8 flex items-center justify-center"
+                  >
+                    ↻
                   </button>
                 )}
                 <button
                   onClick={() => handleDeleteTodo(todo._id)}
-                  className="text-red-600 hover:text-red-800 text-sm"
+                  className="text-red-600 hover:text-red-800 text-lg w-8 h-8 flex items-center justify-center"
                 >
                   ×
                 </button>
