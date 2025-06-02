@@ -115,26 +115,91 @@ This application is configured as a PWA and can be installed on mobile devices l
 - **iOS Safari optimization** - Proper meta tags for iOS home screen installation
 - **Offline support** - Basic caching allows app to load without internet
 
-### Production Deployment
+## Production Deployment with Railway
 
-For permanent deployment, replace localtunnel with proper hosting:
+This application is configured for easy deployment on Railway with separate frontend and backend services.
+
+### Deployment Files Added
+
+- `backend/railway.json` - Backend service configuration
+- `backend/Procfile` - Process definition for backend
+- `backend/runtime.txt` - Python version specification
+- `frontend/railway.json` - Frontend service configuration  
+- `frontend/nixpacks.toml` - Node.js build configuration
+- `frontend/.eslintrc.json` - ESLint configuration for build process
+
+### Railway Deployment Steps
+
+1. **Connect Repository**: Link your GitHub repo to Railway
+
+2. **Create Two Services**:
+   - **Backend Service**: 
+     - Set Root Directory: `backend`
+     - Railway auto-detects Python and uses `railway.json` config
+   - **Frontend Service**:
+     - Set Root Directory: `frontend` 
+     - Railway auto-detects Node.js and uses Nixpacks for build
+
+3. **Environment Variables**:
+   - **Backend Service**:
+     ```
+     OPENAI_API_KEY=your_api_key_here
+     MONGODB_URL=mongodb+srv://user:pass@cluster.mongodb.net/todo_db
+     ```
+   - **Frontend Service**: No environment variables needed
+
+4. **Database Setup**:
+   - Option A: Add Railway MongoDB service, copy connection URL to `MONGODB_URL`
+   - Option B: Use MongoDB Atlas free tier, set connection string as `MONGODB_URL`
+
+5. **Deploy**: Both services deploy automatically on git push
+
+### Deployment Configuration Details
+
+- **Backend** (`backend/railway.json`):
+  - Uses Nixpacks builder
+  - Installs dependencies: `pip install -r requirements.txt`
+  - Starts with: `python app.py` (automatically uses Railway's PORT)
+  - Restart policy: ON_FAILURE
+
+- **Frontend** (`frontend/railway.json` + `nixpacks.toml`):
+  - Uses Node.js 18
+  - Installs: `npm install`
+  - Builds: `npm run build` 
+  - Starts: `npm start`
+
+### Alternative Deployment Options
+
+For other hosting platforms:
 - **Frontend**: Vercel, Netlify, or GitHub Pages
-- **Backend**: Railway, Render, or DigitalOcean
+- **Backend**: Render, DigitalOcean, or Heroku
 - **Database**: MongoDB Atlas (cloud) instead of local MongoDB
 
 ## Environment Variables
 
-### Frontend (.env.local)
+### Local Development
+
+#### Frontend (.env.local)
 ```bash
 NEXT_PUBLIC_API_URL=http://localhost:8000  # For local development
 # NEXT_PUBLIC_API_URL=https://your-backend-tunnel.loca.lt  # For PWA testing
-OPENAI_API_KEY=your_api_key_here
 ```
 
-### Backend (.env)
+#### Backend (.env)
 ```bash
 OPENAI_API_KEY=your_api_key_here
 MONGODB_URL=mongodb://localhost:27017  # Optional, defaults to localhost
+```
+
+### Production (Railway)
+
+#### Frontend Service
+No environment variables needed - frontend calls backend via relative URLs
+
+#### Backend Service  
+```bash
+OPENAI_API_KEY=your_api_key_here
+MONGODB_URL=mongodb+srv://user:pass@cluster.mongodb.net/todo_db
 ```
 
 Replace `your_api_key_here` with your actual OpenAI API key.
