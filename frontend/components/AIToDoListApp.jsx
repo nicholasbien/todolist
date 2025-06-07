@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from "react";
-import { useRouter } from 'next/router';
 
 /**
  * AI-Todo main component
  * Fetches classification from /api/classify
  */
-export default function AIToDoListApp() {
+export default function AIToDoListApp({ user, token }) {
   const [todos, setTodos] = useState([]);
   const [newTodo, setNewTodo] = useState("");
   const [categories, setCategories] = useState([]);
@@ -15,9 +14,6 @@ export default function AIToDoListApp() {
   const [activeCat, setActiveCat] = useState("All");
   const [showAddCategory, setShowAddCategory] = useState(false);
   const [editingCategory, setEditingCategory] = useState(null);
-  const [user, setUser] = useState(null);
-  const [token, setToken] = useState(null);
-  const router = useRouter();
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
   
@@ -25,16 +21,6 @@ export default function AIToDoListApp() {
   // console.log('API_URL:', API_URL);
   // console.log('Environment:', process.env.NEXT_PUBLIC_API_URL);
 
-  // Load authentication data on mount
-  useEffect(() => {
-    const storedToken = localStorage.getItem('auth_token');
-    const storedUser = localStorage.getItem('auth_user');
-    
-    if (storedToken && storedUser) {
-      setToken(storedToken);
-      setUser(JSON.parse(storedUser));
-    }
-  }, []);
 
   // Helper function for authenticated requests
   const authenticatedFetch = async (url, options = {}) => {
@@ -52,19 +38,10 @@ export default function AIToDoListApp() {
     });
 
     if (response.status === 401) {
-      localStorage.removeItem('auth_token');
-      localStorage.removeItem('auth_user');
-      router.push('/login');
       throw new Error('Authentication expired');
     }
 
     return response;
-  };
-
-  const handleLogout = () => {
-    localStorage.removeItem('auth_token');
-    localStorage.removeItem('auth_user');
-    router.push('/login');
   };
 
   // Fetch categories from MongoDB
@@ -357,29 +334,8 @@ export default function AIToDoListApp() {
       return new Date(b.dateAdded) - new Date(a.dateAdded);
     });
 
-  // Don't render if not authenticated
-  if (!user || !token) {
-    return (
-      <div className="container mx-auto p-4 max-w-md">
-        <div className="animate-pulse">Loading...</div>
-      </div>
-    );
-  }
-
   return (
-    <div className="container mx-auto p-4 max-w-md">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">AI Todo List</h1>
-        <div className="flex items-center space-x-4">
-          <span className="text-sm text-gray-400">Hello, {user.email}</span>
-          <button 
-            onClick={handleLogout}
-            className="text-blue-400 hover:text-blue-300 text-sm underline"
-          >
-            Logout
-          </button>
-        </div>
-      </div>
+    <div>
       
       {error && (
         <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
