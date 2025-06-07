@@ -359,6 +359,15 @@ self.addEventListener('message', (event) => {
   }
 });
 
+// Message event - handle communication with main thread
+self.addEventListener('message', (event) => {
+  // Handle any messages from the main thread
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
+  // Don't return true unless you send a response
+});
+
 // Activate event - clean up old caches
 self.addEventListener('activate', (event) => {
   event.waitUntil(
