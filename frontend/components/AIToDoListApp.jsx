@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 
 /**
  * AI-Todo main component
@@ -14,6 +14,7 @@ export default function AIToDoListApp({ user, token }) {
   const [activeCat, setActiveCat] = useState("All");
   const [showAddCategory, setShowAddCategory] = useState(false);
   const [editingCategory, setEditingCategory] = useState(null);
+  const [isOffline, setIsOffline] = useState(false);
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
   
@@ -45,7 +46,7 @@ export default function AIToDoListApp({ user, token }) {
   };
 
   // Fetch categories from MongoDB
-  const fetchCategories = async () => {
+  const fetchCategories = useCallback(async () => {
     try {
       const response = await authenticatedFetch(`${API_URL}/categories`);
       if (!response?.ok) {
@@ -56,10 +57,10 @@ export default function AIToDoListApp({ user, token }) {
     } catch (err) {
       setError('Error loading categories: ' + err.message);
     }
-  };
+  }, [API_URL, token]);
 
   // Fetch todos from MongoDB
-  const fetchTodos = async () => {
+  const fetchTodos = useCallback(async () => {
     try {
       const response = await authenticatedFetch(`${API_URL}/todos`);
       if (!response?.ok) {
@@ -70,7 +71,25 @@ export default function AIToDoListApp({ user, token }) {
     } catch (err) {
       setError('Error loading todos: ' + err.message);
     }
-  };
+  }, [API_URL, token]);
+
+  // Monitor online/offline status
+  useEffect(() => {
+    const updateOnlineStatus = () => {
+      setIsOffline(!navigator.onLine);
+    };
+
+    window.addEventListener('online', updateOnlineStatus);
+    window.addEventListener('offline', updateOnlineStatus);
+    
+    // Set initial status
+    updateOnlineStatus();
+
+    return () => {
+      window.removeEventListener('online', updateOnlineStatus);
+      window.removeEventListener('offline', updateOnlineStatus);
+    };
+  }, []);
 
   // Load todos and categories when token is available
   useEffect(() => {
@@ -78,7 +97,7 @@ export default function AIToDoListApp({ user, token }) {
       fetchTodos();
       fetchCategories();
     }
-  }, [token]);
+  }, [token, fetchTodos, fetchCategories]);
 
   // Classify task using AI
   async function classify(text) {
@@ -116,7 +135,7 @@ export default function AIToDoListApp({ user, token }) {
       if (error.name === 'AbortError') {
         console.log('Request was aborted due to timeout');
       }
-      return { category: 'General', priority: 'Low' };
+      return { category: 'General', priority: 'Medium' };
     }
   }
 
@@ -340,6 +359,12 @@ export default function AIToDoListApp({ user, token }) {
       {error && (
         <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
           {error}
+        </div>
+      )}
+
+      {isOffline && (
+        <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded mb-4">
+          📴 You&apos;re offline. Changes will sync when connection is restored.
         </div>
       )}
 
