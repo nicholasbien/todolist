@@ -258,8 +258,25 @@ NEXT_PUBLIC_API_URL=http://localhost:8000
 - Sanitized error logging (no SMTP credential exposure)
 - Admin-only endpoints for bulk operations
 
+## Deployment
+
+### Railway Deployment
+A deployment script is available but should **NOT** be run by AI agents:
+
+```bash
+# HUMAN USE ONLY - DO NOT RUN AS AI AGENT
+./deploy.sh
+```
+
+The script deploys both backend and frontend services to Railway. Manual deployment steps:
+
+1. Ensure Railway CLI is installed and authenticated
+2. Configure environment variables in Railway dashboard
+3. Run deployment script from project root
+
 ### Deployment Considerations
-- Environment variables must be configured
+- Environment variables must be configured in Railway dashboard
 - MongoDB connection required
 - SMTP credentials needed for email functionality
 - Daily email scheduler runs automatically at 9 AM Eastern
+- Backend has restart policy ON_FAILURE for automatic recovery
