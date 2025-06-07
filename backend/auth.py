@@ -35,9 +35,9 @@ JWT_EXPIRATION_HOURS = 24 * 7  # 7 days
 # Email settings
 SMTP_SERVER = os.getenv("SMTP_SERVER", "smtp.gmail.com")
 SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
-SMTP_USERNAME = os.getenv("SMTP_USERNAME")
+FROM_EMAIL = os.getenv("FROM_EMAIL")
+SMTP_USERNAME = FROM_EMAIL  # Use FROM_EMAIL as username
 SMTP_PASSWORD = os.getenv("SMTP_PASSWORD")
-FROM_EMAIL = os.getenv("FROM_EMAIL", SMTP_USERNAME)
 
 # Pydantic models
 class User(BaseModel):
