@@ -23,16 +23,15 @@ A modern todo list application with AI-powered task classification. Built with N
 
 ```
 .
-├── components/           # Frontend React components
-│   └── AIToDoListApp.jsx
-├── pages/               # Next.js pages
-│   └── api/
-│       └── classify.js
-├── backend/             # Python FastAPI backend
+├── frontend/
+│   ├── components/           # Frontend React components
+│   │   └── AIToDoListApp.jsx
+│   └── pages/                # Next.js pages
+├── backend/                  # Python FastAPI backend
 │   ├── app.py
 │   └── classify.py
-├── requirements.txt     # Python dependencies
-└── .env                 # Environment variables
+├── requirements.txt          # Python dependencies
+└── .env                      # Environment variables
 ```
 
 ## Setup Instructions
