@@ -380,7 +380,7 @@ export default function AIToDoListApp({ user, token }) {
         <div className="flex flex-wrap gap-2 mb-4">
           <button
             onClick={() => setActiveCat("All")}
-            className={`px-3 py-1 rounded-full text-sm ${
+            className={`px-4 py-2 rounded-full text-base ${
               activeCat === "All"
                 ? "bg-blue-500 text-white"
                 : "bg-gray-700 text-white hover:bg-gray-600"
@@ -398,7 +398,7 @@ export default function AIToDoListApp({ user, token }) {
             <button
               key={cat}
               onClick={() => setActiveCat(cat)}
-              className={`px-3 py-1 rounded-full text-sm ${
+              className={`px-4 py-2 rounded-full text-base ${
                 cat === activeCat
                   ? "bg-blue-500 text-white"
                   : "bg-gray-700 text-white hover:bg-gray-600"
@@ -409,7 +409,7 @@ export default function AIToDoListApp({ user, token }) {
           ))}
           <button
             onClick={() => setShowAddCategory(!showAddCategory)}
-            className="px-3 py-1 rounded-full text-sm bg-gray-700 text-white hover:bg-gray-600"
+            className="px-4 py-2 rounded-full text-base bg-gray-700 text-white hover:bg-gray-600"
           >
             +
           </button>
