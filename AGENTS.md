@@ -131,14 +131,32 @@ cd frontend
 cd backend
 source venv/bin/activate
 
-# Run existing tests
-python test_auth.py
-python test_auth_automated.py
-python test_email.py
+# Install test dependencies
+pip install -r requirements.txt
 
-# Run with pytest (if installed)
+# Run all pytest tests (automated)
 pytest
+
+# Run specific test categories
+pytest tests/test_auth.py -v                     # All auth tests
+pytest tests/test_auth.py::TestAuthentication -v # Basic auth tests only
+pytest -m "not integration" -v                   # Skip integration tests
+
+# Run manual tests (require interactive input)
+python manual_tests/auth_manual.py
+python manual_tests/email_manual.py  # Only if SMTP configured
 ```
+
+**Test Structure:**
+- `tests/` - Pytest-compatible automated tests
+- `manual_tests/` - Manual tests requiring user interaction or special setup
+- Integration tests marked with `@pytest.mark.integration`
+
+**⚠️ IMPORTANT FOR AI AGENTS**:
+- **DO NOT RUN** files in `manual_tests/` directory - they require interactive input or SMTP connections
+- **DO NOT RUN** integration tests in agent environments - use `pytest -m "not integration"`
+- Pytest automatically excludes manual tests (only looks in `tests/` directory)
+- Use `pytest --tb=short` for concise output in agent environments
 
 ## Architecture
 

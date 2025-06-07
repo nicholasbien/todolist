@@ -1,90 +1,161 @@
 # AI-Powered Todo List Application
 
-A modern todo list application with AI-powered task classification. Built with Next.js for the frontend and FastAPI for the backend.
+A modern todo list application with AI-powered task classification, email verification authentication, and daily email summaries. Built with Next.js for the frontend and FastAPI for the backend.
 
 ## Features
 
-- AI-powered task classification
-- Drag-and-drop task organization
-- Category management
-- Priority levels
-- Modern, responsive UI
+- **AI-powered task classification** using OpenAI GPT-4o-mini
+- **Email verification authentication** with JWT sessions
+- **Daily email summaries** with AI-generated insights
+- **Category and priority management**
 - **Progressive Web App (PWA)** - Install on iPhone/Android like a native app
 - **Offline functionality** - Works without internet connection
-- **Cross-platform** - Same codebase works on desktop, mobile web, and as installed app
+- **User isolation** - Each user sees only their own todos
+- **Modern, responsive UI** with Tailwind CSS
+- **Comprehensive testing** with pytest and manual testing
 
 ## Prerequisites
 
-- Node.js (v14 or later)
-- Python (v3.8 or later)
+- Node.js (v18 or later)
+- Python (v3.9 or later)
+- MongoDB (local or cloud)
 - OpenAI API key
+- SMTP credentials (for email functionality)
+
+## Quick Setup
+
+Run the automated setup script:
+
+```bash
+./setup.sh
+```
+
+Then configure your environment variables (see below) and start the servers.
 
 ## Project Structure
 
 ```
 .
-├── frontend/
-│   ├── components/           # Frontend React components
-│   │   └── AIToDoListApp.jsx
-│   └── pages/                # Next.js pages
-├── backend/                  # Python FastAPI backend
-│   ├── app.py
-│   └── classify.py
-├── requirements.txt          # Python dependencies
-└── .env                      # Environment variables
+├── frontend/                 # Next.js React frontend
+│   ├── components/           # React components
+│   │   ├── AIToDoListApp.jsx # Main todo interface
+│   │   └── AuthForm.jsx      # Login/signup form
+│   ├── context/             # Authentication context
+│   ├── pages/               # Next.js pages
+│   └── public/              # PWA assets and service worker
+├── backend/                 # FastAPI Python backend
+│   ├── app.py               # Main FastAPI application
+│   ├── auth.py              # Authentication system
+│   ├── todos.py             # Todo CRUD operations
+│   ├── classify.py          # AI task classification
+│   ├── email_summary.py     # Daily email summaries
+│   ├── scheduler.py         # Background job scheduling
+│   ├── tests/               # Automated pytest tests
+│   └── manual_tests/        # Manual interactive tests
+├── setup.sh                 # Automated setup script
+└── deploy.sh                # Railway deployment script
 ```
 
-## Setup Instructions
+## Manual Setup
 
-### 1. Frontend Setup
-
-```bash
-# Install dependencies
-npm install
-
-# Create a .env.local file in the root directory
-echo "OPENAI_API_KEY=your_api_key_here" > .env.local
-```
-
-### 2. Backend Setup
+### Backend Setup
 
 ```bash
-# Create and activate a virtual environment
-python -m venv venv
+cd backend
+
+# Create virtual environment
+python3 -m venv venv
+
+# Activate virtual environment
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 
-# Install Python dependencies
+# Install dependencies
 pip install -r requirements.txt
 
-# Create a .env file in the backend directory
-echo "OPENAI_API_KEY=your_api_key_here" > backend/.env
+# Install pre-commit hooks
+pre-commit install
+```
+
+### Frontend Setup
+
+```bash
+cd frontend
+
+# Install dependencies
+npm install
 ```
 
 ## Running the Application
 
-### 1. Start the Backend Server
+### Development Mode
 
+**Backend (Terminal 1):**
 ```bash
-# Make sure you're in the virtual environment
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-
-# Navigate to the backend directory
 cd backend
-
-# Start the FastAPI server
+source venv/bin/activate
 python app.py
 ```
+Backend runs on http://localhost:8000
 
-The backend server will run on `http://localhost:8000`
-
-### 2. Start the Frontend Development Server
-
+**Frontend (Terminal 2):**
 ```bash
-# In a new terminal, from the project root
+cd frontend
 npm run dev
 ```
+Frontend runs on http://localhost:3000
 
-The frontend will be available at `http://localhost:3000`
+### Production Mode
+
+**Frontend Build:**
+```bash
+cd frontend
+npm run build
+npm start
+```
+
+## Testing
+
+### Automated Tests (Pytest)
+```bash
+cd backend
+source venv/bin/activate
+
+# Run all automated tests
+pytest
+
+# Run specific test categories
+pytest tests/test_auth.py -v                     # All auth tests
+pytest tests/test_auth.py::TestAuthentication -v # Basic auth tests only
+pytest -m "not integration" -v                   # Skip integration tests
+```
+
+### Manual Tests
+```bash
+cd backend
+source venv/bin/activate
+
+# Interactive authentication test
+python manual_tests/auth_manual.py
+
+# Email functionality test (requires SMTP config)
+python manual_tests/email_manual.py
+```
+
+### Linting and Code Quality
+```bash
+cd backend
+source venv/bin/activate
+
+# Pre-commit hooks run automatically on commit
+# Run manually on all files:
+pre-commit run --all-files
+
+# Individual tools:
+flake8 .      # Style checking
+black .       # Code formatting
+isort .       # Import sorting
+mypy .        # Type checking
+```
 
 ## PWA (Progressive Web App) Setup
 
@@ -176,48 +247,116 @@ For other hosting platforms:
 
 ## Environment Variables
 
-### Local Development
-
-#### Frontend (.env.local)
+### Backend (.env)
 ```bash
-NEXT_PUBLIC_API_URL=http://localhost:8000  # For local development
-# NEXT_PUBLIC_API_URL=https://your-backend-tunnel.loca.lt  # For PWA testing
+# Required
+OPENAI_API_KEY=your_openai_api_key
+JWT_SECRET=your_jwt_secret_key
+
+# Database (optional, defaults to localhost)
+MONGODB_URL=mongodb://localhost:27017
+
+# Email (required for authentication and daily summaries)
+SMTP_SERVER=smtp.gmail.com
+SMTP_PORT=587
+FROM_EMAIL=your_email@gmail.com
+SMTP_PASSWORD=your_app_password
+
+# Optional
+ADMIN_EMAIL=your_email@gmail.com
 ```
 
-#### Backend (.env)
+### Frontend (.env.local)
 ```bash
-OPENAI_API_KEY=your_api_key_here
-MONGODB_URL=mongodb://localhost:27017  # Optional, defaults to localhost
+# Local development
+OPENAI_API_KEY=your_openai_api_key
+NEXT_PUBLIC_API_URL=http://localhost:8000
+
+# For PWA testing with HTTPS
+# NEXT_PUBLIC_API_URL=https://your-backend-tunnel.loca.lt
 ```
 
-### Production (Railway)
-
-#### Frontend Service
-No environment variables needed - frontend calls backend via relative URLs
-
-#### Backend Service
+### Generating JWT Secret
 ```bash
-OPENAI_API_KEY=your_api_key_here
-MONGODB_URL=mongodb+srv://user:pass@cluster.mongodb.net/todo_db
+python3 -c "import secrets; print(secrets.token_urlsafe(32))"
 ```
 
-Replace `your_api_key_here` with your actual OpenAI API key.
+### Gmail App Password Setup
+1. Enable 2-factor authentication on your Gmail account
+2. Go to Google Account settings → Security → 2-Step Verification → App passwords
+3. Generate an app password and use it as `SMTP_PASSWORD`
 
 ## API Endpoints
 
-- `POST /api/classify`
-  - Request body: `{ "text": "task description" }`
-  - Response: `{ "category": "category name", "priority": "High/Medium/Low" }`
+### Authentication
+- `POST /auth/signup` - Send verification code to email
+- `POST /auth/login` - Verify code and login
+- `POST /auth/logout` - Logout user
+- `GET /auth/me` - Get current user info
+- `POST /auth/update-name` - Update user's first name
+
+### Todos
+- `GET /todos` - Get user's todos
+- `POST /todos` - Create new todo
+- `PUT /todos/{id}` - Update todo
+- `PUT /todos/{id}/complete` - Toggle completion
+- `DELETE /todos/{id}` - Delete todo
+
+### Categories
+- `GET /categories` - Get all categories
+- `POST /categories` - Add new category
+- `DELETE /categories/{name}` - Delete category
+
+### AI Classification
+- `POST /classify` - Classify task text
+  - Request: `{ "text": "task description" }`
+  - Response: `{ "category": "Work", "priority": "High" }`
+
+### Email
+- `POST /email/send-summary` - Send daily summary to current user
+- `GET /email/scheduler-status` - Check scheduler status
+
+## Deployment
+
+### Railway Deployment
+```bash
+# Deploy both services
+./deploy.sh
+```
+
+### Manual Railway Setup
+1. Create backend service with root directory: `backend`
+2. Create frontend service with root directory: `frontend`
+3. Configure environment variables in Railway dashboard
+4. Deploy automatically on git push
 
 ## Troubleshooting
 
-1. If you encounter CORS issues:
-   - Make sure both servers are running
-   - Check that the backend CORS settings in `app.py` are correct
+### Common Issues
 
-2. If the AI classification isn't working:
-   - Verify your OpenAI API key is correctly set in both `.env` files
-   - Check the backend console for any error messages
+1. **CORS errors**: Ensure both servers are running and CORS is configured correctly in `app.py`
+
+2. **AI classification not working**:
+   - Verify OpenAI API key in backend `.env`
+   - Check backend console for errors
+
+3. **Authentication issues**:
+   - Ensure JWT_SECRET is set in backend `.env`
+   - Check that SMTP credentials are configured for email verification
+
+4. **Email not sending**:
+   - Verify SMTP settings in backend `.env`
+   - Check Gmail app password setup
+   - Verification codes are printed to backend console for testing
+
+5. **Database connection issues**:
+   - Ensure MongoDB is running (local) or connection string is correct (cloud)
+   - Check MONGODB_URL in backend `.env`
+
+6. **Tests failing**:
+   - Run `pytest -m "not integration"` to skip database-dependent tests
+   - Ensure backend server is running for integration tests
+   - Manual tests require interactive input
 
 ## License
 

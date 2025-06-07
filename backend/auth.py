@@ -130,6 +130,8 @@ Nicholas"""
         server.quit()
 
         logger.info(f"Verification email sent to {email}")
+        # For testing: always print verification code to console
+        print(f"VERIFICATION CODE for {email}: {code}")
         return True
 
     except Exception as e:
