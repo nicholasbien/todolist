@@ -1,5 +1,8 @@
 const API_CACHE_NAME = 'ai-todo-api-v3';
 
+// Shared default categories used when offline
+const DEFAULT_CATEGORIES = ['Work', 'Personal', 'Shopping', 'Finance', 'Health', 'General'];
+
 // IndexedDB setup for offline data
 const DB_NAME = 'TodoOfflineDB';
 const DB_VERSION = 1;
@@ -189,13 +192,7 @@ const handleAPIRequest = async (request) => {
       
       if (url.pathname === '/categories') {
         // Return default categories when offline
-        const defaultCategories = [
-          { name: 'Work' },
-          { name: 'Personal' },
-          { name: 'Shopping' },
-          { name: 'Health' },
-          { name: 'General' }
-        ];
+        const defaultCategories = DEFAULT_CATEGORIES.map((name) => ({ name }));
         return new Response(JSON.stringify(defaultCategories), {
           headers: { 'Content-Type': 'application/json' }
         });

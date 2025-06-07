@@ -19,6 +19,16 @@ client = AsyncIOMotorClient(MONGODB_URL)
 db = client.todo_db
 categories_collection = db.categories
 
+# Shared default categories
+DEFAULT_CATEGORIES = [
+    "Work",
+    "Personal",
+    "Shopping",
+    "Finance",
+    "Health",
+    "General",
+]
+
 # Pydantic model
 class Category(BaseModel):
     name: str
@@ -86,8 +96,7 @@ async def init_default_categories():
     try:
         count = await categories_collection.count_documents({})
         if count == 0:
-            default_categories = ["Work", "Personal", "Shopping", "Finance", "Health", "General"]
-            await categories_collection.insert_many([{"name": cat} for cat in default_categories])
+            await categories_collection.insert_many([{"name": cat} for cat in DEFAULT_CATEGORIES])
             logger.info("Initialized default categories")
     except Exception as e:
         logger.error(f"Error initializing default categories: {str(e)}") 
