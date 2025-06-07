@@ -1,4 +1,4 @@
-const API_CACHE_NAME = 'ai-todo-api-v2';
+const API_CACHE_NAME = 'ai-todo-api-v3';
 
 // IndexedDB setup for offline data
 const DB_NAME = 'TodoOfflineDB';
