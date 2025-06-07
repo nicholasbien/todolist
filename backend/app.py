@@ -34,6 +34,8 @@ from auth import (
     update_user_name,
     cleanup_expired_sessions
 )
+from email_summary import send_daily_summary, send_all_daily_summaries
+from scheduler import start_scheduler, stop_scheduler, get_scheduler_status
 
 # Set up logging with more detail
 logging.basicConfig(
@@ -208,9 +210,10 @@ async def api_health_check():
 
 @app.on_event("startup")
 async def startup_event():
-    """Initialize default categories and cleanup expired sessions on startup."""
+    """Initialize default categories, cleanup expired sessions, and start scheduler on startup."""
     await init_default_categories()
     await cleanup_expired_sessions()
+    start_scheduler()
 
 # Category management endpoints
 @app.get("/categories", response_model=List[str])
@@ -230,6 +233,35 @@ async def api_delete_category(name: str):
     """Delete a category."""
     logger.info(f"Deleting category: {name}")
     return await delete_category(name)
+
+# Email summary endpoints
+@app.post("/email/send-summary")
+async def api_send_summary(current_user: dict = Depends(get_current_user)):
+    """Send daily summary email to current user."""
+    logger.info(f"Manual summary request for user: {current_user['email']}")
+    success = await send_daily_summary(
+        current_user['user_id'], 
+        current_user['email'], 
+        current_user.get('first_name')
+    )
+    
+    if success:
+        return {"message": "Summary email sent successfully"}
+    else:
+        raise HTTPException(status_code=500, detail="Failed to send summary email")
+
+@app.post("/email/send-all-summaries")
+async def api_send_all_summaries(current_user: dict = Depends(get_current_user)):
+    """Send daily summaries to all users (admin function)."""
+    logger.info(f"Send all summaries request from user: {current_user['email']}")
+    results = await send_all_daily_summaries()
+    return results
+
+@app.get("/email/scheduler-status")
+async def api_scheduler_status():
+    """Get scheduler status."""
+    return get_scheduler_status()
+
 
 if __name__ == "__main__":
     import uvicorn
