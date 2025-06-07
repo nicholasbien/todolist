@@ -1,5 +1,5 @@
 .env
-venv/*
+backend/venv/*
 backend/.env
 backend/__pycache__/
 frontend/node_modules/

@@ -23,6 +23,9 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 
 # Install dependencies
 pip install -r requirements.txt
+
+# Install pre-commit hooks
+pre-commit install
 ```
 
 ### Frontend Setup
@@ -63,21 +66,24 @@ npm start
 
 ## Linting and Code Quality
 
-### Pre-commit Hooks (Recommended)
-Set up pre-commit hooks to run linting automatically on every commit:
+### Pre-commit Hooks (Automatic)
+Pre-commit hooks are automatically installed during setup to run linting on every commit.
+
+The hooks include:
+- **autoflake**: Removes unused imports and variables
+- **trailing-whitespace**: Fixes trailing whitespace
+- **black**: Code formatting (120 char line length)
+- **isort**: Import sorting
+- **flake8**: Style and error checking
+- **mypy**: Type checking
 
 ```bash
-# Install pre-commit (included in backend requirements.txt)
-cd backend && source venv/bin/activate && pip install pre-commit
+# Run pre-commit on all files manually
+cd backend && source venv/bin/activate && pre-commit run --all-files
 
-# Install the git hooks
-pre-commit install
-
-# Run on all files (optional)
-pre-commit run --all-files
+# Skip pre-commit hooks (not recommended)
+git commit -m "message" --no-verify
 ```
-
-Now linting will run automatically on every `git commit`.
 
 ### Manual Linting
 

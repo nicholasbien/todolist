@@ -30,8 +30,13 @@ source venv/bin/activate
 # Install Python dependencies
 pip install -r requirements.txt
 
+# Install pre-commit hooks
+pre-commit install
+
+cd ..
+
 echo "📦 Installing frontend dependencies..."
-cd ../frontend
+cd frontend
 npm install
 
 echo ""
