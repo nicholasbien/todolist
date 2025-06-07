@@ -97,7 +97,7 @@ This application is configured as a PWA and can be installed on mobile devices l
    # Option 1: Quick testing with localtunnel
    npx localtunnel --port 3000  # Frontend tunnel
    npx localtunnel --port 8000  # Backend tunnel
-   
+
    # Update frontend/.env.local with backend tunnel URL:
    NEXT_PUBLIC_API_URL=https://your-backend-tunnel.loca.lt
    ```
@@ -123,7 +123,7 @@ This application is configured for easy deployment on Railway with separate fron
 - `backend/railway.json` - Backend service configuration
 - `backend/Procfile` - Process definition for backend
 - `backend/runtime.txt` - Python version specification
-- `frontend/railway.json` - Frontend service configuration  
+- `frontend/railway.json` - Frontend service configuration
 - `frontend/nixpacks.toml` - Node.js build configuration
 - `frontend/.eslintrc.json` - ESLint configuration for build process
 
@@ -132,11 +132,11 @@ This application is configured for easy deployment on Railway with separate fron
 1. **Connect Repository**: Link your GitHub repo to Railway
 
 2. **Create Two Services**:
-   - **Backend Service**: 
+   - **Backend Service**:
      - Set Root Directory: `backend`
      - Railway auto-detects Python and uses `railway.json` config
    - **Frontend Service**:
-     - Set Root Directory: `frontend` 
+     - Set Root Directory: `frontend`
      - Railway auto-detects Node.js and uses Nixpacks for build
 
 3. **Environment Variables**:
@@ -164,7 +164,7 @@ This application is configured for easy deployment on Railway with separate fron
 - **Frontend** (`frontend/railway.json` + `nixpacks.toml`):
   - Uses Node.js 18
   - Installs: `npm install`
-  - Builds: `npm run build` 
+  - Builds: `npm run build`
   - Starts: `npm start`
 
 ### Alternative Deployment Options
@@ -195,7 +195,7 @@ MONGODB_URL=mongodb://localhost:27017  # Optional, defaults to localhost
 #### Frontend Service
 No environment variables needed - frontend calls backend via relative URLs
 
-#### Backend Service  
+#### Backend Service
 ```bash
 OPENAI_API_KEY=your_api_key_here
 MONGODB_URL=mongodb+srv://user:pass@cluster.mongodb.net/todo_db
@@ -221,4 +221,4 @@ Replace `your_api_key_here` with your actual OpenAI API key.
 
 ## License
 
-MIT 
+MIT

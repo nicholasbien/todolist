@@ -23,14 +23,14 @@ export default function AuthForm() {
     setMessage('');
 
     const result = await signup(email);
-    
+
     if (result.success) {
       setStep('code');
       setMessage('Verification code sent! Check the server console for your code.');
     } else {
       setError(result.error);
     }
-    
+
     setLoading(false);
   };
 
@@ -45,14 +45,14 @@ export default function AuthForm() {
     setError('');
 
     const result = await login(email, code);
-    
+
     if (result.success) {
       // AuthContext will handle redirect via useEffect
       setMessage('Login successful!');
     } else {
       setError(result.error);
     }
-    
+
     setLoading(false);
   };
 
@@ -69,8 +69,8 @@ export default function AuthForm() {
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Todo App</h1>
           <p className="text-gray-600">
-            {step === 'email' 
-              ? 'Enter your email to get started' 
+            {step === 'email'
+              ? 'Enter your email to get started'
               : 'Enter the verification code sent to your email'
             }
           </p>
@@ -156,8 +156,8 @@ export default function AuthForm() {
 
         <div className="mt-8 pt-6 border-t border-gray-200">
           <p className="text-xs text-gray-500 text-center">
-            {step === 'email' 
-              ? 'New users will be automatically registered' 
+            {step === 'email'
+              ? 'New users will be automatically registered'
               : 'Check the server console for your verification code'
             }
           </p>

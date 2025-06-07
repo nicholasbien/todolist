@@ -78,11 +78,11 @@ export const AuthProvider = ({ children }) => {
     const initializeAuth = async () => {
       const storedToken = localStorage.getItem('auth_token');
       const storedUser = localStorage.getItem('auth_user');
-      
+
       if (storedToken && storedUser) {
         setToken(storedToken);
         setUser(JSON.parse(storedUser));
-        
+
         // Verify token is still valid
         await verifyToken(storedToken);
       } else {
@@ -104,7 +104,7 @@ export const AuthProvider = ({ children }) => {
       });
 
       const data = await response.json();
-      
+
       if (response.ok) {
         return { success: true, message: data.message };
       } else {
@@ -126,20 +126,20 @@ export const AuthProvider = ({ children }) => {
       });
 
       const data = await response.json();
-      
+
       if (response.ok) {
         const { token: newToken, user: userData } = data;
-        
+
         // Store in localStorage (client-side only)
         if (typeof window !== 'undefined') {
           localStorage.setItem('auth_token', newToken);
           localStorage.setItem('auth_user', JSON.stringify(userData));
         }
-        
+
         // Update state
         setToken(newToken);
         setUser(userData);
-        
+
         return { success: true };
       } else {
         return { success: false, error: data.detail || 'Login failed' };

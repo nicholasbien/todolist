@@ -18,7 +18,7 @@ export default function AIToDoListApp({ user, token }) {
   const [sendingEmail, setSendingEmail] = useState(false);
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-  
+
   // Debug logging
   // console.log('API_URL:', API_URL);
   // console.log('Environment:', process.env.NEXT_PUBLIC_API_URL);
@@ -27,7 +27,7 @@ export default function AIToDoListApp({ user, token }) {
   // Helper function for authenticated requests
   const authenticatedFetch = useCallback(async (url, options = {}) => {
     if (!token) return;
-    
+
     const headers = {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${token}`,
@@ -82,7 +82,7 @@ export default function AIToDoListApp({ user, token }) {
 
     window.addEventListener('online', updateOnlineStatus);
     window.addEventListener('offline', updateOnlineStatus);
-    
+
     // Set initial status
     updateOnlineStatus();
 
@@ -111,24 +111,24 @@ export default function AIToDoListApp({ user, token }) {
 
       const res = await fetch(`${API_URL}/classify`, {
         method: 'POST',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json'
         },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           text,
           categories: categories
         }),
         signal: controller.signal
       });
-      
+
       clearTimeout(timeoutId);
-      
+
       if (!res.ok) {
         console.error('Classification failed:', res.status, res.statusText);
         throw new Error(`Classification failed with status ${res.status}`);
       }
-      
+
       const data = await res.json();
       return data;
     } catch (error) {
@@ -364,25 +364,25 @@ export default function AIToDoListApp({ user, token }) {
   };
 
   // Filter and sort todos by category
-  const filteredTodos = (activeCat === "All" 
+  const filteredTodos = (activeCat === "All"
     ? todos
     : todos.filter(todo => todo.category === activeCat))
     .sort((a, b) => {
       // First sort by priority (High > Medium > Low)
       const priorityOrder = { 'High': 3, 'Medium': 2, 'Low': 1 };
       const priorityDiff = (priorityOrder[b.priority] || 0) - (priorityOrder[a.priority] || 0);
-      
+
       if (priorityDiff !== 0) {
         return priorityDiff;
       }
-      
+
       // Then sort by date (most recent first)
       return new Date(b.dateAdded) - new Date(a.dateAdded);
     });
 
   return (
     <div>
-      
+
       {error && (
         <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
           {error}
@@ -466,7 +466,7 @@ export default function AIToDoListApp({ user, token }) {
             +
           </button>
         </div>
-        
+
         {/* Add category input - expandable */}
         {showAddCategory && (
           <div className="flex gap-2 mt-2">
@@ -590,7 +590,7 @@ export default function AIToDoListApp({ user, token }) {
           </div>
         ))}
       </div>
-      
+
       {/* Email Summary Button */}
       <div className="mt-8 flex justify-center">
         <button
