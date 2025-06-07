@@ -4,6 +4,7 @@ import logging
 from openai import OpenAI
 from dotenv import load_dotenv
 from typing import List, Dict, Any
+from categories import DEFAULT_CATEGORIES
 import time
 
 # Configure logging
@@ -44,7 +45,7 @@ async def classify_task(text: str, categories: List[str] = None) -> Dict[str, An
     
     # Default categories if none provided
     if categories is None:
-        categories = ["Work", "Personal", "Shopping", "Finance", "Health", "General"]
+        categories = DEFAULT_CATEGORIES
     
     if not text.strip():
         logger.warning("Empty task text provided")

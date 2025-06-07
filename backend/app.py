@@ -24,7 +24,8 @@ from categories import (
     get_categories,
     add_category,
     delete_category,
-    init_default_categories
+    init_default_categories,
+    DEFAULT_CATEGORIES,
 )
 from auth import (
     SignupRequest,
@@ -63,7 +64,7 @@ app.add_middleware(
 
 class ClassificationRequest(BaseModel):
     text: str
-    categories: Optional[List[str]] = ["Shopping", "Work", "Personal", "Finance", "General"]
+    categories: Optional[List[str]] = DEFAULT_CATEGORIES
 
 # Authentication dependency
 async def get_current_user(authorization: str = Header(None)):
