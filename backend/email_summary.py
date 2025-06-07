@@ -11,7 +11,6 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
 import openai
-from auth import get_all_users
 from dotenv import load_dotenv
 from todos import get_todos
 
@@ -194,35 +193,3 @@ async def send_daily_summary(user_id: str, user_email: str, user_name: str = "")
     except Exception as e:
         logger.error(f"Failed to send daily summary to {user_email}: {e}")
         return False
-
-
-async def send_all_daily_summaries() -> dict:
-    """
-    Send daily summaries to all users.
-    Returns a dict with success/failure counts.
-    """
-    try:
-        users = await get_all_users()
-        results: dict = {"sent": 0, "failed": 0, "errors": []}
-
-        for user in users:
-            user_id = str(user.get("_id"))
-            user_email = user.get("email")
-            user_name = user.get("first_name", "")
-
-            if not user_email:
-                continue
-
-            success = await send_daily_summary(user_id, user_email, user_name)
-            if success:
-                results["sent"] += 1
-            else:
-                results["failed"] += 1
-                results["errors"].append(user_email)
-
-        logger.info(f"Daily summaries sent: {results['sent']} success, {results['failed']} failed")
-        return results
-
-    except Exception as e:
-        logger.error(f"Error sending daily summaries: {e}")
-        return {"sent": 0, "failed": 0, "errors": [str(e)]}
