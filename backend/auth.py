@@ -43,6 +43,7 @@ SMTP_PASSWORD = os.getenv("SMTP_PASSWORD")
 class User(BaseModel):
     id: Optional[str] = Field(alias="_id", default=None)
     email: EmailStr
+    first_name: str
     verification_code: Optional[str] = None
     code_expires_at: Optional[datetime] = None
     is_verified: bool = False
@@ -73,6 +74,9 @@ class SignupRequest(BaseModel):
 class LoginRequest(BaseModel):
     email: EmailStr
     code: str
+
+class UpdateNameRequest(BaseModel):
+    first_name: str
 
 def generate_verification_code() -> str:
     """Generate a 6-digit verification code."""
@@ -150,9 +154,10 @@ async def signup_user(email: str) -> dict:
             )
             logger.info(f"Updated verification code for existing user: {email}")
         else:
-            # Create new user
+            # Create new user (first_name will be added during login)
             user = User(
                 email=email,
+                first_name="",  # Will be set during first login
                 verification_code=code,
                 code_expires_at=code_expires_at
             )
@@ -226,7 +231,8 @@ async def login_user(email: str, code: str) -> dict:
             "token": token,
             "user": {
                 "id": str(user["_id"]),
-                "email": user["email"]
+                "email": user["email"],
+                "first_name": user.get("first_name", "")
             }
         }
         
@@ -256,7 +262,8 @@ async def verify_session(token: str) -> dict:
         
         return {
             "user_id": str(user["_id"]),
-            "email": user["email"]
+            "email": user["email"],
+            "first_name": user.get("first_name", "")
         }
         
     except HTTPException:
@@ -283,6 +290,38 @@ async def logout_user(token: str) -> dict:
     except Exception as e:
         logger.error(f"Error in logout_user: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Logout failed: {str(e)}")
+
+async def update_user_name(user_id: str, first_name: str) -> dict:
+    """Update user's first name."""
+    try:
+        # Update user's first name
+        result = await users_collection.update_one(
+            {"_id": ObjectId(user_id)},
+            {"$set": {"first_name": first_name}}
+        )
+        
+        if result.matched_count == 0:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        # Get updated user data
+        user = await users_collection.find_one({"_id": ObjectId(user_id)})
+        
+        logger.info(f"Updated first name for user: {user['email']}")
+        
+        return {
+            "message": "Name updated successfully",
+            "user": {
+                "id": str(user["_id"]),
+                "email": user["email"],
+                "first_name": user["first_name"]
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error in update_user_name: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to update name: {str(e)}")
 
 async def cleanup_expired_sessions():
     """Clean up expired sessions and verification codes."""
