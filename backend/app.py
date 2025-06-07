@@ -34,7 +34,7 @@ from auth import (
     update_user_name,
     cleanup_expired_sessions
 )
-from email_summary import send_daily_summary, send_all_daily_summaries
+from email_summary import send_daily_summary
 from scheduler import start_scheduler, stop_scheduler, get_scheduler_status
 
 # Set up logging with more detail
@@ -250,12 +250,6 @@ async def api_send_summary(current_user: dict = Depends(get_current_user)):
     else:
         raise HTTPException(status_code=500, detail="Failed to send summary email")
 
-@app.post("/email/send-all-summaries")
-async def api_send_all_summaries(current_user: dict = Depends(get_current_user)):
-    """Send daily summaries to all users (admin function)."""
-    logger.info(f"Send all summaries request from user: {current_user['email']}")
-    results = await send_all_daily_summaries()
-    return results
 
 @app.get("/email/scheduler-status")
 async def api_scheduler_status():

@@ -15,6 +15,7 @@ export default function AIToDoListApp({ user, token }) {
   const [showAddCategory, setShowAddCategory] = useState(false);
   const [editingCategory, setEditingCategory] = useState(null);
   const [isOffline, setIsOffline] = useState(false);
+  const [sendingEmail, setSendingEmail] = useState(false);
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
   
@@ -336,6 +337,32 @@ export default function AIToDoListApp({ user, token }) {
     }
   };
 
+  // Send email summary
+  const handleSendEmailSummary = async () => {
+    try {
+      setSendingEmail(true);
+      setError('');
+
+      const response = await authenticatedFetch(`${API_URL}/email/send-summary`, {
+        method: 'POST',
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to send email summary');
+      }
+
+      const result = await response.json();
+      setError(''); // Clear any errors
+      // Could add a success message state if you want
+      console.log('Email summary sent successfully:', result);
+    } catch (err) {
+      setError('Error sending email summary: ' + err.message);
+    } finally {
+      setSendingEmail(false);
+    }
+  };
+
   // Filter and sort todos by category
   const filteredTodos = (activeCat === "All" 
     ? todos
@@ -562,6 +589,27 @@ export default function AIToDoListApp({ user, token }) {
             </div>
           </div>
         ))}
+      </div>
+      
+      {/* Email Summary Button */}
+      <div className="mt-8 flex justify-center">
+        <button
+          onClick={handleSendEmailSummary}
+          disabled={sendingEmail}
+          className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white px-6 py-2 rounded-lg transition-colors flex items-center space-x-2"
+        >
+          {sendingEmail ? (
+            <>
+              <span className="animate-spin">⏳</span>
+              <span>Sending Summary...</span>
+            </>
+          ) : (
+            <>
+              <span>📧</span>
+              <span>Send Email Summary</span>
+            </>
+          )}
+        </button>
       </div>
     </div>
   );
