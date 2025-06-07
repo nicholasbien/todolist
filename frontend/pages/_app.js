@@ -8,7 +8,7 @@ function MyApp({ Component, pageProps }) {
       navigator.serviceWorker
         .register('/sw.js')
         .then((registration) => {
-          console.log('Service Worker registered: ', registration);
+          // Service Worker registered successfully
         })
         .catch((registrationError) => {
           console.log('Service Worker registration failed: ', registrationError);
