@@ -33,7 +33,10 @@ def create_summary_prompt(todos_json: str, user_name: str = "there") -> str:
     """
     Create a prompt for generating a daily todo summary.
     """
+    current_date = datetime.now().strftime("%B %d, %Y")
     return f"""You are a helpful personal assistant creating a daily todo summary email.
+
+Today's date: {current_date}
 
 Given the following JSON data of todos, create a warm, encouraging daily summary email.
 
@@ -43,16 +46,22 @@ Todo Data:
 Instructions:
 1. Address the user as "{user_name}" if provided, otherwise use "there"
 2. Create a friendly, motivational tone
-3. Organize todos by:
-   - Completed tasks (celebrate achievements!)
-   - Pending tasks by priority (High, Medium, Low)
+3. Pay attention to the "dateAdded" field in each todo to understand timing:
+   - Celebrate recently completed tasks (completed in last few days)
+   - Note if tasks have been completed for a while
+   - Identify pending tasks that are getting old/stale
+   - Highlight urgent items that have been pending for too long
+4. Organize todos by:
+   - Recently completed tasks (celebrate achievements!)
+   - Pending tasks by priority AND age (High, Medium, Low)
    - Group by categories where relevant
-4. Provide insights like:
+5. Provide insights like:
    - Total tasks completed vs pending
    - Most productive category
-   - Encouragement for upcoming tasks
-5. Keep it concise but personal (2-3 paragraphs max)
-6. End with a motivational note for the day ahead
+   - Tasks that need attention due to age
+   - Recent momentum and progress patterns
+6. Keep it concise but personal (2-3 paragraphs max)
+7. End with a motivational note for the day ahead
 
 Format as plain text email content (no HTML, no subject line).
 """

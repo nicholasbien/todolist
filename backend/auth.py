@@ -99,8 +99,7 @@ async def send_verification_email(email: str, code: str) -> bool:
         msg['To'] = email
         msg['Subject'] = "Your Todo App Verification Code"
 
-        body = f"""
-Hi there!
+        body = f"""Hi there!
 
 Your verification code for my todolist app is: {code}
 
@@ -109,8 +108,7 @@ This code will expire in 10 minutes.
 If you didn't request this code, please ignore this email.
 
 Best regards,
--Nicholas
-        """
+Nicholas"""
         
         msg.attach(MIMEText(body, 'plain'))
         
