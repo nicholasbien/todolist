@@ -133,8 +133,22 @@ self.addEventListener('install', (event) => {
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
   
-  // Only handle API requests
-  if (url.pathname.startsWith('/todos') || url.pathname.startsWith('/classify') || url.pathname.startsWith('/categories')) {
+  // Skip all Next.js internal requests and same-origin requests that aren't API calls
+  if (event.request.url.includes('/_next/') || 
+      event.request.url.includes('/__nextjs') ||
+      event.request.url.includes('/favicon')) {
+    return;
+  }
+  
+  // Only handle backend API requests (different origin or specific API endpoints)
+  const isBackendAPI = url.hostname !== location.hostname || 
+                       (url.hostname === location.hostname && url.port === '8000');
+  
+  if (isBackendAPI && (
+    url.pathname.startsWith('/todos') || 
+    url.pathname.startsWith('/classify') || 
+    url.pathname.startsWith('/categories')
+  )) {
     event.respondWith(handleAPIRequest(event.request));
   }
 });

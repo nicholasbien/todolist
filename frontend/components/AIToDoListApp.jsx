@@ -24,7 +24,7 @@ export default function AIToDoListApp({ user, token }) {
 
 
   // Helper function for authenticated requests
-  const authenticatedFetch = async (url, options = {}) => {
+  const authenticatedFetch = useCallback(async (url, options = {}) => {
     if (!token) return;
     
     const headers = {
@@ -43,7 +43,7 @@ export default function AIToDoListApp({ user, token }) {
     }
 
     return response;
-  };
+  }, [token]);
 
   // Fetch categories from MongoDB
   const fetchCategories = useCallback(async () => {
@@ -57,7 +57,7 @@ export default function AIToDoListApp({ user, token }) {
     } catch (err) {
       setError('Error loading categories: ' + err.message);
     }
-  }, [API_URL, token]);
+  }, [API_URL, authenticatedFetch]);
 
   // Fetch todos from MongoDB
   const fetchTodos = useCallback(async () => {
@@ -71,7 +71,7 @@ export default function AIToDoListApp({ user, token }) {
     } catch (err) {
       setError('Error loading todos: ' + err.message);
     }
-  }, [API_URL, token]);
+  }, [API_URL, authenticatedFetch]);
 
   // Monitor online/offline status
   useEffect(() => {
