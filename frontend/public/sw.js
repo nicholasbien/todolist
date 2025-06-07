@@ -1,11 +1,4 @@
-const CACHE_NAME = 'ai-todo-v2';
 const API_CACHE_NAME = 'ai-todo-api-v2';
-const urlsToCache = [
-  '/',
-  '/manifest.json',
-  '/icon-192x192.png',
-  '/icon-512x512.png'
-];
 
 // IndexedDB setup for offline data
 const DB_NAME = 'TodoOfflineDB';
@@ -126,52 +119,24 @@ const clearSyncQueue = () => {
   });
 };
 
-// Install event - cache resources
+// Install event - initialize database
 self.addEventListener('install', (event) => {
   event.waitUntil(
     Promise.all([
-      caches.open(CACHE_NAME).then(cache => cache.addAll(urlsToCache)),
       caches.open(API_CACHE_NAME),
       initDB()
     ])
   );
 });
 
-// Fetch event - handle offline API requests
+// Fetch event - handle offline API requests only
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
   
-  // Skip non-GET requests and Next.js development files for caching
-  if (event.request.url.includes('/_next/static/') ||
-      event.request.url.includes('/_next/webpack-hmr') ||
-      event.request.url.includes('/webpack') ||
-      event.request.url.includes('hot-update')) {
-    return;
-  }
-
-  // Handle API requests
+  // Only handle API requests
   if (url.pathname.startsWith('/todos') || url.pathname.startsWith('/classify') || url.pathname.startsWith('/categories')) {
     event.respondWith(handleAPIRequest(event.request));
-    return;
   }
-
-  // Handle regular requests
-  event.respondWith(
-    caches.match(event.request)
-      .then((response) => {
-        if (response) {
-          return response;
-        }
-        return fetch(event.request)
-          .catch((error) => {
-            // For navigation requests, return the main page from cache
-            if (event.request.mode === 'navigate') {
-              return caches.match('/');
-            }
-            throw error;
-          });
-      })
-  );
 });
 
 // Handle API requests with offline support
@@ -222,11 +187,6 @@ const handleAPIRequest = async (request) => {
         });
       }
       
-      // Try to serve from cache
-      const cachedResponse = await caches.match(request);
-      if (cachedResponse) {
-        return cachedResponse;
-      }
     } else {
       // Handle offline POST/PUT/DELETE requests
       const body = await request.text();
@@ -391,7 +351,7 @@ self.addEventListener('activate', (event) => {
     caches.keys().then((cacheNames) => {
       return Promise.all(
         cacheNames.map((cacheName) => {
-          if (cacheName !== CACHE_NAME && cacheName !== API_CACHE_NAME) {
+          if (cacheName !== API_CACHE_NAME) {
             return caches.delete(cacheName);
           }
         })
