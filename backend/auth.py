@@ -28,7 +28,9 @@ users_collection = db.users
 sessions_collection = db.sessions
 
 # JWT settings
-JWT_SECRET = os.getenv("JWT_SECRET", "your-secret-key-change-this")
+JWT_SECRET = os.getenv("JWT_SECRET")
+if not JWT_SECRET:
+    raise ValueError("JWT_SECRET environment variable is required")
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRATION_HOURS = 24 * 7  # 7 days
 
