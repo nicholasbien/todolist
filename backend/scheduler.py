@@ -83,7 +83,6 @@ def stop_scheduler():
 
 def get_scheduler_status():
     """Get current scheduler status."""
-    global scheduler
 
     if scheduler is None:
         return {"status": "stopped", "jobs": []}

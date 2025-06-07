@@ -1,8 +1,7 @@
 import json
 import logging
 import os
-from collections import defaultdict
-from typing import Dict, List, Optional
+from typing import List, Optional
 
 from auth import (
     LoginRequest,
@@ -39,8 +38,6 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI(title="AI Todo List API")
 
-# Rate limiting for email summaries
-email_rate_limiter: Dict[str, List] = defaultdict(list)
 
 # Enable CORS - specifically for the Next.js frontend
 app.add_middleware(

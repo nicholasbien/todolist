@@ -335,15 +335,3 @@ async def cleanup_expired_sessions():
 
     except Exception as e:
         logger.error(f"Error in cleanup: {str(e)}")
-
-
-async def get_all_users():
-    """Get all verified users for daily summary emails."""
-    try:
-        users = await users_collection.find({"is_verified": True}).to_list(length=None)
-
-        return users
-
-    except Exception as e:
-        logger.error(f"Error getting all users: {str(e)}")
-        return []
