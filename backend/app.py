@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, Depends, Header
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional
@@ -23,6 +23,15 @@ from categories import (
     delete_category,
     init_default_categories
 )
+from auth import (
+    SignupRequest,
+    LoginRequest,
+    signup_user,
+    login_user,
+    verify_session,
+    logout_user,
+    cleanup_expired_sessions
+)
 
 # Set up logging with more detail
 logging.basicConfig(
@@ -46,9 +55,67 @@ class ClassificationRequest(BaseModel):
     text: str
     categories: Optional[List[str]] = ["Shopping", "Work", "Personal", "Finance", "General"]
 
+# Authentication dependency
+async def get_current_user(authorization: str = Header(None)):
+    """Extract user from Authorization header."""
+    if not authorization:
+        raise HTTPException(status_code=401, detail="Authorization header required")
+    
+    # Expect format: "Bearer <token>"
+    try:
+        scheme, token = authorization.split()
+        if scheme.lower() != "bearer":
+            raise HTTPException(status_code=401, detail="Invalid authentication scheme")
+    except ValueError:
+        raise HTTPException(status_code=401, detail="Invalid authorization header format")
+    
+    # Verify the session token
+    user_info = await verify_session(token)
+    user_info["token"] = token  # Add token to user info for logout
+    return user_info
+
+# Optional authentication dependency (for backward compatibility)
+async def get_current_user_optional(authorization: str = Header(None)):
+    """Extract user from Authorization header, but don't require it."""
+    if not authorization:
+        return None
+    
+    try:
+        scheme, token = authorization.split()
+        if scheme.lower() != "bearer":
+            return None
+        user_info = await verify_session(token)
+        return user_info
+    except:
+        return None
+
 @app.get("/")
 async def root():
     return {"message": "AI Todo List API is running"}
+
+# Authentication endpoints
+@app.post("/auth/signup")
+async def api_signup(request: SignupRequest):
+    """Send verification code to email for signup/login."""
+    logger.info(f"Signup request for email: {request.email}")
+    return await signup_user(request.email)
+
+@app.post("/auth/login")
+async def api_login(request: LoginRequest):
+    """Verify code and create session."""
+    logger.info(f"Login request for email: {request.email}")
+    return await login_user(request.email, request.code)
+
+@app.post("/auth/logout")
+async def api_logout(current_user: dict = Depends(get_current_user)):
+    """Logout and deactivate session."""
+    logger.info(f"Logout request for user: {current_user['email']}")
+    return await logout_user(current_user["token"])
+
+@app.get("/auth/me")
+async def api_get_current_user(current_user: dict = Depends(get_current_user)):
+    """Get current user info."""
+    return current_user
 
 @app.post("/classify")
 async def classify(request: ClassificationRequest):
@@ -67,18 +134,21 @@ async def classify(request: ClassificationRequest):
 
 # Add todo management endpoints
 @app.get("/todos", response_model=List[Todo])
-async def api_get_todos():
-    logger.info("Fetching all todos")
-    result = await get_todos()
+async def api_get_todos(current_user: dict = Depends(get_current_user)):
+    logger.info(f"Fetching todos for user: {current_user['email']}")
+    result = await get_todos(current_user['user_id'])
     logger.info(f"Fetched {len(result)} todos")
     return result
 
 @app.post("/todos", response_model=Todo)
-async def api_create_todo(request: Request):
+async def api_create_todo(request: Request, current_user: dict = Depends(get_current_user)):
     try:
         # Log the raw request body for debugging
         body = await request.json()
         logger.info(f"Received todo creation request: {json.dumps(body)}")
+        
+        # Add user_id to the todo
+        body["user_id"] = current_user["user_id"]
         
         # Create Todo object from request data
         todo = Todo(**body)
@@ -93,17 +163,17 @@ async def api_create_todo(request: Request):
         raise HTTPException(status_code=500, detail=f"Error creating todo: {str(e)}")
 
 @app.delete("/todos/{todo_id}")
-async def api_delete_todo(todo_id: str):
-    logger.info(f"Deleting todo with ID: {todo_id}")
-    return await delete_todo(todo_id)
+async def api_delete_todo(todo_id: str, current_user: dict = Depends(get_current_user)):
+    logger.info(f"Deleting todo with ID: {todo_id} for user: {current_user['email']}")
+    return await delete_todo(todo_id, current_user['user_id'])
 
 @app.put("/todos/{todo_id}/complete")
-async def api_complete_todo(todo_id: str):
-    logger.info(f"Marking todo as complete with ID: {todo_id}")
-    return await complete_todo(todo_id)
+async def api_complete_todo(todo_id: str, current_user: dict = Depends(get_current_user)):
+    logger.info(f"Marking todo as complete with ID: {todo_id} for user: {current_user['email']}")
+    return await complete_todo(todo_id, current_user['user_id'])
 
 @app.put("/todos/{todo_id}")
-async def api_update_todo(todo_id: str, request: Request):
+async def api_update_todo(todo_id: str, request: Request, current_user: dict = Depends(get_current_user)):
     try:
         body = await request.json()
         
@@ -117,8 +187,8 @@ async def api_update_todo(todo_id: str, request: Request):
         if not updates:
             raise HTTPException(status_code=400, detail="No valid fields to update")
         
-        logger.info(f"Updating todo {todo_id} with: {updates}")
-        return await update_todo_fields(todo_id, updates)
+        logger.info(f"Updating todo {todo_id} with: {updates} for user: {current_user['email']}")
+        return await update_todo_fields(todo_id, updates, current_user['user_id'])
     except Exception as e:
         logger.error(f"Error updating todo: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error updating todo: {str(e)}")
@@ -130,8 +200,9 @@ async def api_health_check():
 
 @app.on_event("startup")
 async def startup_event():
-    """Initialize default categories on startup if they don't exist."""
+    """Initialize default categories and cleanup expired sessions on startup."""
     await init_default_categories()
+    await cleanup_expired_sessions()
 
 # Category management endpoints
 @app.get("/categories", response_model=List[str])

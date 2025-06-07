@@ -32,6 +32,7 @@ class Todo(BaseModel):
     dateAdded: str
     completed: bool = False
     dateCompleted: Optional[str] = None
+    user_id: str
 
     class Config:
         arbitrary_types_allowed = True
@@ -59,10 +60,11 @@ async def create_todo(todo: Todo):
         logger.error(f"Error creating todo: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error creating todo: {str(e)}")
 
-async def get_todos():
+async def get_todos(user_id: str = None):
     try:
         todos = []
-        cursor = todos_collection.find()
+        query = {"user_id": user_id} if user_id else {}
+        cursor = todos_collection.find(query)
         async for todo in cursor:
             # Ensure _id is properly converted to string
             todo["_id"] = str(todo["_id"])
@@ -73,28 +75,7 @@ async def get_todos():
         logger.error(f"Error fetching todos: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error fetching todos: {str(e)}")
 
-async def delete_todo(todo_id: str):
-    try:
-        # Check if todo_id is valid
-        if not todo_id or todo_id == "None" or todo_id == "undefined":
-            raise HTTPException(status_code=400, detail="Invalid todo ID")
-            
-        try:
-            object_id = ObjectId(todo_id)
-        except Exception as e:
-            raise HTTPException(status_code=400, detail=f"Invalid todo ID format: {todo_id}")
-            
-        result = await todos_collection.delete_one({"_id": object_id})
-        if result.deleted_count == 1:
-            return {"message": "Todo deleted successfully"}
-        raise HTTPException(status_code=404, detail="Todo not found")
-    except HTTPException as he:
-        raise he
-    except Exception as e:
-        logger.error(f"Error deleting todo: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error deleting todo: {str(e)}")
-
-async def complete_todo(todo_id: str):
+async def delete_todo(todo_id: str, user_id: str = None):
     try:
         # Check if todo_id is valid
         if not todo_id or todo_id == "None" or todo_id == "undefined":
@@ -105,8 +86,39 @@ async def complete_todo(todo_id: str):
         except Exception as e:
             raise HTTPException(status_code=400, detail=f"Invalid todo ID format: {todo_id}")
         
+        # Build query - include user_id filter if provided
+        query = {"_id": object_id}
+        if user_id:
+            query["user_id"] = user_id
+            
+        result = await todos_collection.delete_one(query)
+        if result.deleted_count == 1:
+            return {"message": "Todo deleted successfully"}
+        raise HTTPException(status_code=404, detail="Todo not found")
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        logger.error(f"Error deleting todo: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error deleting todo: {str(e)}")
+
+async def complete_todo(todo_id: str, user_id: str = None):
+    try:
+        # Check if todo_id is valid
+        if not todo_id or todo_id == "None" or todo_id == "undefined":
+            raise HTTPException(status_code=400, detail="Invalid todo ID")
+            
+        try:
+            object_id = ObjectId(todo_id)
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Invalid todo ID format: {todo_id}")
+        
+        # Build query - include user_id filter if provided
+        query = {"_id": object_id}
+        if user_id:
+            query["user_id"] = user_id
+        
         # First get the current todo to check its completion status
-        todo = await todos_collection.find_one({"_id": object_id})
+        todo = await todos_collection.find_one(query)
         if not todo:
             raise HTTPException(status_code=404, detail="Todo not found")
         
@@ -123,7 +135,7 @@ async def complete_todo(todo_id: str):
             update_fields["dateCompleted"] = None
         
         result = await todos_collection.update_one(
-            {"_id": object_id},
+            query,
             {"$set": update_fields}
         )
         if result.modified_count == 1:
@@ -136,7 +148,7 @@ async def complete_todo(todo_id: str):
         logger.error(f"Error updating todo: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error updating todo: {str(e)}")
 
-async def update_todo_fields(todo_id: str, updates: dict):
+async def update_todo_fields(todo_id: str, updates: dict, user_id: str = None):
     try:
         # Check if todo_id is valid
         if not todo_id or todo_id == "None" or todo_id == "undefined":
@@ -147,9 +159,14 @@ async def update_todo_fields(todo_id: str, updates: dict):
         except Exception as e:
             raise HTTPException(status_code=400, detail=f"Invalid todo ID format: {todo_id}")
         
+        # Build query - include user_id filter if provided
+        query = {"_id": object_id}
+        if user_id:
+            query["user_id"] = user_id
+        
         # Update the todo with provided fields
         result = await todos_collection.update_one(
-            {"_id": object_id},
+            query,
             {"$set": updates}
         )
         if result.modified_count == 1:
