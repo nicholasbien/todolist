@@ -31,6 +31,7 @@ class Todo(BaseModel):
     priority: str
     dateAdded: str
     completed: bool = False
+    dateCompleted: Optional[str] = None
 
     class Config:
         arbitrary_types_allowed = True
@@ -112,9 +113,18 @@ async def complete_todo(todo_id: str):
         # Toggle the completion status
         new_completed_status = not todo.get("completed", False)
         
+        # Prepare update fields
+        update_fields = {"completed": new_completed_status}
+        
+        # Set dateCompleted if marking as complete, clear it if marking as incomplete
+        if new_completed_status:
+            update_fields["dateCompleted"] = datetime.now().isoformat()
+        else:
+            update_fields["dateCompleted"] = None
+        
         result = await todos_collection.update_one(
             {"_id": object_id},
-            {"$set": {"completed": new_completed_status}}
+            {"$set": update_fields}
         )
         if result.modified_count == 1:
             status = "complete" if new_completed_status else "incomplete"
