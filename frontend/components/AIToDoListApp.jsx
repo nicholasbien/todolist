@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useRouter } from 'next/router';
 
 /**
  * AI-Todo main component
@@ -14,6 +15,9 @@ export default function AIToDoListApp() {
   const [activeCat, setActiveCat] = useState("All");
   const [showAddCategory, setShowAddCategory] = useState(false);
   const [editingCategory, setEditingCategory] = useState(null);
+  const [user, setUser] = useState(null);
+  const [token, setToken] = useState(null);
+  const router = useRouter();
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
   
@@ -21,11 +25,53 @@ export default function AIToDoListApp() {
   // console.log('API_URL:', API_URL);
   // console.log('Environment:', process.env.NEXT_PUBLIC_API_URL);
 
+  // Load authentication data on mount
+  useEffect(() => {
+    const storedToken = localStorage.getItem('auth_token');
+    const storedUser = localStorage.getItem('auth_user');
+    
+    if (storedToken && storedUser) {
+      setToken(storedToken);
+      setUser(JSON.parse(storedUser));
+    }
+  }, []);
+
+  // Helper function for authenticated requests
+  const authenticatedFetch = async (url, options = {}) => {
+    if (!token) return;
+    
+    const headers = {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+      ...options.headers
+    };
+
+    const response = await fetch(url, {
+      ...options,
+      headers
+    });
+
+    if (response.status === 401) {
+      localStorage.removeItem('auth_token');
+      localStorage.removeItem('auth_user');
+      router.push('/login');
+      throw new Error('Authentication expired');
+    }
+
+    return response;
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('auth_token');
+    localStorage.removeItem('auth_user');
+    router.push('/login');
+  };
+
   // Fetch categories from MongoDB
   const fetchCategories = async () => {
     try {
-      const response = await fetch(`${API_URL}/categories`);
-      if (!response.ok) {
+      const response = await authenticatedFetch(`${API_URL}/categories`);
+      if (!response?.ok) {
         throw new Error('Failed to fetch categories');
       }
       const data = await response.json();
@@ -38,8 +84,8 @@ export default function AIToDoListApp() {
   // Fetch todos from MongoDB
   const fetchTodos = async () => {
     try {
-      const response = await fetch(`${API_URL}/todos`);
-      if (!response.ok) {
+      const response = await authenticatedFetch(`${API_URL}/todos`);
+      if (!response?.ok) {
         throw new Error('Failed to fetch todos');
       }
       const data = await response.json();
@@ -49,11 +95,13 @@ export default function AIToDoListApp() {
     }
   };
 
-  // Load todos and categories on component mount
+  // Load todos and categories when token is available
   useEffect(() => {
-    fetchTodos();
-    fetchCategories();
-  }, []);
+    if (token) {
+      fetchTodos();
+      fetchCategories();
+    }
+  }, [token]);
 
   // Classify task using AI
   async function classify(text) {
@@ -101,11 +149,8 @@ export default function AIToDoListApp() {
     if (!name) return;
 
     try {
-      const response = await fetch(`${API_URL}/categories`, {
+      const response = await authenticatedFetch(`${API_URL}/categories`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify({ name }),
       });
 
@@ -127,7 +172,7 @@ export default function AIToDoListApp() {
   // Delete category
   const handleDeleteCategory = async (name) => {
     try {
-      const response = await fetch(`${API_URL}/categories/${encodeURIComponent(name)}`, {
+      const response = await authenticatedFetch(`${API_URL}/categories/${encodeURIComponent(name)}`, {
         method: 'DELETE',
       });
 
@@ -173,11 +218,8 @@ export default function AIToDoListApp() {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
 
-      const response = await fetch(`${API_URL}/todos`, {
+      const response = await authenticatedFetch(`${API_URL}/todos`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify(todo),
         signal: controller.signal
       });
@@ -212,7 +254,7 @@ export default function AIToDoListApp() {
         return;
       }
 
-      const response = await fetch(`${API_URL}/todos/${id}`, {
+      const response = await authenticatedFetch(`${API_URL}/todos/${id}`, {
         method: 'DELETE',
       });
 
@@ -238,7 +280,7 @@ export default function AIToDoListApp() {
         return;
       }
 
-      const response = await fetch(`${API_URL}/todos/${id}/complete`, {
+      const response = await authenticatedFetch(`${API_URL}/todos/${id}/complete`, {
         method: 'PUT',
       });
 
@@ -258,11 +300,8 @@ export default function AIToDoListApp() {
   // Update todo category
   const handleUpdateCategory = async (todoId, newCategory) => {
     try {
-      const response = await fetch(`${API_URL}/todos/${todoId}`, {
+      const response = await authenticatedFetch(`${API_URL}/todos/${todoId}`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify({ category: newCategory }),
       });
 
@@ -283,11 +322,8 @@ export default function AIToDoListApp() {
   // Update todo priority
   const handleUpdatePriority = async (todoId, newPriority) => {
     try {
-      const response = await fetch(`${API_URL}/todos/${todoId}`, {
+      const response = await authenticatedFetch(`${API_URL}/todos/${todoId}`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify({ priority: newPriority }),
       });
 
@@ -321,9 +357,29 @@ export default function AIToDoListApp() {
       return new Date(b.dateAdded) - new Date(a.dateAdded);
     });
 
+  // Don't render if not authenticated
+  if (!user || !token) {
+    return (
+      <div className="container mx-auto p-4 max-w-md">
+        <div className="animate-pulse">Loading...</div>
+      </div>
+    );
+  }
+
   return (
     <div className="container mx-auto p-4 max-w-md">
-      <h1 className="text-2xl font-bold mb-6 text-center">AI Todo List</h1>
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-bold">AI Todo List</h1>
+        <div className="flex items-center space-x-4">
+          <span className="text-sm text-gray-400">Hello, {user.email}</span>
+          <button 
+            onClick={handleLogout}
+            className="text-blue-400 hover:text-blue-300 text-sm underline"
+          >
+            Logout
+          </button>
+        </div>
+      </div>
       
       {error && (
         <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
