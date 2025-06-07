@@ -137,7 +137,14 @@ async def send_email(to_email: str, subject: str, body: str) -> bool:
         return True
         
     except Exception as e:
-        logger.error(f"Failed to send email to {to_email}: {e}")
+        # Log sanitized error (don't expose SMTP details)
+        error_type = type(e).__name__
+        if "authentication" in str(e).lower():
+            logger.error(f"Email authentication failed for {to_email}")
+        elif "connection" in str(e).lower():
+            logger.error(f"Email connection failed for {to_email}")
+        else:
+            logger.error(f"Email send failed for {to_email}: {error_type}")
         return False
 
 async def send_daily_summary(user_id: str, user_email: str, user_name: str = None) -> bool:

@@ -4,6 +4,9 @@ from pydantic import BaseModel
 from typing import List, Optional
 import logging
 import json
+import os
+from collections import defaultdict
+from datetime import datetime, timedelta
 
 # Import the classification function and todo management
 from classify import classify_task
@@ -45,6 +48,9 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="AI Todo List API")
+
+# Rate limiting for email summaries
+email_rate_limiter = defaultdict(list)
 
 # Enable CORS - specifically for the Next.js frontend
 app.add_middleware(
