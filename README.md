@@ -9,6 +9,7 @@ A modern todo list application with AI-powered task classification, email verifi
 - **Daily email summaries** with AI-generated insights
 - **Category and priority management**
 - **Due date tracking** with upcoming deadlines highlighted in daily summaries
+- **Day-of-week aware date parsing** for more accurate due dates
 - **Link support** - Add a URL as a task and its page title is fetched automatically
 - **Progressive Web App (PWA)** - Install on iPhone/Android like a native app
 - **Offline functionality** - Works without internet connection

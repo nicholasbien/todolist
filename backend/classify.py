@@ -59,12 +59,13 @@ async def classify_task(text: str, categories: List[str]) -> Dict[str, Any]:
 
         logger.info(f"Starting OpenAI API call for text: {text[:30]}...")
 
-        current_date = datetime.now().isoformat()
+        current_dt = datetime.now()
+        date_context = f"{current_dt.strftime('%A')}, {current_dt.date().isoformat()}"
         system_prompt = (
             "You are a task organizer. Analyze the task text, remove any date references, "
             "and extract a due date if present. Return a JSON object with fields: "
             "'category', 'priority', 'text' (cleaned task description), and 'dueDate' (YYYY-MM-DD or null). "
-            f"Dates should be interpreted relative to {current_date}. Available categories: {categories_str}. "
+            f"Dates should be interpreted relative to {date_context}. Available categories: {categories_str}. "
             "Priority options: High, Medium, Low. Only output valid JSON."
         )
 
