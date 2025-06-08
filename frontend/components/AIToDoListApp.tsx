@@ -33,7 +33,7 @@ export default function AIToDoListApp({ user, token }: Props) {
 
 
   // Helper function for authenticated requests
-  const authenticatedFetch = useCallback(async (url, options = {}) => {
+  const authenticatedFetch = useCallback(async (url: string, options: RequestInit = {}) => {
     if (!token) return;
 
     const headers = {
@@ -389,14 +389,14 @@ export default function AIToDoListApp({ user, token }: Props) {
       }
 
       // Then sort by date (most recent first)
-      return new Date(b.dateAdded) - new Date(a.dateAdded);
+      return new Date(b.dateAdded).getTime() - new Date(a.dateAdded).getTime();
     });
 
   const completedTodos = allFilteredTodos
     .filter(todo => todo.completed)
     .sort((a, b) => {
       // Sort completed todos by completion date (most recent first)
-      return new Date(b.dateAdded) - new Date(a.dateAdded);
+      return new Date(b.dateAdded).getTime() - new Date(a.dateAdded).getTime();
     });
 
   // Combine todos: uncompleted first, then completed (if showing)
@@ -550,7 +550,7 @@ export default function AIToDoListApp({ user, token }: Props) {
                       onBlur={() => setEditingCategory(null)}
                       className="px-2 py-1 rounded mr-2 bg-gray-800 text-white border border-gray-600 text-xs"
                       autoFocus
-                      onClick={(e) => e.target.focus()}
+                      onClick={(e) => (e.target as HTMLSelectElement).focus()}
                     >
                       {categories
                         .sort((a, b) => {

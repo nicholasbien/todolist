@@ -1,5 +1,5 @@
-const STATIC_CACHE = 'todo-static-v1';
-const API_CACHE = 'todo-api-v1';
+const STATIC_CACHE = 'todo-static-v25';
+const API_CACHE = 'todo-api-v25';
 
 const DB_NAME = 'TodoOfflineDB';
 const DB_VERSION = 1;
@@ -79,12 +79,36 @@ async function handleApiRequest(request) {
   const online = self.navigator.onLine;
   const url = new URL(request.url);
 
-  if (online) {
+  // Check if this is an offline-generated ID that shouldn't go to server
+  const isOfflineId = url.pathname.includes('offline_');
+
+  if (online && !isOfflineId) {
     try {
       const response = await fetch(request.clone());
       if (request.method === 'GET' && response.ok) {
         const cache = await caches.open(API_CACHE);
         cache.put(request, response.clone());
+
+        // For GET /todos, sync server data to IndexedDB and merge with offline todos
+        if (url.pathname === '/todos') {
+          const serverTodos = await response.clone().json();
+
+          // Save all server todos to IndexedDB for offline access
+          for (const todo of serverTodos) {
+            await putTodo(todo);
+          }
+
+          // Get offline-only todos (not yet synced)
+          const offlineTodos = await getTodos();
+          const offlineOnlyTodos = offlineTodos.filter(t => t._id.startsWith('offline_'));
+
+          // Merge server todos with offline-only todos
+          const mergedTodos = [...serverTodos, ...offlineOnlyTodos];
+
+          return new Response(JSON.stringify(mergedTodos), {
+            headers: { 'Content-Type': 'application/json' }
+          });
+        }
       }
       if (request.method !== 'GET' && response.ok) {
         syncQueue();
@@ -98,6 +122,7 @@ async function handleApiRequest(request) {
 }
 
 async function offlineFallback(request, url) {
+  // Handle core todo operations offline
   if (request.method === 'GET') {
     if (url.pathname === '/todos') {
       const todos = await getTodos();
@@ -113,11 +138,15 @@ async function offlineFallback(request, url) {
         { headers: { 'Content-Type': 'application/json' } }
       );
     }
-  } else {
+  }
+
+  // Handle core todo mutations offline
+  else {
     const dataText = await request.clone().text();
     let data = {};
     try { data = JSON.parse(dataText); } catch (_) {}
 
+    // Create new todo
     if (url.pathname === '/todos' && request.method === 'POST') {
       const newTodo = {
         _id: 'offline_' + Date.now(),
@@ -132,22 +161,50 @@ async function offlineFallback(request, url) {
       return new Response(JSON.stringify(newTodo), { headers: { 'Content-Type': 'application/json' } });
     }
 
-    if (url.pathname.startsWith('/todos/') && request.method === 'PUT') {
-      const id = url.pathname.split('/').pop();
-      const updated = { ...data, _id: id };
-      await putTodo(updated);
-      await addQueue({ type: 'UPDATE', data: updated });
-      return new Response(JSON.stringify(updated), { headers: { 'Content-Type': 'application/json' } });
+    // Update todo (category, priority changes)
+    if (url.pathname.startsWith('/todos/') && request.method === 'PUT' && !url.pathname.endsWith('/complete')) {
+      const id = url.pathname.split('/')[2]; // Get ID from /todos/{id}
+      const existingTodos = await getTodos();
+      const existingTodo = existingTodos.find(t => t._id === id);
+
+      if (existingTodo) {
+        const updated = { ...existingTodo, ...data };
+        await putTodo(updated);
+        await addQueue({ type: 'UPDATE', data: updated });
+        return new Response(JSON.stringify(updated), { headers: { 'Content-Type': 'application/json' } });
+      }
     }
 
+    // Complete/uncomplete todo
+    if (url.pathname.endsWith('/complete') && request.method === 'PUT') {
+      const id = url.pathname.split('/')[2]; // Get ID from /todos/{id}/complete
+      const existingTodos = await getTodos();
+      const existingTodo = existingTodos.find(t => t._id === id);
+
+      if (existingTodo) {
+        const updated = { ...existingTodo, completed: !existingTodo.completed };
+        await putTodo(updated);
+        await addQueue({ type: 'UPDATE', data: updated });
+        return new Response(JSON.stringify({ message: 'Todo updated' }), { headers: { 'Content-Type': 'application/json' } });
+      }
+    }
+
+    // Delete todo
     if (url.pathname.startsWith('/todos/') && request.method === 'DELETE') {
-      const id = url.pathname.split('/').pop();
+      const id = url.pathname.split('/')[2]; // Get ID from /todos/{id}
       await delTodo(id);
       await addQueue({ type: 'DELETE', data: { _id: id } });
-      return new Response('', { status: 204 });
+      return new Response(null, { status: 204 });
     }
   }
-  return fetch(request);
+
+  // Gracefully fail all other requests when offline
+  return new Response(JSON.stringify({
+    error: 'This feature is not available offline. Please check your connection and try again.'
+  }), {
+    status: 503,
+    headers: { 'Content-Type': 'application/json' }
+  });
 }
 
 function normalizePriority(p) {

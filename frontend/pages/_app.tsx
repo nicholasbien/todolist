@@ -4,6 +4,7 @@ import type { AppProps } from 'next/app';
 
 function MyApp({ Component, pageProps }: AppProps) {
   useEffect(() => {
+    // Register service worker in all environments
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker
         .register('/sw.js')

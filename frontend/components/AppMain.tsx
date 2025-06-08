@@ -3,7 +3,7 @@ import AuthForm from './AuthForm';
 import { useAuth } from '../context/AuthContext';
 
 export default function AppMain() {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, user, token } = useAuth();
 
   if (isLoading) {
     return (
@@ -17,7 +17,7 @@ export default function AppMain() {
 
   return (
     <main className="min-h-screen bg-zinc-950 text-white">
-      {isAuthenticated ? <AIToDoListApp /> : <AuthForm />}
+      {isAuthenticated ? <AIToDoListApp user={user} token={token} /> : <AuthForm />}
     </main>
   );
 }
