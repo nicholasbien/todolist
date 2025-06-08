@@ -306,6 +306,8 @@ python3 -c "import secrets; print(secrets.token_urlsafe(32))"
 - `DELETE /categories/{name}` - Delete category
 
 ### AI Classification
+Todos are automatically classified when created. You can also use
+the manual endpoint if needed:
 - `POST /classify` - Classify task text
   - Request: `{ "text": "task description" }`
   - Response: `{ "category": "Work", "priority": "High" }`

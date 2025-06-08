@@ -147,8 +147,7 @@ self.addEventListener('fetch', (event) => {
   const isApi =
     url.origin === self.location.origin &&
     (url.pathname.startsWith('/todos') ||
-      url.pathname.startsWith('/categories') ||
-      url.pathname.startsWith('/classify'));
+      url.pathname.startsWith('/categories'));
   if (!isApi) return;
   event.respondWith(handleApiRequest(event.request));
 });
@@ -239,12 +238,6 @@ async function offlineFallback(request, url) {
       } else {
         return new Response(JSON.stringify(DEFAULT_CATEGORIES), { headers: { 'Content-Type': 'application/json' } });
       }
-    }
-    if (url.pathname.includes('/classify')) {
-      return new Response(
-        JSON.stringify({ category: 'General', priority: 'Medium' }),
-        { headers: { 'Content-Type': 'application/json' } }
-      );
     }
   }
 

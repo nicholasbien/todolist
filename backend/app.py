@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+from datetime import datetime
 from typing import List, Optional
 
 import httpx
@@ -167,8 +168,11 @@ async def api_create_todo(request: Request, current_user: dict = Depends(get_cur
         # Add user_id to the todo
         body["user_id"] = current_user["user_id"]
 
-        # Detect if text is a URL
+        # Determine the text to classify
         text = body.get("text", "").strip()
+        classify_text = text
+
+        # Detect if text is a URL and fetch page title
         if text.startswith("http://") or text.startswith("https://"):
             body["link"] = text
             try:
@@ -188,14 +192,7 @@ async def api_create_todo(request: Request, current_user: dict = Depends(get_cur
                             page_title = title_tag.text.strip()
                             print(f"Extracted title: '{page_title}' from {text}")
                             body["text"] = page_title
-
-                            # Classify based on page title
-                            try:
-                                classification = await classify_task(page_title, body.get("categories", []))
-                                body["category"] = classification.get("category", "General")
-                                body["priority"] = classification.get("priority", "Medium")
-                            except Exception as e:
-                                logger.error(f"Failed to classify page title '{page_title}': {e}")
+                            classify_text = page_title
                         else:
                             print(f"No title found for {text}")
                     else:
@@ -203,6 +200,19 @@ async def api_create_todo(request: Request, current_user: dict = Depends(get_cur
             except Exception as e:
                 print(f"Exception fetching {text}: {e}")
                 logger.error(f"Failed to fetch title for {text}: {e}")
+
+        # Always classify the final text on the backend
+        try:
+            classification = await classify_task(classify_text, body.get("categories", []))
+            body["category"] = classification.get("category", "General")
+            body["priority"] = classification.get("priority", "Medium")
+        except Exception as e:
+            logger.error(f"Failed to classify text '{classify_text}': {e}")
+            body["category"] = "General"
+            body["priority"] = "Medium"
+
+        # Ensure dateAdded exists
+        body.setdefault("dateAdded", datetime.now().isoformat())
 
         # Create Todo object from request data
         todo = Todo(**body)

@@ -7,7 +7,7 @@ interface Props {
 
 /**
  * AI-Todo main component
- * Fetches classification from /api/classify
+ * Backend classifies tasks automatically when creating todos
  */
 export default function AIToDoListApp({ user, token }: Props) {
   const [todos, setTodos] = useState([]);
@@ -122,46 +122,6 @@ export default function AIToDoListApp({ user, token }: Props) {
     return text.trim().startsWith('http://') || text.trim().startsWith('https://');
   };
 
-  // Classify task using AI
-  async function classify(text) {
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => {
-        controller.abort();
-        console.log('Classification request timed out after 5 seconds');
-      }, 5000); // Reduced to 5 seconds to match backend timeout
-
-      const res = await fetch(`${API_BASE}/classify`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        body: JSON.stringify({
-          text,
-          categories: categories
-        }),
-        signal: controller.signal
-      });
-
-      clearTimeout(timeoutId);
-
-      if (!res.ok) {
-        console.error('Classification failed:', res.status, res.statusText);
-        throw new Error(`Classification failed with status ${res.status}`);
-      }
-
-      const data = await res.json();
-      return data;
-    } catch (error) {
-      console.error('Error during classification:', error.name, error.message);
-      if (error.name === 'AbortError') {
-        console.log('Request was aborted due to timeout');
-      }
-      return { category: 'General', priority: 'Medium' };
-    }
-  }
-
   // Add new category
   const handleAddCategory = async () => {
     const name = newCat.trim();
@@ -221,24 +181,17 @@ export default function AIToDoListApp({ user, token }: Props) {
     setError('');
 
     try {
-      let category = 'General';
-      let priority = 'Medium';
-
-      // Only classify if it's not a URL (backend handles URL classification after title fetch)
-      if (!isUrl(newTodo)) {
-        const classification = await classify(newTodo);
-        category = classification.category;
-        priority = classification.priority;
-      }
-
-      // Create new todo object
-      const todo = {
+      // Create new todo object; backend will classify and set category/priority
+      const todo: any = {
         text: newTodo,
-        category: category,
-        priority: priority,
         dateAdded: new Date().toISOString(),
         completed: false
       };
+
+      // Store link if it's a URL so backend can fetch title
+      if (isUrl(newTodo)) {
+        todo.link = newTodo;
+      }
 
       // Save to MongoDB with timeout
       const controller = new AbortController();
