@@ -3,6 +3,7 @@ import json
 import logging
 from fastapi import HTTPException
 from motor.motor_asyncio import AsyncIOMotorClient
+from mongomock_motor import AsyncMongoMockClient
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
 from bson import ObjectId
@@ -19,7 +20,8 @@ load_dotenv()
 
 # MongoDB connection
 MONGODB_URL = os.getenv("MONGODB_URL", "mongodb://localhost:27017")
-client = AsyncIOMotorClient(MONGODB_URL)
+USE_MOCK_DB = os.getenv("USE_MOCK_DB", "false").lower() == "true"
+client = AsyncMongoMockClient() if USE_MOCK_DB else AsyncIOMotorClient(MONGODB_URL)
 db = client.todo_db
 todos_collection = db.todos
 
