@@ -97,6 +97,15 @@ export default function AIToDoListApp({ user, token }: Props) {
     }
   }, [token, user, fetchTodos, fetchCategories]);
 
+  // Update email time when user info loads
+  useEffect(() => {
+    if (user) {
+      const h = String(user.summary_hour ?? 9).padStart(2, '0');
+      const m = String(user.summary_minute ?? 0).padStart(2, '0');
+      setEmailTime(`${h}:${m}`);
+    }
+  }, [user]);
+
   // Service worker update detection
   useEffect(() => {
     if ('serviceWorker' in navigator) {
