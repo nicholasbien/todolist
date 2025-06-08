@@ -24,9 +24,6 @@ function LoginForm({ onLogin }: LoginFormProps) {
   const [message, setMessage] = useState('');
   const [needsName, setNeedsName] = useState(false);
 
-  const API_BASE = process.env.NEXT_PUBLIC_API_URL
-    ? process.env.NEXT_PUBLIC_API_URL.replace(/\/$/, '')
-    : '';
 
   const handleEmailSubmit = async (e) => {
     e.preventDefault();
@@ -40,7 +37,7 @@ function LoginForm({ onLogin }: LoginFormProps) {
     setMessage('');
 
     try {
-      const response = await fetch(`${API_BASE}/auth/signup`, {
+      const response = await fetch('/auth/signup', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -74,7 +71,7 @@ function LoginForm({ onLogin }: LoginFormProps) {
     setError('');
 
     try {
-      const response = await fetch(`${API_BASE}/auth/login`, {
+      const response = await fetch('/auth/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -119,7 +116,7 @@ function LoginForm({ onLogin }: LoginFormProps) {
 
     try {
       const token = localStorage.getItem('auth_token');
-      const response = await fetch(`${API_BASE}/auth/update-name`, {
+      const response = await fetch('/auth/update-name', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -60,14 +60,6 @@ const clearQueue = () => dbTx(QUEUE, 'readwrite', (s) => s.clear());
 const getAuth = () => dbTx(AUTH, 'readonly', (s) => s.get('token'));
 const putAuth = (token, userId) => dbTx(AUTH, 'readwrite', (s) => s.put({ key: 'token', token, userId }));
 
-// Function to get API base URL
-function getApiBase() {
-  // In production, use relative paths; in development, check for proxy
-  if (self.location.hostname === 'localhost' && self.location.port === '3000') {
-    return ''; // Next.js dev server with proxy
-  }
-  return ''; // Production - relative paths
-}
 
 // Function to get authenticated headers
 async function getAuthHeaders() {
@@ -85,12 +77,11 @@ async function syncServerDataToLocal() {
     // Only sync if we're online
     if (!self.navigator.onLine) return;
 
-    const apiBase = getApiBase();
     const headers = await getAuthHeaders();
 
     // Fetch and store categories
     try {
-      const categoriesResponse = await fetch(`${apiBase}/categories`, { headers });
+      const categoriesResponse = await fetch('/categories', { headers });
       if (categoriesResponse.ok) {
         const serverCategories = await categoriesResponse.json();
         for (const categoryName of serverCategories) {
@@ -103,7 +94,7 @@ async function syncServerDataToLocal() {
 
     // Fetch and store todos
     try {
-      const todosResponse = await fetch(`${apiBase}/todos`, { headers });
+      const todosResponse = await fetch('/todos', { headers });
       if (todosResponse.ok) {
         const serverTodos = await todosResponse.json();
         for (const todo of serverTodos) {
@@ -155,7 +146,6 @@ self.addEventListener('fetch', (event) => {
 async function handleApiRequest(request) {
   const online = self.navigator.onLine;
   const url = new URL(request.url);
-  const apiBase = getApiBase();
 
   // Check if this is an offline-generated ID that shouldn't go to server
   const isOfflineId = url.pathname.includes('offline_');
@@ -168,7 +158,7 @@ async function handleApiRequest(request) {
         cache.put(request, response.clone());
 
         // For GET /todos, sync server data to IndexedDB and merge with offline todos
-        if (url.pathname === '/todos' || url.pathname === `${apiBase}/todos`) {
+        if (url.pathname === '/todos') {
           const serverTodos = await response.clone().json();
 
           // Save all server todos to IndexedDB for offline access
@@ -189,7 +179,7 @@ async function handleApiRequest(request) {
         }
 
         // For GET /categories, sync server data to IndexedDB and merge with offline categories
-        if (url.pathname === '/categories' || url.pathname === `${apiBase}/categories`) {
+        if (url.pathname === '/categories') {
           const serverCategories = await response.clone().json(); // Array of strings like ["Work", "Personal"]
 
           // Save all server categories to IndexedDB for offline access (as objects)
@@ -347,7 +337,6 @@ function normalizePriority(p) {
 
 async function syncQueue() {
   const queue = await readQueue();
-  const apiBase = getApiBase();
   const headers = await getAuthHeaders();
 
   for (const op of queue) {
@@ -357,7 +346,7 @@ async function syncQueue() {
         case 'CREATE':
           if (op.data._id.startsWith('offline_')) {
             const { _id, ...payload } = op.data;
-            res = await fetch(`${apiBase}/todos`, {
+            res = await fetch('/todos', {
               method: 'POST',
               headers,
               body: JSON.stringify(payload),
@@ -371,7 +360,7 @@ async function syncQueue() {
           break;
         case 'UPDATE':
           if (!op.data._id.startsWith('offline_')) {
-            await fetch(`${apiBase}/todos/${op.data._id}`, {
+            await fetch(`/todos/${op.data._id}`, {
               method: 'PUT',
               headers,
               body: JSON.stringify(op.data),
@@ -380,14 +369,14 @@ async function syncQueue() {
           break;
         case 'DELETE':
           if (!op.data._id.startsWith('offline_')) {
-            await fetch(`${apiBase}/todos/${op.data._id}`, {
+            await fetch(`/todos/${op.data._id}`, {
               method: 'DELETE',
               headers
             });
           }
           break;
         case 'CREATE_CATEGORY':
-          res = await fetch(`${apiBase}/categories`, {
+          res = await fetch('/categories', {
             method: 'POST',
             headers,
             body: JSON.stringify(op.data),
@@ -398,7 +387,7 @@ async function syncQueue() {
           }
           break;
         case 'DELETE_CATEGORY':
-          await fetch(`${apiBase}/categories/${encodeURIComponent(op.data.name)}`, {
+          await fetch(`/categories/${encodeURIComponent(op.data.name)}`, {
             method: 'DELETE',
             headers
           });
@@ -411,7 +400,7 @@ async function syncQueue() {
   }
   await clearQueue();
   try {
-    const res = await fetch(`${apiBase}/todos`, { headers });
+    const res = await fetch('/todos', { headers });
     if (res.ok) {
       const todos = await res.json();
       for (const t of todos) await putTodo(t);

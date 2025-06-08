@@ -31,15 +31,12 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [isLoading, setIsLoading] = useState(true);
   const [mounted, setMounted] = useState(false);
 
-  const API_BASE = process.env.NEXT_PUBLIC_API_URL
-    ? process.env.NEXT_PUBLIC_API_URL.replace(/\/$/, '')
-    : '';
 
   const logout = async (): Promise<void> => {
     try {
       if (token) {
         // Call logout endpoint to invalidate token on server
-        await fetch(`${API_BASE}/auth/logout`, {
+        await fetch('/auth/logout', {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${token}`
@@ -61,7 +58,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
   const verifyToken = async (tokenToVerify: string) => {
     try {
-      const response = await fetch(`${API_BASE}/auth/me`, {
+      const response = await fetch('/auth/me', {
         headers: {
           'Authorization': `Bearer ${tokenToVerify}`
         }
@@ -112,7 +109,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
   const signup = async (email: string): Promise<{ success: boolean; message?: string; error?: string }> => {
     try {
-      const response = await fetch(`${API_BASE}/auth/signup`, {
+      const response = await fetch('/auth/signup', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -134,7 +131,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
   const login = async (email: string, code: string): Promise<{ success: boolean; error?: string }> => {
     try {
-      const response = await fetch(`${API_BASE}/auth/login`, {
+      const response = await fetch('/auth/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
