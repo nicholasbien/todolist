@@ -213,7 +213,8 @@ const handleAPIRequest = async (request) => {
         // Return default classification when offline
         return new Response(JSON.stringify({
           category: 'General',
-          priority: 'medium'
+          // Use consistent casing so priority sorting works
+          priority: 'Medium'
         }), {
           headers: { 'Content-Type': 'application/json' }
         });
@@ -222,11 +223,20 @@ const handleAPIRequest = async (request) => {
       if (url.pathname === '/todos') {
         if (request.method === 'POST') {
           // Create new todo offline
+          const normalizePriority = (value) => {
+            if (!value) return 'Medium';
+            const p = value.toLowerCase();
+            if (p === 'high') return 'High';
+            if (p === 'low') return 'Low';
+            return 'Medium';
+          };
+
           const newTodo = {
             _id: 'offline_' + Date.now(),
             text: data.text,
             category: data.category || 'General',
-            priority: data.priority || 'medium',
+            // Ensure priority matches casing used in the app
+            priority: normalizePriority(data.priority),
             dateAdded: new Date().toISOString(),
             completed: false
           };
