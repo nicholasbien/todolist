@@ -136,8 +136,8 @@ async def api_update_name(request: UpdateNameRequest, current_user: dict = Depen
 @app.post("/classify")
 async def classify(request: ClassificationRequest):
     """
-    Classify a task based on its text description.
-    Returns category and priority.
+    Classify a task text and extract due date and cleaned text.
+    Returns category, priority, cleaned text, and due date.
     """
     try:
         logger.info(f"Starting classification for text: {request.text[:30]}...")
@@ -146,7 +146,12 @@ async def classify(request: ClassificationRequest):
         return result
     except Exception as e:
         logger.error(f"Error in classification: {str(e)}")
-        return {"category": "General", "priority": "Low"}
+        return {
+            "category": "General",
+            "priority": "Low",
+            "text": request.text,
+            "dueDate": None,
+        }
 
 
 # Add todo management endpoints
@@ -207,6 +212,10 @@ async def api_create_todo(request: Request, current_user: dict = Depends(get_cur
                 classification = await classify_task(classify_text, body.get("categories", []))
                 body["category"] = classification.get("category", "General")
                 body["priority"] = classification.get("priority", "Medium")
+                if classification.get("text"):
+                    body["text"] = classification["text"]
+                if classification.get("dueDate"):
+                    body["dueDate"] = classification["dueDate"]
             except Exception as e:
                 logger.error(f"Failed to classify text '{classify_text}': {e}")
                 body["category"] = "General"

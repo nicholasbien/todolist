@@ -612,9 +612,11 @@ export default function AIToDoListApp({ user, token }: Props) {
                     <option value="Medium">Medium</option>
                     <option value="Low">Low</option>
                   </select>
-                  <span className={`text-xs ${todo.completed ? 'text-gray-500' : 'text-gray-400'}`}>
-                    {new Date(todo.dateAdded).toLocaleDateString()}
-                  </span>
+                  {todo.dueDate && (
+                    <span className={`text-xs ${todo.completed ? 'text-gray-500' : 'text-gray-400'}`}>
+                      Due: {new Date(todo.dueDate).toLocaleDateString()}
+                    </span>
+                  )}
                 </div>
               </div>
               <div className="flex space-x-2 ml-3">

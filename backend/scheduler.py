@@ -92,7 +92,7 @@ def get_scheduler_status():
         jobs.append(
             {
                 "id": job.id,
-                "next_run": job.next_run_time.isoformat() if job.next_run_time else None,
+                "next_run": (job.next_run_time.isoformat() if job.next_run_time else None),
                 "trigger": str(job.trigger),
             }
         )

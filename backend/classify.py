@@ -2,6 +2,7 @@ import json
 import logging
 import os
 import time
+from datetime import datetime
 from typing import Any, Dict, List
 
 from categories import DEFAULT_CATEGORIES
@@ -36,7 +37,12 @@ async def classify_task(text: str, categories: List[str]) -> Dict[str, Any]:
     Returns:
         dict: A dictionary containing category and priority
     """
-    default_response = {"category": "General", "priority": "Low"}
+    default_response = {
+        "category": "General",
+        "priority": "Low",
+        "dueDate": None,
+        "text": text,
+    }
 
     # Use provided categories or default ones if empty
     if not categories:
@@ -53,10 +59,14 @@ async def classify_task(text: str, categories: List[str]) -> Dict[str, Any]:
 
         logger.info(f"Starting OpenAI API call for text: {text[:30]}...")
 
-        system_prompt = f"""You are a task organizer. Analyze the task and categorize it.
-Respond with a JSON object containing 'category' and 'priority'.
-Available categories: {categories_str}.
-Priority options: High, Medium, Low. Only output valid JSON."""
+        current_date = datetime.now().isoformat()
+        system_prompt = (
+            "You are a task organizer. Analyze the task text, remove any date references, "
+            "and extract a due date if present. Return a JSON object with fields: "
+            "'category', 'priority', 'text' (cleaned task description), and 'dueDate' (YYYY-MM-DD or null). "
+            f"Dates should be interpreted relative to {current_date}. Available categories: {categories_str}. "
+            "Priority options: High, Medium, Low. Only output valid JSON."
+        )
 
         # Make synchronous call since OpenAI client handles async internally
         completion = client.chat.completions.create(
@@ -85,7 +95,16 @@ Priority options: High, Medium, Low. Only output valid JSON."""
                 logger.warning(f"Category {category} not in available categories, defaulting to General")
                 category = "General"
 
-            return {"category": category, "priority": result.get("priority", "Low")}
+            due_date = result.get("dueDate")
+            if due_date:
+                due_date = str(due_date).split("T")[0]
+
+            return {
+                "category": category,
+                "priority": result.get("priority", "Low"),
+                "dueDate": due_date,
+                "text": result.get("text", text),
+            }
         except json.JSONDecodeError as e:
             logger.error(f"Failed to parse OpenAI response as JSON: {e}")
             logger.error(f"Response content: {completion.choices[0].message.content}")
