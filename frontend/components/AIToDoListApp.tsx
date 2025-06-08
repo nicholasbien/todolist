@@ -27,6 +27,7 @@ export default function AIToDoListApp({ user, token }: Props) {
   const [showEmailSettings, setShowEmailSettings] = useState(false);
   const [emailTime, setEmailTime] = useState('09:00');
   const [savingSchedule, setSavingSchedule] = useState(false);
+  const [emailInstructions, setEmailInstructions] = useState('');
 
 
 
@@ -105,6 +106,7 @@ export default function AIToDoListApp({ user, token }: Props) {
       const h = String(user.summary_hour ?? 9).padStart(2, '0');
       const m = String(user.summary_minute ?? 0).padStart(2, '0');
       setEmailTime(`${h}:${m}`);
+      setEmailInstructions(user.email_instructions ?? '');
     }
   }, [user]);
 
@@ -408,6 +410,17 @@ export default function AIToDoListApp({ user, token }: Props) {
         const errorData = await response.json();
         throw new Error(errorData.detail || 'Failed to update schedule');
       }
+
+      const resp2 = await authenticatedFetch('/email/update-instructions', {
+        method: 'POST',
+        body: JSON.stringify({ instructions: emailInstructions }),
+      });
+
+      if (!resp2.ok) {
+        const errorData = await resp2.json();
+        throw new Error(errorData.detail || 'Failed to update instructions');
+      }
+
 
       setShowEmailSettings(false);
       setError('');
@@ -759,6 +772,12 @@ export default function AIToDoListApp({ user, token }: Props) {
                 value={emailTime}
                 onChange={(e) => setEmailTime(e.target.value)}
                 className="w-full bg-gray-700 p-1 rounded"
+              />
+              <label className="block text-sm mt-2">Custom Instructions</label>
+              <textarea
+                value={emailInstructions}
+                onChange={(e) => setEmailInstructions(e.target.value)}
+                className="w-full bg-gray-700 p-1 rounded h-24"
               />
               <div className="flex justify-end space-x-2 mt-2">
                 <button

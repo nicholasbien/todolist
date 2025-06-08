@@ -7,6 +7,7 @@ A modern todo list application with AI-powered task classification, email verifi
 - **AI-powered task classification** using OpenAI GPT-4o-mini
 - **Email verification authentication** with JWT sessions
 - **Daily email summaries** with AI-generated insights
+- **Customizable email instructions** for personalized summaries
 - **Category and priority management**
 - **Due date tracking** with upcoming deadlines highlighted in daily summaries
 - **Day-of-week aware date parsing** for more accurate due dates
@@ -332,6 +333,7 @@ the manual endpoint if needed:
 ### Email
 - `POST /email/send-summary` - Send daily summary to current user
 - `GET /email/scheduler-status` - Check scheduler status
+- `POST /email/update-instructions` - Set custom instructions for summaries
 
 ## Deployment
 

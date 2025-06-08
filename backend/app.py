@@ -13,6 +13,7 @@ from auth import (
     login_user,
     logout_user,
     signup_user,
+    update_user_email_instructions,
     update_user_name,
     update_user_summary_time,
     verify_session,
@@ -328,6 +329,7 @@ async def api_send_summary(current_user: dict = Depends(get_current_user)):
         current_user["user_id"],
         current_user["email"],
         current_user.get("first_name") or "",
+        current_user.get("email_instructions", ""),
     )
 
     if success:
@@ -345,6 +347,10 @@ async def api_scheduler_status():
 class UpdateScheduleRequest(BaseModel):
     hour: int
     minute: int
+
+
+class UpdateInstructionsRequest(BaseModel):
+    instructions: str
 
 
 @app.post("/email/update-schedule")
@@ -368,6 +374,16 @@ async def api_update_schedule(
         req.minute,
     )
     return {"message": "Schedule updated"}
+
+
+@app.post("/email/update-instructions")
+async def api_update_instructions(
+    req: UpdateInstructionsRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    """Update custom summary instructions for the current user."""
+    logger.info("Instructions update requested by %s", current_user["email"])
+    return await update_user_email_instructions(current_user["user_id"], req.instructions)
 
 
 if __name__ == "__main__":
