@@ -4,16 +4,13 @@ import secrets
 import smtplib
 from datetime import datetime, timedelta
 from email.mime.multipart import MIMEMultipart
-from fastapi import HTTPException
-from motor.motor_asyncio import AsyncIOMotorClient
-from mongomock_motor import AsyncMongoMockClient
-from pydantic import BaseModel, Field, EmailStr
 from email.mime.text import MIMEText
 from typing import Optional
 
 from bson import ObjectId
 from dotenv import load_dotenv
 from fastapi import HTTPException
+from mongomock_motor import AsyncMongoMockClient
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, EmailStr, Field
 
