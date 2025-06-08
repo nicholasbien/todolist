@@ -466,23 +466,28 @@ export default function AIToDoListApp({ user, token }: Props) {
           </button>
           {categories
             .sort((a, b) => {
-              if (a === "General") return -1;
-              if (b === "General") return 1;
-              return a.localeCompare(b);
+              const aName = typeof a === 'string' ? a : a.name;
+              const bName = typeof b === 'string' ? b : b.name;
+              if (aName === "General") return -1;
+              if (bName === "General") return 1;
+              return aName.localeCompare(bName);
             })
-            .map(cat => (
+            .map(cat => {
+              const catName = typeof cat === 'string' ? cat : cat.name;
+              return (
             <button
-              key={cat}
-              onClick={() => setActiveCat(cat)}
+              key={catName}
+              onClick={() => setActiveCat(catName)}
               className={`px-4 py-2 rounded-full text-base ${
-                cat === activeCat
+                catName === activeCat
                   ? "bg-blue-500 text-white"
                   : "bg-gray-700 text-white hover:bg-gray-600"
               }`}
             >
-              {cat}
+              {catName}
             </button>
-          ))}
+              );
+            })}
           <button
             onClick={() => setShowAddCategory(!showAddCategory)}
             className="px-4 py-2 rounded-full text-base bg-gray-700 text-white hover:bg-gray-600"

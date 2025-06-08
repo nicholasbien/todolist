@@ -1,9 +1,10 @@
-const STATIC_CACHE = 'todo-static-v25';
-const API_CACHE = 'todo-api-v25';
+const STATIC_CACHE = 'todo-static-v28';
+const API_CACHE = 'todo-api-v28';
 
 const DB_NAME = 'TodoOfflineDB';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const TODOS = 'todos';
+const CATEGORIES = 'categories';
 const QUEUE = 'queue';
 
 const DEFAULT_CATEGORIES = ['Work', 'Personal', 'Shopping', 'Finance', 'Health', 'General'];
@@ -17,6 +18,9 @@ function openDB() {
       const db = event.target.result;
       if (!db.objectStoreNames.contains(TODOS)) {
         db.createObjectStore(TODOS, { keyPath: '_id' });
+      }
+      if (!db.objectStoreNames.contains(CATEGORIES)) {
+        db.createObjectStore(CATEGORIES, { keyPath: 'name' });
       }
       if (!db.objectStoreNames.contains(QUEUE)) {
         db.createObjectStore(QUEUE, { keyPath: 'id', autoIncrement: true });
@@ -40,10 +44,50 @@ const getTodos = () => dbTx(TODOS, 'readonly', (s) => s.getAll());
 const putTodo = (t) => dbTx(TODOS, 'readwrite', (s) => s.put(t));
 const delTodo = (id) => dbTx(TODOS, 'readwrite', (s) => s.delete(id));
 
+const getCategories = () => dbTx(CATEGORIES, 'readonly', (s) => s.getAll());
+const putCategory = (c) => dbTx(CATEGORIES, 'readwrite', (s) => s.put(c));
+const delCategory = (name) => dbTx(CATEGORIES, 'readwrite', (s) => s.delete(name));
+
 const addQueue = (action) =>
   dbTx(QUEUE, 'readwrite', (s) => s.add({ ...action, timestamp: Date.now() }));
 const readQueue = () => dbTx(QUEUE, 'readonly', (s) => s.getAll());
 const clearQueue = () => dbTx(QUEUE, 'readwrite', (s) => s.clear());
+
+// Function to sync server data to local database on startup
+async function syncServerDataToLocal() {
+  try {
+    // Only sync if we're online
+    if (!self.navigator.onLine) return;
+
+    // Fetch and store categories
+    try {
+      const categoriesResponse = await fetch('/categories');
+      if (categoriesResponse.ok) {
+        const serverCategories = await categoriesResponse.json();
+        for (const categoryName of serverCategories) {
+          await putCategory({ name: categoryName });
+        }
+      }
+    } catch (err) {
+      console.log('Failed to sync categories:', err);
+    }
+
+    // Fetch and store todos
+    try {
+      const todosResponse = await fetch('/todos');
+      if (todosResponse.ok) {
+        const serverTodos = await todosResponse.json();
+        for (const todo of serverTodos) {
+          await putTodo(todo);
+        }
+      }
+    } catch (err) {
+      console.log('Failed to sync todos:', err);
+    }
+  } catch (err) {
+    console.log('Failed to sync server data:', err);
+  }
+}
 
 self.addEventListener('install', (event) => {
   event.waitUntil(Promise.all([caches.open(STATIC_CACHE), caches.open(API_CACHE), openDB()]));
@@ -52,14 +96,19 @@ self.addEventListener('install', (event) => {
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((names) =>
-      Promise.all(
-        names.map((n) => {
-          if (![STATIC_CACHE, API_CACHE].includes(n)) return caches.delete(n);
-          return null;
-        })
-      )
-    )
+    Promise.all([
+      // Clean up old caches
+      caches.keys().then((names) =>
+        Promise.all(
+          names.map((n) => {
+            if (![STATIC_CACHE, API_CACHE].includes(n)) return caches.delete(n);
+            return null;
+          })
+        )
+      ),
+      // Sync server data to local database when service worker activates
+      syncServerDataToLocal()
+    ])
   );
   self.clients.claim();
 });
@@ -109,6 +158,28 @@ async function handleApiRequest(request) {
             headers: { 'Content-Type': 'application/json' }
           });
         }
+
+        // For GET /categories, sync server data to IndexedDB and merge with offline categories
+        if (url.pathname === '/categories') {
+          const serverCategories = await response.clone().json(); // Array of strings like ["Work", "Personal"]
+
+          // Save all server categories to IndexedDB for offline access (as objects)
+          for (const categoryName of serverCategories) {
+            await putCategory({ name: categoryName });
+          }
+
+          // Get offline-only categories (not yet synced)
+          const offlineCategories = await getCategories();
+          const offlineOnlyCategories = offlineCategories.filter(c => c.name.startsWith('offline_'));
+          const offlineOnlyNames = offlineOnlyCategories.map(c => c.name);
+
+          // Merge server categories with offline-only categories (return as strings)
+          const mergedCategories = [...serverCategories, ...offlineOnlyNames];
+
+          return new Response(JSON.stringify(mergedCategories), {
+            headers: { 'Content-Type': 'application/json' }
+          });
+        }
       }
       if (request.method !== 'GET' && response.ok) {
         syncQueue();
@@ -129,8 +200,15 @@ async function offlineFallback(request, url) {
       return new Response(JSON.stringify(todos), { headers: { 'Content-Type': 'application/json' } });
     }
     if (url.pathname === '/categories') {
-      const cats = DEFAULT_CATEGORIES.map((name) => ({ name }));
-      return new Response(JSON.stringify(cats), { headers: { 'Content-Type': 'application/json' } });
+      const offlineCategories = await getCategories();
+
+      // If we have stored categories, return their names; otherwise use defaults
+      if (offlineCategories && offlineCategories.length > 0) {
+        const categoryNames = offlineCategories.map(c => c.name);
+        return new Response(JSON.stringify(categoryNames), { headers: { 'Content-Type': 'application/json' } });
+      } else {
+        return new Response(JSON.stringify(DEFAULT_CATEGORIES), { headers: { 'Content-Type': 'application/json' } });
+      }
     }
     if (url.pathname.startsWith('/classify')) {
       return new Response(
@@ -196,6 +274,24 @@ async function offlineFallback(request, url) {
       await addQueue({ type: 'DELETE', data: { _id: id } });
       return new Response(null, { status: 204 });
     }
+
+    // Create new category
+    if (url.pathname === '/categories' && request.method === 'POST') {
+      const categoryName = data.name || `offline_${Date.now()}`;
+      const newCategory = { name: categoryName };
+
+      await putCategory(newCategory);
+      await addQueue({ type: 'CREATE_CATEGORY', data: newCategory });
+      return new Response(JSON.stringify(newCategory), { headers: { 'Content-Type': 'application/json' } });
+    }
+
+    // Delete category
+    if (url.pathname.startsWith('/categories/') && request.method === 'DELETE') {
+      const categoryName = decodeURIComponent(url.pathname.split('/')[2]); // Get name from /categories/{name}
+      await delCategory(categoryName);
+      await addQueue({ type: 'DELETE_CATEGORY', data: { name: categoryName } });
+      return new Response(null, { status: 204 });
+    }
   }
 
   // Gracefully fail all other requests when offline
@@ -249,6 +345,20 @@ async function syncQueue() {
           if (!op.data._id.startsWith('offline_')) {
             await fetch(`/todos/${op.data._id}`, { method: 'DELETE' });
           }
+          break;
+        case 'CREATE_CATEGORY':
+          res = await fetch('/categories', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(op.data),
+          });
+          if (res.ok) {
+            const serverCategory = await res.json();
+            await putCategory(serverCategory);
+          }
+          break;
+        case 'DELETE_CATEGORY':
+          await fetch(`/categories/${encodeURIComponent(op.data.name)}`, { method: 'DELETE' });
           break;
       }
     } catch (err) {
