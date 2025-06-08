@@ -479,7 +479,7 @@ export default function AIToDoListApp({ user, token }: Props) {
             type="text"
             value={newTodo}
             onChange={(e) => setNewTodo(e.target.value)}
-            placeholder="Add a new task..."
+            placeholder="Add a new task/thought/link..."
             className="flex-1 p-3 border border-gray-700 rounded bg-gray-800 text-white placeholder-gray-400"
             onKeyPress={(e) => e.key === 'Enter' && handleAddTodo()}
           />
