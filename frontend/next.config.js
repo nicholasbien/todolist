@@ -28,6 +28,31 @@ const nextConfig = {
       },
     ];
   },
-}
+  async rewrites() {
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+    return [
+      {
+        source: '/todos/:path*',
+        destination: `${apiUrl}/todos/:path*`,
+      },
+      {
+        source: '/categories/:path*',
+        destination: `${apiUrl}/categories/:path*`,
+      },
+      {
+        source: '/classify',
+        destination: `${apiUrl}/classify`,
+      },
+      {
+        source: '/auth/:path*',
+        destination: `${apiUrl}/auth/:path*`,
+      },
+      {
+        source: '/email/:path*',
+        destination: `${apiUrl}/email/:path*`,
+      },
+    ];
+  },
+};
 
-module.exports = nextConfig
+module.exports = nextConfig;

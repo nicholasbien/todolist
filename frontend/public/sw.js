@@ -1,4 +1,12 @@
 const API_CACHE_NAME = 'ai-todo-api-v3';
+const STATIC_CACHE_NAME = 'ai-todo-static-v1';
+const STATIC_ASSETS = [
+  '/',
+  '/index.html',
+  '/manifest.json',
+  '/icon-192x192.png',
+  '/icon-512x512.png',
+];
 
 // Shared default categories used when offline
 const DEFAULT_CATEGORIES = ['Work', 'Personal', 'Shopping', 'Finance', 'Health', 'General'];
@@ -80,6 +88,26 @@ const deleteTodo = (id) => {
   });
 };
 
+const clearTodos = () => {
+  return withDB(db => {
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction([TODOS_STORE], 'readwrite');
+      const store = transaction.objectStore(TODOS_STORE);
+      const request = store.clear();
+
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+  });
+};
+
+const setTodos = async (todos) => {
+  await clearTodos();
+  for (const todo of todos) {
+    await saveTodo(todo);
+  }
+};
+
 const addToSyncQueue = (action) => {
   return withDB(db => {
     return new Promise((resolve, reject) => {
@@ -127,7 +155,8 @@ self.addEventListener('install', (event) => {
   event.waitUntil(
     Promise.all([
       caches.open(API_CACHE_NAME),
-      initDB()
+      caches.open(STATIC_CACHE_NAME).then((cache) => cache.addAll(STATIC_ASSETS)),
+      initDB(),
     ])
   );
 });
@@ -136,22 +165,26 @@ self.addEventListener('install', (event) => {
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
-  // Skip all Next.js internal requests and same-origin requests that aren't API calls
+  if (event.request.mode === 'navigate') {
+    event.respondWith(
+      fetch(event.request).catch(() => caches.match('/'))
+    );
+    return;
+  }
+
   if (event.request.url.includes('/_next/') ||
       event.request.url.includes('/__nextjs') ||
       event.request.url.includes('/favicon')) {
     return;
   }
 
-  // Only handle backend API requests (different origin or specific API endpoints)
-  const isBackendAPI = url.hostname !== location.hostname ||
-                       (url.hostname === location.hostname && url.port === '8000');
-
-  if (isBackendAPI && (
-    url.pathname.startsWith('/todos') ||
-    url.pathname.startsWith('/classify') ||
-    url.pathname.startsWith('/categories')
-  )) {
+  if (
+    url.origin === location.origin && (
+      url.pathname.startsWith('/todos') ||
+      url.pathname.startsWith('/classify') ||
+      url.pathname.startsWith('/categories')
+    )
+  ) {
     event.respondWith(handleAPIRequest(event.request));
   }
 });
@@ -165,15 +198,37 @@ const handleAPIRequest = async (request) => {
     if (isOnline) {
       const response = await fetch(request);
 
-      // Cache successful GET responses
-      if (request.method === 'GET' && response.ok) {
-        const cache = await caches.open(API_CACHE_NAME);
-        cache.put(request, response.clone());
-      }
+      if (response.ok) {
+        const cloned = response.clone();
 
-      // If this is a successful sync, sync any queued operations
-      if (response.ok && request.method !== 'GET') {
-        syncQueuedOperations();
+        if (request.method === 'GET' && url.pathname === '/todos') {
+          const todos = await cloned.clone().json();
+          await setTodos(todos);
+        }
+
+        if (request.method === 'POST' && url.pathname === '/todos') {
+          const todo = await cloned.clone().json();
+          await saveTodo(todo);
+        }
+
+        if (request.method === 'PUT' && url.pathname.startsWith('/todos/')) {
+          const updated = await cloned.clone().json();
+          await saveTodo(updated);
+        }
+
+        if (request.method === 'DELETE' && url.pathname.startsWith('/todos/')) {
+          const id = url.pathname.split('/').pop();
+          await deleteTodo(id);
+        }
+
+        if (request.method === 'GET') {
+          const cache = await caches.open(API_CACHE_NAME);
+          cache.put(request, response.clone());
+        }
+
+        if (request.method !== 'GET') {
+          syncQueuedOperations();
+        }
       }
 
       return response;
@@ -184,7 +239,13 @@ const handleAPIRequest = async (request) => {
     // Handle offline requests
     if (request.method === 'GET') {
       if (url.pathname === '/todos') {
-        const todos = await getTodos();
+        let todos = await getTodos();
+        if (todos.length === 0) {
+          const cached = await caches.match(request);
+          if (cached) {
+            return cached;
+          }
+        }
         return new Response(JSON.stringify(todos), {
           headers: { 'Content-Type': 'application/json' }
         });
@@ -338,10 +399,7 @@ const syncQueuedOperations = async () => {
     const response = await fetch('/todos');
     if (response.ok) {
       const serverTodos = await response.json();
-      // Update local cache with server data
-      for (const todo of serverTodos) {
-        await saveTodo(todo);
-      }
+      await setTodos(serverTodos);
     }
 
   } catch (error) {
@@ -351,18 +409,12 @@ const syncQueuedOperations = async () => {
 
 // Listen for online events to trigger sync
 self.addEventListener('message', (event) => {
-  if (event.data.type === 'SYNC_WHEN_ONLINE') {
+  if (event.data?.type === 'SYNC_WHEN_ONLINE') {
     syncQueuedOperations();
   }
-});
-
-// Message event - handle communication with main thread
-self.addEventListener('message', (event) => {
-  // Handle any messages from the main thread
-  if (event.data && event.data.type === 'SKIP_WAITING') {
+  if (event.data?.type === 'SKIP_WAITING') {
     self.skipWaiting();
   }
-  // Don't return true unless you send a response
 });
 
 // Activate event - clean up old caches
@@ -371,7 +423,7 @@ self.addEventListener('activate', (event) => {
     caches.keys().then((cacheNames) => {
       return Promise.all(
         cacheNames.map((cacheName) => {
-          if (cacheName !== API_CACHE_NAME) {
+          if (cacheName !== API_CACHE_NAME && cacheName !== STATIC_CACHE_NAME) {
             return caches.delete(cacheName);
           }
         })

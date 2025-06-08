@@ -16,13 +16,14 @@ export const AuthProvider = ({ children }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [mounted, setMounted] = useState(false);
 
-  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+  // Use relative paths so the service worker can cache requests
+  const API_URL = '';
 
   const logout = async () => {
     try {
       if (token) {
         // Call logout endpoint to invalidate token on server
-        await fetch(`${API_URL}/auth/logout`, {
+        await fetch(`/auth/logout`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${token}`
@@ -44,7 +45,7 @@ export const AuthProvider = ({ children }) => {
 
   const verifyToken = async (tokenToVerify) => {
     try {
-      const response = await fetch(`${API_URL}/auth/me`, {
+      const response = await fetch(`/auth/me`, {
         headers: {
           'Authorization': `Bearer ${tokenToVerify}`
         }
@@ -95,7 +96,7 @@ export const AuthProvider = ({ children }) => {
 
   const signup = async (email) => {
     try {
-      const response = await fetch(`${API_URL}/auth/signup`, {
+      const response = await fetch(`/auth/signup`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -117,7 +118,7 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (email, code) => {
     try {
-      const response = await fetch(`${API_URL}/auth/login`, {
+      const response = await fetch(`/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'

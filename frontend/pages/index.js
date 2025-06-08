@@ -20,7 +20,8 @@ function LoginForm({ onLogin }) {
   const [message, setMessage] = useState('');
   const [needsName, setNeedsName] = useState(false);
 
-  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+  // Use relative paths so the service worker can cache requests
+  const API_URL = '';
 
   const handleEmailSubmit = async (e) => {
     e.preventDefault();
@@ -34,7 +35,7 @@ function LoginForm({ onLogin }) {
     setMessage('');
 
     try {
-      const response = await fetch(`${API_URL}/auth/signup`, {
+      const response = await fetch(`/auth/signup`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -68,7 +69,7 @@ function LoginForm({ onLogin }) {
     setError('');
 
     try {
-      const response = await fetch(`${API_URL}/auth/login`, {
+      const response = await fetch(`/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -113,7 +114,7 @@ function LoginForm({ onLogin }) {
 
     try {
       const token = localStorage.getItem('auth_token');
-      const response = await fetch(`${API_URL}/auth/update-name`, {
+      const response = await fetch(`/auth/update-name`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
