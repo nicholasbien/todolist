@@ -1,9 +1,10 @@
 import json
 import logging
 import os
+import re
 import time
-from datetime import datetime
-from typing import Any, Dict, List
+from datetime import datetime, timedelta
+from typing import Any, Dict, List, Optional, Tuple
 
 from categories import DEFAULT_CATEGORIES
 from dotenv import load_dotenv
@@ -24,6 +25,49 @@ if not api_key:
 
 # Initialize OpenAI client with timeout
 client = OpenAI(api_key=api_key, timeout=5.0, max_retries=0)  # 10 second timeout
+
+
+def extract_due_date(text: str) -> Tuple[Optional[str], str]:
+    """Extract a due date from natural language text.
+
+    Supports simple expressions like "today", "tomorrow" and weekdays
+    with optional "next" prefix.
+
+    Returns a tuple of (YYYY-MM-DD or None, cleaned_text).
+    """
+    lower = text.lower()
+    today = datetime.now().date()
+    due_date: Optional[str] = None
+    cleaned = text
+
+    if re.search(r"\btoday\b", lower):
+        due_date = today.isoformat()
+        cleaned = re.sub(r"\btoday\b", "", cleaned, flags=re.IGNORECASE).strip()
+    elif re.search(r"\btomorrow\b", lower):
+        due_date = (today + timedelta(days=1)).isoformat()
+        cleaned = re.sub(r"\btomorrow\b", "", cleaned, flags=re.IGNORECASE).strip()
+    else:
+        days = [
+            "monday",
+            "tuesday",
+            "wednesday",
+            "thursday",
+            "friday",
+            "saturday",
+            "sunday",
+        ]
+        for i, day in enumerate(days):
+            match = re.search(rf"(next\s+)?{day}\b", lower)
+            if match:
+                weekday = today.weekday()  # Monday=0
+                delta = (i - weekday) % 7
+                if match.group(1) or delta == 0:
+                    delta = delta + 7 if delta == 0 else delta
+                due_date = (today + timedelta(days=delta)).isoformat()
+                cleaned = re.sub(rf"(next\s+)?{day}\b", "", cleaned, flags=re.IGNORECASE).strip()
+                break
+
+    return due_date, cleaned
 
 
 async def classify_task(text: str, categories: List[str]) -> Dict[str, Any]:
@@ -52,6 +96,9 @@ async def classify_task(text: str, categories: List[str]) -> Dict[str, Any]:
         logger.warning("Empty task text provided")
         return default_response
 
+    # We'll rely on the LLM to parse the due date. Heuristics are used only as a fallback
+    extracted_due, cleaned_fallback = extract_due_date(text)
+
     start_time = time.time()
     try:
         # Format categories for the prompt
@@ -61,9 +108,9 @@ async def classify_task(text: str, categories: List[str]) -> Dict[str, Any]:
 
         current_date = datetime.now().isoformat()
         system_prompt = (
-            "You are a task organizer. Analyze the task text, remove any date references, "
-            "and extract a due date if present. Return a JSON object with fields: "
-            "'category', 'priority', 'text' (cleaned task description), and 'dueDate' (YYYY-MM-DD or null). "
+            "You are a task organizer. Analyze the task text and return a JSON object with fields: "
+            "'category', 'priority', 'text' (cleaned task description with date references removed), "
+            "and 'dueDate' (YYYY-MM-DD or null). "
             f"Dates should be interpreted relative to {current_date}. Available categories: {categories_str}. "
             "Priority options: High, Medium, Low. Only output valid JSON."
         )
@@ -72,10 +119,7 @@ async def classify_task(text: str, categories: List[str]) -> Dict[str, Any]:
         completion = client.chat.completions.create(
             model="gpt-4.1-nano",
             messages=[
-                {
-                    "role": "system",
-                    "content": system_prompt,
-                },
+                {"role": "system", "content": system_prompt},
                 {"role": "user", "content": f'Task: "{text}"'},
             ],
             temperature=0,
@@ -99,11 +143,29 @@ async def classify_task(text: str, categories: List[str]) -> Dict[str, Any]:
             if due_date:
                 due_date = str(due_date).split("T")[0]
 
+            if not due_date:
+                due_date = extracted_due
+
+            cleaned = result.get("text", text).strip() or text
+            if cleaned == text and cleaned_fallback != text:
+                cleaned = cleaned_fallback
+
+            priority = result.get("priority", "Low")
+            if due_date:
+                try:
+                    days = (datetime.fromisoformat(due_date).date() - datetime.now().date()).days
+                    if days <= 1:
+                        priority = "High"
+                    elif days <= 3 and priority == "Low":
+                        priority = "Medium"
+                except Exception:
+                    pass
+
             return {
                 "category": category,
-                "priority": result.get("priority", "Low"),
+                "priority": priority,
                 "dueDate": due_date,
-                "text": result.get("text", text),
+                "text": cleaned,
             }
         except json.JSONDecodeError as e:
             logger.error(f"Failed to parse OpenAI response as JSON: {e}")
