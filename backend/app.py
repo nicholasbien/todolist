@@ -201,15 +201,16 @@ async def api_create_todo(request: Request, current_user: dict = Depends(get_cur
                 print(f"Exception fetching {text}: {e}")
                 logger.error(f"Failed to fetch title for {text}: {e}")
 
-        # Always classify the final text on the backend
-        try:
-            classification = await classify_task(classify_text, body.get("categories", []))
-            body["category"] = classification.get("category", "General")
-            body["priority"] = classification.get("priority", "Medium")
-        except Exception as e:
-            logger.error(f"Failed to classify text '{classify_text}': {e}")
-            body["category"] = "General"
-            body["priority"] = "Medium"
+        # Only classify if not created offline (offline todos are already classified)
+        if not body.get("created_offline", False):
+            try:
+                classification = await classify_task(classify_text, body.get("categories", []))
+                body["category"] = classification.get("category", "General")
+                body["priority"] = classification.get("priority", "Medium")
+            except Exception as e:
+                logger.error(f"Failed to classify text '{classify_text}': {e}")
+                body["category"] = "General"
+                body["priority"] = "Medium"
 
         # Ensure dateAdded exists
         body.setdefault("dateAdded", datetime.now().isoformat())

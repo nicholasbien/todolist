@@ -251,6 +251,7 @@ async function offlineFallback(request, url) {
         dateAdded: new Date().toISOString(),
         completed: false,
         user_id: authData ? authData.userId : 'offline_user',
+        created_offline: true,
       };
 
       // If it's a URL, store it as a link (title fetching will happen when synced)

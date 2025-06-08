@@ -30,12 +30,13 @@ class Todo(BaseModel):
     id: Optional[str] = Field(alias="_id", default=None)
     text: str
     link: Optional[str] = None
-    category: str
-    priority: str
+    category: str = "General"
+    priority: str = "Medium"
     dateAdded: str
     completed: bool = False
     dateCompleted: Optional[str] = None
     user_id: str
+    created_offline: bool = False
 
     class Config:
         arbitrary_types_allowed = True
