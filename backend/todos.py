@@ -27,6 +27,7 @@ todos_collection = db.todos
 class Todo(BaseModel):
     id: Optional[str] = Field(alias="_id", default=None)
     text: str
+    link: Optional[str] = None
     category: str
     priority: str
     dateAdded: str

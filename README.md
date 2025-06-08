@@ -8,6 +8,7 @@ A modern todo list application with AI-powered task classification, email verifi
 - **Email verification authentication** with JWT sessions
 - **Daily email summaries** with AI-generated insights
 - **Category and priority management**
+- **Link support** - Add a URL as a task and its page title is fetched automatically
 - **Progressive Web App (PWA)** - Install on iPhone/Android like a native app
 - **Offline functionality** - Works without internet connection
 - **User isolation** - Each user sees only their own todos
