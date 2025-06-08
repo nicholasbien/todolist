@@ -1,5 +1,5 @@
-const STATIC_CACHE = 'todo-static-v31';
-const API_CACHE = 'todo-api-v31';
+const STATIC_CACHE = 'todo-static-v33';
+const API_CACHE = 'todo-api-v33';
 
 const GLOBAL_DB_NAME = 'TodoGlobalDB';
 const USER_DB_PREFIX = 'TodoUserDB_';
@@ -427,8 +427,13 @@ async function offlineFallback(request, url) {
 
       if (existingTodo) {
         const updated = { ...existingTodo, completed: !existingTodo.completed };
+        if (updated.completed) {
+          updated.dateCompleted = new Date().toISOString();
+        } else {
+          delete updated.dateCompleted;
+        }
         await putTodo(updated, authData ? authData.userId : null);
-        await addQueue({ type: 'UPDATE', data: updated }, authData ? authData.userId : null);
+        await addQueue({ type: 'COMPLETE', data: { _id: id, completed: updated.completed } }, authData ? authData.userId : null);
         return new Response(JSON.stringify({ message: 'Todo updated' }), { headers: { 'Content-Type': 'application/json' } });
       }
     }
@@ -512,6 +517,14 @@ async function syncQueue() {
             });
           }
           break;
+        case 'COMPLETE':
+          if (!op.data._id.startsWith('offline_')) {
+            await fetch(`/todos/${op.data._id}/complete`, {
+              method: 'PUT',
+              headers
+            });
+          }
+          break;
         case 'DELETE':
           if (!op.data._id.startsWith('offline_')) {
             await fetch(`/todos/${op.data._id}`, {
@@ -539,10 +552,14 @@ async function syncQueue() {
           break;
       }
     } catch (err) {
-      // keep in queue on error
+      // Continue processing other operations on error
+      // Failed operations are not retried to prevent infinite loops
       continue;
     }
   }
+
+  // Always clear queue after processing (prevents infinite retry loops)
+  // Final GET /todos ensures data consistency regardless of individual operation failures
   await clearQueue(authData.userId);
   try {
     const res = await fetch('/todos', { headers });
