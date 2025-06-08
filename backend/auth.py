@@ -1,18 +1,21 @@
+import logging
 import os
 import secrets
 import smtplib
-import logging
 from datetime import datetime, timedelta
-from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from fastapi import HTTPException
 from motor.motor_asyncio import AsyncIOMotorClient
 from mongomock_motor import AsyncMongoMockClient
 from pydantic import BaseModel, Field, EmailStr
+from email.mime.text import MIMEText
 from typing import Optional
+
 from bson import ObjectId
 from dotenv import load_dotenv
-import jwt
+from fastapi import HTTPException
+from motor.motor_asyncio import AsyncIOMotorClient
+from pydantic import BaseModel, EmailStr, Field
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -30,7 +33,9 @@ users_collection = db.users
 sessions_collection = db.sessions
 
 # JWT settings
-JWT_SECRET = os.getenv("JWT_SECRET", "your-secret-key-change-this")
+JWT_SECRET = os.getenv("JWT_SECRET")
+if not JWT_SECRET:
+    raise ValueError("JWT_SECRET environment variable is required")
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRATION_HOURS = 24 * 7  # 7 days
 
@@ -40,6 +45,7 @@ SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
 FROM_EMAIL = os.getenv("FROM_EMAIL")
 SMTP_USERNAME = FROM_EMAIL  # Use FROM_EMAIL as username
 SMTP_PASSWORD = os.getenv("SMTP_PASSWORD")
+
 
 # Pydantic models
 class User(BaseModel):
@@ -57,6 +63,7 @@ class User(BaseModel):
         json_encoders = {ObjectId: str}
         allow_population_by_field_name = True
 
+
 class Session(BaseModel):
     id: Optional[str] = Field(alias="_id", default=None)
     user_id: str
@@ -70,39 +77,44 @@ class Session(BaseModel):
         json_encoders = {ObjectId: str}
         allow_population_by_field_name = True
 
+
 class SignupRequest(BaseModel):
     email: EmailStr
+
 
 class LoginRequest(BaseModel):
     email: EmailStr
     code: str
 
+
 class UpdateNameRequest(BaseModel):
     first_name: str
+
 
 def generate_verification_code() -> str:
     """Generate a 6-digit verification code."""
     return f"{secrets.randbelow(1000000):06d}"
 
+
 def generate_session_token() -> str:
     """Generate a secure session token."""
     return secrets.token_urlsafe(32)
 
+
 async def send_verification_email(email: str, code: str) -> bool:
     """Send verification code via email."""
     try:
-        if not SMTP_USERNAME or not SMTP_PASSWORD:
+        if not SMTP_USERNAME or not SMTP_PASSWORD or not FROM_EMAIL:
             logger.warning("Email credentials not configured, printing code to console")
             print(f"VERIFICATION CODE for {email}: {code}")
             return True
 
         msg = MIMEMultipart()
-        msg['From'] = FROM_EMAIL
-        msg['To'] = email
-        msg['Subject'] = "Your Todo App Verification Code"
+        msg["From"] = FROM_EMAIL
+        msg["To"] = email
+        msg["Subject"] = "Your Todo App Verification Code"
 
-        body = f"""
-Hi there!
+        body = f"""Hi there!
 
 Your verification code for my todolist app is: {code}
 
@@ -111,26 +123,28 @@ This code will expire in 10 minutes.
 If you didn't request this code, please ignore this email.
 
 Best regards,
--Nicholas
-        """
-        
-        msg.attach(MIMEText(body, 'plain'))
-        
+Nicholas"""
+
+        msg.attach(MIMEText(body, "plain"))
+
         server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
         server.starttls()
         server.login(SMTP_USERNAME, SMTP_PASSWORD)
         text = msg.as_string()
         server.sendmail(FROM_EMAIL, email, text)
         server.quit()
-        
+
         logger.info(f"Verification email sent to {email}")
+        # For testing: always print verification code to console
+        print(f"VERIFICATION CODE for {email}: {code}")
         return True
-        
+
     except Exception as e:
         logger.error(f"Failed to send email to {email}: {str(e)}")
         # For development, print to console if email fails
         print(f"EMAIL FAILED - VERIFICATION CODE for {email}: {code}")
         return True  # Return True anyway for development
+
 
 async def signup_user(email: str) -> dict:
     """Create or update user with new verification code."""
@@ -138,10 +152,10 @@ async def signup_user(email: str) -> dict:
         # Generate verification code
         code = generate_verification_code()
         code_expires_at = datetime.now() + timedelta(minutes=10)
-        
+
         # Check if user already exists
         existing_user = await users_collection.find_one({"email": email})
-        
+
         if existing_user:
             # Update existing user with new code
             await users_collection.update_one(
@@ -150,9 +164,9 @@ async def signup_user(email: str) -> dict:
                     "$set": {
                         "verification_code": code,
                         "code_expires_at": code_expires_at,
-                        "is_verified": False
+                        "is_verified": False,
                     }
-                }
+                },
             )
             logger.info(f"Updated verification code for existing user: {email}")
         else:
@@ -161,25 +175,26 @@ async def signup_user(email: str) -> dict:
                 email=email,
                 first_name="",  # Will be set during first login
                 verification_code=code,
-                code_expires_at=code_expires_at
+                code_expires_at=code_expires_at,
             )
             user_dict = user.dict(by_alias=True)
             user_dict.pop("_id", None)
-            
+
             await users_collection.insert_one(user_dict)
             logger.info(f"Created new user: {email}")
-        
+
         # Send verification email
         email_sent = await send_verification_email(email, code)
-        
+
         if email_sent:
             return {"message": "Verification code sent to your email"}
         else:
             raise HTTPException(status_code=500, detail="Failed to send verification email")
-            
+
     except Exception as e:
         logger.error(f"Error in signup_user: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Signup failed: {str(e)}")
+
 
 async def login_user(email: str, code: str) -> dict:
     """Verify code and create session for user."""
@@ -188,176 +203,142 @@ async def login_user(email: str, code: str) -> dict:
         user = await users_collection.find_one({"email": email})
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
-        
+
         # Check if code is valid and not expired
         if user.get("verification_code") != code:
             raise HTTPException(status_code=400, detail="Invalid verification code")
-        
+
         if not user.get("code_expires_at") or datetime.now() > user["code_expires_at"]:
             raise HTTPException(status_code=400, detail="Verification code has expired")
-        
+
         # Mark user as verified and update last login
         await users_collection.update_one(
             {"email": email},
             {
-                "$set": {
-                    "is_verified": True,
-                    "last_login": datetime.now()
-                },
-                "$unset": {
-                    "verification_code": "",
-                    "code_expires_at": ""
-                }
-            }
+                "$set": {"is_verified": True, "last_login": datetime.now()},
+                "$unset": {"verification_code": "", "code_expires_at": ""},
+            },
         )
-        
+
         # Create session
         token = generate_session_token()
         expires_at = datetime.now() + timedelta(hours=JWT_EXPIRATION_HOURS)
-        
-        session = Session(
-            user_id=str(user["_id"]),
-            token=token,
-            expires_at=expires_at
-        )
-        
+
+        session = Session(user_id=str(user["_id"]), token=token, expires_at=expires_at)
+
         session_dict = session.dict(by_alias=True)
         session_dict.pop("_id", None)
-        
+
         await sessions_collection.insert_one(session_dict)
-        
+
         logger.info(f"User logged in successfully: {email}")
-        
+
         return {
             "message": "Login successful",
             "token": token,
             "user": {
                 "id": str(user["_id"]),
                 "email": user["email"],
-                "first_name": user.get("first_name", "")
-            }
+                "first_name": user.get("first_name", ""),
+            },
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error in login_user: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Login failed: {str(e)}")
 
+
 async def verify_session(token: str) -> dict:
     """Verify session token and return user info."""
     try:
         # Find active session
-        session = await sessions_collection.find_one({
-            "token": token,
-            "is_active": True,
-            "expires_at": {"$gt": datetime.now()}
-        })
-        
+        session = await sessions_collection.find_one(
+            {"token": token, "is_active": True, "expires_at": {"$gt": datetime.now()}}
+        )
+
         if not session:
             raise HTTPException(status_code=401, detail="Invalid or expired session")
-        
+
         # Get user info
         user = await users_collection.find_one({"_id": ObjectId(session["user_id"])})
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
-        
+
         return {
             "user_id": str(user["_id"]),
             "email": user["email"],
-            "first_name": user.get("first_name", "")
+            "first_name": user.get("first_name", ""),
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error in verify_session: {str(e)}")
         raise HTTPException(status_code=401, detail="Session verification failed")
 
+
 async def logout_user(token: str) -> dict:
     """Deactivate user session."""
     try:
-        result = await sessions_collection.update_one(
-            {"token": token},
-            {"$set": {"is_active": False}}
-        )
-        
+        result = await sessions_collection.update_one({"token": token}, {"$set": {"is_active": False}})
+
         if result.modified_count == 0:
             raise HTTPException(status_code=404, detail="Session not found")
-        
+
         return {"message": "Logged out successfully"}
-        
+
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error in logout_user: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Logout failed: {str(e)}")
 
+
 async def update_user_name(user_id: str, first_name: str) -> dict:
     """Update user's first name."""
     try:
         # Update user's first name
-        result = await users_collection.update_one(
-            {"_id": ObjectId(user_id)},
-            {"$set": {"first_name": first_name}}
-        )
-        
+        result = await users_collection.update_one({"_id": ObjectId(user_id)}, {"$set": {"first_name": first_name}})
+
         if result.matched_count == 0:
             raise HTTPException(status_code=404, detail="User not found")
-        
+
         # Get updated user data
         user = await users_collection.find_one({"_id": ObjectId(user_id)})
-        
+
         logger.info(f"Updated first name for user: {user['email']}")
-        
+
         return {
             "message": "Name updated successfully",
             "user": {
                 "id": str(user["_id"]),
                 "email": user["email"],
-                "first_name": user["first_name"]
-            }
+                "first_name": user["first_name"],
+            },
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error in update_user_name: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to update name: {str(e)}")
 
+
 async def cleanup_expired_sessions():
     """Clean up expired sessions and verification codes."""
     try:
         # Remove expired sessions
-        await sessions_collection.delete_many({
-            "expires_at": {"$lt": datetime.now()}
-        })
-        
+        await sessions_collection.delete_many({"expires_at": {"$lt": datetime.now()}})
+
         # Remove expired verification codes
         await users_collection.update_many(
             {"code_expires_at": {"$lt": datetime.now()}},
-            {
-                "$unset": {
-                    "verification_code": "",
-                    "code_expires_at": ""
-                }
-            }
+            {"$unset": {"verification_code": "", "code_expires_at": ""}},
         )
-        
+
         logger.info("Cleaned up expired sessions and codes")
-        
+
     except Exception as e:
         logger.error(f"Error in cleanup: {str(e)}")
-
-async def get_all_users():
-    """Get all verified users for daily summary emails."""
-    try:
-        users = await users_collection.find({
-            "is_verified": True
-        }).to_list(length=None)
-        
-        return users
-        
-    except Exception as e:
-        logger.error(f"Error getting all users: {str(e)}")
-        return []

@@ -10,7 +10,11 @@ const AIToDoListApp = dynamic(() => import('../components/AIToDoListApp'), {
   )
 });
 
-function LoginForm({ onLogin }) {
+interface LoginFormProps {
+  onLogin: (user: any, token: string) => void;
+}
+
+function LoginForm({ onLogin }: LoginFormProps) {
   const [email, setEmail] = useState('');
   const [code, setCode] = useState('');
   const [firstName, setFirstName] = useState('');
@@ -43,7 +47,7 @@ function LoginForm({ onLogin }) {
       });
 
       const data = await response.json();
-      
+
       if (response.ok) {
         setStep('code');
         // setMessage('Verification code sent! Check your email.');
@@ -77,13 +81,13 @@ function LoginForm({ onLogin }) {
       });
 
       const data = await response.json();
-      
+
       if (response.ok) {
         const { token, user } = data;
-        
+
         localStorage.setItem('auth_token', token);
         localStorage.setItem('auth_user', JSON.stringify(user));
-        
+
         // Check if user needs to set their name
         if (!user.first_name) {
           setNeedsName(true);
@@ -123,7 +127,7 @@ function LoginForm({ onLogin }) {
       });
 
       const data = await response.json();
-      
+
       if (response.ok) {
         const updatedUser = data.user;
         localStorage.setItem('auth_user', JSON.stringify(updatedUser));
@@ -151,8 +155,8 @@ function LoginForm({ onLogin }) {
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">todolist</h1>
           <p className="text-gray-600">
-            {step === 'email' 
-              ? 'Enter your email to get started' 
+            {step === 'email'
+              ? 'Enter your email to get started'
               : step === 'code'
               ? 'Enter the verification code sent to your email'
               : 'What should we call you?'
@@ -278,11 +282,11 @@ export default function Home() {
 
   useEffect(() => {
     setIsClient(true);
-    
+
     const checkAuth = () => {
       const storedToken = localStorage.getItem('auth_token');
       const storedUser = localStorage.getItem('auth_user');
-      
+
       if (storedToken && storedUser) {
         setToken(storedToken);
         setUser(JSON.parse(storedUser));
@@ -329,7 +333,7 @@ export default function Home() {
           <h1 className="text-2xl font-bold">todolist</h1>
           <div className="flex items-center space-x-4">
             <span className="text-sm text-gray-400">Hello, {user?.first_name || user?.email}</span>
-            <button 
+            <button
               onClick={handleLogout}
               className="text-blue-400 hover:text-blue-300 text-sm underline"
             >
@@ -341,4 +345,4 @@ export default function Home() {
       </div>
     </main>
   );
-} 
+}

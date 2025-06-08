@@ -1,6 +1,17 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 
-const AuthContext = createContext();
+interface AuthContextValue {
+  user: any;
+  token: string | null;
+  isLoading: boolean;
+  isAuthenticated: boolean;
+  signup: (email: string) => Promise<{ success: boolean; message?: string; error?: string }>;
+  login: (email: string, code: string) => Promise<{ success: boolean; error?: string }>;
+  logout: () => Promise<void> | void;
+  authenticatedFetch: (url: string, options?: RequestInit) => Promise<Response>;
+}
+
+const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
@@ -10,7 +21,11 @@ export const useAuth = () => {
   return context;
 };
 
-export const AuthProvider = ({ children }) => {
+interface AuthProviderProps {
+  children: ReactNode;
+}
+
+export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -18,7 +33,7 @@ export const AuthProvider = ({ children }) => {
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
-  const logout = async () => {
+  const logout = async (): Promise<void> => {
     try {
       if (token) {
         // Call logout endpoint to invalidate token on server
@@ -42,7 +57,7 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const verifyToken = async (tokenToVerify) => {
+  const verifyToken = async (tokenToVerify: string) => {
     try {
       const response = await fetch(`${API_URL}/auth/me`, {
         headers: {
@@ -78,11 +93,11 @@ export const AuthProvider = ({ children }) => {
     const initializeAuth = async () => {
       const storedToken = localStorage.getItem('auth_token');
       const storedUser = localStorage.getItem('auth_user');
-      
+
       if (storedToken && storedUser) {
         setToken(storedToken);
         setUser(JSON.parse(storedUser));
-        
+
         // Verify token is still valid
         await verifyToken(storedToken);
       } else {
@@ -93,7 +108,7 @@ export const AuthProvider = ({ children }) => {
     initializeAuth();
   }, [mounted]);
 
-  const signup = async (email) => {
+  const signup = async (email: string): Promise<{ success: boolean; message?: string; error?: string }> => {
     try {
       const response = await fetch(`${API_URL}/auth/signup`, {
         method: 'POST',
@@ -104,7 +119,7 @@ export const AuthProvider = ({ children }) => {
       });
 
       const data = await response.json();
-      
+
       if (response.ok) {
         return { success: true, message: data.message };
       } else {
@@ -115,7 +130,7 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const login = async (email, code) => {
+  const login = async (email: string, code: string): Promise<{ success: boolean; error?: string }> => {
     try {
       const response = await fetch(`${API_URL}/auth/login`, {
         method: 'POST',
@@ -126,20 +141,20 @@ export const AuthProvider = ({ children }) => {
       });
 
       const data = await response.json();
-      
+
       if (response.ok) {
         const { token: newToken, user: userData } = data;
-        
+
         // Store in localStorage (client-side only)
         if (typeof window !== 'undefined') {
           localStorage.setItem('auth_token', newToken);
           localStorage.setItem('auth_user', JSON.stringify(userData));
         }
-        
+
         // Update state
         setToken(newToken);
         setUser(userData);
-        
+
         return { success: true };
       } else {
         return { success: false, error: data.detail || 'Login failed' };
@@ -150,7 +165,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   // Helper function to make authenticated API calls
-  const authenticatedFetch = useCallback(async (url, options = {}) => {
+  const authenticatedFetch = useCallback(async (url: string, options: RequestInit = {}): Promise<Response> => {
     if (!token) {
       throw new Error('No authentication token available');
     }
@@ -175,7 +190,7 @@ export const AuthProvider = ({ children }) => {
     return response;
   }, [token, logout]);
 
-  const value = {
+  const value: AuthContextValue = {
     user,
     token,
     isLoading: !mounted || isLoading,

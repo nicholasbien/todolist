@@ -1,10 +1,15 @@
 import React, { useState, useEffect, useCallback } from "react";
 
+interface Props {
+  user: any;
+  token: string;
+}
+
 /**
  * AI-Todo main component
  * Fetches classification from /api/classify
  */
-export default function AIToDoListApp({ user, token }) {
+export default function AIToDoListApp({ user, token }: Props) {
   const [todos, setTodos] = useState([]);
   const [newTodo, setNewTodo] = useState("");
   const [categories, setCategories] = useState([]);
@@ -16,9 +21,10 @@ export default function AIToDoListApp({ user, token }) {
   const [editingCategory, setEditingCategory] = useState(null);
   const [isOffline, setIsOffline] = useState(false);
   const [sendingEmail, setSendingEmail] = useState(false);
+  const [showCompleted, setShowCompleted] = useState(false);
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-  
+
   // Debug logging
   // console.log('API_URL:', API_URL);
   // console.log('Environment:', process.env.NEXT_PUBLIC_API_URL);
@@ -27,7 +33,7 @@ export default function AIToDoListApp({ user, token }) {
   // Helper function for authenticated requests
   const authenticatedFetch = useCallback(async (url, options = {}) => {
     if (!token) return;
-    
+
     const headers = {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${token}`,
@@ -82,7 +88,7 @@ export default function AIToDoListApp({ user, token }) {
 
     window.addEventListener('online', updateOnlineStatus);
     window.addEventListener('offline', updateOnlineStatus);
-    
+
     // Set initial status
     updateOnlineStatus();
 
@@ -111,24 +117,24 @@ export default function AIToDoListApp({ user, token }) {
 
       const res = await fetch(`${API_URL}/classify`, {
         method: 'POST',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json'
         },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           text,
           categories: categories
         }),
         signal: controller.signal
       });
-      
+
       clearTimeout(timeoutId);
-      
+
       if (!res.ok) {
         console.error('Classification failed:', res.status, res.statusText);
         throw new Error(`Classification failed with status ${res.status}`);
       }
-      
+
       const data = await res.json();
       return data;
     } catch (error) {
@@ -364,25 +370,41 @@ export default function AIToDoListApp({ user, token }) {
   };
 
   // Filter and sort todos by category
-  const filteredTodos = (activeCat === "All" 
+  const allFilteredTodos = (activeCat === "All"
     ? todos
-    : todos.filter(todo => todo.category === activeCat))
+    : todos.filter(todo => todo.category === activeCat));
+
+  // Separate completed and uncompleted todos
+  const uncompletedTodos = allFilteredTodos
+    .filter(todo => !todo.completed)
     .sort((a, b) => {
       // First sort by priority (High > Medium > Low)
       const priorityOrder = { 'High': 3, 'Medium': 2, 'Low': 1 };
       const priorityDiff = (priorityOrder[b.priority] || 0) - (priorityOrder[a.priority] || 0);
-      
+
       if (priorityDiff !== 0) {
         return priorityDiff;
       }
-      
+
       // Then sort by date (most recent first)
       return new Date(b.dateAdded) - new Date(a.dateAdded);
     });
 
+  const completedTodos = allFilteredTodos
+    .filter(todo => todo.completed)
+    .sort((a, b) => {
+      // Sort completed todos by completion date (most recent first)
+      return new Date(b.dateAdded) - new Date(a.dateAdded);
+    });
+
+  // Combine todos: uncompleted first, then completed (if showing)
+  const filteredTodos = showCompleted
+    ? [...uncompletedTodos, ...completedTodos]
+    : uncompletedTodos;
+
   return (
     <div>
-      
+
       {error && (
         <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
           {error}
@@ -466,7 +488,7 @@ export default function AIToDoListApp({ user, token }) {
             +
           </button>
         </div>
-        
+
         {/* Add category input - expandable */}
         {showAddCategory && (
           <div className="flex gap-2 mt-2">
@@ -510,7 +532,13 @@ export default function AIToDoListApp({ user, token }) {
             <div className="flex justify-between items-start">
               <div className="flex-1">
                 <p className={`text-base ${todo.completed ? 'line-through' : ''}`}>
-                  {todo.text}
+                  {todo.link ? (
+                    <a href={todo.link} target="_blank" rel="noopener noreferrer" className="underline">
+                      {todo.text}
+                    </a>
+                  ) : (
+                    todo.text
+                  )}
                 </p>
                 <div className="text-xs mt-1">
                   {editingCategory === todo._id ? (
@@ -590,7 +618,19 @@ export default function AIToDoListApp({ user, token }) {
           </div>
         ))}
       </div>
-      
+
+      {/* Show/Hide Completed Toggle Button */}
+      {completedTodos.length > 0 && (
+        <div className="mt-6 flex justify-center">
+          <button
+            onClick={() => setShowCompleted(!showCompleted)}
+            className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg transition-colors"
+          >
+            {showCompleted ? 'Hide Completed' : 'Show Completed'} ({completedTodos.length})
+          </button>
+        </div>
+      )}
+
       {/* Email Summary Button */}
       <div className="mt-8 flex justify-center">
         <button
