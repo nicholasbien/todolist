@@ -1,7 +1,8 @@
 import '../styles/globals.css';
 import { useEffect } from 'react';
+import type { AppProps } from 'next/app';
 
-function MyApp({ Component, pageProps }) {
+function MyApp({ Component, pageProps }: AppProps) {
   useEffect(() => {
     // Only register service worker in production
     if ('serviceWorker' in navigator && process.env.NODE_ENV === 'production') {
