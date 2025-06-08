@@ -696,7 +696,7 @@ export default function AIToDoListApp({ user, token }: Props) {
                     <option value="Low">Low</option>
                   </select>
                   {todo.dueDate && (
-                    <span className={`text-xs ${todo.completed ? 'text-gray-500' : 'text-gray-400'}`}>
+                    <span className={`text-xs whitespace-nowrap ${todo.completed ? 'text-gray-500' : 'text-gray-400'}`}>
                       {/* Ensure date string isn't shifted by timezone */}
                       Due: {new Date(`${todo.dueDate}T00:00:00`).toLocaleDateString()}
                     </span>
