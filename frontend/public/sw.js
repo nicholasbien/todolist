@@ -1,7 +1,8 @@
 const STATIC_CACHE = 'todo-static-v28';
 const API_CACHE = 'todo-api-v28';
 
-const DB_NAME = 'TodoOfflineDB';
+const GLOBAL_DB_NAME = 'TodoGlobalDB';
+const USER_DB_PREFIX = 'TodoUserDB_';
 const DB_VERSION = 2;
 const TODOS = 'todos';
 const CATEGORIES = 'categories';
@@ -10,9 +11,26 @@ const AUTH = 'auth';
 
 const DEFAULT_CATEGORIES = ['Work', 'Personal', 'Shopping', 'Finance', 'Health', 'General'];
 
-function openDB() {
+// Open global database for auth data
+function openGlobalDB() {
   return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, DB_VERSION);
+    const request = indexedDB.open(GLOBAL_DB_NAME, DB_VERSION);
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => resolve(request.result);
+    request.onupgradeneeded = (event) => {
+      const db = event.target.result;
+      if (!db.objectStoreNames.contains(AUTH)) {
+        db.createObjectStore(AUTH, { keyPath: 'key' });
+      }
+    };
+  });
+}
+
+// Open user-specific database for todos, categories, and queue
+function openUserDB(userId) {
+  const dbName = userId ? `${USER_DB_PREFIX}${userId}` : `${USER_DB_PREFIX}guest`;
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(dbName, DB_VERSION);
     request.onerror = () => reject(request.error);
     request.onsuccess = () => resolve(request.result);
     request.onupgradeneeded = (event) => {
@@ -26,15 +44,13 @@ function openDB() {
       if (!db.objectStoreNames.contains(QUEUE)) {
         db.createObjectStore(QUEUE, { keyPath: 'id', autoIncrement: true });
       }
-      if (!db.objectStoreNames.contains(AUTH)) {
-        db.createObjectStore(AUTH, { keyPath: 'key' });
-      }
     };
   });
 }
 
-async function dbTx(store, mode, fn) {
-  const db = await openDB();
+// Global database transaction for auth
+async function globalDbTx(store, mode, fn) {
+  const db = await openGlobalDB();
   return new Promise((resolve, reject) => {
     const tx = db.transaction([store], mode);
     const st = tx.objectStore(store);
@@ -44,21 +60,76 @@ async function dbTx(store, mode, fn) {
   });
 }
 
-const getTodos = () => dbTx(TODOS, 'readonly', (s) => s.getAll());
-const putTodo = (t) => dbTx(TODOS, 'readwrite', (s) => s.put(t));
-const delTodo = (id) => dbTx(TODOS, 'readwrite', (s) => s.delete(id));
+// User-specific database transaction
+async function userDbTx(userId, store, mode, fn) {
+  const db = await openUserDB(userId);
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction([store], mode);
+    const st = tx.objectStore(store);
+    const req = fn(st);
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
 
-const getCategories = () => dbTx(CATEGORIES, 'readonly', (s) => s.getAll());
-const putCategory = (c) => dbTx(CATEGORIES, 'readwrite', (s) => s.put(c));
-const delCategory = (name) => dbTx(CATEGORIES, 'readwrite', (s) => s.delete(name));
+// Auth operations (global)
+const getAuth = () => globalDbTx(AUTH, 'readonly', (s) => s.get('token'));
+const putAuth = (token, userId) => globalDbTx(AUTH, 'readwrite', (s) => s.put({ key: 'token', token, userId }));
 
-const addQueue = (action) =>
-  dbTx(QUEUE, 'readwrite', (s) => s.add({ ...action, timestamp: Date.now() }));
-const readQueue = () => dbTx(QUEUE, 'readonly', (s) => s.getAll());
-const clearQueue = () => dbTx(QUEUE, 'readwrite', (s) => s.clear());
+// User-specific operations
+const getTodos = async (userId) => {
+  const authData = userId ? null : await getAuth();
+  const effectiveUserId = userId || (authData ? authData.userId : null);
+  return userDbTx(effectiveUserId, TODOS, 'readonly', (s) => s.getAll());
+};
 
-const getAuth = () => dbTx(AUTH, 'readonly', (s) => s.get('token'));
-const putAuth = (token, userId) => dbTx(AUTH, 'readwrite', (s) => s.put({ key: 'token', token, userId }));
+const putTodo = async (todo, userId) => {
+  const authData = userId ? null : await getAuth();
+  const effectiveUserId = userId || (authData ? authData.userId : null);
+  return userDbTx(effectiveUserId, TODOS, 'readwrite', (s) => s.put(todo));
+};
+
+const delTodo = async (id, userId) => {
+  const authData = userId ? null : await getAuth();
+  const effectiveUserId = userId || (authData ? authData.userId : null);
+  return userDbTx(effectiveUserId, TODOS, 'readwrite', (s) => s.delete(id));
+};
+
+const getCategories = async (userId) => {
+  const authData = userId ? null : await getAuth();
+  const effectiveUserId = userId || (authData ? authData.userId : null);
+  return userDbTx(effectiveUserId, CATEGORIES, 'readonly', (s) => s.getAll());
+};
+
+const putCategory = async (category, userId) => {
+  const authData = userId ? null : await getAuth();
+  const effectiveUserId = userId || (authData ? authData.userId : null);
+  return userDbTx(effectiveUserId, CATEGORIES, 'readwrite', (s) => s.put(category));
+};
+
+const delCategory = async (name, userId) => {
+  const authData = userId ? null : await getAuth();
+  const effectiveUserId = userId || (authData ? authData.userId : null);
+  return userDbTx(effectiveUserId, CATEGORIES, 'readwrite', (s) => s.delete(name));
+};
+
+const addQueue = async (action, userId) => {
+  const authData = userId ? null : await getAuth();
+  const effectiveUserId = userId || (authData ? authData.userId : null);
+  return userDbTx(effectiveUserId, QUEUE, 'readwrite', (s) => s.add({ ...action, timestamp: Date.now() }));
+};
+
+const readQueue = async (userId) => {
+  const authData = userId ? null : await getAuth();
+  const effectiveUserId = userId || (authData ? authData.userId : null);
+  return userDbTx(effectiveUserId, QUEUE, 'readonly', (s) => s.getAll());
+};
+
+const clearQueue = async (userId) => {
+  const authData = userId ? null : await getAuth();
+  const effectiveUserId = userId || (authData ? authData.userId : null);
+  return userDbTx(effectiveUserId, QUEUE, 'readwrite', (s) => s.clear());
+};
 
 
 // Function to get authenticated headers
@@ -77,6 +148,9 @@ async function syncServerDataToLocal() {
     // Only sync if we're online
     if (!self.navigator.onLine) return;
 
+    const authData = await getAuth();
+    if (!authData || !authData.userId) return; // No user to sync for
+
     const headers = await getAuthHeaders();
 
     // Fetch and store categories
@@ -85,7 +159,7 @@ async function syncServerDataToLocal() {
       if (categoriesResponse.ok) {
         const serverCategories = await categoriesResponse.json();
         for (const categoryName of serverCategories) {
-          await putCategory({ name: categoryName });
+          await putCategory({ name: categoryName }, authData.userId);
         }
       }
     } catch (err) {
@@ -98,7 +172,7 @@ async function syncServerDataToLocal() {
       if (todosResponse.ok) {
         const serverTodos = await todosResponse.json();
         for (const todo of serverTodos) {
-          await putTodo(todo);
+          await putTodo(todo, authData.userId);
         }
       }
     } catch (err) {
@@ -110,7 +184,7 @@ async function syncServerDataToLocal() {
 }
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(Promise.all([caches.open(STATIC_CACHE), caches.open(API_CACHE), openDB()]));
+  event.waitUntil(Promise.all([caches.open(STATIC_CACHE), caches.open(API_CACHE), openGlobalDB()]));
   self.skipWaiting();
 });
 
@@ -159,15 +233,18 @@ async function handleApiRequest(request) {
 
         // For GET /todos, sync server data to IndexedDB and merge with offline todos
         if (url.pathname === '/todos') {
+          const authData = await getAuth();
+          if (!authData || !authData.userId) return response; // No user context
+
           const serverTodos = await response.clone().json();
 
           // Save all server todos to IndexedDB for offline access
           for (const todo of serverTodos) {
-            await putTodo(todo);
+            await putTodo(todo, authData.userId);
           }
 
           // Get offline-only todos (not yet synced)
-          const offlineTodos = await getTodos();
+          const offlineTodos = await getTodos(authData.userId);
           const offlineOnlyTodos = offlineTodos.filter(t => t._id.startsWith('offline_'));
 
           // Merge server todos with offline-only todos
@@ -180,15 +257,18 @@ async function handleApiRequest(request) {
 
         // For GET /categories, sync server data to IndexedDB and merge with offline categories
         if (url.pathname === '/categories') {
+          const authData = await getAuth();
+          if (!authData || !authData.userId) return response; // No user context
+
           const serverCategories = await response.clone().json(); // Array of strings like ["Work", "Personal"]
 
           // Save all server categories to IndexedDB for offline access (as objects)
           for (const categoryName of serverCategories) {
-            await putCategory({ name: categoryName });
+            await putCategory({ name: categoryName }, authData.userId);
           }
 
           // Get offline-only categories (not yet synced)
-          const offlineCategories = await getCategories();
+          const offlineCategories = await getCategories(authData.userId);
           const offlineOnlyCategories = offlineCategories.filter(c => c.name.startsWith('offline_'));
           const offlineOnlyNames = offlineOnlyCategories.map(c => c.name);
 
@@ -212,14 +292,16 @@ async function handleApiRequest(request) {
 }
 
 async function offlineFallback(request, url) {
+  const authData = await getAuth();
+
   // Handle core todo operations offline
   if (request.method === 'GET') {
     if (url.pathname === '/todos' || url.pathname.endsWith('/todos')) {
-      const todos = await getTodos();
+      const todos = await getTodos(authData ? authData.userId : null);
       return new Response(JSON.stringify(todos), { headers: { 'Content-Type': 'application/json' } });
     }
     if (url.pathname === '/categories' || url.pathname.endsWith('/categories')) {
-      const offlineCategories = await getCategories();
+      const offlineCategories = await getCategories(authData ? authData.userId : null);
 
       // If we have stored categories, return their names; otherwise use defaults
       if (offlineCategories && offlineCategories.length > 0) {
@@ -239,7 +321,6 @@ async function offlineFallback(request, url) {
 
     // Create new todo
     if ((url.pathname === '/todos' || url.pathname.endsWith('/todos')) && request.method === 'POST') {
-      const authData = await getAuth();
       const text = data.text || '';
 
       // Check if it's a URL - if so, store as link and use basic classification
@@ -259,21 +340,21 @@ async function offlineFallback(request, url) {
         todoData.link = text;
       }
 
-      await putTodo(todoData);
-      await addQueue({ type: 'CREATE', data: todoData });
+      await putTodo(todoData, authData ? authData.userId : null);
+      await addQueue({ type: 'CREATE', data: todoData }, authData ? authData.userId : null);
       return new Response(JSON.stringify(todoData), { headers: { 'Content-Type': 'application/json' } });
     }
 
     // Update todo (category, priority changes)
     if (url.pathname.startsWith('/todos/') && request.method === 'PUT' && !url.pathname.endsWith('/complete')) {
       const id = url.pathname.split('/')[2]; // Get ID from /todos/{id}
-      const existingTodos = await getTodos();
+      const existingTodos = await getTodos(authData ? authData.userId : null);
       const existingTodo = existingTodos.find(t => t._id === id);
 
       if (existingTodo) {
         const updated = { ...existingTodo, ...data };
-        await putTodo(updated);
-        await addQueue({ type: 'UPDATE', data: updated });
+        await putTodo(updated, authData ? authData.userId : null);
+        await addQueue({ type: 'UPDATE', data: updated }, authData ? authData.userId : null);
         return new Response(JSON.stringify(updated), { headers: { 'Content-Type': 'application/json' } });
       }
     }
@@ -281,13 +362,13 @@ async function offlineFallback(request, url) {
     // Complete/uncomplete todo
     if (url.pathname.endsWith('/complete') && request.method === 'PUT') {
       const id = url.pathname.split('/')[2]; // Get ID from /todos/{id}/complete
-      const existingTodos = await getTodos();
+      const existingTodos = await getTodos(authData ? authData.userId : null);
       const existingTodo = existingTodos.find(t => t._id === id);
 
       if (existingTodo) {
         const updated = { ...existingTodo, completed: !existingTodo.completed };
-        await putTodo(updated);
-        await addQueue({ type: 'UPDATE', data: updated });
+        await putTodo(updated, authData ? authData.userId : null);
+        await addQueue({ type: 'UPDATE', data: updated }, authData ? authData.userId : null);
         return new Response(JSON.stringify({ message: 'Todo updated' }), { headers: { 'Content-Type': 'application/json' } });
       }
     }
@@ -295,8 +376,8 @@ async function offlineFallback(request, url) {
     // Delete todo
     if (url.pathname.startsWith('/todos/') && request.method === 'DELETE') {
       const id = url.pathname.split('/')[2]; // Get ID from /todos/{id}
-      await delTodo(id);
-      await addQueue({ type: 'DELETE', data: { _id: id } });
+      await delTodo(id, authData ? authData.userId : null);
+      await addQueue({ type: 'DELETE', data: { _id: id } }, authData ? authData.userId : null);
       return new Response(null, { status: 204 });
     }
 
@@ -305,16 +386,16 @@ async function offlineFallback(request, url) {
       const categoryName = data.name || `offline_${Date.now()}`;
       const newCategory = { name: categoryName };
 
-      await putCategory(newCategory);
-      await addQueue({ type: 'CREATE_CATEGORY', data: newCategory });
+      await putCategory(newCategory, authData ? authData.userId : null);
+      await addQueue({ type: 'CREATE_CATEGORY', data: newCategory }, authData ? authData.userId : null);
       return new Response(JSON.stringify(newCategory), { headers: { 'Content-Type': 'application/json' } });
     }
 
     // Delete category
     if (url.pathname.startsWith('/categories/') && request.method === 'DELETE') {
       const categoryName = decodeURIComponent(url.pathname.split('/')[2]); // Get name from /categories/{name}
-      await delCategory(categoryName);
-      await addQueue({ type: 'DELETE_CATEGORY', data: { name: categoryName } });
+      await delCategory(categoryName, authData ? authData.userId : null);
+      await addQueue({ type: 'DELETE_CATEGORY', data: { name: categoryName } }, authData ? authData.userId : null);
       return new Response(null, { status: 204 });
     }
   }
@@ -337,7 +418,10 @@ function normalizePriority(p) {
 }
 
 async function syncQueue() {
-  const queue = await readQueue();
+  const authData = await getAuth();
+  if (!authData || !authData.userId) return; // No user to sync for
+
+  const queue = await readQueue(authData.userId);
   const headers = await getAuthHeaders();
 
   for (const op of queue) {
@@ -354,8 +438,8 @@ async function syncQueue() {
             });
             if (res.ok) {
               const serverTodo = await res.json();
-              await delTodo(_id);
-              await putTodo(serverTodo);
+              await delTodo(_id, authData.userId);
+              await putTodo(serverTodo, authData.userId);
             }
           }
           break;
@@ -384,7 +468,7 @@ async function syncQueue() {
           });
           if (res.ok) {
             const serverCategory = await res.json();
-            await putCategory(serverCategory);
+            await putCategory(serverCategory, authData.userId);
           }
           break;
         case 'DELETE_CATEGORY':
@@ -399,12 +483,12 @@ async function syncQueue() {
       continue;
     }
   }
-  await clearQueue();
+  await clearQueue(authData.userId);
   try {
     const res = await fetch('/todos', { headers });
     if (res.ok) {
       const todos = await res.json();
-      for (const t of todos) await putTodo(t);
+      for (const t of todos) await putTodo(t, authData.userId);
     }
   } catch (e) {}
 }
