@@ -11,10 +11,8 @@ import os
 from datetime import datetime
 
 import pytest
-import requests
 
-# Use BASE_URL for now - will be replaced by fixture later
-BASE_URL = "http://localhost:8000"
+# Requests is no longer needed when using TestClient
 
 
 async def get_verification_code_from_db(email):
@@ -61,65 +59,65 @@ async def verification_code2(test_email2):
 class TestAuthentication:
     """Authentication system tests."""
 
-    def test_signup_success(self, test_email):
+    def test_signup_success(self, client, test_email):
         """Test user signup sends verification code."""
-        response = requests.post(f"{BASE_URL}/auth/signup", json={"email": test_email})
+        response = client.post("/auth/signup", json={"email": test_email})
 
         assert response.status_code == 200
         result = response.json()
         assert "message" in result
 
-    def test_signup_invalid_email(self):
+    def test_signup_invalid_email(self, client):
         """Test signup with invalid email fails."""
-        response = requests.post(f"{BASE_URL}/auth/signup", json={"email": "invalid-email"})
+        response = client.post("/auth/signup", json={"email": "invalid-email"})
 
         assert response.status_code == 422  # Validation error
 
-    def test_login_invalid_code(self, test_email):
+    def test_login_invalid_code(self, client, test_email):
         """Test login with invalid verification code fails."""
         # First signup
-        signup_response = requests.post(f"{BASE_URL}/auth/signup", json={"email": test_email})
+        signup_response = client.post("/auth/signup", json={"email": test_email})
         assert signup_response.status_code == 200
 
         # Try login with invalid code
-        response = requests.post(f"{BASE_URL}/auth/login", json={"email": test_email, "code": "invalid-code"})
+        response = client.post("/auth/login", json={"email": test_email, "code": "invalid-code"})
 
         assert response.status_code == 400
 
-    def test_auth_me_no_token(self):
+    def test_auth_me_no_token(self, client):
         """Test /auth/me without token fails."""
-        response = requests.get(f"{BASE_URL}/auth/me")
+        response = client.get("/auth/me")
 
         assert response.status_code == 401
 
-    def test_auth_me_invalid_token(self):
+    def test_auth_me_invalid_token(self, client):
         """Test /auth/me with invalid token fails."""
         headers = {"Authorization": "Bearer invalid-token"}
-        response = requests.get(f"{BASE_URL}/auth/me", headers=headers)
+        response = client.get("/auth/me", headers=headers)
 
         assert response.status_code == 401
 
-    def test_unauthorized_todo_access(self):
+    def test_unauthorized_todo_access(self, client):
         """Test that todo endpoints require authentication."""
         # Try to get todos without token
-        response = requests.get(f"{BASE_URL}/todos")
+        response = client.get("/todos")
         assert response.status_code == 401
 
         # Try with invalid token
         headers = {"Authorization": "Bearer invalid-token"}
-        response = requests.get(f"{BASE_URL}/todos", headers=headers)
+        response = client.get("/todos", headers=headers)
         assert response.status_code == 401
 
-    def test_health_endpoint(self):
+    def test_health_endpoint(self, client):
         """Test health check endpoint."""
-        response = requests.get(f"{BASE_URL}/health")
+        response = client.get("/health")
         assert response.status_code == 200
         result = response.json()
         assert result["status"] == "healthy"
 
-    def test_root_endpoint(self):
+    def test_root_endpoint(self, client):
         """Test root endpoint."""
-        response = requests.get(f"{BASE_URL}/")
+        response = client.get("/")
         assert response.status_code == 200
         result = response.json()
         assert "message" in result
@@ -130,10 +128,10 @@ class TestAuthenticationWithDatabase:
     """Integration tests that require database access for verification codes."""
 
     @pytest.mark.asyncio
-    async def test_full_auth_flow(self, test_email):
+    async def test_full_auth_flow(self, client, test_email):
         """Test complete authentication flow."""
         # Signup
-        signup_response = requests.post(f"{BASE_URL}/auth/signup", json={"email": test_email})
+        signup_response = await client.apost("/auth/signup", json={"email": test_email})
         assert signup_response.status_code == 200
 
         # Get verification code from database
@@ -142,7 +140,7 @@ class TestAuthenticationWithDatabase:
             pytest.skip("Could not retrieve verification code from database")
 
         # Login
-        login_response = requests.post(f"{BASE_URL}/auth/login", json={"email": test_email, "code": code})
+        login_response = await client.apost("/auth/login", json={"email": test_email, "code": code})
         assert login_response.status_code == 200
         result = login_response.json()
         assert "token" in result
@@ -150,7 +148,7 @@ class TestAuthenticationWithDatabase:
 
         # Test auth/me
         headers = {"Authorization": f"Bearer {token}"}
-        me_response = requests.get(f"{BASE_URL}/auth/me", headers=headers)
+        me_response = await client.aget("/auth/me", headers=headers)
         assert me_response.status_code == 200
         user_info = me_response.json()
         assert user_info["email"] == test_email
@@ -165,54 +163,54 @@ class TestAuthenticationWithDatabase:
         }
 
         # Create todo
-        create_response = requests.post(f"{BASE_URL}/todos", json=todo_data, headers=headers)
+        create_response = await client.apost("/todos", json=todo_data, headers=headers)
         assert create_response.status_code == 200
         todo = create_response.json()
         todo_id = todo["_id"]
 
         # Get todos
-        get_response = requests.get(f"{BASE_URL}/todos", headers=headers)
+        get_response = await client.aget("/todos", headers=headers)
         assert get_response.status_code == 200
         todos = get_response.json()
         assert len(todos) >= 1
         assert any(t["_id"] == todo_id for t in todos)
 
         # Complete todo
-        complete_response = requests.put(f"{BASE_URL}/todos/{todo_id}/complete", headers=headers)
+        complete_response = await client.aput(f"/todos/{todo_id}/complete", headers=headers)
         assert complete_response.status_code == 200
 
         # Delete todo
-        delete_response = requests.delete(f"{BASE_URL}/todos/{todo_id}", headers=headers)
+        delete_response = await client.adelete(f"/todos/{todo_id}", headers=headers)
         assert delete_response.status_code == 200
 
         # Logout
-        logout_response = requests.post(f"{BASE_URL}/auth/logout", headers=headers)
+        logout_response = await client.apost("/auth/logout", headers=headers)
         assert logout_response.status_code == 200
 
         # Verify token is invalid after logout
-        me_after_logout = requests.get(f"{BASE_URL}/auth/me", headers=headers)
+        me_after_logout = await client.aget("/auth/me", headers=headers)
         assert me_after_logout.status_code == 401
 
     @pytest.mark.asyncio
-    async def test_user_isolation(self, test_email, test_email2):
+    async def test_user_isolation(self, client, test_email, test_email2):
         """Test that users can only see their own todos."""
         # Create first user
-        requests.post(f"{BASE_URL}/auth/signup", json={"email": test_email})
+        await client.apost("/auth/signup", json={"email": test_email})
         code1 = await get_verification_code_from_db(test_email)
         if not code1:
             pytest.skip("Could not retrieve verification code for user 1")
 
-        login1_response = requests.post(f"{BASE_URL}/auth/login", json={"email": test_email, "code": code1})
+        login1_response = await client.apost("/auth/login", json={"email": test_email, "code": code1})
         assert login1_response.status_code == 200
         token1 = login1_response.json()["token"]
 
         # Create second user
-        requests.post(f"{BASE_URL}/auth/signup", json={"email": test_email2})
+        await client.apost("/auth/signup", json={"email": test_email2})
         code2 = await get_verification_code_from_db(test_email2)
         if not code2:
             pytest.skip("Could not retrieve verification code for user 2")
 
-        login2_response = requests.post(f"{BASE_URL}/auth/login", json={"email": test_email2, "code": code2})
+        login2_response = await client.apost("/auth/login", json={"email": test_email2, "code": code2})
         assert login2_response.status_code == 200
         token2 = login2_response.json()["token"]
 
@@ -225,11 +223,11 @@ class TestAuthenticationWithDatabase:
             "dateAdded": datetime.now().isoformat(),
             "completed": False,
         }
-        requests.post(f"{BASE_URL}/todos", json=todo_data, headers=headers1)
+        await client.apost("/todos", json=todo_data, headers=headers1)
 
         # User 2 should not see User 1's todos
         headers2 = {"Authorization": f"Bearer {token2}"}
-        user2_todos = requests.get(f"{BASE_URL}/todos", headers=headers2)
+        user2_todos = await client.aget("/todos", headers=headers2)
         assert user2_todos.status_code == 200
         todos = user2_todos.json()
         assert len(todos) == 0  # User 2 should have no todos
