@@ -1,5 +1,5 @@
-const STATIC_CACHE = 'todo-static-v30';
-const API_CACHE = 'todo-api-v30';
+const STATIC_CACHE = 'todo-static-v31';
+const API_CACHE = 'todo-api-v31';
 
 const GLOBAL_DB_NAME = 'TodoGlobalDB';
 const USER_DB_PREFIX = 'TodoUserDB_';
@@ -10,6 +10,14 @@ const QUEUE = 'queue';
 const AUTH = 'auth';
 
 const DEFAULT_CATEGORIES = ['Work', 'Personal', 'Shopping', 'Finance', 'Health', 'General'];
+
+// Static files to cache for offline use
+const STATIC_FILES = [
+  '/',
+  '/manifest.json',
+  '/icon-192x192.png',
+  '/icon-512x512.png'
+];
 
 // Open global database for auth data
 function openGlobalDB() {
@@ -184,7 +192,13 @@ async function syncServerDataToLocal() {
 }
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(Promise.all([caches.open(STATIC_CACHE), caches.open(API_CACHE), openGlobalDB()]));
+  event.waitUntil(
+    Promise.all([
+      caches.open(STATIC_CACHE).then(cache => cache.addAll(STATIC_FILES)),
+      caches.open(API_CACHE),
+      openGlobalDB()
+    ])
+  );
   self.skipWaiting();
 });
 
@@ -209,12 +223,22 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
+
+  // Handle API requests
   const isApi =
     url.origin === self.location.origin &&
     (url.pathname.startsWith('/todos') ||
       url.pathname.startsWith('/categories'));
-  if (!isApi) return;
-  event.respondWith(handleApiRequest(event.request));
+
+  if (isApi) {
+    event.respondWith(handleApiRequest(event.request));
+    return;
+  }
+
+  // Handle static file requests (including page navigation)
+  if (url.origin === self.location.origin) {
+    event.respondWith(handleStaticRequest(event.request));
+  }
 });
 
 async function handleApiRequest(request) {
@@ -289,6 +313,42 @@ async function handleApiRequest(request) {
     }
   }
   return offlineFallback(request, url);
+}
+
+async function handleStaticRequest(request) {
+  const url = new URL(request.url);
+
+  try {
+    // Try network first for static files
+    const response = await fetch(request);
+
+    // Cache successful responses
+    if (response.ok) {
+      const cache = await caches.open(STATIC_CACHE);
+      cache.put(request, response.clone());
+    }
+
+    return response;
+  } catch (error) {
+    // Network failed, try cache
+    const cache = await caches.open(STATIC_CACHE);
+    const cachedResponse = await cache.match(request);
+
+    if (cachedResponse) {
+      return cachedResponse;
+    }
+
+    // For navigation requests (page loads), return the root page
+    if (request.mode === 'navigate') {
+      const rootResponse = await cache.match('/');
+      if (rootResponse) {
+        return rootResponse;
+      }
+    }
+
+    // Fallback for other requests
+    return new Response('Offline', { status: 503 });
+  }
 }
 
 async function offlineFallback(request, url) {
