@@ -127,9 +127,16 @@ cd frontend
 ```
 
 ### Backend Tests
+
+**⚠️ IMPORTANT**: Backend tests require the backend server to be running. Start it in the background before running tests:
+
 ```bash
 cd backend
 source venv/bin/activate
+
+# Start backend server in background (required for tests)
+python app.py &
+SERVER_PID=$!
 
 # Install test dependencies
 pip install -r requirements.txt
@@ -141,6 +148,9 @@ pytest
 pytest tests/test_auth.py -v                     # All auth tests
 pytest tests/test_auth.py::TestAuthentication -v # Basic auth tests only
 pytest -m "not integration" -v                   # Skip integration tests
+
+# Stop the background server when done
+kill $SERVER_PID
 
 # Run manual tests (require interactive input)
 python manual_tests/auth_manual.py
