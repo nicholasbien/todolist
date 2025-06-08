@@ -23,10 +23,12 @@ export default function AIToDoListApp({ user, token }: Props) {
   const [sendingEmail, setSendingEmail] = useState(false);
   const [showCompleted, setShowCompleted] = useState(false);
 
-  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+  const API_BASE = process.env.NEXT_PUBLIC_API_URL
+    ? process.env.NEXT_PUBLIC_API_URL.replace(/\/$/, '')
+    : '';
 
   // Debug logging
-  // console.log('API_URL:', API_URL);
+  // console.log('API_BASE:', API_BASE);
   // console.log('Environment:', process.env.NEXT_PUBLIC_API_URL);
 
 
@@ -55,7 +57,7 @@ export default function AIToDoListApp({ user, token }: Props) {
   // Fetch categories from MongoDB
   const fetchCategories = useCallback(async () => {
     try {
-      const response = await authenticatedFetch(`${API_URL}/categories`);
+      const response = await authenticatedFetch(`${API_BASE}/categories`);
       if (!response?.ok) {
         throw new Error('Failed to fetch categories');
       }
@@ -64,12 +66,12 @@ export default function AIToDoListApp({ user, token }: Props) {
     } catch (err) {
       setError('Error loading categories: ' + err.message);
     }
-  }, [API_URL, authenticatedFetch]);
+  }, [API_BASE, authenticatedFetch]);
 
   // Fetch todos from MongoDB
   const fetchTodos = useCallback(async () => {
     try {
-      const response = await authenticatedFetch(`${API_URL}/todos`);
+      const response = await authenticatedFetch(`${API_BASE}/todos`);
       if (!response?.ok) {
         throw new Error('Failed to fetch todos');
       }
@@ -78,7 +80,7 @@ export default function AIToDoListApp({ user, token }: Props) {
     } catch (err) {
       setError('Error loading todos: ' + err.message);
     }
-  }, [API_URL, authenticatedFetch]);
+  }, [API_BASE, authenticatedFetch]);
 
   // Monitor online/offline status
   useEffect(() => {
@@ -115,7 +117,7 @@ export default function AIToDoListApp({ user, token }: Props) {
         console.log('Classification request timed out after 5 seconds');
       }, 5000); // Reduced to 5 seconds to match backend timeout
 
-      const res = await fetch(`${API_URL}/classify`, {
+      const res = await fetch(`${API_BASE}/classify`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -152,7 +154,7 @@ export default function AIToDoListApp({ user, token }: Props) {
     if (!name) return;
 
     try {
-      const response = await authenticatedFetch(`${API_URL}/categories`, {
+      const response = await authenticatedFetch(`${API_BASE}/categories`, {
         method: 'POST',
         body: JSON.stringify({ name }),
       });
@@ -175,7 +177,7 @@ export default function AIToDoListApp({ user, token }: Props) {
   // Delete category
   const handleDeleteCategory = async (name) => {
     try {
-      const response = await authenticatedFetch(`${API_URL}/categories/${encodeURIComponent(name)}`, {
+      const response = await authenticatedFetch(`${API_BASE}/categories/${encodeURIComponent(name)}`, {
         method: 'DELETE',
       });
 
@@ -221,7 +223,7 @@ export default function AIToDoListApp({ user, token }: Props) {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
 
-      const response = await authenticatedFetch(`${API_URL}/todos`, {
+      const response = await authenticatedFetch(`${API_BASE}/todos`, {
         method: 'POST',
         body: JSON.stringify(todo),
         signal: controller.signal
@@ -257,7 +259,7 @@ export default function AIToDoListApp({ user, token }: Props) {
         return;
       }
 
-      const response = await authenticatedFetch(`${API_URL}/todos/${id}`, {
+      const response = await authenticatedFetch(`${API_BASE}/todos/${id}`, {
         method: 'DELETE',
       });
 
@@ -283,7 +285,7 @@ export default function AIToDoListApp({ user, token }: Props) {
         return;
       }
 
-      const response = await authenticatedFetch(`${API_URL}/todos/${id}/complete`, {
+      const response = await authenticatedFetch(`${API_BASE}/todos/${id}/complete`, {
         method: 'PUT',
       });
 
@@ -303,7 +305,7 @@ export default function AIToDoListApp({ user, token }: Props) {
   // Update todo category
   const handleUpdateCategory = async (todoId, newCategory) => {
     try {
-      const response = await authenticatedFetch(`${API_URL}/todos/${todoId}`, {
+      const response = await authenticatedFetch(`${API_BASE}/todos/${todoId}`, {
         method: 'PUT',
         body: JSON.stringify({ category: newCategory }),
       });
@@ -325,7 +327,7 @@ export default function AIToDoListApp({ user, token }: Props) {
   // Update todo priority
   const handleUpdatePriority = async (todoId, newPriority) => {
     try {
-      const response = await authenticatedFetch(`${API_URL}/todos/${todoId}`, {
+      const response = await authenticatedFetch(`${API_BASE}/todos/${todoId}`, {
         method: 'PUT',
         body: JSON.stringify({ priority: newPriority }),
       });
@@ -349,7 +351,7 @@ export default function AIToDoListApp({ user, token }: Props) {
       setSendingEmail(true);
       setError('');
 
-      const response = await authenticatedFetch(`${API_URL}/email/send-summary`, {
+      const response = await authenticatedFetch(`${API_BASE}/email/send-summary`, {
         method: 'POST',
       });
 

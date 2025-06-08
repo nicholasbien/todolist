@@ -269,11 +269,8 @@ ADMIN_EMAIL=your_email@gmail.com
 
 ### Frontend (.env.local)
 ```bash
-# Local development
+# Local development uses a proxy to http://localhost:8000
 OPENAI_API_KEY=your_openai_api_key
-NEXT_PUBLIC_API_URL=http://localhost:8000
-
-# For PWA testing with HTTPS
 # NEXT_PUBLIC_API_URL=https://your-backend-tunnel.loca.lt
 ```
 
