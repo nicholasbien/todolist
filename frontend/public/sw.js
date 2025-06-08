@@ -1,5 +1,5 @@
-const STATIC_CACHE = 'todo-static-v28';
-const API_CACHE = 'todo-api-v28';
+const STATIC_CACHE = 'todo-static-v30';
+const API_CACHE = 'todo-api-v30';
 
 const GLOBAL_DB_NAME = 'TodoGlobalDB';
 const USER_DB_PREFIX = 'TodoUserDB_';

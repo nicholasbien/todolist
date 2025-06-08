@@ -107,6 +107,15 @@ export default function AIToDoListApp({ user, token }: Props) {
           userId: user.id || user._id || user.email
         });
       }
+
+      // Check for service worker updates
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistration().then(registration => {
+          if (registration) {
+            registration.update(); // Force check for updates
+          }
+        });
+      }
     }
   }, [token, user, fetchTodos, fetchCategories]);
 
