@@ -21,6 +21,7 @@ export default function AIToDoListApp({ user, token }: Props) {
   const [editingCategory, setEditingCategory] = useState(null);
   const [isOffline, setIsOffline] = useState(false);
   const [sendingEmail, setSendingEmail] = useState(false);
+  const [showCompleted, setShowCompleted] = useState(false);
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -369,9 +370,13 @@ export default function AIToDoListApp({ user, token }: Props) {
   };
 
   // Filter and sort todos by category
-  const filteredTodos = (activeCat === "All"
+  const allFilteredTodos = (activeCat === "All"
     ? todos
-    : todos.filter(todo => todo.category === activeCat))
+    : todos.filter(todo => todo.category === activeCat));
+
+  // Separate completed and uncompleted todos
+  const uncompletedTodos = allFilteredTodos
+    .filter(todo => !todo.completed)
     .sort((a, b) => {
       // First sort by priority (High > Medium > Low)
       const priorityOrder = { 'High': 3, 'Medium': 2, 'Low': 1 };
@@ -384,6 +389,18 @@ export default function AIToDoListApp({ user, token }: Props) {
       // Then sort by date (most recent first)
       return new Date(b.dateAdded) - new Date(a.dateAdded);
     });
+
+  const completedTodos = allFilteredTodos
+    .filter(todo => todo.completed)
+    .sort((a, b) => {
+      // Sort completed todos by completion date (most recent first)
+      return new Date(b.dateAdded) - new Date(a.dateAdded);
+    });
+
+  // Combine todos: uncompleted first, then completed (if showing)
+  const filteredTodos = showCompleted
+    ? [...uncompletedTodos, ...completedTodos]
+    : uncompletedTodos;
 
   return (
     <div>
@@ -595,6 +612,18 @@ export default function AIToDoListApp({ user, token }: Props) {
           </div>
         ))}
       </div>
+
+      {/* Show/Hide Completed Toggle Button */}
+      {completedTodos.length > 0 && (
+        <div className="mt-6 flex justify-center">
+          <button
+            onClick={() => setShowCompleted(!showCompleted)}
+            className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg transition-colors"
+          >
+            {showCompleted ? 'Hide Completed' : 'Show Completed'} ({completedTodos.length})
+          </button>
+        </div>
+      )}
 
       {/* Email Summary Button */}
       <div className="mt-8 flex justify-center">
