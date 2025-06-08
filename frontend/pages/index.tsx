@@ -10,7 +10,11 @@ const AIToDoListApp = dynamic(() => import('../components/AIToDoListApp'), {
   )
 });
 
-function LoginForm({ onLogin }) {
+interface LoginFormProps {
+  onLogin: (user: any, token: string) => void;
+}
+
+function LoginForm({ onLogin }: LoginFormProps) {
   const [email, setEmail] = useState('');
   const [code, setCode] = useState('');
   const [firstName, setFirstName] = useState('');

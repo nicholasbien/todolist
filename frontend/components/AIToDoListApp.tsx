@@ -1,10 +1,15 @@
 import React, { useState, useEffect, useCallback } from "react";
 
+interface Props {
+  user: any;
+  token: string;
+}
+
 /**
  * AI-Todo main component
  * Fetches classification from /api/classify
  */
-export default function AIToDoListApp({ user, token }) {
+export default function AIToDoListApp({ user, token }: Props) {
   const [todos, setTodos] = useState([]);
   const [newTodo, setNewTodo] = useState("");
   const [categories, setCategories] = useState([]);
