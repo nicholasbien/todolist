@@ -1,6 +1,6 @@
 {
-  "name": "AI Todo List",
-  "short_name": "AI Todo",
+  "name": "todolist.nyc",
+  "short_name": "todolist.nyc",
   "description": "AI-powered task management app",
   "start_url": "/",
   "display": "standalone",
