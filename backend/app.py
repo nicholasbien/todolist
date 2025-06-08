@@ -14,6 +14,7 @@ from auth import (
     logout_user,
     signup_user,
     update_user_name,
+    update_user_summary_time,
     verify_session,
 )
 from bs4 import BeautifulSoup
@@ -358,7 +359,14 @@ async def api_update_schedule(
         req.hour,
         req.minute,
     )
-    update_schedule_time(req.hour, req.minute)
+    await update_user_summary_time(current_user["user_id"], req.hour, req.minute)
+    update_schedule_time(
+        current_user["user_id"],
+        current_user["email"],
+        current_user.get("first_name", ""),
+        req.hour,
+        req.minute,
+    )
     return {"message": "Schedule updated"}
 
 
