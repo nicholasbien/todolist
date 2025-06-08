@@ -22,6 +22,7 @@ export default function AIToDoListApp({ user, token }: Props) {
   const [isOffline, setIsOffline] = useState(false);
   const [sendingEmail, setSendingEmail] = useState(false);
   const [showCompleted, setShowCompleted] = useState(false);
+  const [showUpdatePrompt, setShowUpdatePrompt] = useState(false);
 
 
 
@@ -108,16 +109,38 @@ export default function AIToDoListApp({ user, token }: Props) {
         });
       }
 
-      // Check for service worker updates
-      if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.getRegistration().then(registration => {
-          if (registration) {
-            registration.update(); // Force check for updates
-          }
-        });
-      }
     }
   }, [token, user, fetchTodos, fetchCategories]);
+
+  // Service worker update detection
+  useEffect(() => {
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistration().then(registration => {
+        if (registration) {
+          registration.update();
+
+          registration.onupdatefound = () => {
+            const newWorker = registration.installing;
+            if (newWorker) {
+              newWorker.onstatechange = () => {
+                if (
+                  newWorker.state === 'installed' &&
+                  navigator.serviceWorker.controller
+                ) {
+                  setShowUpdatePrompt(true);
+                }
+              };
+            }
+          };
+        }
+      });
+    }
+  }, []);
+
+  // Function to handle app update
+  const handleUpdate = () => {
+    window.location.reload();
+  };
 
   // Function to check if text is a URL
   const isUrl = (text) => {
@@ -392,6 +415,26 @@ export default function AIToDoListApp({ user, token }: Props) {
       {isOffline && (
         <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded mb-4">
           📴 You&apos;re offline. Changes will sync when connection is restored.
+        </div>
+      )}
+
+      {showUpdatePrompt && (
+        <div className="bg-blue-100 border border-blue-400 text-blue-700 px-4 py-3 rounded mb-4 flex justify-between items-center">
+          <span>🔄 A new version is available!</span>
+          <div className="space-x-2">
+            <button
+              onClick={handleUpdate}
+              className="bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600"
+            >
+              Update Now
+            </button>
+            <button
+              onClick={() => setShowUpdatePrompt(false)}
+              className="bg-gray-300 text-gray-700 px-3 py-1 rounded text-sm hover:bg-gray-400"
+            >
+              Later
+            </button>
+          </div>
         </div>
       )}
 
