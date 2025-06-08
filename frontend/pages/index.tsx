@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useOffline } from '../context/OfflineContext';
 import dynamic from 'next/dynamic';
 
 const AIToDoListApp = dynamic(() => import('../components/AIToDoListApp'), {
@@ -278,6 +279,7 @@ export default function Home() {
   const [isChecking, setIsChecking] = useState(true);
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(null);
+  const isOffline = useOffline();
 
   useEffect(() => {
     setIsClient(true);
@@ -297,6 +299,7 @@ export default function Home() {
     };
 
     checkAuth();
+    // OfflineProvider handles network status updates
   }, []);
 
   const handleLogin = (userData, userToken) => {
@@ -331,7 +334,10 @@ export default function Home() {
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-2xl font-bold">todolist</h1>
           <div className="flex items-center space-x-4">
-            <span className="text-sm text-gray-400">Hello, {user?.first_name || user?.email}</span>
+            <div className="flex items-center">
+              {isOffline && <span className="mr-2" title="Offline">📴</span>}
+              <span className="text-sm text-gray-400">Hello, {user?.first_name || user?.email}</span>
+            </div>
             <button
               onClick={handleLogout}
               className="text-blue-400 hover:text-blue-300 text-sm underline"
