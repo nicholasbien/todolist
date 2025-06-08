@@ -1,5 +1,5 @@
-const STATIC_CACHE = 'todo-static-v33';
-const API_CACHE = 'todo-api-v33';
+const STATIC_CACHE = 'todo-static-v34';
+const API_CACHE = 'todo-api-v34';
 
 const GLOBAL_DB_NAME = 'TodoGlobalDB';
 const USER_DB_PREFIX = 'TodoUserDB_';
@@ -457,11 +457,70 @@ async function offlineFallback(request, url) {
       return new Response(JSON.stringify(newCategory), { headers: { 'Content-Type': 'application/json' } });
     }
 
+    // Rename category
+    if (url.pathname.startsWith('/categories/') && request.method === 'PUT') {
+      const oldName = decodeURIComponent(url.pathname.split('/')[2]);
+      const newName = (data.new_name || '').trim();
+      if (!newName) {
+        return new Response(JSON.stringify({ error: 'Invalid name' }), { status: 400 });
+      }
+
+      // Update all todos referencing this category
+      const todos = await getTodos(authData ? authData.userId : null);
+      for (const t of todos) {
+        if (t.category === oldName) {
+          const updated = { ...t, category: newName };
+          await putTodo(updated, authData ? authData.userId : null);
+          await addQueue({ type: 'UPDATE', data: updated }, authData ? authData.userId : null);
+        }
+      }
+
+      await delCategory(oldName, authData ? authData.userId : null);
+      await putCategory({ name: newName }, authData ? authData.userId : null);
+
+      const queueEntries = await readQueue(authData ? authData.userId : null);
+      const createIdx = queueEntries.findIndex(q => q.type === 'CREATE_CATEGORY' && q.data.name === oldName);
+      if (createIdx !== -1) {
+        queueEntries[createIdx].data.name = newName;
+        await clearQueue(authData ? authData.userId : null);
+        for (const entry of queueEntries) {
+          await addQueue({ type: entry.type, data: entry.data }, authData ? authData.userId : null);
+        }
+      } else {
+        await addQueue({ type: 'RENAME_CATEGORY', data: { old_name: oldName, new_name: newName } }, authData ? authData.userId : null);
+      }
+
+      return new Response(JSON.stringify({ message: 'Category renamed' }), { headers: { 'Content-Type': 'application/json' } });
+    }
+
     // Delete category
     if (url.pathname.startsWith('/categories/') && request.method === 'DELETE') {
       const categoryName = decodeURIComponent(url.pathname.split('/')[2]); // Get name from /categories/{name}
+
+      // Update todos that use this category to "General"
+      const todos = await getTodos(authData ? authData.userId : null);
+      for (const t of todos) {
+        if (t.category === categoryName) {
+          const updated = { ...t, category: 'General' };
+          await putTodo(updated, authData ? authData.userId : null);
+          await addQueue({ type: 'UPDATE', data: updated }, authData ? authData.userId : null);
+        }
+      }
+
       await delCategory(categoryName, authData ? authData.userId : null);
-      await addQueue({ type: 'DELETE_CATEGORY', data: { name: categoryName } }, authData ? authData.userId : null);
+
+      const queueEntries = await readQueue(authData ? authData.userId : null);
+      const createIdx = queueEntries.findIndex(q => q.type === 'CREATE_CATEGORY' && q.data.name === categoryName);
+      if (createIdx !== -1) {
+        queueEntries.splice(createIdx, 1); // Cancel pending create if never synced
+        await clearQueue(authData ? authData.userId : null);
+        for (const entry of queueEntries) {
+          await addQueue({ type: entry.type, data: entry.data }, authData ? authData.userId : null);
+        }
+      } else {
+        await addQueue({ type: 'DELETE_CATEGORY', data: { name: categoryName } }, authData ? authData.userId : null);
+      }
+
       return new Response(null, { status: 204 });
     }
   }
@@ -549,6 +608,13 @@ async function syncQueue() {
           await fetch(`/categories/${encodeURIComponent(op.data.name)}`, {
             method: 'DELETE',
             headers
+          });
+          break;
+        case 'RENAME_CATEGORY':
+          await fetch(`/categories/${encodeURIComponent(op.data.old_name)}`, {
+            method: 'PUT',
+            headers,
+            body: JSON.stringify({ new_name: op.data.new_name })
           });
           break;
       }

@@ -7,6 +7,11 @@ from fastapi import HTTPException
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel
 
+
+class CategoryRename(BaseModel):
+    new_name: str
+
+
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -96,6 +101,30 @@ async def delete_category(name: str) -> dict:
     except Exception as e:
         logger.error(f"Error deleting category: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error deleting category: {str(e)}")
+
+
+async def rename_category(old_name: str, new_name: str) -> dict:
+    """Rename a category and update todos referencing it."""
+    try:
+        existing = await categories_collection.find_one({"name": old_name})
+        if not existing:
+            raise HTTPException(status_code=404, detail="Category not found")
+
+        if await categories_collection.find_one({"name": new_name}):
+            raise HTTPException(status_code=400, detail="Category with new name already exists")
+
+        await categories_collection.update_one({"name": old_name}, {"$set": {"name": new_name}})
+
+        from todos import todos_collection
+
+        await todos_collection.update_many({"category": old_name}, {"$set": {"category": new_name}})
+
+        return {"message": f"Category {old_name} renamed to {new_name}"}
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        logger.error(f"Error renaming category: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error renaming category: {str(e)}")
 
 
 # Initialize default categories if none exist

@@ -180,6 +180,26 @@ describe('Category Operations', () => {
     });
   });
 
+  test('syncQueue processes RENAME_CATEGORY operations', async () => {
+    const sw = require('../public/sw.js');
+    await sw.putAuth('token123', 'user1');
+
+    const renameData = { old_name: 'Old', new_name: 'New' };
+
+    global.fetch = jest.fn().mockResolvedValue({ ok: true });
+    await sw.addQueue({ type: 'RENAME_CATEGORY', data: renameData }, 'user1');
+    await sw.syncQueue();
+
+    expect(fetch).toHaveBeenCalledWith('/categories/Old', {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer token123'
+      },
+      body: JSON.stringify({ new_name: 'New' })
+    });
+  });
+
   test('should isolate categories between users', async () => {
     const sw = require('../public/sw.js');
 

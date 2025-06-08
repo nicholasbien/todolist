@@ -20,10 +20,12 @@ from bs4 import BeautifulSoup
 from categories import (
     DEFAULT_CATEGORIES,
     Category,
+    CategoryRename,
     add_category,
     delete_category,
     get_categories,
     init_default_categories,
+    rename_category,
 )
 
 # Import the classification function and todo management
@@ -300,6 +302,13 @@ async def api_add_category(category: Category):
     """Add a new category."""
     logger.info(f"Adding new category: {category.name}")
     return await add_category(category)
+
+
+@app.put("/categories/{name}")
+async def api_rename_category(name: str, body: CategoryRename):
+    """Rename an existing category."""
+    logger.info(f"Renaming category {name} to {body.new_name}")
+    return await rename_category(name, body.new_name)
 
 
 @app.delete("/categories/{name}")
