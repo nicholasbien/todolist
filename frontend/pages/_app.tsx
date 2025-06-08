@@ -1,5 +1,6 @@
 import '../styles/globals.css';
 import { useEffect } from 'react';
+import { OfflineProvider } from '../context/OfflineContext';
 import type { AppProps } from 'next/app';
 
 function MyApp({ Component, pageProps }: AppProps) {
@@ -16,30 +17,14 @@ function MyApp({ Component, pageProps }: AppProps) {
         });
     }
 
-    // Listen for online/offline events
-    const handleOnline = () => {
-      // Trigger sync when coming back online
-      if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
-        navigator.serviceWorker.controller.postMessage({
-          type: 'SYNC_WHEN_ONLINE'
-        });
-      }
-    };
-
-    const handleOffline = () => {
-      // Could show offline indicator here if needed
-    };
-
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-    };
+    // OfflineProvider handles online/offline events
   }, []);
 
-  return <Component {...pageProps} />;
+  return (
+    <OfflineProvider>
+      <Component {...pageProps} />
+    </OfflineProvider>
+  );
 }
 
 export default MyApp;

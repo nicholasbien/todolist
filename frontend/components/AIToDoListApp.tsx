@@ -19,7 +19,6 @@ export default function AIToDoListApp({ user, token }: Props) {
   const [activeCat, setActiveCat] = useState("All");
   const [showAddCategory, setShowAddCategory] = useState(false);
   const [editingCategory, setEditingCategory] = useState(null);
-  const [isOffline, setIsOffline] = useState(false);
   const [sendingEmail, setSendingEmail] = useState(false);
   const [showCompleted, setShowCompleted] = useState(false);
   const [showUpdatePrompt, setShowUpdatePrompt] = useState(false);
@@ -76,23 +75,6 @@ export default function AIToDoListApp({ user, token }: Props) {
     }
   }, [authenticatedFetch]);
 
-  // Monitor online/offline status
-  useEffect(() => {
-    const updateOnlineStatus = () => {
-      setIsOffline(!navigator.onLine);
-    };
-
-    window.addEventListener('online', updateOnlineStatus);
-    window.addEventListener('offline', updateOnlineStatus);
-
-    // Set initial status
-    updateOnlineStatus();
-
-    return () => {
-      window.removeEventListener('online', updateOnlineStatus);
-      window.removeEventListener('offline', updateOnlineStatus);
-    };
-  }, []);
 
   // Load todos and categories when token is available
   useEffect(() => {
@@ -412,11 +394,6 @@ export default function AIToDoListApp({ user, token }: Props) {
         </div>
       )}
 
-      {isOffline && (
-        <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded mb-4">
-          📴 You&apos;re offline. Changes will sync when connection is restored.
-        </div>
-      )}
 
       {showUpdatePrompt && (
         <div className="bg-blue-100 border border-blue-400 text-blue-700 px-4 py-3 rounded mb-4 flex justify-between items-center">
