@@ -172,14 +172,36 @@ async def api_create_todo(request: Request, current_user: dict = Depends(get_cur
         if text.startswith("http://") or text.startswith("https://"):
             body["link"] = text
             try:
-                async with httpx.AsyncClient(timeout=5) as client:
+                headers = {
+                    "User-Agent": (
+                        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                        "(KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+                    )
+                }
+                async with httpx.AsyncClient(timeout=5, headers=headers, follow_redirects=True) as client:
                     resp = await client.get(text)
-                if resp.status_code == 200:
-                    soup = BeautifulSoup(resp.text, "html.parser")
-                    title_tag = soup.find("title")
-                    if title_tag and title_tag.text:
-                        body["text"] = title_tag.text.strip()
+                    print(f"URL fetch response: {resp.status_code} for {text}")
+                    if resp.status_code == 200:
+                        soup = BeautifulSoup(resp.text, "html.parser")
+                        title_tag = soup.find("title")
+                        if title_tag and title_tag.text:
+                            page_title = title_tag.text.strip()
+                            print(f"Extracted title: '{page_title}' from {text}")
+                            body["text"] = page_title
+
+                            # Classify based on page title
+                            try:
+                                classification = await classify_task(page_title, body.get("categories", []))
+                                body["category"] = classification.get("category", "General")
+                                body["priority"] = classification.get("priority", "Medium")
+                            except Exception as e:
+                                logger.error(f"Failed to classify page title '{page_title}': {e}")
+                        else:
+                            print(f"No title found for {text}")
+                    else:
+                        print(f"HTTP error {resp.status_code} for {text}")
             except Exception as e:
+                print(f"Exception fetching {text}: {e}")
                 logger.error(f"Failed to fetch title for {text}: {e}")
 
         # Create Todo object from request data

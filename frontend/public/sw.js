@@ -257,18 +257,27 @@ async function offlineFallback(request, url) {
     // Create new todo
     if ((url.pathname === '/todos' || url.pathname.endsWith('/todos')) && request.method === 'POST') {
       const authData = await getAuth();
-      const newTodo = {
+      const text = data.text || '';
+
+      // Check if it's a URL - if so, store as link and use basic classification
+      let todoData = {
         _id: 'offline_' + Date.now(),
-        text: data.text,
+        text: text,
         category: data.category || 'General',
         priority: normalizePriority(data.priority),
         dateAdded: new Date().toISOString(),
         completed: false,
         user_id: authData ? authData.userId : 'offline_user',
       };
-      await putTodo(newTodo);
-      await addQueue({ type: 'CREATE', data: newTodo });
-      return new Response(JSON.stringify(newTodo), { headers: { 'Content-Type': 'application/json' } });
+
+      // If it's a URL, store it as a link (title fetching will happen when synced)
+      if (text.startsWith('http://') || text.startsWith('https://')) {
+        todoData.link = text;
+      }
+
+      await putTodo(todoData);
+      await addQueue({ type: 'CREATE', data: todoData });
+      return new Response(JSON.stringify(todoData), { headers: { 'Content-Type': 'application/json' } });
     }
 
     // Update todo (category, priority changes)

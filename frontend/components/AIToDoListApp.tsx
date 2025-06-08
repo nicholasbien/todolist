@@ -117,6 +117,11 @@ export default function AIToDoListApp({ user, token }: Props) {
     }
   }, [token, user, fetchTodos, fetchCategories]);
 
+  // Function to check if text is a URL
+  const isUrl = (text) => {
+    return text.trim().startsWith('http://') || text.trim().startsWith('https://');
+  };
+
   // Classify task using AI
   async function classify(text) {
     try {
@@ -216,8 +221,15 @@ export default function AIToDoListApp({ user, token }: Props) {
     setError('');
 
     try {
-      // Get AI classification
-      const { category, priority } = await classify(newTodo);
+      let category = 'General';
+      let priority = 'Medium';
+
+      // Only classify if it's not a URL (backend handles URL classification after title fetch)
+      if (!isUrl(newTodo)) {
+        const classification = await classify(newTodo);
+        category = classification.category;
+        priority = classification.priority;
+      }
 
       // Create new todo object
       const todo = {
