@@ -24,6 +24,7 @@ describe('Todo Operations', () => {
       category: 'General',
       priority: 'Medium',
       dateAdded: new Date().toISOString(),
+      dueDate: null,
       completed: false,
       user_id: 'user1',
     };
@@ -205,6 +206,7 @@ describe('User Isolation', () => {
       category: 'Work',
       priority: 'High',
       dateAdded: new Date().toISOString(),
+      dueDate: null,
       completed: false,
       user_id: 'user1'
     };
@@ -215,6 +217,7 @@ describe('User Isolation', () => {
       category: 'Personal',
       priority: 'Low',
       dateAdded: new Date().toISOString(),
+      dueDate: null,
       completed: false,
       user_id: 'user2'
     };
@@ -290,6 +293,7 @@ describe('Integration Tests', () => {
       category: 'General',
       priority: 'Medium',
       dateAdded: new Date().toISOString(),
+      dueDate: null,
       completed: false,
       user_id: 'user1',
       created_offline: true

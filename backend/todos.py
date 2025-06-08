@@ -33,6 +33,7 @@ class Todo(BaseModel):
     category: str = "General"
     priority: str = "Medium"
     dateAdded: str
+    dueDate: Optional[str] = None
     completed: bool = False
     dateCompleted: Optional[str] = None
     user_id: str

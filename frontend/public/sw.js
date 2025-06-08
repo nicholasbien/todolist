@@ -390,6 +390,7 @@ async function offlineFallback(request, url) {
         category: data.category || 'General',
         priority: normalizePriority(data.priority),
         dateAdded: new Date().toISOString(),
+        dueDate: null,
         completed: false,
         user_id: authData ? authData.userId : 'offline_user',
         created_offline: true,

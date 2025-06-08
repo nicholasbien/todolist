@@ -6,7 +6,7 @@ import json
 import logging
 import os
 import smtplib
-from datetime import datetime
+from datetime import datetime, timedelta
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
@@ -47,11 +47,12 @@ Todo Data:
 Instructions:
 1. Address the user as "{user_name}" if provided, otherwise use "there"
 2. Create a friendly, motivational tone
-3. Pay attention to the "dateAdded" field in each todo to understand timing:
+3. Pay attention to the "dateAdded" field in each todo to understand timing and
+   the "dueDate" field for upcoming deadlines:
    - Celebrate recently completed tasks (completed in last few days)
    - Note if tasks have been completed for a while
    - Identify pending tasks that are getting old/stale
-   - Highlight urgent items that have been pending for too long
+   - Highlight urgent items or those with approaching due dates
 4. Organize todos by:
    - Recently completed tasks (celebrate achievements!)
    - Pending tasks by priority AND age (High, Medium, Low)
@@ -109,6 +110,11 @@ def create_simple_summary(todos: list, user_name: str = "there") -> str:
     pending = [t for t in todos if not t.get("completed", False)]
 
     high_priority = [t for t in pending if t.get("priority", "").lower() == "high"]
+    due_soon = [
+        t
+        for t in pending
+        if t.get("dueDate") and datetime.fromisoformat(str(t["dueDate"])) <= datetime.now() + timedelta(days=1)
+    ]
 
     summary = f"""Good morning {user_name}!
 
@@ -117,6 +123,7 @@ Here's your daily todo summary:
 ✅ Completed: {len(completed)} tasks
 📋 Pending: {len(pending)} tasks
 🔥 High Priority: {len(high_priority)} tasks
+⏰ Due Soon: {len(due_soon)} tasks
 
 """
 
@@ -124,6 +131,13 @@ Here's your daily todo summary:
         summary += "High priority tasks for today:\n"
         for todo in high_priority[:3]:  # Show top 3
             summary += f"  • {todo.get('text', 'Unknown task')}\n"
+        summary += "\n"
+
+    if due_soon:
+        summary += "Tasks due soon:\n"
+        for todo in due_soon[:3]:
+            due = datetime.fromisoformat(str(todo["dueDate"])).strftime("%b %d")
+            summary += f"  • {todo.get('text', 'Unknown task')} (due {due})\n"
         summary += "\n"
 
     summary += "Have a productive day ahead! 🚀"

@@ -8,6 +8,7 @@ A modern todo list application with AI-powered task classification, email verifi
 - **Email verification authentication** with JWT sessions
 - **Daily email summaries** with AI-generated insights
 - **Category and priority management**
+- **Due date tracking** with upcoming deadlines highlighted in daily summaries
 - **Link support** - Add a URL as a task and its page title is fetched automatically
 - **Progressive Web App (PWA)** - Install on iPhone/Android like a native app
 - **Offline functionality** - Works without internet connection
@@ -310,7 +311,7 @@ Todos are automatically classified when created. You can also use
 the manual endpoint if needed:
 - `POST /classify` - Classify task text
   - Request: `{ "text": "task description" }`
-  - Response: `{ "category": "Work", "priority": "High" }`
+  - Response: `{ "category": "Work", "priority": "High", "text": "cleaned task", "dueDate": "2024-06-10" }`
 
 ### Email
 - `POST /email/send-summary` - Send daily summary to current user
