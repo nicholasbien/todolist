@@ -101,17 +101,27 @@ def generate_session_token() -> str:
 async def send_verification_email(email: str, code: str) -> bool:
     """Send verification code via email."""
     try:
+        # In test environment, just print and return
+        if os.getenv("USE_MOCK_DB"):
+            print(f"VERIFICATION CODE for {email}: {code}")
+            return True
+
         if not SMTP_USERNAME or not SMTP_PASSWORD or not FROM_EMAIL:
             logger.warning("Email credentials not configured, printing code to console")
             print(f"VERIFICATION CODE for {email}: {code}")
             return True
 
-        msg = MIMEMultipart()
-        msg["From"] = FROM_EMAIL
-        msg["To"] = email
-        msg["Subject"] = "Your Todo App Verification Code"
+        # Run SMTP operations in thread pool to avoid blocking the event loop
+        import asyncio
+        import concurrent.futures
 
-        body = f"""Hi there!
+        def send_smtp_email():
+            msg = MIMEMultipart()
+            msg["From"] = FROM_EMAIL
+            msg["To"] = email
+            msg["Subject"] = "Your Todo App Verification Code"
+
+            body = f"""Hi there!
 
 Your verification code for my todolist app is: {code}
 
@@ -122,14 +132,20 @@ If you didn't request this code, please ignore this email.
 Best regards,
 Nicholas"""
 
-        msg.attach(MIMEText(body, "plain"))
+            msg.attach(MIMEText(body, "plain"))
 
-        server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
-        server.starttls()
-        server.login(SMTP_USERNAME, SMTP_PASSWORD)
-        text = msg.as_string()
-        server.sendmail(FROM_EMAIL, email, text)
-        server.quit()
+            server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
+            server.starttls()
+            server.login(SMTP_USERNAME, SMTP_PASSWORD)
+            text = msg.as_string()
+            server.sendmail(FROM_EMAIL, email, text)
+            server.quit()
+            return True
+
+        # Run SMTP in thread pool
+        loop = asyncio.get_event_loop()
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            await loop.run_in_executor(executor, send_smtp_email)
 
         logger.info(f"Verification email sent to {email}")
         # For testing: always print verification code to console

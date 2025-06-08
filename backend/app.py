@@ -271,9 +271,11 @@ async def api_health_check():
 @app.on_event("startup")
 async def startup_event():
     """Initialize default categories, cleanup expired sessions, and start scheduler."""
-    await init_default_categories()
-    await cleanup_expired_sessions()
-    start_scheduler()
+    # Skip startup tasks in test environment
+    if not os.getenv("USE_MOCK_DB"):
+        await init_default_categories()
+        await cleanup_expired_sessions()
+        start_scheduler()
 
 
 # Category management endpoints

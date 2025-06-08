@@ -117,18 +117,32 @@ npm start
 ## Testing
 
 ### Automated Tests (Pytest)
+**✅ Simplified**: Tests now run standalone with mock databases - no server required!
+
 ```bash
 cd backend
 source venv/bin/activate
 
-# Run all automated tests
+# Run all automated tests (11 authentication tests with mock database)
 pytest
+
+# Run with coverage
+pytest --cov=. --cov-report=term-missing
 
 # Run specific test categories
 pytest tests/test_auth.py -v                     # All auth tests
 pytest tests/test_auth.py::TestAuthentication -v # Basic auth tests only
 pytest -m "not integration" -v                   # Skip integration tests
+
+# Verbose output for debugging
+pytest -v --tb=short
 ```
+
+**Key Test Features:**
+- **Mock Database**: All tests use `AsyncMongoMockClient` for fast, isolated testing
+- **Async Support**: Proper `pytest-asyncio` fixtures with event loop safety
+- **Email Mocking**: SMTP operations are mocked for testing
+- **No External Dependencies**: Tests run without MongoDB or SMTP server
 
 ### Manual Tests
 ```bash
@@ -354,9 +368,9 @@ the manual endpoint if needed:
    - Check MONGODB_URL in backend `.env`
 
 6. **Tests failing**:
-   - Run `pytest -m "not integration"` to skip database-dependent tests
-   - Ensure backend server is running for integration tests
-   - Manual tests require interactive input
+   - All automated tests use mock databases and should pass without setup
+   - Run `pytest -v --tb=short` for detailed error output
+   - Manual tests require interactive input and a running server
 
 ## License
 

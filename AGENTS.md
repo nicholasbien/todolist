@@ -122,13 +122,38 @@ mypy .
 ```bash
 cd frontend
 
-# No tests currently configured
-# To add: npm install --save-dev @testing-library/react @testing-library/jest-dom jest
+# Run all tests
+npm test
+
+# Run specific test suites
+npm test -- AppMain.test.tsx                     # Component tests
+npm test -- AuthForm.test.tsx                    # Auth form tests
+npm test -- ServiceWorkerSync.test.ts            # Service worker tests
+
+# Run tests with coverage
+npm test -- --coverage
+
+# Run tests in watch mode
+npm test -- --watch
 ```
+
+**Test Structure:**
+- `__tests__/AppMain.test.tsx` - Main app component tests
+- `__tests__/AuthForm.test.tsx` - Authentication form tests
+- `__tests__/ServiceWorkerSync.test.ts` - Comprehensive service worker tests (13 tests)
+- `docs/ServiceWorkerTests.md` - Detailed test documentation
+
+**Service Worker Tests Cover:**
+- Todo operations (CREATE, UPDATE, COMPLETE, DELETE)
+- Category operations (CREATE_CATEGORY, DELETE_CATEGORY)
+- User isolation (multi-account support)
+- Authentication & security
+- Error handling & resilience
+- Integration workflows
 
 ### Backend Tests
 
-**⚠️ IMPORTANT**: Backend tests require the backend server to be running. Start it in the background before running tests:
+**✅ SIMPLIFIED**: Backend tests now run standalone with mock databases - no server startup required!
 
 ```bash
 cd backend
@@ -137,35 +162,52 @@ source venv/bin/activate
 # Install test dependencies first
 pip install -r requirements.txt
 
-# Start backend server in background (required for tests)
-python app.py &
-SERVER_PID=$!
-
-# Run all pytest tests (automated)
+# Run all pytest tests (automated with mock database)
 pytest
 
+# Run specific test files
+pytest tests/test_auth.py -v                     # Authentication tests
+pytest tests/conftest.py -v                      # Test configuration
+
 # Run specific test categories
-pytest tests/test_auth.py -v                     # All auth tests
 pytest tests/test_auth.py::TestAuthentication -v # Basic auth tests only
 pytest -m "not integration" -v                   # Skip integration tests
 
-# Stop the background server when done
-kill $SERVER_PID
+# Run with coverage
+pytest --cov=. --cov-report=term-missing
 
-# Run manual tests (require interactive input)
+# Run with verbose output when tests fail
+pytest -v --tb=short
+
+# Run manual tests (require interactive input and real server)
 python manual_tests/auth_manual.py
 python manual_tests/email_manual.py  # Only if SMTP configured
 ```
 
 **Test Structure:**
-- `tests/` - Pytest-compatible automated tests
-- `manual_tests/` - Manual tests requiring user interaction or special setup
-- Integration tests marked with `@pytest.mark.integration`
+- `tests/test_auth.py` - Authentication system tests (11 tests covering signup, login, sessions)
+- `tests/conftest.py` - Pytest configuration with async fixtures and mock database setup
+- `manual_tests/auth_manual.py` - Manual authentication testing
+- `manual_tests/email_manual.py` - Manual email system testing
+
+**Test Coverage:**
+- Email verification workflows (with mock SMTP in tests)
+- JWT token management and session handling
+- User authentication endpoints and error handling
+- User isolation (multi-tenant functionality)
+- Integration workflows with database operations
+
+**Key Test Features:**
+- **Mock Database**: All tests use `AsyncMongoMockClient` for isolated, fast testing
+- **Async Support**: Proper `pytest-asyncio` fixtures with function-scoped event loops
+- **Event Loop Safety**: Database connections are reset per test to avoid event loop conflicts
+- **Email Mocking**: SMTP operations run in thread pools and are mocked for tests
 
 **⚠️ IMPORTANT FOR AI AGENTS**:
 - **DO NOT RUN** files in `manual_tests/` directory - they require interactive input or SMTP connections
 - **DO NOT RUN** integration tests in agent environments - use `pytest -m "not integration"`
-- Pytest automatically excludes manual tests (only looks in `tests/` directory)
+- Tests are fully automated and use mock databases - no external dependencies required
+- All 11 authentication tests should pass without any setup
 - Use `pytest --tb=short` for concise output in agent environments
 
 ## Architecture
