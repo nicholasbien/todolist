@@ -32,7 +32,7 @@ from email_summary import send_daily_summary
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from scheduler import get_scheduler_status, start_scheduler
+from scheduler import get_scheduler_status, start_scheduler, update_schedule_time
 from todos import Todo, complete_todo, create_todo, delete_todo, get_todos, health_check, update_todo_fields
 
 # Set up logging with more detail
@@ -330,6 +330,27 @@ async def api_send_summary(current_user: dict = Depends(get_current_user)):
 async def api_scheduler_status():
     """Get scheduler status."""
     return get_scheduler_status()
+
+
+class UpdateScheduleRequest(BaseModel):
+    hour: int
+    minute: int
+
+
+@app.post("/email/update-schedule")
+async def api_update_schedule(
+    req: UpdateScheduleRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    """Update daily summary schedule time."""
+    logger.info(
+        "Schedule update requested by %s to %02d:%02d",
+        current_user["email"],
+        req.hour,
+        req.minute,
+    )
+    update_schedule_time(req.hour, req.minute)
+    return {"message": "Schedule updated"}
 
 
 if __name__ == "__main__":
