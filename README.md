@@ -319,6 +319,7 @@ python3 -c "import secrets; print(secrets.token_urlsafe(32))"
 ### Categories
 - `GET /categories` - Get all categories
 - `POST /categories` - Add new category
+- `PUT /categories/{name}` - Rename category
 - `DELETE /categories/{name}` - Delete category
 
 ### AI Classification

@@ -18,6 +18,8 @@ export default function AIToDoListApp({ user, token }: Props) {
   const [newCat, setNewCat] = useState("");
   const [activeCat, setActiveCat] = useState("All");
   const [showAddCategory, setShowAddCategory] = useState(false);
+  const [showEditCategoryModal, setShowEditCategoryModal] = useState(false);
+  const [editCatName, setEditCatName] = useState("");
   const [editingCategory, setEditingCategory] = useState(null);
   const [sendingEmail, setSendingEmail] = useState(false);
   const [showCompleted, setShowCompleted] = useState(false);
@@ -180,6 +182,35 @@ export default function AIToDoListApp({ user, token }: Props) {
       setError('');
     } catch (err) {
       setError('Error deleting category: ' + err.message);
+    }
+  };
+
+  const handleRenameCategory = async () => {
+    const trimmed = editCatName.trim();
+    if (!trimmed || trimmed === activeCat) {
+      setShowEditCategoryModal(false);
+      return;
+    }
+
+    try {
+      const response = await authenticatedFetch(`/categories/${encodeURIComponent(activeCat)}`, {
+        method: 'PUT',
+        body: JSON.stringify({ new_name: trimmed }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to rename category');
+      }
+
+      await fetchCategories();
+      await fetchTodos();
+      setActiveCat(trimmed);
+      setShowEditCategoryModal(false);
+      setEditCatName('');
+      setError('');
+    } catch (err) {
+      setError('Error renaming category: ' + err.message);
     }
   };
 
@@ -468,10 +499,13 @@ export default function AIToDoListApp({ user, token }: Props) {
           <h2 className="text-lg font-semibold">{activeCat}</h2>
           {activeCat !== "All" && (
             <button
-              onClick={() => handleDeleteCategory(activeCat)}
-              className="ml-2 text-red-600 hover:text-red-800 text-lg"
+              onClick={() => {
+                setEditCatName(activeCat);
+                setShowEditCategoryModal(true);
+              }}
+              className="ml-2 text-gray-400 hover:text-gray-200 text-sm border border-gray-500 px-2 py-1 rounded"
             >
-              ×
+              Edit
             </button>
           )}
         </div>
@@ -548,6 +582,43 @@ export default function AIToDoListApp({ user, token }: Props) {
           </div>
         )}
       </div>
+
+      {showEditCategoryModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-gray-800 p-4 rounded w-64 space-y-3">
+            <h3 className="text-white text-lg">Edit Category</h3>
+            <input
+              type="text"
+              value={editCatName}
+              onChange={(e) => setEditCatName(e.target.value)}
+              className="w-full p-2 rounded bg-gray-700 border border-gray-600 text-white"
+            />
+            <div className="flex justify-end space-x-2">
+              <button
+                onClick={handleRenameCategory}
+                className="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700"
+              >
+                Rename
+              </button>
+              <button
+                onClick={() => {
+                  handleDeleteCategory(activeCat);
+                  setShowEditCategoryModal(false);
+                }}
+                className="bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700"
+              >
+                Delete
+              </button>
+              <button
+                onClick={() => setShowEditCategoryModal(false)}
+                className="bg-gray-300 text-gray-800 px-3 py-1 rounded hover:bg-gray-400"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Todo list */}
       <div className="space-y-3">
