@@ -1,0 +1,95 @@
+from datetime import datetime
+from unittest.mock import AsyncMock, patch
+
+import pytest
+from tests.test_auth import get_verification_code_from_db
+
+
+async def get_token(client, email):
+    await client.post("/auth/signup", json={"email": email})
+    code = await get_verification_code_from_db(email)
+    if not code:
+        pytest.skip("Could not retrieve verification code from database")
+    login_resp = await client.post("/auth/login", json={"email": email, "code": code})
+    assert login_resp.status_code == 200
+    return login_resp.json()["token"]
+
+
+@pytest.mark.asyncio
+async def test_todo_crud_flow(client, test_email):
+    """Full CRUD flow for todos with classification integration."""
+    token = await get_token(client, test_email)
+    headers = {"Authorization": f"Bearer {token}"}
+    todo_payload = {
+        "text": "Buy milk",
+        "dateAdded": datetime.now().isoformat(),
+    }
+    with patch(
+        "app.classify_task", new=AsyncMock(return_value={"category": "Shopping", "priority": "High"})
+    ) as mock_classify:
+        create_resp = await client.post("/todos", json=todo_payload, headers=headers)
+        assert create_resp.status_code == 200
+        todo = create_resp.json()
+        assert todo["category"] == "Shopping"
+        assert todo["priority"] == "High"
+        mock_classify.assert_awaited_once()
+        todo_id = todo["_id"]
+
+    # Retrieve todos
+    get_resp = await client.get("/todos", headers=headers)
+    assert get_resp.status_code == 200
+    todos = get_resp.json()
+    assert any(t["_id"] == todo_id for t in todos)
+
+    # Complete todo
+    complete_resp = await client.put(f"/todos/{todo_id}/complete", headers=headers)
+    assert complete_resp.status_code == 200
+
+    # Update todo fields
+    update_resp = await client.put(
+        f"/todos/{todo_id}",
+        json={"category": "Work", "priority": "Low"},
+        headers=headers,
+    )
+    assert update_resp.status_code == 200
+
+    # Delete todo
+    delete_resp = await client.delete(f"/todos/{todo_id}", headers=headers)
+    assert delete_resp.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_category_management(client, test_email):
+    """Test adding and deleting categories with todo reassignment."""
+    token = await get_token(client, test_email)
+    headers = {"Authorization": f"Bearer {token}"}
+
+    # Add category
+    add_resp = await client.post("/categories", json={"name": "Errands"})
+    assert add_resp.status_code == 200
+
+    # Ensure category exists
+    categories_resp = await client.get("/categories")
+    assert categories_resp.status_code == 200
+    categories = categories_resp.json()
+    assert "Errands" in categories
+
+    # Create todo using this category
+    todo_payload = {
+        "text": "Pick up dry cleaning",
+        "dateAdded": datetime.now().isoformat(),
+    }
+    with patch("app.classify_task", new=AsyncMock(return_value={"category": "Errands", "priority": "Medium"})):
+        create_resp = await client.post("/todos", json=todo_payload, headers=headers)
+        assert create_resp.status_code == 200
+        todo_id = create_resp.json()["_id"]
+
+    # Delete category and ensure todo updated to General
+    delete_resp = await client.delete("/categories/Errands")
+    assert delete_resp.status_code == 200
+
+    get_todos_resp = await client.get("/todos", headers=headers)
+    assert get_todos_resp.status_code == 200
+    todos = get_todos_resp.json()
+    todo = next(t for t in todos if t["_id"] == todo_id)
+    assert todo["category"] == "General"
