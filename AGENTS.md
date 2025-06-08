@@ -171,7 +171,6 @@ pytest tests/conftest.py -v                      # Test configuration
 
 # Run specific test categories
 pytest tests/test_auth.py::TestAuthentication -v # Basic auth tests only
-pytest -m "not integration" -v                   # Skip integration tests
 
 # Run with coverage
 pytest --cov=. --cov-report=term-missing
@@ -205,11 +204,9 @@ python manual_tests/email_manual.py  # Only if SMTP configured
 
 **⚠️ IMPORTANT FOR AI AGENTS**:
 - **DO NOT RUN** files in `manual_tests/` directory - they require interactive input or SMTP connections
-- **DO NOT RUN** integration tests in agent environments - use `pytest -m "not integration"`
 - Tests are fully automated and use mock databases - no external dependencies required
 - All 11 authentication tests should pass without any setup
 - Use `pytest --tb=short` for concise output in agent environments
-
 ## Architecture
 
 ### Backend (FastAPI)
