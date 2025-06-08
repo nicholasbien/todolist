@@ -22,6 +22,9 @@ export default function AIToDoListApp({ user, token }: Props) {
   const [sendingEmail, setSendingEmail] = useState(false);
   const [showCompleted, setShowCompleted] = useState(false);
   const [showUpdatePrompt, setShowUpdatePrompt] = useState(false);
+  const [showEmailSettings, setShowEmailSettings] = useState(false);
+  const [emailTime, setEmailTime] = useState('09:00');
+  const [savingSchedule, setSavingSchedule] = useState(false);
 
 
 
@@ -352,6 +355,29 @@ export default function AIToDoListApp({ user, token }: Props) {
     }
   };
 
+  const handleUpdateSchedule = async () => {
+    try {
+      setSavingSchedule(true);
+      const [hour, minute] = emailTime.split(':').map((v) => parseInt(v, 10));
+      const response = await authenticatedFetch('/email/update-schedule', {
+        method: 'POST',
+        body: JSON.stringify({ hour, minute }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to update schedule');
+      }
+
+      setShowEmailSettings(false);
+      setError('');
+    } catch (err) {
+      setError('Error updating schedule: ' + err.message);
+    } finally {
+      setSavingSchedule(false);
+    }
+  };
+
   // Filter and sort todos by category
   const allFilteredTodos = (activeCat === "All"
     ? todos
@@ -636,8 +662,40 @@ export default function AIToDoListApp({ user, token }: Props) {
         </div>
       )}
 
-      {/* Email Summary Button */}
-      <div className="mt-8 flex justify-center">
+      {/* Email Settings Button */}
+      <div className="mt-8 flex justify-center relative">
+        <button
+          onClick={() => setShowEmailSettings(!showEmailSettings)}
+          className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg mr-4"
+        >
+          Email Settings
+        </button>
+        {showEmailSettings && (
+          <div className="absolute bg-gray-800 border border-gray-600 rounded p-4 mt-12 w-60 text-white space-y-2">
+            <label className="block text-sm">Daily Summary Time</label>
+            <input
+              type="time"
+              value={emailTime}
+              onChange={(e) => setEmailTime(e.target.value)}
+              className="w-full bg-gray-700 p-1 rounded"
+            />
+            <div className="flex justify-end space-x-2 mt-2">
+              <button
+                onClick={handleUpdateSchedule}
+                disabled={savingSchedule}
+                className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 px-3 py-1 rounded"
+              >
+                {savingSchedule ? 'Saving...' : 'Save'}
+              </button>
+              <button
+                onClick={() => setShowEmailSettings(false)}
+                className="bg-gray-500 hover:bg-gray-600 px-3 py-1 rounded"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        )}
         <button
           onClick={handleSendEmailSummary}
           disabled={sendingEmail}

@@ -10,8 +10,10 @@ from apscheduler.triggers.cron import CronTrigger
 
 logger = logging.getLogger(__name__)
 
-# Global scheduler instance
+# Global scheduler instance and default time
 scheduler = None
+scheduled_hour = 9
+scheduled_minute = 0
 
 
 async def daily_summary_job():
@@ -55,17 +57,25 @@ def start_scheduler():
     try:
         scheduler = AsyncIOScheduler()
 
-        # Schedule daily at 9:00 AM Eastern Time
+        # Schedule daily using configured time
         scheduler.add_job(
             daily_summary_job,
-            CronTrigger(hour=9, minute=0, timezone="America/New_York"),  # 9:00 AM Eastern
+            CronTrigger(
+                hour=scheduled_hour,
+                minute=scheduled_minute,
+                timezone="America/New_York",
+            ),
             id="daily_summary",
             max_instances=1,
             replace_existing=True,
         )
 
         scheduler.start()
-        logger.info("Daily summary scheduler started (9:00 AM daily)")
+        logger.info(
+            "Daily summary scheduler started (%02d:%02d Eastern)",
+            scheduled_hour,
+            scheduled_minute,
+        )
 
     except Exception as e:
         logger.error(f"Failed to start scheduler: {e}")
@@ -79,6 +89,35 @@ def stop_scheduler():
         scheduler.shutdown()
         scheduler = None
         logger.info("Scheduler stopped")
+
+
+def update_schedule_time(hour: int, minute: int):
+    """Update the daily summary schedule time."""
+    global scheduled_hour, scheduled_minute, scheduler
+
+    scheduled_hour = hour
+    scheduled_minute = minute
+
+    if scheduler is None:
+        start_scheduler()
+        return
+
+    try:
+        scheduler.reschedule_job(
+            "daily_summary",
+            trigger=CronTrigger(
+                hour=scheduled_hour,
+                minute=scheduled_minute,
+                timezone="America/New_York",
+            ),
+        )
+        logger.info(
+            "Rescheduled daily summary to %02d:%02d Eastern",
+            scheduled_hour,
+            scheduled_minute,
+        )
+    except Exception as e:
+        logger.error(f"Failed to reschedule daily summary: {e}")
 
 
 def get_scheduler_status():
