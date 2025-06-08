@@ -501,3 +501,24 @@ self.addEventListener('message', (event) => {
     putAuth(event.data.token, event.data.userId);
   }
 });
+
+// Export functions for unit testing in Node environment
+if (typeof module !== 'undefined') {
+  module.exports = {
+    openGlobalDB,
+    openUserDB,
+    getAuth,
+    putAuth,
+    getTodos,
+    putTodo,
+    delTodo,
+    getCategories,
+    putCategory,
+    delCategory,
+    addQueue,
+    readQueue,
+    clearQueue,
+    getAuthHeaders,
+    syncQueue,
+  };
+}
