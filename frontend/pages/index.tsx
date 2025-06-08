@@ -24,9 +24,10 @@ function LoginForm({ onLogin }: LoginFormProps) {
   const [message, setMessage] = useState('');
   const [needsName, setNeedsName] = useState(false);
 
-  const API_BASE = process.env.NEXT_PUBLIC_API_URL
-    ? process.env.NEXT_PUBLIC_API_URL.replace(/\/$/, '')
-    : '';
+  const API_BASE =
+    process.env.NODE_ENV === 'development' && process.env.NEXT_PUBLIC_API_URL
+      ? process.env.NEXT_PUBLIC_API_URL.replace(/\/$/, '')
+      : '';
 
   const handleEmailSubmit = async (e) => {
     e.preventDefault();

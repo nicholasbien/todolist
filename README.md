@@ -186,6 +186,10 @@ This application is configured as a PWA and can be installed on mobile devices l
 - **iOS Safari optimization** - Proper meta tags for iOS home screen installation
 - **Offline support** - Basic caching allows app to load without internet
 
+**Important:** For offline functionality in production, leave
+`NEXT_PUBLIC_API_URL` unset so API requests use relative paths. The service
+worker can only intercept same-origin requests.
+
 ## Production Deployment with Railway
 
 This application is configured for easy deployment on Railway with separate frontend and backend services.

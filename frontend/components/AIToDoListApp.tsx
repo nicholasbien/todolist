@@ -23,9 +23,10 @@ export default function AIToDoListApp({ user, token }: Props) {
   const [sendingEmail, setSendingEmail] = useState(false);
   const [showCompleted, setShowCompleted] = useState(false);
 
-  const API_BASE = process.env.NEXT_PUBLIC_API_URL
-    ? process.env.NEXT_PUBLIC_API_URL.replace(/\/$/, '')
-    : '';
+  const API_BASE =
+    process.env.NODE_ENV === 'development' && process.env.NEXT_PUBLIC_API_URL
+      ? process.env.NEXT_PUBLIC_API_URL.replace(/\/$/, '')
+      : '';
 
   // Debug logging
   // console.log('API_BASE:', API_BASE);
