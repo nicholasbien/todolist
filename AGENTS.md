@@ -134,12 +134,12 @@ cd frontend
 cd backend
 source venv/bin/activate
 
+# Install test dependencies first
+pip install -r requirements.txt
+
 # Start backend server in background (required for tests)
 python app.py &
 SERVER_PID=$!
-
-# Install test dependencies
-pip install -r requirements.txt
 
 # Run all pytest tests (automated)
 pytest
