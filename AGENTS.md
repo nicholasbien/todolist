@@ -315,6 +315,7 @@ NEXT_PUBLIC_API_URL=http://localhost:8000
 ### Database Schema
 - **todos**: `{_id, text, category, priority, dateAdded, completed, user_id}`
 - **users**: `{_id, email, first_name, is_verified, verification_code, code_expires_at}`
+- **users**: `{_id, email, first_name, email_instructions, is_verified, verification_code, code_expires_at}`
 - **sessions**: `{_id, user_id, token, expires_at}`
 - **categories**: `{name}`
 

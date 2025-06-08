@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useOffline } from '../context/OfflineContext';
 import dynamic from 'next/dynamic';
+import Head from 'next/head';
 
 const AIToDoListApp = dynamic(() => import('../components/AIToDoListApp'), {
   ssr: false,
@@ -153,7 +154,7 @@ function LoginForm({ onLogin }: LoginFormProps) {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
       <div className="max-w-md w-full bg-white rounded-xl shadow-lg p-8">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">todolist</h1>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">todolist.nyc</h1>
           <p className="text-gray-600">
             {step === 'email'
               ? 'Enter your email to get started'
@@ -318,21 +319,37 @@ export default function Home() {
 
   if (!isClient || isChecking) {
     return (
-      <main className="min-h-screen bg-zinc-950 text-white flex items-center justify-center">
-        <div className="animate-pulse">Loading...</div>
-      </main>
+      <>
+        <Head>
+          <title>todolist.nyc</title>
+        </Head>
+        <main className="min-h-screen bg-zinc-950 text-white flex items-center justify-center">
+          <div className="animate-pulse">Loading...</div>
+        </main>
+      </>
     );
   }
 
   if (!isAuthenticated) {
-    return <LoginForm onLogin={handleLogin} />;
+    return (
+      <>
+        <Head>
+          <title>todolist.nyc</title>
+        </Head>
+        <LoginForm onLogin={handleLogin} />
+      </>
+    );
   }
 
   return (
-    <main className="min-h-screen bg-zinc-950 text-white">
-      <div className="container mx-auto p-4 max-w-md">
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-bold">todolist</h1>
+    <>
+      <Head>
+        <title>todolist.nyc</title>
+      </Head>
+      <main className="min-h-screen bg-zinc-950 text-white">
+        <div className="container mx-auto p-4 max-w-md">
+          <div className="flex justify-between items-center mb-6">
+            <h1 className="text-2xl font-bold">todolist.nyc</h1>
           <div className="flex items-center space-x-4">
             <div className="flex items-center">
               {isOffline && <span className="mr-2" title="Offline">📴</span>}
@@ -349,5 +366,6 @@ export default function Home() {
         <AIToDoListApp user={user} token={token} />
       </div>
     </main>
+    </>
   );
 }

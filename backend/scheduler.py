@@ -2,48 +2,78 @@
 """
 Daily email scheduler for todo summaries
 """
+import asyncio
 import logging
-import os
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 
 logger = logging.getLogger(__name__)
 
-# Global scheduler instance and default time
+# Global scheduler instance
 scheduler = None
-scheduled_hour = 9
-scheduled_minute = 0
 
 
-async def daily_summary_job():
-    """Job function that runs daily to send summary to admin only."""
+async def daily_summary_job(user_id: str, email: str, first_name: str = "", instructions: str = "") -> None:
+    """Send daily summary for a specific user."""
     try:
-        from auth import users_collection
-
-        logger.info("Starting daily summary job...")
-
-        admin_email = os.getenv("ADMIN_EMAIL")
-        if not admin_email:
-            logger.warning("No ADMIN_EMAIL configured, skipping daily summary")
-            return
-
-        # Find admin user
-        admin_user = await users_collection.find_one({"email": admin_email, "is_verified": True})
-        if not admin_user:
-            logger.warning(f"Admin user {admin_email} not found or not verified")
-            return
-
-        # Send summary to admin only
         from email_summary import send_daily_summary
 
-        success = await send_daily_summary(str(admin_user["_id"]), admin_user["email"], admin_user.get("first_name"))
-
+        success = await send_daily_summary(user_id, email, first_name, instructions)
         result = {"sent": 1 if success else 0, "failed": 0 if success else 1}
-        logger.info(f"Daily summary job completed: {result}")
-
+        logger.info("Daily summary job completed for %s: %s", email, result)
     except Exception as e:
-        logger.error(f"Error in daily summary job: {e}")
+        logger.error("Error in daily summary job for %s: %s", email, e)
+
+
+def schedule_user_job(
+    user_id: str,
+    email: str,
+    first_name: str,
+    hour: int,
+    minute: int,
+    instructions: str = "",
+) -> None:
+    """Schedule or reschedule a summary job for a user."""
+    global scheduler
+    if scheduler is None:
+        scheduler = AsyncIOScheduler()
+        scheduler.start()
+
+    trigger = CronTrigger(hour=hour, minute=minute, timezone="America/New_York")
+    job_id = f"daily_summary_{user_id}"
+
+    try:
+        if scheduler.get_job(job_id):
+            scheduler.reschedule_job(job_id, trigger=trigger)
+            scheduler.modify_job(job_id, args=[user_id, email, first_name, instructions])
+        else:
+            scheduler.add_job(
+                daily_summary_job,
+                trigger,
+                id=job_id,
+                args=[user_id, email, first_name, instructions],
+                replace_existing=True,
+                max_instances=1,
+            )
+        logger.info("Scheduled daily summary for %s at %02d:%02d", email, hour, minute)
+    except Exception as e:
+        logger.error("Failed to schedule job for %s: %s", email, e)
+
+
+async def _load_jobs():
+    from auth import users_collection
+
+    cursor = users_collection.find({"is_verified": True})
+    async for user in cursor:
+        schedule_user_job(
+            str(user["_id"]),
+            user["email"],
+            user.get("first_name", ""),
+            user.get("summary_hour", 9),
+            user.get("summary_minute", 0),
+            user.get("email_instructions", ""),
+        )
 
 
 def start_scheduler():
@@ -54,31 +84,10 @@ def start_scheduler():
         logger.warning("Scheduler already running")
         return
 
-    try:
-        scheduler = AsyncIOScheduler()
-
-        # Schedule daily using configured time
-        scheduler.add_job(
-            daily_summary_job,
-            CronTrigger(
-                hour=scheduled_hour,
-                minute=scheduled_minute,
-                timezone="America/New_York",
-            ),
-            id="daily_summary",
-            max_instances=1,
-            replace_existing=True,
-        )
-
-        scheduler.start()
-        logger.info(
-            "Daily summary scheduler started (%02d:%02d Eastern)",
-            scheduled_hour,
-            scheduled_minute,
-        )
-
-    except Exception as e:
-        logger.error(f"Failed to start scheduler: {e}")
+    scheduler = AsyncIOScheduler()
+    scheduler.start()
+    asyncio.create_task(_load_jobs())
+    logger.info("Daily summary scheduler started")
 
 
 def stop_scheduler():
@@ -91,33 +100,16 @@ def stop_scheduler():
         logger.info("Scheduler stopped")
 
 
-def update_schedule_time(hour: int, minute: int):
-    """Update the daily summary schedule time."""
-    global scheduled_hour, scheduled_minute, scheduler
-
-    scheduled_hour = hour
-    scheduled_minute = minute
-
-    if scheduler is None:
-        start_scheduler()
-        return
-
-    try:
-        scheduler.reschedule_job(
-            "daily_summary",
-            trigger=CronTrigger(
-                hour=scheduled_hour,
-                minute=scheduled_minute,
-                timezone="America/New_York",
-            ),
-        )
-        logger.info(
-            "Rescheduled daily summary to %02d:%02d Eastern",
-            scheduled_hour,
-            scheduled_minute,
-        )
-    except Exception as e:
-        logger.error(f"Failed to reschedule daily summary: {e}")
+def update_schedule_time(
+    user_id: str,
+    email: str,
+    first_name: str,
+    hour: int,
+    minute: int,
+    instructions: str = "",
+) -> None:
+    """Update a user's summary schedule."""
+    schedule_user_job(user_id, email, first_name, hour, minute, instructions)
 
 
 def get_scheduler_status():
