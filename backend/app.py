@@ -3,6 +3,7 @@ import logging
 import os
 from typing import List, Optional
 
+import httpx
 from auth import (
     LoginRequest,
     SignupRequest,
@@ -14,6 +15,7 @@ from auth import (
     update_user_name,
     verify_session,
 )
+from bs4 import BeautifulSoup
 from categories import (
     DEFAULT_CATEGORIES,
     Category,
@@ -164,6 +166,21 @@ async def api_create_todo(request: Request, current_user: dict = Depends(get_cur
 
         # Add user_id to the todo
         body["user_id"] = current_user["user_id"]
+
+        # Detect if text is a URL
+        text = body.get("text", "").strip()
+        if text.startswith("http://") or text.startswith("https://"):
+            body["link"] = text
+            try:
+                async with httpx.AsyncClient(timeout=5) as client:
+                    resp = await client.get(text)
+                if resp.status_code == 200:
+                    soup = BeautifulSoup(resp.text, "html.parser")
+                    title_tag = soup.find("title")
+                    if title_tag and title_tag.text:
+                        body["text"] = title_tag.text.strip()
+            except Exception as e:
+                logger.error(f"Failed to fetch title for {text}: {e}")
 
         # Create Todo object from request data
         todo = Todo(**body)

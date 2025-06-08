@@ -510,7 +510,13 @@ export default function AIToDoListApp({ user, token }) {
             <div className="flex justify-between items-start">
               <div className="flex-1">
                 <p className={`text-base ${todo.completed ? 'line-through' : ''}`}>
-                  {todo.text}
+                  {todo.link ? (
+                    <a href={todo.link} target="_blank" rel="noopener noreferrer" className="underline">
+                      {todo.text}
+                    </a>
+                  ) : (
+                    todo.text
+                  )}
                 </p>
                 <div className="text-xs mt-1">
                   {editingCategory === todo._id ? (
