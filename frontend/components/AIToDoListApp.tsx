@@ -102,11 +102,20 @@ export default function AIToDoListApp({ user, token }: Props) {
 
   // Load todos and categories when token is available
   useEffect(() => {
-    if (token) {
+    if (token && user) {
       fetchTodos();
       fetchCategories();
+
+      // Send auth info to service worker for offline sync
+      if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+        navigator.serviceWorker.controller.postMessage({
+          type: 'SET_AUTH',
+          token: token,
+          userId: user.id || user._id || user.email
+        });
+      }
     }
-  }, [token, fetchTodos, fetchCategories]);
+  }, [token, user, fetchTodos, fetchCategories]);
 
   // Classify task using AI
   async function classify(text) {
