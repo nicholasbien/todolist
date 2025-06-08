@@ -26,7 +26,6 @@ const nextConfig = {
       { source: '/auth/:path*', destination: `${API_URL}/auth/:path*` },
       { source: '/todos/:path*', destination: `${API_URL}/todos/:path*` },
       { source: '/categories/:path*', destination: `${API_URL}/categories/:path*` },
-      { source: '/classify/:path*', destination: `${API_URL}/classify/:path*` },
       { source: '/email/:path*', destination: `${API_URL}/email/:path*` },
     ];
   },

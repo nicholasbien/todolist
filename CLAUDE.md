@@ -43,7 +43,7 @@ This is an AI-powered todo list application with a React/Next.js frontend and Fa
 ### Frontend Architecture
 - **Framework**: Next.js 14 with React 18
 - **Styling**: Tailwind CSS
-- **Main Component**: `AIToDoListApp.jsx` - handles all todo management, categories, and AI classification
+- **Main Component**: `AIToDoListApp.jsx` - handles todo management and categories
 - **API Communication**: Direct fetch calls to backend endpoints
 - **State Management**: React useState hooks for local state
 
@@ -59,11 +59,9 @@ This is an AI-powered todo list application with a React/Next.js frontend and Fa
 
 ### Data Flow
 1. User adds a task in the frontend
-2. Frontend calls `/classify` endpoint with task text
-3. Backend uses OpenAI API to classify task into category and priority
-4. Frontend saves classified task via `/todos` endpoint
-5. MongoDB stores the todo with generated ObjectId
-6. Frontend refreshes todo list from `/todos` endpoint
+2. Frontend sends task text to `/todos`
+3. Backend classifies the task using OpenAI and stores it in MongoDB
+4. Frontend refreshes todo list from `/todos` endpoint
 
 ### Database Schema
 - **Todos Collection**: `{_id, text, category, priority, dateAdded, completed}`

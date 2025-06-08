@@ -6,8 +6,8 @@ from typing import Optional
 from bson import ObjectId
 from dotenv import load_dotenv
 from fastapi import HTTPException
-from motor.motor_asyncio import AsyncIOMotorClient
 from mongomock_motor import AsyncMongoMockClient
+from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, Field
 
 # Configure logging
