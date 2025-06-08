@@ -4,11 +4,10 @@ import type { AppProps } from 'next/app';
 
 function MyApp({ Component, pageProps }: AppProps) {
   useEffect(() => {
-    // Only register service worker in production
-    if ('serviceWorker' in navigator && process.env.NODE_ENV === 'production') {
+    if ('serviceWorker' in navigator) {
       navigator.serviceWorker
         .register('/sw.js')
-        .then((registration) => {
+        .then(() => {
           // Service Worker registered successfully
         })
         .catch((registrationError) => {
