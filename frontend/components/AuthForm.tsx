@@ -11,7 +11,7 @@ export default function AuthForm() {
 
   const { signup, login } = useAuth();
 
-  const handleEmailSubmit = async (e) => {
+  const handleEmailSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!email.trim()) {
       setError('Please enter an email address');
@@ -34,7 +34,7 @@ export default function AuthForm() {
     setLoading(false);
   };
 
-  const handleCodeSubmit = async (e) => {
+  const handleCodeSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!code.trim()) {
       setError('Please enter the verification code');
