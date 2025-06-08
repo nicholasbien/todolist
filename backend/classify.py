@@ -1,9 +1,10 @@
 import json
 import logging
 import os
+import re
 import time
-from datetime import datetime
-from typing import Any, Dict, List
+from datetime import datetime, timedelta
+from typing import Any, Dict, List, Optional
 
 from categories import DEFAULT_CATEGORIES
 from dotenv import load_dotenv
@@ -24,6 +25,38 @@ if not api_key:
 
 # Initialize OpenAI client with timeout
 client = OpenAI(api_key=api_key, timeout=5.0, max_retries=0)  # 10 second timeout
+
+
+WEEKDAYS = [
+    "monday",
+    "tuesday",
+    "wednesday",
+    "thursday",
+    "friday",
+    "saturday",
+    "sunday",
+]
+
+
+def manual_parse_due_date(text: str, reference: datetime) -> Optional[str]:
+    """Parse simple relative dates from text."""
+    lowered = text.lower()
+    if "today" in lowered:
+        return reference.date().isoformat()
+    if "tomorrow" in lowered:
+        return (reference.date() + timedelta(days=1)).isoformat()
+
+    match = re.search(r"next\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday)", lowered)
+    if match:
+        weekday = WEEKDAYS.index(match.group(1))
+        days_ahead = (weekday - reference.weekday() + 7) % 7
+        days_ahead = days_ahead or 7
+        return (reference.date() + timedelta(days=days_ahead)).isoformat()
+
+    iso_match = re.search(r"(\d{4}-\d{2}-\d{2})", text)
+    if iso_match:
+        return iso_match.group(1)
+    return None
 
 
 async def classify_task(text: str, categories: List[str]) -> Dict[str, Any]:
@@ -99,6 +132,8 @@ async def classify_task(text: str, categories: List[str]) -> Dict[str, Any]:
             due_date = result.get("dueDate")
             if due_date:
                 due_date = str(due_date).split("T")[0]
+            else:
+                due_date = manual_parse_due_date(text, current_dt)
 
             return {
                 "category": category,
@@ -112,4 +147,7 @@ async def classify_task(text: str, categories: List[str]) -> Dict[str, Any]:
             return default_response
     except Exception as e:
         logger.error(f"OpenAI API error after {time.time() - start_time:.2f} seconds: {str(e)}")
-        return default_response
+        fallback_due = manual_parse_due_date(text, datetime.now())
+        resp = default_response.copy()
+        resp["dueDate"] = fallback_due
+        return resp
