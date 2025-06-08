@@ -734,7 +734,7 @@ export default function AIToDoListApp({ user, token }: Props) {
       )}
 
       {/* Email Settings Button */}
-      <div className="mt-8 flex justify-center relative">
+      <div className="mt-8 flex justify-center">
         <button
           onClick={() => setShowEmailSettings(!showEmailSettings)}
           className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg mr-4"
@@ -742,28 +742,30 @@ export default function AIToDoListApp({ user, token }: Props) {
           Email Settings
         </button>
         {showEmailSettings && (
-          <div className="absolute bg-gray-800 border border-gray-600 rounded p-4 mt-12 w-60 text-white space-y-2">
-            <label className="block text-sm">Daily Summary Time</label>
-            <input
-              type="time"
-              value={emailTime}
-              onChange={(e) => setEmailTime(e.target.value)}
-              className="w-full bg-gray-700 p-1 rounded"
-            />
-            <div className="flex justify-end space-x-2 mt-2">
-              <button
-                onClick={handleUpdateSchedule}
-                disabled={savingSchedule}
-                className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 px-3 py-1 rounded"
-              >
-                {savingSchedule ? 'Saving...' : 'Save'}
-              </button>
-              <button
-                onClick={() => setShowEmailSettings(false)}
-                className="bg-gray-500 hover:bg-gray-600 px-3 py-1 rounded"
-              >
-                Close
-              </button>
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-gray-800 border border-gray-600 rounded p-4 w-60 text-white space-y-2">
+              <label className="block text-sm">Daily Summary Time</label>
+              <input
+                type="time"
+                value={emailTime}
+                onChange={(e) => setEmailTime(e.target.value)}
+                className="w-full bg-gray-700 p-1 rounded"
+              />
+              <div className="flex justify-end space-x-2 mt-2">
+                <button
+                  onClick={handleUpdateSchedule}
+                  disabled={savingSchedule}
+                  className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 px-3 py-1 rounded"
+                >
+                  {savingSchedule ? 'Saving...' : 'Save'}
+                </button>
+                <button
+                  onClick={() => setShowEmailSettings(false)}
+                  className="bg-gray-500 hover:bg-gray-600 px-3 py-1 rounded"
+                >
+                  Close
+                </button>
+              </div>
             </div>
           </div>
         )}
