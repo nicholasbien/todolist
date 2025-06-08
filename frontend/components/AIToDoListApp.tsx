@@ -26,6 +26,7 @@ export default function AIToDoListApp({ user, token }: Props) {
   const [showUpdatePrompt, setShowUpdatePrompt] = useState(false);
   const [showEmailSettings, setShowEmailSettings] = useState(false);
   const [emailTime, setEmailTime] = useState('09:00');
+  const [emailInstructions, setEmailInstructions] = useState(user.email_instructions || '');
   const [savingSchedule, setSavingSchedule] = useState(false);
 
 
@@ -392,7 +393,7 @@ export default function AIToDoListApp({ user, token }: Props) {
       const [hour, minute] = emailTime.split(':').map((v) => parseInt(v, 10));
       const response = await authenticatedFetch('/email/update-schedule', {
         method: 'POST',
-        body: JSON.stringify({ hour, minute }),
+        body: JSON.stringify({ hour, minute, instructions: emailInstructions }),
       });
 
       if (!response.ok) {
@@ -749,6 +750,12 @@ export default function AIToDoListApp({ user, token }: Props) {
               value={emailTime}
               onChange={(e) => setEmailTime(e.target.value)}
               className="w-full bg-gray-700 p-1 rounded"
+            />
+            <label className="block text-sm mt-2">Custom Instructions</label>
+            <textarea
+              value={emailInstructions}
+              onChange={(e) => setEmailInstructions(e.target.value)}
+              className="w-full bg-gray-700 p-1 rounded h-24"
             />
             <div className="flex justify-end space-x-2 mt-2">
               <button

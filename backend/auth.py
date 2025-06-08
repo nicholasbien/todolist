@@ -49,6 +49,7 @@ class User(BaseModel):
     id: Optional[str] = Field(alias="_id", default=None)
     email: EmailStr
     first_name: str
+    email_instructions: str = ""
     verification_code: Optional[str] = None
     code_expires_at: Optional[datetime] = None
     is_verified: bool = False
@@ -253,6 +254,7 @@ async def login_user(email: str, code: str) -> dict:
                 "id": str(user["_id"]),
                 "email": user["email"],
                 "first_name": user.get("first_name", ""),
+                "email_instructions": user.get("email_instructions", ""),
             },
         }
 
@@ -283,6 +285,7 @@ async def verify_session(token: str) -> dict:
             "user_id": str(user["_id"]),
             "email": user["email"],
             "first_name": user.get("first_name", ""),
+            "email_instructions": user.get("email_instructions", ""),
         }
 
     except HTTPException:
@@ -337,6 +340,25 @@ async def update_user_name(user_id: str, first_name: str) -> dict:
     except Exception as e:
         logger.error(f"Error in update_user_name: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to update name: {str(e)}")
+
+
+async def update_email_instructions(user_id: str, instructions: str) -> dict:
+    """Update user's custom email instructions."""
+    try:
+        result = await users_collection.update_one(
+            {"_id": ObjectId(user_id)}, {"$set": {"email_instructions": instructions}}
+        )
+
+        if result.matched_count == 0:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        return {"message": "Email instructions updated"}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error in update_email_instructions: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to update email instructions: {str(e)}")
 
 
 async def cleanup_expired_sessions():

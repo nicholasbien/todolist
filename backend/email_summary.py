@@ -30,11 +30,10 @@ openai.api_key = os.getenv("OPENAI_API_KEY")
 logger = logging.getLogger(__name__)
 
 
-def create_summary_prompt(todos_json: str, user_name: str = "there") -> str:
-    """
-    Create a prompt for generating a daily todo summary.
-    """
+def create_summary_prompt(todos_json: str, user_name: str = "there", instructions: str = "") -> str:
+    """Create a prompt for generating a daily todo summary."""
     current_date = datetime.now().strftime("%B %d, %Y")
+    extra = f"\nAdditional instructions from user:\n{instructions}" if instructions else ""
     return f"""You are a helpful personal assistant creating a daily todo summary email.
 
 Today's date: {current_date}
@@ -65,11 +64,11 @@ Instructions:
 6. Keep it concise but personal (2-3 paragraphs max)
 7. End with a motivational note for the day ahead
 
-Format as plain text email content (no HTML, no subject line).
+Format as plain text email content (no HTML, no subject line).{extra}
 """
 
 
-async def generate_todo_summary(todos: list, user_name: str = "there") -> str:
+async def generate_todo_summary(todos: list, user_name: str = "there", instructions: str = "") -> str:
     """
     Use OpenAI to generate a personalized todo summary.
     """
@@ -77,7 +76,7 @@ async def generate_todo_summary(todos: list, user_name: str = "there") -> str:
         # Convert todos to JSON for the prompt
         todos_json = json.dumps(todos, indent=2, default=str)
 
-        prompt = create_summary_prompt(todos_json, user_name)
+        prompt = create_summary_prompt(todos_json, user_name, instructions)
 
         # Use OpenAI to generate the summary
         client = openai.AsyncOpenAI(api_key=openai.api_key)
@@ -182,7 +181,7 @@ async def send_email(to_email: str, subject: str, body: str) -> bool:
         return False
 
 
-async def send_daily_summary(user_id: str, user_email: str, user_name: str = "") -> bool:
+async def send_daily_summary(user_id: str, user_email: str, user_name: str = "", instructions: str = "") -> bool:
     """
     Generate and send daily summary for a specific user.
     """
@@ -195,7 +194,7 @@ async def send_daily_summary(user_id: str, user_email: str, user_name: str = "")
 
         # Generate summary
         display_name = user_name or user_email.split("@")[0]
-        summary = await generate_todo_summary(todos_dict, display_name)
+        summary = await generate_todo_summary(todos_dict, display_name, instructions)
 
         # Create subject with date
         today = datetime.now().strftime("%B %d, %Y")

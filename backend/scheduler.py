@@ -37,7 +37,12 @@ async def daily_summary_job():
         # Send summary to admin only
         from email_summary import send_daily_summary
 
-        success = await send_daily_summary(str(admin_user["_id"]), admin_user["email"], admin_user.get("first_name"))
+        success = await send_daily_summary(
+            str(admin_user["_id"]),
+            admin_user["email"],
+            admin_user.get("first_name"),
+            admin_user.get("email_instructions", ""),
+        )
 
         result = {"sent": 1 if success else 0, "failed": 0 if success else 1}
         logger.info(f"Daily summary job completed: {result}")
