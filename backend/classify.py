@@ -1,12 +1,12 @@
+# flake8: noqa: E501
 import json
 import logging
 import os
-import re
 import time
-from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 from categories import DEFAULT_CATEGORIES
+from dateparse import manual_parse_due_date
 from dotenv import load_dotenv
 from openai import OpenAI
 
@@ -27,39 +27,7 @@ if not api_key:
 client = OpenAI(api_key=api_key, timeout=5.0, max_retries=0)  # 10 second timeout
 
 
-WEEKDAYS = [
-    "monday",
-    "tuesday",
-    "wednesday",
-    "thursday",
-    "friday",
-    "saturday",
-    "sunday",
-]
-
-
-def manual_parse_due_date(text: str, reference: datetime) -> Optional[str]:
-    """Parse simple relative dates from text."""
-    lowered = text.lower()
-    if "today" in lowered:
-        return reference.date().isoformat()
-    if "tomorrow" in lowered:
-        return (reference.date() + timedelta(days=1)).isoformat()
-
-    match = re.search(r"next\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday)", lowered)
-    if match:
-        weekday = WEEKDAYS.index(match.group(1))
-        days_ahead = (weekday - reference.weekday() + 7) % 7
-        days_ahead = days_ahead or 7
-        return (reference.date() + timedelta(days=days_ahead)).isoformat()
-
-    iso_match = re.search(r"(\d{4}-\d{2}-\d{2})", text)
-    if iso_match:
-        return iso_match.group(1)
-    return None
-
-
-async def classify_task(text: str, categories: List[str]) -> Dict[str, Any]:
+async def classify_task(text: str, categories: List[str], date_added: str) -> Dict[str, Any]:
     """
     Classify a task using OpenAI's API to determine category and priority.
 
@@ -92,15 +60,24 @@ async def classify_task(text: str, categories: List[str]) -> Dict[str, Any]:
 
         logger.info(f"Starting OpenAI API call for text: {text[:30]}...")
 
-        current_dt = datetime.now()
-        date_context = f"{current_dt.strftime('%A')}, {current_dt.date().isoformat()}"
-        system_prompt = (
-            "You are a task organizer. Analyze the task text, remove any date references, "
-            "and extract a due date if present. Return a JSON object with fields: "
-            "'category', 'priority', 'text' (cleaned task description), and 'dueDate' (YYYY-MM-DD or null). "
-            f"Dates should be interpreted relative to {date_context}. Available categories: {categories_str}. "
-            "Priority options: High, Medium, Low. Only output valid JSON."
-        )
+        # Figure out the day of week from date_added
+        try:
+            from datetime import datetime
+
+            date_obj = datetime.fromisoformat(date_added)
+            day_of_week = date_obj.strftime("%A")
+        except Exception:
+            day_of_week = None
+
+        system_prompt = f"""
+        You are a task organizer. Given a task description, do the following:
+        - Remove all date references and keywords (such as 'on', 'by', 'due', 'before', 'today', 'tomorrow', etc.) from the text.
+        - Extract a due date if present. For phrases like 'on <weekday>', '<weekday>' at the end, 'today', or 'tomorrow', always interpret as the next occurrence of that day (including today for 'today').
+        - Use the provided date as the reference for all relative dates: {day_of_week + ', ' if day_of_week else ''}{date_added}.
+        - Return only a valid JSON object with these fields: 'category', 'priority', 'text' (the cleaned task description), and 'dueDate' (YYYY-MM-DD or null).
+        Available categories: {categories_str}.
+        Priority options: High, Medium, Low.
+        """
 
         # Make synchronous call since OpenAI client handles async internally
         completion = client.chat.completions.create(
@@ -129,17 +106,13 @@ async def classify_task(text: str, categories: List[str]) -> Dict[str, Any]:
                 logger.warning(f"Category {category} not in available categories, defaulting to General")
                 category = "General"
 
-            due_date = result.get("dueDate")
-            if due_date:
-                due_date = str(due_date).split("T")[0]
-            else:
-                due_date = manual_parse_due_date(text, current_dt)
+            due_date, cleaned_text = result.get("dueDate"), result.get("text", text)
 
             return {
                 "category": category,
                 "priority": result.get("priority", "Low"),
                 "dueDate": due_date,
-                "text": result.get("text", text),
+                "text": cleaned_text,
             }
         except json.JSONDecodeError as e:
             logger.error(f"Failed to parse OpenAI response as JSON: {e}")
@@ -147,7 +120,7 @@ async def classify_task(text: str, categories: List[str]) -> Dict[str, Any]:
             return default_response
     except Exception as e:
         logger.error(f"OpenAI API error after {time.time() - start_time:.2f} seconds: {str(e)}")
-        fallback_due = manual_parse_due_date(text, datetime.now())
+        fallback_due, _ = manual_parse_due_date(text, date_added)
         resp = default_response.copy()
         resp["dueDate"] = fallback_due
         return resp

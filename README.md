@@ -7,6 +7,7 @@ A modern todo list application with AI-powered task classification, email verifi
 - **AI-powered task classification** using OpenAI GPT-4o-mini
 - **Email verification authentication** with JWT sessions
 - **Daily email summaries** with AI-generated insights
+- **Customizable email instructions** for personalized summaries
 - **Category and priority management**
 - **Due date tracking** with upcoming deadlines highlighted in daily summaries
 - **Day-of-week aware date parsing** for more accurate due dates
@@ -322,7 +323,7 @@ python3 -c "import secrets; print(secrets.token_urlsafe(32))"
 - `PUT /categories/{name}` - Rename category
 - `DELETE /categories/{name}` - Delete category
 
-### AI Classification
+### AI Classification - now handled fully on the backend as part of adding task
 Todos are automatically classified when created. You can also use
 the manual endpoint if needed:
 - `POST /classify` - Classify task text
@@ -332,6 +333,7 @@ the manual endpoint if needed:
 ### Email
 - `POST /email/send-summary` - Send daily summary to current user
 - `GET /email/scheduler-status` - Check scheduler status
+- `POST /email/update-instructions` - Set custom instructions for summaries
 
 ## Deployment
 

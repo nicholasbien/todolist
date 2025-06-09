@@ -54,8 +54,10 @@ class User(BaseModel):
     is_verified: bool = False
     created_at: datetime = Field(default_factory=datetime.now)
     last_login: Optional[datetime] = None
-    summary_hour: int = 9
-    summary_minute: int = 0
+    summary_hour: Optional[int] = None
+    summary_minute: Optional[int] = None
+    email_instructions: str = ""
+    timezone: str = "UTC"
 
     class Config:
         arbitrary_types_allowed = True
@@ -191,8 +193,9 @@ async def signup_user(email: str) -> dict:
                 first_name="",  # Will be set during first login
                 verification_code=code,
                 code_expires_at=code_expires_at,
-                summary_hour=9,
-                summary_minute=0,
+                summary_hour=None,
+                summary_minute=None,
+                email_instructions="",
             )
             user_dict = user.dict(by_alias=True)
             user_dict.pop("_id", None)
@@ -257,8 +260,9 @@ async def login_user(email: str, code: str) -> dict:
                 "id": str(user["_id"]),
                 "email": user["email"],
                 "first_name": user.get("first_name", ""),
-                "summary_hour": user.get("summary_hour", 9),
-                "summary_minute": user.get("summary_minute", 0),
+                "summary_hour": user.get("summary_hour"),
+                "summary_minute": user.get("summary_minute"),
+                "email_instructions": user.get("email_instructions", ""),
             },
         }
 
@@ -289,8 +293,9 @@ async def verify_session(token: str) -> dict:
             "user_id": str(user["_id"]),
             "email": user["email"],
             "first_name": user.get("first_name", ""),
-            "summary_hour": user.get("summary_hour", 9),
-            "summary_minute": user.get("summary_minute", 0),
+            "summary_hour": user.get("summary_hour"),
+            "summary_minute": user.get("summary_minute"),
+            "email_instructions": user.get("email_instructions", ""),
         }
 
     except HTTPException:
@@ -367,6 +372,28 @@ async def update_user_summary_time(user_id: str, hour: int, minute: int) -> dict
     except Exception as e:
         logger.error(f"Error in update_user_summary_time: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to update summary time")
+
+
+async def update_user_email_instructions(user_id: str, instructions: str) -> dict:
+    """Update a user's custom email instructions."""
+    try:
+        result = await users_collection.update_one(
+            {"_id": ObjectId(user_id)},
+            {"$set": {"email_instructions": instructions}},
+        )
+
+        if result.matched_count == 0:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        logger.info("Updated email instructions for user %s", user_id)
+
+        return {"message": "Email instructions updated"}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error in update_user_email_instructions: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to update email instructions")
 
 
 async def cleanup_expired_sessions():

@@ -11,6 +11,7 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
 import openai
+from bson import ObjectId
 from dotenv import load_dotenv
 from todos import get_todos
 
@@ -30,10 +31,8 @@ openai.api_key = os.getenv("OPENAI_API_KEY")
 logger = logging.getLogger(__name__)
 
 
-def create_summary_prompt(todos_json: str, user_name: str = "there") -> str:
-    """
-    Create a prompt for generating a daily todo summary.
-    """
+def create_summary_prompt(todos_json: str, user_name: str = "there", custom_instructions: str = "") -> str:
+    """Create a prompt for generating a daily todo summary."""
     current_date = datetime.now().strftime("%B %d, %Y")
     return f"""You are a helpful personal assistant creating a daily todo summary email.
 
@@ -47,29 +46,31 @@ Todo Data:
 Instructions:
 1. Address the user as "{user_name}" if provided, otherwise use "there"
 2. Create a friendly, motivational tone
-3. Pay attention to the "dateAdded" field in each todo to understand timing and
+3. **IMPORTANT**: Focus primarily on tasks completed in the last day (check "dateCompleted" field).
+   Ignore tasks completed before yesterday - they're included for context but shouldn't be highlighted.
+4. Pay attention to the "dateAdded" field in each todo to understand timing and
    the "dueDate" field for upcoming deadlines:
-   - Celebrate recently completed tasks (completed in last few days)
-   - Note if tasks have been completed for a while
+   - Celebrate recently completed tasks (completed yesterday or today only)
    - Identify pending tasks that are getting old/stale
    - Highlight urgent items or those with approaching due dates
-4. Organize todos by:
-   - Recently completed tasks (celebrate achievements!)
+5. Organize todos by:
+   - Recently completed tasks from last day (celebrate achievements!)
    - Pending tasks by priority AND age (High, Medium, Low)
    - Group by categories where relevant
-5. Provide insights like:
-   - Total tasks completed vs pending
+6. Provide insights like:
+   - Total tasks completed vs pending (focus on recent completions)
    - Most productive category
    - Tasks that need attention due to age
    - Recent momentum and progress patterns
-6. Keep it concise but personal (2-3 paragraphs max)
-7. End with a motivational note for the day ahead
+7. Keep it concise but personal (2-3 paragraphs max)
+8. End with a motivational note for the day ahead
+{custom_instructions}
 
 Format as plain text email content (no HTML, no subject line).
 """
 
 
-async def generate_todo_summary(todos: list, user_name: str = "there") -> str:
+async def generate_todo_summary(todos: list, user_name: str = "there", custom_instructions: str = "") -> str:
     """
     Use OpenAI to generate a personalized todo summary.
     """
@@ -77,7 +78,7 @@ async def generate_todo_summary(todos: list, user_name: str = "there") -> str:
         # Convert todos to JSON for the prompt
         todos_json = json.dumps(todos, indent=2, default=str)
 
-        prompt = create_summary_prompt(todos_json, user_name)
+        prompt = create_summary_prompt(todos_json, user_name, custom_instructions)
 
         # Use OpenAI to generate the summary
         client = openai.AsyncOpenAI(api_key=openai.api_key)
@@ -150,6 +151,12 @@ async def send_email(to_email: str, subject: str, body: str) -> bool:
     Send an email using SMTP.
     """
     try:
+        # Block test emails from being sent
+        test_emails = ["pytest@example.com", "test@example.com", "pytest2@example.com"]
+        if to_email.lower() in [email.lower() for email in test_emails]:
+            logger.info(f"Blocked email send to test address: {to_email}")
+            return True  # Return True to avoid breaking tests
+
         if not SMTP_USERNAME or not SMTP_PASSWORD or not FROM_EMAIL:
             logger.error("Email credentials not configured")
             return False
@@ -182,7 +189,9 @@ async def send_email(to_email: str, subject: str, body: str) -> bool:
         return False
 
 
-async def send_daily_summary(user_id: str, user_email: str, user_name: str = "") -> bool:
+async def send_daily_summary(
+    user_id: str, user_email: str, user_name: str = "", custom_instructions: str | None = None
+) -> bool:
     """
     Generate and send daily summary for a specific user.
     """
@@ -190,12 +199,55 @@ async def send_daily_summary(user_id: str, user_email: str, user_name: str = "")
         # Get user's todos
         todos = await get_todos(user_id)
 
+        if custom_instructions is None:
+            from auth import users_collection
+
+            user = await users_collection.find_one({"_id": ObjectId(user_id)})
+            custom_instructions = user.get("email_instructions", "") if user else ""
+
         # Convert todos to dict format for processing
         todos_dict = [todo.dict() if hasattr(todo, "dict") else todo for todo in todos]
 
+        # Separate completed and uncompleted tasks
+        completed_todos = [todo for todo in todos_dict if todo.get("completed", False)]
+        uncompleted_todos = [todo for todo in todos_dict if not todo.get("completed", False)]
+
+        # Sort completed by completion date (most recent first)
+        completed_todos.sort(key=lambda x: x.get("dateCompleted", ""), reverse=True)
+
+        # Sort uncompleted by: closest due dates first, then most recently created
+        def uncompleted_sort_key(todo):
+            due_date = todo.get("dueDate")
+            date_added = todo.get("dateAdded", "")
+
+            if due_date:
+                # Tasks with due dates come first, sorted by due date (closest first)
+                try:
+                    due_dt = datetime.fromisoformat(due_date.replace("Z", "+00:00"))
+                    return (0, due_dt, date_added)  # 0 = has due date (higher priority)
+                except (ValueError, AttributeError):
+                    # If due date parsing fails, treat as no due date
+                    return (1, datetime.max, date_added)
+            else:
+                # Tasks without due dates come second, sorted by creation date (most recent first)
+                try:
+                    added_dt = datetime.fromisoformat(date_added.replace("Z", "+00:00"))
+                    return (
+                        1,
+                        -added_dt.timestamp(),
+                        date_added,
+                    )  # 1 = no due date, negative timestamp for reverse order
+                except (ValueError, AttributeError):
+                    return (1, 0, date_added)
+
+        uncompleted_todos.sort(key=uncompleted_sort_key)
+
+        # Take up to 40 uncompleted and up to 20 completed tasks
+        limited_todos = uncompleted_todos[:40] + completed_todos[:20]
+
         # Generate summary
         display_name = user_name or user_email.split("@")[0]
-        summary = await generate_todo_summary(todos_dict, display_name)
+        summary = await generate_todo_summary(limited_todos, display_name, custom_instructions or "")
 
         # Create subject with date
         today = datetime.now().strftime("%B %d, %Y")

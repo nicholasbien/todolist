@@ -28,6 +28,15 @@ export default function AIToDoListApp({ user, token }: Props) {
   const [showEmailSettings, setShowEmailSettings] = useState(false);
   const [emailTime, setEmailTime] = useState('09:00');
   const [savingSchedule, setSavingSchedule] = useState(false);
+  const [emailInstructions, setEmailInstructions] = useState('');
+
+  const handleOpenEmailSettings = () => {
+    const h = String(user?.summary_hour ?? 9).padStart(2, '0');
+    const m = String(user?.summary_minute ?? 0).padStart(2, '0');
+    setEmailTime(`${h}:${m}`);
+    setEmailInstructions(user?.email_instructions ?? '');
+    setShowEmailSettings(true);
+  };
 
 
 
@@ -106,6 +115,7 @@ export default function AIToDoListApp({ user, token }: Props) {
       const h = String(user.summary_hour ?? 9).padStart(2, '0');
       const m = String(user.summary_minute ?? 0).padStart(2, '0');
       setEmailTime(`${h}:${m}`);
+      setEmailInstructions(user.email_instructions ?? '');
     }
   }, [user]);
 
@@ -233,9 +243,15 @@ export default function AIToDoListApp({ user, token }: Props) {
 
     try {
       // Create new todo object; backend will classify and set category/priority
+      // Create dateAdded in user's local timezone
+      const now = new Date();
+      const localDateString = now.toLocaleDateString('en-CA'); // YYYY-MM-DD format
+      const localTimeString = now.toLocaleTimeString('en-GB', { hour12: false }); // HH:MM:SS format
+      const localISOString = `${localDateString}T${localTimeString}`;
+
       const todo: any = {
         text: newTodo,
-        dateAdded: new Date().toISOString(),
+        dateAdded: localISOString,
         completed: false
       };
 
@@ -410,6 +426,17 @@ export default function AIToDoListApp({ user, token }: Props) {
         throw new Error(errorData.detail || 'Failed to update schedule');
       }
 
+      const resp2 = await authenticatedFetch('/email/update-instructions', {
+        method: 'POST',
+        body: JSON.stringify({ instructions: emailInstructions }),
+      });
+
+      if (!resp2.ok) {
+        const errorData = await resp2.json();
+        throw new Error(errorData.detail || 'Failed to update instructions');
+      }
+
+
       setShowEmailSettings(false);
       setError('');
     } catch (err) {
@@ -485,7 +512,7 @@ export default function AIToDoListApp({ user, token }: Props) {
             type="text"
             value={newTodo}
             onChange={(e) => setNewTodo(e.target.value)}
-            placeholder="Add a new task/thought/link..."
+            placeholder="Add a new task..."
             className="flex-1 p-3 border border-gray-700 rounded bg-gray-800 text-white placeholder-gray-400"
             onKeyPress={(e) => e.key === 'Enter' && handleAddTodo()}
           />
@@ -591,18 +618,18 @@ export default function AIToDoListApp({ user, token }: Props) {
 
       {showEditCategoryModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-gray-800 p-4 rounded w-64 space-y-3">
-            <h3 className="text-white text-lg">Edit Category</h3>
+          <div className="bg-gray-800 p-6 rounded-xl w-80 space-y-4 shadow-2xl border border-gray-700">
+            <h3 className="text-white text-lg font-bold mb-2">Edit Category</h3>
             <input
               type="text"
               value={editCatName}
               onChange={(e) => setEditCatName(e.target.value)}
-              className="w-full p-2 rounded bg-gray-700 border border-gray-600 text-white"
+              className="w-full p-3 rounded-lg bg-gray-700 border border-gray-600 text-white text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
-            <div className="flex justify-end space-x-2">
+            <div className="flex flex-row gap-3 mt-2">
               <button
                 onClick={handleRenameCategory}
-                className="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700"
+                className="flex-1 min-w-0 bg-blue-600 text-white font-semibold py-2 rounded-lg shadow hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-400 transition-colors"
               >
                 Rename
               </button>
@@ -611,13 +638,13 @@ export default function AIToDoListApp({ user, token }: Props) {
                   handleDeleteCategory(activeCat);
                   setShowEditCategoryModal(false);
                 }}
-                className="bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700"
+                className="flex-1 min-w-0 bg-blue-900 text-white font-semibold py-2 rounded-lg shadow hover:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-900 transition-colors"
               >
                 Delete
               </button>
               <button
                 onClick={() => setShowEditCategoryModal(false)}
-                className="bg-gray-300 text-gray-800 px-3 py-1 rounded hover:bg-gray-400"
+                className="flex-1 min-w-0 bg-gray-300 text-gray-800 font-semibold py-2 rounded-lg shadow hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors"
               >
                 Cancel
               </button>
@@ -676,20 +703,27 @@ export default function AIToDoListApp({ user, token }: Props) {
       {/* Email Settings Button */}
       <div className="mt-8 flex justify-center">
         <button
-          onClick={() => setShowEmailSettings(!showEmailSettings)}
+          onClick={handleOpenEmailSettings}
           className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg mr-4"
         >
           Email Settings
         </button>
         {showEmailSettings && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-gray-800 border border-gray-600 rounded p-4 w-60 text-white space-y-2">
+            <div className="bg-gray-800 border border-gray-600 rounded-xl p-6 w-80 text-white space-y-2 shadow-2xl">
               <label className="block text-sm">Daily Summary Time</label>
               <input
                 type="time"
                 value={emailTime}
                 onChange={(e) => setEmailTime(e.target.value)}
                 className="w-full bg-gray-700 p-1 rounded"
+              />
+              <label className="block text-sm mt-2">Custom Instructions</label>
+              <textarea
+                value={emailInstructions}
+                onChange={(e) => setEmailInstructions(e.target.value)}
+                className="w-full bg-gray-700 p-1 rounded h-24"
+                placeholder="Write like a Buddhist monk. Include a haiku at the end."
               />
               <div className="flex justify-end space-x-2 mt-2">
                 <button
