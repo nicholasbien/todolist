@@ -56,7 +56,7 @@ def schedule_user_job(user_id: str, email: str, first_name: str, hour: int, minu
 async def _load_jobs():
     from auth import users_collection
 
-    cursor = users_collection.find({"is_verified": True})
+    cursor = users_collection.find({"is_verified": True, "email_enabled": True})
     async for user in cursor:
         hour = user.get("summary_hour")
         minute = user.get("summary_minute")
@@ -101,6 +101,21 @@ def update_schedule_time(
 ) -> None:
     """Update a user's summary schedule."""
     schedule_user_job(user_id, email, first_name, hour, minute, timezone)
+
+
+def remove_user_schedule(user_id: str) -> None:
+    """Remove a user's scheduled email job."""
+    global scheduler
+    if scheduler is None:
+        return
+
+    job_id = f"daily_summary_{user_id}"
+    try:
+        if scheduler.get_job(job_id):
+            scheduler.remove_job(job_id)
+            logger.info("Removed scheduled job for user %s", user_id)
+    except Exception as e:
+        logger.error("Failed to remove job for user %s: %s", user_id, e)
 
 
 def get_scheduler_status():

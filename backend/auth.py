@@ -58,6 +58,7 @@ class User(BaseModel):
     summary_minute: Optional[int] = None
     email_instructions: str = ""
     timezone: str = "UTC"
+    email_enabled: bool = False
 
     class Config:
         arbitrary_types_allowed = True
@@ -196,6 +197,8 @@ async def signup_user(email: str) -> dict:
                 summary_hour=None,
                 summary_minute=None,
                 email_instructions="",
+                timezone="UTC",
+                email_enabled=False,
             )
             user_dict = user.dict(by_alias=True)
             user_dict.pop("_id", None)
@@ -264,6 +267,7 @@ async def login_user(email: str, code: str) -> dict:
                 "summary_minute": user.get("summary_minute"),
                 "email_instructions": user.get("email_instructions", ""),
                 "timezone": user.get("timezone", "UTC"),
+                "email_enabled": user.get("email_enabled", False),
             },
         }
 
@@ -298,6 +302,7 @@ async def verify_session(token: str) -> dict:
             "summary_minute": user.get("summary_minute"),
             "email_instructions": user.get("email_instructions", ""),
             "timezone": user.get("timezone", "UTC"),
+            "email_enabled": user.get("email_enabled", False),
         }
 
     except HTTPException:
@@ -354,20 +359,32 @@ async def update_user_name(user_id: str, first_name: str) -> dict:
         raise HTTPException(status_code=500, detail=f"Failed to update name: {str(e)}")
 
 
-async def update_user_summary_time(user_id: str, hour: int, minute: int, timezone: str = "UTC") -> dict:
-    """Update user's daily summary time and timezone."""
+async def update_user_summary_time(
+    user_id: str, email_enabled: bool, hour: int, minute: int, timezone: str = "UTC"
+) -> dict:
+    """Update user's daily summary time, timezone, and email enabled status."""
     try:
+        update_fields = {
+            "summary_hour": hour,
+            "summary_minute": minute,
+            "timezone": timezone,
+            "email_enabled": email_enabled,
+        }
+
         result = await users_collection.update_one(
             {"_id": ObjectId(user_id)},
-            {"$set": {"summary_hour": hour, "summary_minute": minute, "timezone": timezone}},
+            {"$set": update_fields},
         )
 
         if result.matched_count == 0:
             raise HTTPException(status_code=404, detail="User not found")
 
-        logger.info("Updated summary time for user %s to %02d:%02d %s", user_id, hour, minute, timezone)
+        status = "enabled" if email_enabled else "disabled" if email_enabled is False else "unchanged"
+        logger.info(
+            "Updated summary time for user %s to %02d:%02d %s (email %s)", user_id, hour, minute, timezone, status
+        )
 
-        return {"message": "Summary time updated"}
+        return {"message": "Summary settings updated"}
 
     except HTTPException:
         raise

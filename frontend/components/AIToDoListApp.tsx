@@ -29,6 +29,7 @@ export default function AIToDoListApp({ user, token }: Props) {
   const [emailTime, setEmailTime] = useState('09:00');
   const [savingSchedule, setSavingSchedule] = useState(false);
   const [emailInstructions, setEmailInstructions] = useState('');
+  const [emailEnabled, setEmailEnabled] = useState(false);
 
   const handleOpenEmailSettings = async () => {
     try {
@@ -39,6 +40,7 @@ export default function AIToDoListApp({ user, token }: Props) {
       const m = String(userData?.summary_minute ?? 0).padStart(2, '0');
       setEmailTime(`${h}:${m}`);
       setEmailInstructions(userData?.email_instructions ?? '');
+      setEmailEnabled(userData?.email_enabled ?? false);
       setShowEmailSettings(true);
       setError('');
     } catch (err) {
@@ -426,7 +428,7 @@ export default function AIToDoListApp({ user, token }: Props) {
       const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
       const response = await authenticatedFetch('/email/update-schedule', {
         method: 'POST',
-        body: JSON.stringify({ hour, minute, timezone: userTimezone }),
+        body: JSON.stringify({ hour, minute, timezone: userTimezone, email_enabled: emailEnabled }),
       });
 
       if (!response.ok) {
@@ -725,6 +727,7 @@ export default function AIToDoListApp({ user, token }: Props) {
                 value={emailTime}
                 onChange={(e) => setEmailTime(e.target.value)}
                 className="w-full bg-gray-700 p-1 rounded"
+                disabled={!emailEnabled}
               />
               <label className="block text-sm mt-2">Custom Instructions</label>
               <textarea
@@ -733,6 +736,18 @@ export default function AIToDoListApp({ user, token }: Props) {
                 className="w-full bg-gray-700 p-1 rounded h-24"
                 placeholder="Write like a Buddhist monk. Include a haiku at the end."
               />
+              <div className="flex items-center space-x-2 mt-2">
+                <input
+                  type="checkbox"
+                  id="emailEnabled"
+                  checked={emailEnabled}
+                  onChange={(e) => setEmailEnabled(e.target.checked)}
+                  className="w-4 h-4 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-500 focus:ring-2"
+                />
+                <label htmlFor="emailEnabled" className="text-sm">
+                  Enable daily email summaries
+                </label>
+              </div>
               <div className="flex justify-end space-x-2 mt-2">
                 <button
                   onClick={handleUpdateSchedule}

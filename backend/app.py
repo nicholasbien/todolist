@@ -36,7 +36,7 @@ from email_summary import send_daily_summary
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from scheduler import get_scheduler_status, start_scheduler, update_schedule_time
+from scheduler import get_scheduler_status, remove_user_schedule, start_scheduler, update_schedule_time
 from todos import Todo, complete_todo, create_todo, delete_todo, get_todos, health_check, update_todo_fields
 
 # Set up logging with more detail
@@ -329,6 +329,7 @@ class UpdateScheduleRequest(BaseModel):
     hour: int
     minute: int
     timezone: str = "UTC"
+    email_enabled: bool = False
 
 
 class UpdateInstructionsRequest(BaseModel):
@@ -340,23 +341,30 @@ async def api_update_schedule(
     req: UpdateScheduleRequest,
     current_user: dict = Depends(get_current_user),
 ):
-    """Update daily summary schedule time and timezone."""
+    """Update daily summary schedule time, timezone, and enabled status."""
     logger.info(
-        "Schedule update requested by %s to %02d:%02d %s",
+        "Schedule update requested by %s to %02d:%02d %s (enabled: %s)",
         current_user["email"],
         req.hour,
         req.minute,
         req.timezone,
+        req.email_enabled,
     )
-    await update_user_summary_time(current_user["user_id"], req.hour, req.minute, req.timezone)
-    update_schedule_time(
-        current_user["user_id"],
-        current_user["email"],
-        current_user.get("first_name", ""),
-        req.hour,
-        req.minute,
-        req.timezone,
-    )
+    await update_user_summary_time(current_user["user_id"], req.email_enabled, req.hour, req.minute, req.timezone)
+
+    if req.email_enabled:
+        update_schedule_time(
+            current_user["user_id"],
+            current_user["email"],
+            current_user.get("first_name", ""),
+            req.hour,
+            req.minute,
+            req.timezone,
+        )
+    else:
+        # Remove the scheduled job if email is disabled
+        remove_user_schedule(current_user["user_id"])
+
     return {"message": "Schedule updated"}
 
 
