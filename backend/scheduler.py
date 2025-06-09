@@ -58,12 +58,16 @@ async def _load_jobs():
 
     cursor = users_collection.find({"is_verified": True})
     async for user in cursor:
+        hour = user.get("summary_hour")
+        minute = user.get("summary_minute")
+        if hour is None or minute is None:
+            continue
         schedule_user_job(
             str(user["_id"]),
             user["email"],
             user.get("first_name", ""),
-            user.get("summary_hour", 9),
-            user.get("summary_minute", 0),
+            hour,
+            minute,
         )
 
 

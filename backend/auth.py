@@ -54,8 +54,8 @@ class User(BaseModel):
     is_verified: bool = False
     created_at: datetime = Field(default_factory=datetime.now)
     last_login: Optional[datetime] = None
-    summary_hour: int = 9
-    summary_minute: int = 0
+    summary_hour: Optional[int] = None
+    summary_minute: Optional[int] = None
     email_instructions: str = ""
     timezone: str = "UTC"
 
@@ -193,8 +193,8 @@ async def signup_user(email: str) -> dict:
                 first_name="",  # Will be set during first login
                 verification_code=code,
                 code_expires_at=code_expires_at,
-                summary_hour=9,
-                summary_minute=0,
+                summary_hour=None,
+                summary_minute=None,
                 email_instructions="",
             )
             user_dict = user.dict(by_alias=True)
@@ -260,8 +260,8 @@ async def login_user(email: str, code: str) -> dict:
                 "id": str(user["_id"]),
                 "email": user["email"],
                 "first_name": user.get("first_name", ""),
-                "summary_hour": user.get("summary_hour", 9),
-                "summary_minute": user.get("summary_minute", 0),
+                "summary_hour": user.get("summary_hour"),
+                "summary_minute": user.get("summary_minute"),
                 "email_instructions": user.get("email_instructions", ""),
             },
         }
@@ -293,8 +293,8 @@ async def verify_session(token: str) -> dict:
             "user_id": str(user["_id"]),
             "email": user["email"],
             "first_name": user.get("first_name", ""),
-            "summary_hour": user.get("summary_hour", 9),
-            "summary_minute": user.get("summary_minute", 0),
+            "summary_hour": user.get("summary_hour"),
+            "summary_minute": user.get("summary_minute"),
             "email_instructions": user.get("email_instructions", ""),
         }
 
