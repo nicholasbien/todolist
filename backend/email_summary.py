@@ -208,37 +208,44 @@ async def send_daily_summary(
         # Convert todos to dict format for processing
         todos_dict = [todo.dict() if hasattr(todo, "dict") else todo for todo in todos]
 
-        # Separate completed and uncompleted tasks
-        completed_todos = [todo for todo in todos_dict if todo.get("completed", False)]
-        uncompleted_todos = [todo for todo in todos_dict if not todo.get("completed", False)]
+        # Filter out invalid todos (those without dateAdded)
+        valid_todos_dict = [todo for todo in todos_dict if todo.get("dateAdded")]
+        logger.info(f"Filtered {len(todos_dict) - len(valid_todos_dict)} todos with missing dateAdded")
 
-        # Sort completed by completion date (most recent first)
-        completed_todos.sort(key=lambda x: x.get("dateCompleted", ""), reverse=True)
+        # Separate completed and uncompleted tasks from valid todos
+        completed_todos = [todo for todo in valid_todos_dict if todo.get("completed", False)]
+        uncompleted_todos = [todo for todo in valid_todos_dict if not todo.get("completed", False)]
+
+        # Sort completed by completion date (most recent first), handle None values
+        def completed_sort_key(todo):
+            date_completed = todo.get("dateCompleted")
+            if date_completed:
+                return date_completed
+            else:
+                return ""  # Put todos without completion date at end
+
+        completed_todos.sort(key=completed_sort_key, reverse=True)
 
         # Sort uncompleted by: closest due dates first, then most recently created
         def uncompleted_sort_key(todo):
             due_date = todo.get("dueDate")
-            date_added = todo.get("dateAdded", "")
+            date_added = todo.get("dateAdded")  # We know this exists from filtering
 
             if due_date:
                 # Tasks with due dates come first, sorted by due date (closest first)
                 try:
                     due_dt = datetime.fromisoformat(due_date.replace("Z", "+00:00"))
-                    return (0, due_dt, date_added)  # 0 = has due date (higher priority)
+                    return (0, due_dt)  # 0 = has due date (higher priority)
                 except (ValueError, AttributeError):
                     # If due date parsing fails, treat as no due date
-                    return (1, datetime.max, date_added)
-            else:
-                # Tasks without due dates come second, sorted by creation date (most recent first)
-                try:
-                    added_dt = datetime.fromisoformat(date_added.replace("Z", "+00:00"))
-                    return (
-                        1,
-                        -added_dt.timestamp(),
-                        date_added,
-                    )  # 1 = no due date, negative timestamp for reverse order
-                except (ValueError, AttributeError):
-                    return (1, 0, date_added)
+                    pass
+
+            # Tasks without due dates or failed due date parsing, sorted by creation date (most recent first)
+            try:
+                added_dt = datetime.fromisoformat(date_added.replace("Z", "+00:00"))
+                return (1, -added_dt.timestamp())  # 1 = no due date, negative timestamp for reverse order
+            except (ValueError, AttributeError):
+                return (1, 0)
 
         uncompleted_todos.sort(key=uncompleted_sort_key)
 
