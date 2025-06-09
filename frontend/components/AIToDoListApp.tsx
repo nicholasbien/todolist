@@ -29,6 +29,14 @@ export default function AIToDoListApp({ user, token }: Props) {
   const [savingSchedule, setSavingSchedule] = useState(false);
   const [emailInstructions, setEmailInstructions] = useState('');
 
+  const handleOpenEmailSettings = () => {
+    const h = String(user?.summary_hour ?? 9).padStart(2, '0');
+    const m = String(user?.summary_minute ?? 0).padStart(2, '0');
+    setEmailTime(`${h}:${m}`);
+    setEmailInstructions(user?.email_instructions ?? '');
+    setShowEmailSettings(true);
+  };
+
 
 
   // Helper function for authenticated requests
@@ -759,7 +767,7 @@ export default function AIToDoListApp({ user, token }: Props) {
       {/* Email Settings Button */}
       <div className="mt-8 flex justify-center">
         <button
-          onClick={() => setShowEmailSettings(!showEmailSettings)}
+          onClick={handleOpenEmailSettings}
           className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg mr-4"
         >
           Email Settings
