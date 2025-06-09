@@ -30,15 +30,21 @@ export default function AIToDoListApp({ user, token }: Props) {
   const [savingSchedule, setSavingSchedule] = useState(false);
   const [emailInstructions, setEmailInstructions] = useState('');
 
-  const handleOpenEmailSettings = () => {
-    const h = String(user?.summary_hour ?? 9).padStart(2, '0');
-    const m = String(user?.summary_minute ?? 0).padStart(2, '0');
-    setEmailTime(`${h}:${m}`);
-    setEmailInstructions(user?.email_instructions ?? '');
-    setShowEmailSettings(true);
+  const handleOpenEmailSettings = async () => {
+    try {
+      const response = await authenticatedFetch('/auth/me');
+      if (!response?.ok) throw new Error('Failed to fetch user info');
+      const userData = await response.json();
+      const h = String(userData?.summary_hour ?? 9).padStart(2, '0');
+      const m = String(userData?.summary_minute ?? 0).padStart(2, '0');
+      setEmailTime(`${h}:${m}`);
+      setEmailInstructions(userData?.email_instructions ?? '');
+      setShowEmailSettings(true);
+      setError('');
+    } catch (err) {
+      setError('Error loading email settings: ' + (err.message || err));
+    }
   };
-
-
 
   // Helper function for authenticated requests
   const authenticatedFetch = useCallback(async (url: string, options: RequestInit = {}) => {
@@ -416,9 +422,11 @@ export default function AIToDoListApp({ user, token }: Props) {
     try {
       setSavingSchedule(true);
       const [hour, minute] = emailTime.split(':').map((v) => parseInt(v, 10));
+      // Detect user's current timezone
+      const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
       const response = await authenticatedFetch('/email/update-schedule', {
         method: 'POST',
-        body: JSON.stringify({ hour, minute }),
+        body: JSON.stringify({ hour, minute, timezone: userTimezone }),
       });
 
       if (!response.ok) {

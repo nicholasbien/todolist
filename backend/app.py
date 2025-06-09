@@ -328,6 +328,7 @@ async def api_scheduler_status():
 class UpdateScheduleRequest(BaseModel):
     hour: int
     minute: int
+    timezone: str = "UTC"
 
 
 class UpdateInstructionsRequest(BaseModel):
@@ -339,20 +340,22 @@ async def api_update_schedule(
     req: UpdateScheduleRequest,
     current_user: dict = Depends(get_current_user),
 ):
-    """Update daily summary schedule time."""
+    """Update daily summary schedule time and timezone."""
     logger.info(
-        "Schedule update requested by %s to %02d:%02d",
+        "Schedule update requested by %s to %02d:%02d %s",
         current_user["email"],
         req.hour,
         req.minute,
+        req.timezone,
     )
-    await update_user_summary_time(current_user["user_id"], req.hour, req.minute)
+    await update_user_summary_time(current_user["user_id"], req.hour, req.minute, req.timezone)
     update_schedule_time(
         current_user["user_id"],
         current_user["email"],
         current_user.get("first_name", ""),
         req.hour,
         req.minute,
+        req.timezone,
     )
     return {"message": "Schedule updated"}
 

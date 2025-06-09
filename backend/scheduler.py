@@ -26,14 +26,14 @@ async def daily_summary_job(user_id: str, email: str, first_name: str = ""):
         logger.error("Error in daily summary job for %s: %s", email, e)
 
 
-def schedule_user_job(user_id: str, email: str, first_name: str, hour: int, minute: int) -> None:
+def schedule_user_job(user_id: str, email: str, first_name: str, hour: int, minute: int, timezone: str = "UTC") -> None:
     """Schedule or reschedule a summary job for a user."""
     global scheduler
     if scheduler is None:
         scheduler = AsyncIOScheduler()
         scheduler.start()
 
-    trigger = CronTrigger(hour=hour, minute=minute, timezone="America/New_York")
+    trigger = CronTrigger(hour=hour, minute=minute, timezone=timezone)
     job_id = f"daily_summary_{user_id}"
 
     try:
@@ -48,7 +48,7 @@ def schedule_user_job(user_id: str, email: str, first_name: str, hour: int, minu
                 replace_existing=True,
                 max_instances=1,
             )
-        logger.info("Scheduled daily summary for %s at %02d:%02d", email, hour, minute)
+        logger.info("Scheduled daily summary for %s at %02d:%02d %s", email, hour, minute, timezone)
     except Exception as e:
         logger.error("Failed to schedule job for %s: %s", email, e)
 
@@ -68,6 +68,7 @@ async def _load_jobs():
             user.get("first_name", ""),
             hour,
             minute,
+            user.get("timezone", "UTC"),
         )
 
 
@@ -95,9 +96,11 @@ def stop_scheduler():
         logger.info("Scheduler stopped")
 
 
-def update_schedule_time(user_id: str, email: str, first_name: str, hour: int, minute: int) -> None:
+def update_schedule_time(
+    user_id: str, email: str, first_name: str, hour: int, minute: int, timezone: str = "UTC"
+) -> None:
     """Update a user's summary schedule."""
-    schedule_user_job(user_id, email, first_name, hour, minute)
+    schedule_user_job(user_id, email, first_name, hour, minute, timezone)
 
 
 def get_scheduler_status():

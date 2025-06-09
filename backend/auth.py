@@ -263,6 +263,7 @@ async def login_user(email: str, code: str) -> dict:
                 "summary_hour": user.get("summary_hour"),
                 "summary_minute": user.get("summary_minute"),
                 "email_instructions": user.get("email_instructions", ""),
+                "timezone": user.get("timezone", "UTC"),
             },
         }
 
@@ -296,6 +297,7 @@ async def verify_session(token: str) -> dict:
             "summary_hour": user.get("summary_hour"),
             "summary_minute": user.get("summary_minute"),
             "email_instructions": user.get("email_instructions", ""),
+            "timezone": user.get("timezone", "UTC"),
         }
 
     except HTTPException:
@@ -352,18 +354,18 @@ async def update_user_name(user_id: str, first_name: str) -> dict:
         raise HTTPException(status_code=500, detail=f"Failed to update name: {str(e)}")
 
 
-async def update_user_summary_time(user_id: str, hour: int, minute: int) -> dict:
-    """Update user's daily summary time."""
+async def update_user_summary_time(user_id: str, hour: int, minute: int, timezone: str = "UTC") -> dict:
+    """Update user's daily summary time and timezone."""
     try:
         result = await users_collection.update_one(
             {"_id": ObjectId(user_id)},
-            {"$set": {"summary_hour": hour, "summary_minute": minute}},
+            {"$set": {"summary_hour": hour, "summary_minute": minute, "timezone": timezone}},
         )
 
         if result.matched_count == 0:
             raise HTTPException(status_code=404, detail="User not found")
 
-        logger.info("Updated summary time for user %s to %02d:%02d", user_id, hour, minute)
+        logger.info("Updated summary time for user %s to %02d:%02d %s", user_id, hour, minute, timezone)
 
         return {"message": "Summary time updated"}
 
