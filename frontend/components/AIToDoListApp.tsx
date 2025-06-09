@@ -621,18 +621,18 @@ export default function AIToDoListApp({ user, token }: Props) {
 
       {showEditCategoryModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-gray-800 p-4 rounded w-64 space-y-3">
-            <h3 className="text-white text-lg">Edit Category</h3>
+          <div className="bg-gray-800 p-6 rounded-xl w-80 space-y-4 shadow-2xl border border-gray-700">
+            <h3 className="text-white text-lg font-bold mb-2">Edit Category</h3>
             <input
               type="text"
               value={editCatName}
               onChange={(e) => setEditCatName(e.target.value)}
-              className="w-full p-2 rounded bg-gray-700 border border-gray-600 text-white"
+              className="w-full p-3 rounded-lg bg-gray-700 border border-gray-600 text-white text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
-            <div className="grid grid-cols-3 gap-2">
+            <div className="flex flex-row gap-3 mt-2">
               <button
                 onClick={handleRenameCategory}
-                className="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 w-full"
+                className="flex-1 min-w-0 bg-blue-600 text-white font-semibold py-2 rounded-lg shadow hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-400 transition-colors"
               >
                 Rename
               </button>
@@ -641,13 +641,13 @@ export default function AIToDoListApp({ user, token }: Props) {
                   handleDeleteCategory(activeCat);
                   setShowEditCategoryModal(false);
                 }}
-                className="bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700 w-full"
+                className="flex-1 min-w-0 bg-blue-900 text-white font-semibold py-2 rounded-lg shadow hover:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-900 transition-colors"
               >
                 Delete
               </button>
               <button
                 onClick={() => setShowEditCategoryModal(false)}
-                className="bg-gray-300 text-gray-800 px-3 py-1 rounded hover:bg-gray-400 w-full"
+                className="flex-1 min-w-0 bg-gray-300 text-gray-800 font-semibold py-2 rounded-lg shadow hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors"
               >
                 Cancel
               </button>
@@ -676,54 +676,56 @@ export default function AIToDoListApp({ user, token }: Props) {
                     todo.text
                   )}
                 </p>
-                <div className="text-xs mt-1 flex items-center flex-wrap">
-                  {editingCategory === todo._id ? (
+                <div className="text-xs mt-1 flex items-center">
+                  <div className="flex items-center flex-shrink-0">
+                    {editingCategory === todo._id ? (
+                      <select
+                        value={todo.category}
+                        onChange={(e) => handleUpdateCategory(todo._id, e.target.value)}
+                        onBlur={() => setEditingCategory(null)}
+                        className="px-2 py-1 rounded mr-2 bg-gray-800 text-white border border-gray-600 text-xs"
+                        autoFocus
+                        onClick={(e) => (e.target as HTMLSelectElement).focus()}
+                      >
+                        {categories
+                          .sort((a, b) => {
+                            if (a === "General") return -1;
+                            if (b === "General") return 1;
+                            return a.localeCompare(b);
+                          })
+                          .map(cat => (
+                          <option key={cat} value={cat}>{cat}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      <select
+                        value={todo.category}
+                        onChange={(e) => handleUpdateCategory(todo._id, e.target.value)}
+                        className={`px-2 py-1 rounded mr-2 cursor-pointer text-xs appearance-none ${todo.completed ? 'bg-gray-700 text-gray-500' : 'bg-gray-600 text-gray-200'}`}
+                      >
+                        {categories
+                          .sort((a, b) => {
+                            if (a === "General") return -1;
+                            if (b === "General") return 1;
+                            return a.localeCompare(b);
+                          })
+                          .map(cat => (
+                          <option key={cat} value={cat}>{cat}</option>
+                        ))}
+                      </select>
+                    )}
                     <select
-                      value={todo.category}
-                      onChange={(e) => handleUpdateCategory(todo._id, e.target.value)}
-                      onBlur={() => setEditingCategory(null)}
-                      className="px-2 py-1 rounded mr-2 bg-gray-800 text-white border border-gray-600 text-xs"
-                      autoFocus
-                      onClick={(e) => (e.target as HTMLSelectElement).focus()}
+                      value={todo.priority}
+                      onChange={(e) => handleUpdatePriority(todo._id, e.target.value)}
+                      className={`px-2 py-1 rounded mr-2 cursor-pointer text-xs appearance-none min-w-16 ${todo.completed ? 'bg-gray-700 text-gray-500' : 'bg-gray-600 text-gray-200'}`}
                     >
-                      {categories
-                        .sort((a, b) => {
-                          if (a === "General") return -1;
-                          if (b === "General") return 1;
-                          return a.localeCompare(b);
-                        })
-                        .map(cat => (
-                        <option key={cat} value={cat}>{cat}</option>
-                      ))}
+                      <option value="High">High</option>
+                      <option value="Medium">Medium</option>
+                      <option value="Low">Low</option>
                     </select>
-                  ) : (
-                    <select
-                      value={todo.category}
-                      onChange={(e) => handleUpdateCategory(todo._id, e.target.value)}
-                      className={`px-2 py-1 rounded mr-2 cursor-pointer text-xs appearance-none ${todo.completed ? 'bg-gray-700 text-gray-500' : 'bg-gray-600 text-gray-200'}`}
-                    >
-                      {categories
-                        .sort((a, b) => {
-                          if (a === "General") return -1;
-                          if (b === "General") return 1;
-                          return a.localeCompare(b);
-                        })
-                        .map(cat => (
-                        <option key={cat} value={cat}>{cat}</option>
-                      ))}
-                    </select>
-                  )}
-                  <select
-                    value={todo.priority}
-                    onChange={(e) => handleUpdatePriority(todo._id, e.target.value)}
-                    className={`px-2 py-1 rounded mr-2 cursor-pointer text-xs appearance-none min-w-16 ${todo.completed ? 'bg-gray-700 text-gray-500' : 'bg-gray-600 text-gray-200'}`}
-                  >
-                    <option value="High">High</option>
-                    <option value="Medium">Medium</option>
-                    <option value="Low">Low</option>
-                  </select>
+                  </div>
                   {todo.dueDate && (
-                    <span className={`ml-2 text-xs whitespace-nowrap ${todo.completed ? 'text-gray-500' : 'text-gray-400'}`}>
+                    <span className={`text-xs whitespace-nowrap flex-shrink-0 ${todo.completed ? 'text-gray-500' : 'text-gray-400'}`}>
                       {/* Ensure date string isn't shifted by timezone */}
                       Due: {new Date(`${todo.dueDate}T00:00:00`).toLocaleDateString()}
                     </span>
