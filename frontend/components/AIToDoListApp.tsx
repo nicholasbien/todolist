@@ -515,7 +515,7 @@ export default function AIToDoListApp({ user, token }: Props) {
             type="text"
             value={newTodo}
             onChange={(e) => setNewTodo(e.target.value)}
-            placeholder="Add a new task/thought/link..."
+            placeholder="Add a new task..."
             className="flex-1 p-3 border border-gray-700 rounded bg-gray-800 text-white placeholder-gray-400"
             onKeyPress={(e) => e.key === 'Enter' && handleAddTodo()}
           />
@@ -782,7 +782,7 @@ export default function AIToDoListApp({ user, token }: Props) {
         </button>
         {showEmailSettings && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-gray-800 border border-gray-600 rounded p-4 w-60 text-white space-y-2">
+            <div className="bg-gray-800 border border-gray-600 rounded-xl p-6 w-80 text-white space-y-2 shadow-2xl">
               <label className="block text-sm">Daily Summary Time</label>
               <input
                 type="time"
@@ -795,6 +795,7 @@ export default function AIToDoListApp({ user, token }: Props) {
                 value={emailInstructions}
                 onChange={(e) => setEmailInstructions(e.target.value)}
                 className="w-full bg-gray-700 p-1 rounded h-24"
+                placeholder="Write like a Buddhist monk. Include a haiku at the end."
               />
               <div className="flex justify-end space-x-2 mt-2">
                 <button

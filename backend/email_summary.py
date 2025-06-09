@@ -46,23 +46,24 @@ Todo Data:
 Instructions:
 1. Address the user as "{user_name}" if provided, otherwise use "there"
 2. Create a friendly, motivational tone
-3. Pay attention to the "dateAdded" field in each todo to understand timing and
+3. **IMPORTANT**: Focus primarily on tasks completed in the last day (check "dateCompleted" field).
+   Ignore tasks completed before yesterday - they're included for context but shouldn't be highlighted.
+4. Pay attention to the "dateAdded" field in each todo to understand timing and
    the "dueDate" field for upcoming deadlines:
-   - Celebrate recently completed tasks (completed in last few days)
-   - Note if tasks have been completed for a while
+   - Celebrate recently completed tasks (completed yesterday or today only)
    - Identify pending tasks that are getting old/stale
    - Highlight urgent items or those with approaching due dates
-4. Organize todos by:
-   - Recently completed tasks (celebrate achievements!)
+5. Organize todos by:
+   - Recently completed tasks from last day (celebrate achievements!)
    - Pending tasks by priority AND age (High, Medium, Low)
    - Group by categories where relevant
-5. Provide insights like:
-   - Total tasks completed vs pending
+6. Provide insights like:
+   - Total tasks completed vs pending (focus on recent completions)
    - Most productive category
    - Tasks that need attention due to age
    - Recent momentum and progress patterns
-6. Keep it concise but personal (2-3 paragraphs max)
-7. End with a motivational note for the day ahead
+7. Keep it concise but personal (2-3 paragraphs max)
+8. End with a motivational note for the day ahead
 {custom_instructions}
 
 Format as plain text email content (no HTML, no subject line).
@@ -201,9 +202,46 @@ async def send_daily_summary(
         # Convert todos to dict format for processing
         todos_dict = [todo.dict() if hasattr(todo, "dict") else todo for todo in todos]
 
+        # Separate completed and uncompleted tasks
+        completed_todos = [todo for todo in todos_dict if todo.get("completed", False)]
+        uncompleted_todos = [todo for todo in todos_dict if not todo.get("completed", False)]
+
+        # Sort completed by completion date (most recent first)
+        completed_todos.sort(key=lambda x: x.get("dateCompleted", ""), reverse=True)
+
+        # Sort uncompleted by: closest due dates first, then most recently created
+        def uncompleted_sort_key(todo):
+            due_date = todo.get("dueDate")
+            date_added = todo.get("dateAdded", "")
+
+            if due_date:
+                # Tasks with due dates come first, sorted by due date (closest first)
+                try:
+                    due_dt = datetime.fromisoformat(due_date.replace("Z", "+00:00"))
+                    return (0, due_dt, date_added)  # 0 = has due date (higher priority)
+                except (ValueError, AttributeError):
+                    # If due date parsing fails, treat as no due date
+                    return (1, datetime.max, date_added)
+            else:
+                # Tasks without due dates come second, sorted by creation date (most recent first)
+                try:
+                    added_dt = datetime.fromisoformat(date_added.replace("Z", "+00:00"))
+                    return (
+                        1,
+                        -added_dt.timestamp(),
+                        date_added,
+                    )  # 1 = no due date, negative timestamp for reverse order
+                except (ValueError, AttributeError):
+                    return (1, 0, date_added)
+
+        uncompleted_todos.sort(key=uncompleted_sort_key)
+
+        # Take up to 40 uncompleted and up to 20 completed tasks
+        limited_todos = uncompleted_todos[:40] + completed_todos[:20]
+
         # Generate summary
         display_name = user_name or user_email.split("@")[0]
-        summary = await generate_todo_summary(todos_dict, display_name, custom_instructions or "")
+        summary = await generate_todo_summary(limited_todos, display_name, custom_instructions or "")
 
         # Create subject with date
         today = datetime.now().strftime("%B %d, %Y")
