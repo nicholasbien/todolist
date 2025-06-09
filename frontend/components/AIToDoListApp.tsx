@@ -615,10 +615,10 @@ export default function AIToDoListApp({ user, token }: Props) {
               onChange={(e) => setEditCatName(e.target.value)}
               className="w-full p-2 rounded bg-gray-700 border border-gray-600 text-white"
             />
-            <div className="flex justify-end space-x-2">
+            <div className="grid grid-cols-3 gap-2">
               <button
                 onClick={handleRenameCategory}
-                className="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700"
+                className="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 w-full"
               >
                 Rename
               </button>
@@ -627,13 +627,13 @@ export default function AIToDoListApp({ user, token }: Props) {
                   handleDeleteCategory(activeCat);
                   setShowEditCategoryModal(false);
                 }}
-                className="bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700"
+                className="bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700 w-full"
               >
                 Delete
               </button>
               <button
                 onClick={() => setShowEditCategoryModal(false)}
-                className="bg-gray-300 text-gray-800 px-3 py-1 rounded hover:bg-gray-400"
+                className="bg-gray-300 text-gray-800 px-3 py-1 rounded hover:bg-gray-400 w-full"
               >
                 Cancel
               </button>
