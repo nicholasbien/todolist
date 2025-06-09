@@ -662,7 +662,7 @@ export default function AIToDoListApp({ user, token }: Props) {
                     todo.text
                   )}
                 </p>
-                <div className="text-xs mt-1">
+                <div className="text-xs mt-1 flex items-center flex-wrap">
                   {editingCategory === todo._id ? (
                     <select
                       value={todo.category}
@@ -709,7 +709,7 @@ export default function AIToDoListApp({ user, token }: Props) {
                     <option value="Low">Low</option>
                   </select>
                   {todo.dueDate && (
-                    <span className={`text-xs whitespace-nowrap ${todo.completed ? 'text-gray-500' : 'text-gray-400'}`}>
+                    <span className={`ml-2 text-xs whitespace-nowrap ${todo.completed ? 'text-gray-500' : 'text-gray-400'}`}>
                       {/* Ensure date string isn't shifted by timezone */}
                       Due: {new Date(`${todo.dueDate}T00:00:00`).toLocaleDateString()}
                     </span>
