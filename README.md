@@ -323,7 +323,7 @@ python3 -c "import secrets; print(secrets.token_urlsafe(32))"
 - `PUT /categories/{name}` - Rename category
 - `DELETE /categories/{name}` - Delete category
 
-### AI Classification
+### AI Classification - now handled fully on the backend as part of adding task
 Todos are automatically classified when created. You can also use
 the manual endpoint if needed:
 - `POST /classify` - Classify task text

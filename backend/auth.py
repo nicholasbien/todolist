@@ -57,6 +57,7 @@ class User(BaseModel):
     summary_hour: int = 9
     summary_minute: int = 0
     email_instructions: str = ""
+    timezone: str = "UTC"
 
     class Config:
         arbitrary_types_allowed = True

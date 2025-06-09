@@ -242,9 +242,15 @@ export default function AIToDoListApp({ user, token }: Props) {
 
     try {
       // Create new todo object; backend will classify and set category/priority
+      // Create dateAdded in user's local timezone
+      const now = new Date();
+      const localDateString = now.toLocaleDateString('en-CA'); // YYYY-MM-DD format
+      const localTimeString = now.toLocaleTimeString('en-GB', { hour12: false }); // HH:MM:SS format
+      const localISOString = `${localDateString}T${localTimeString}`;
+
       const todo: any = {
         text: newTodo,
-        dateAdded: new Date().toISOString(),
+        dateAdded: localISOString,
         completed: false
       };
 
