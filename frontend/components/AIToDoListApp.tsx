@@ -652,7 +652,7 @@ export default function AIToDoListApp({ user, token }: Props) {
             }`}
           >
             <div className="flex justify-between items-start">
-              <div className="flex-1">
+              <div className="flex-1 min-w-0 break-words">
                 <p className={`text-base ${todo.completed ? 'line-through' : ''}`}>
                   {todo.link ? (
                     <a href={todo.link} target="_blank" rel="noopener noreferrer" className="underline">
@@ -716,7 +716,7 @@ export default function AIToDoListApp({ user, token }: Props) {
                   )}
                 </div>
               </div>
-              <div className="flex space-x-2 ml-3">
+              <div className="flex space-x-2 ml-3 flex-shrink-0">
                 {!todo.completed ? (
                   <button
                     onClick={() => handleCompleteTodo(todo._id)}
