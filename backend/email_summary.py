@@ -53,17 +53,20 @@ Instructions:
    - Celebrate recently completed tasks (completed yesterday or today only)
    - Identify pending tasks that are getting old/stale
    - Highlight urgent items or those with approaching due dates
-5. Organize todos by:
+5. **PRIORITY ATTENTION**: Pay special attention to "High" priority tasks in the pending list.
+   Always mention high priority tasks prominently and encourage action on them.
+6. Organize todos by:
    - Recently completed tasks from last day (celebrate achievements!)
-   - Pending tasks by priority AND age (High, Medium, Low)
+   - Pending tasks by priority (High, Medium, Low) - emphasize High priority items
    - Group by categories where relevant
-6. Provide insights like:
+7. Provide insights like:
    - Total tasks completed vs pending (focus on recent completions)
+   - Number of high priority tasks that need attention
    - Most productive category
-   - Tasks that need attention due to age
+   - Tasks that need attention due to age or priority
    - Recent momentum and progress patterns
-7. Keep it concise but personal (2-3 paragraphs max)
-8. End with a motivational note for the day ahead
+8. Keep it concise but personal (2-3 paragraphs max)
+9. End with a motivational note for the day ahead
 {custom_instructions}
 
 Format as plain text email content (no HTML, no subject line).
@@ -216,38 +219,32 @@ async def send_daily_summary(
         completed_todos = [todo for todo in valid_todos_dict if todo.get("completed", False)]
         uncompleted_todos = [todo for todo in valid_todos_dict if not todo.get("completed", False)]
 
-        # Sort completed by completion date (most recent first), handle None values
-        def completed_sort_key(todo):
-            date_completed = todo.get("dateCompleted")
-            if date_completed:
-                return date_completed
-            else:
-                return ""  # Put todos without completion date at end
-
-        completed_todos.sort(key=completed_sort_key, reverse=True)
-
-        # Sort uncompleted by: closest due dates first, then most recently created
+        # Sort uncompleted todos using same logic as UI: priority first, then most recent dateAdded
         def uncompleted_sort_key(todo):
-            due_date = todo.get("dueDate")
-            date_added = todo.get("dateAdded")  # We know this exists from filtering
+            # First sort by priority (High > Medium > Low)
+            priority_order = {"High": 3, "Medium": 2, "Low": 1}
+            priority_value = priority_order.get(todo.get("priority"), 0)
 
-            if due_date:
-                # Tasks with due dates come first, sorted by due date (closest first)
-                try:
-                    due_dt = datetime.fromisoformat(due_date.replace("Z", "+00:00"))
-                    return (0, due_dt)  # 0 = has due date (higher priority)
-                except (ValueError, AttributeError):
-                    # If due date parsing fails, treat as no due date
-                    pass
-
-            # Tasks without due dates or failed due date parsing, sorted by creation date (most recent first)
+            # Then sort by dateAdded (most recent first)
+            date_added = todo.get("dateAdded")
             try:
                 added_dt = datetime.fromisoformat(date_added.replace("Z", "+00:00"))
-                return (1, -added_dt.timestamp())  # 1 = no due date, negative timestamp for reverse order
+                return (-priority_value, -added_dt.timestamp())  # Negative for descending order
             except (ValueError, AttributeError):
-                return (1, 0)
+                return (-priority_value, 0)
 
         uncompleted_todos.sort(key=uncompleted_sort_key)
+
+        # Sort completed todos by dateAdded (most recent first) - same as UI
+        def completed_sort_key(todo):
+            date_added = todo.get("dateAdded")
+            try:
+                added_dt = datetime.fromisoformat(date_added.replace("Z", "+00:00"))
+                return -added_dt.timestamp()  # Negative for descending order (most recent first)
+            except (ValueError, AttributeError):
+                return 0
+
+        completed_todos.sort(key=completed_sort_key)
 
         # Take up to 40 uncompleted and up to 20 completed tasks
         limited_todos = uncompleted_todos[:40] + completed_todos[:20]
