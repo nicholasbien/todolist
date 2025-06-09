@@ -805,6 +805,13 @@ export default function AIToDoListApp({ user, token }: Props) {
                   {savingSchedule ? 'Saving...' : 'Save'}
                 </button>
                 <button
+                  onClick={handleSendEmailSummary}
+                  disabled={sendingEmail}
+                  className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 px-3 py-1 rounded"
+                >
+                  {sendingEmail ? 'Sending...' : 'Send Summary Now'}
+                </button>
+                <button
                   onClick={() => setShowEmailSettings(false)}
                   className="bg-gray-500 hover:bg-gray-600 px-3 py-1 rounded"
                 >
@@ -814,23 +821,6 @@ export default function AIToDoListApp({ user, token }: Props) {
             </div>
           </div>
         )}
-        <button
-          onClick={handleSendEmailSummary}
-          disabled={sendingEmail}
-          className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white px-6 py-2 rounded-lg transition-colors flex items-center space-x-2"
-        >
-          {sendingEmail ? (
-            <>
-              <span className="animate-spin">⏳</span>
-              <span>Sending Summary...</span>
-            </>
-          ) : (
-            <>
-              <span>📧</span>
-              <span>Send Email Summary</span>
-            </>
-          )}
-        </button>
       </div>
     </div>
   );
