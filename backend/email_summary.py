@@ -33,6 +33,7 @@ logger = logging.getLogger(__name__)
 
 def create_summary_prompt(todos_json: str, user_name: str = "there", custom_instructions: str = "") -> str:
     """Create a prompt for generating a daily todo summary."""
+    # TODO: localize this to user's timezone
     current_date = datetime.now().strftime("%B %d, %Y")
     return f"""You are a helpful personal assistant creating a daily todo summary email.
 
