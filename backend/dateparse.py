@@ -54,7 +54,7 @@ def manual_parse_due_date(text: str, date_added: str) -> tuple[Optional[str], st
         cleaned_text = remove_phrase(cleaned_text, m)
         return (reference.date() + timedelta(days=days_ahead)).isoformat(), cleaned_text
 
-    # Handle "<keyword> <weekday>" (later this week)
+    # Handle "<keyword> <weekday>" (later this week or next week)
     m = re.search(
         rf"\b({keyword_re})\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b",
         lowered,
@@ -62,14 +62,9 @@ def manual_parse_due_date(text: str, date_added: str) -> tuple[Optional[str], st
     if m:
         weekday = WEEKDAYS.index(m.group(2))
         today_weekday = reference.weekday()
-        days_ahead = weekday - today_weekday
+        days_ahead = (weekday - today_weekday + 7) % 7
         cleaned_text = remove_phrase(cleaned_text, m)
-        if days_ahead < 0:
-            return None, cleaned_text
-        elif days_ahead == 0:
-            return reference.date().isoformat(), cleaned_text
-        else:
-            return (reference.date() + timedelta(days=days_ahead)).isoformat(), cleaned_text
+        return (reference.date() + timedelta(days=days_ahead)).isoformat(), cleaned_text
 
     # Handle just a weekday at the end (e.g., "Finish report Friday")
     m = re.search(
@@ -79,14 +74,9 @@ def manual_parse_due_date(text: str, date_added: str) -> tuple[Optional[str], st
     if m:
         weekday = WEEKDAYS.index(m.group(1))
         today_weekday = reference.weekday()
-        days_ahead = weekday - today_weekday
+        days_ahead = (weekday - today_weekday + 7) % 7
         cleaned_text = remove_phrase(cleaned_text, m)
-        if days_ahead < 0:
-            return None, cleaned_text
-        elif days_ahead == 0:
-            return reference.date().isoformat(), cleaned_text
-        else:
-            return (reference.date() + timedelta(days=days_ahead)).isoformat(), cleaned_text
+        return (reference.date() + timedelta(days=days_ahead)).isoformat(), cleaned_text
 
     # Handle ISO format: YYYY-MM-DD
     m = re.search(rf"\b({keyword_re})?\s*(\d{{4}}-\d{{2}}-\d{{2}})\b", lowered)

@@ -1,3 +1,4 @@
+# flake8: noqa: E501
 import json
 import logging
 import os
@@ -59,14 +60,24 @@ async def classify_task(text: str, categories: List[str], date_added: str) -> Di
 
         logger.info(f"Starting OpenAI API call for text: {text[:30]}...")
 
-        system_prompt = (
-            "You are a task organizer. Analyze the task text, remove any date references, "
-            "and extract a due date if present. Return a JSON object with fields: "
-            "'category', 'priority', 'text' (cleaned task description), and 'dueDate' (YYYY-MM-DD or null). "
-            f"Dates should be interpreted relative to {date_added}."
-            f"Available categories: {categories_str}. "
-            "Priority options: High, Medium, Low. Only output valid JSON."
-        )
+        # Figure out the day of week from date_added
+        try:
+            from datetime import datetime
+
+            date_obj = datetime.fromisoformat(date_added)
+            day_of_week = date_obj.strftime("%A")
+        except Exception:
+            day_of_week = None
+
+        system_prompt = f"""
+        You are a task organizer. Given a task description, do the following:
+        - Remove all date references and keywords (such as 'on', 'by', 'due', 'before', 'today', 'tomorrow', etc.) from the text.
+        - Extract a due date if present. For phrases like 'on <weekday>', '<weekday>' at the end, 'today', or 'tomorrow', always interpret as the next occurrence of that day (including today for 'today').
+        - Use the provided date as the reference for all relative dates: {day_of_week + ', ' if day_of_week else ''}{date_added}.
+        - Return only a valid JSON object with these fields: 'category', 'priority', 'text' (the cleaned task description), and 'dueDate' (YYYY-MM-DD or null).
+        Available categories: {categories_str}.
+        Priority options: High, Medium, Low.
+        """
 
         # Make synchronous call since OpenAI client handles async internally
         completion = client.chat.completions.create(
