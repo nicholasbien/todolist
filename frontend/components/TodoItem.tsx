@@ -128,7 +128,7 @@ export default function TodoItem({
           <option value="Low">Low</option>
         </select>
         {todo.dueDate && (
-          <span className={`text-xs px-2 py-1 rounded-md ${todo.completed ? "text-gray-500 bg-gray-900" : "text-gray-300 bg-gray-800"}`}>
+          <span className={`text-xs ${todo.completed ? "text-gray-500" : "text-gray-300"}`}>
             Due: {new Date(`${todo.dueDate}T00:00:00`).toLocaleDateString()}
           </span>
         )}

@@ -397,6 +397,7 @@ export default function AIToDoListApp({ user, token }: Props) {
     }
   };
 
+
   // Send email summary
   const handleSendEmailSummary = async () => {
     try {
@@ -642,21 +643,21 @@ export default function AIToDoListApp({ user, token }: Props) {
               className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 placeholder-gray-500 text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
               autoFocus
             />
-            <div className="flex justify-end space-x-2">
+            <div className="flex justify-center space-x-3">
+              <button
+                onClick={handleAddCategory}
+                className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-2 rounded-lg transition-colors"
+              >
+                Add
+              </button>
               <button
                 onClick={() => {
                   setShowAddCategoryModal(false);
                   setNewCat("");
                 }}
-                className="bg-gray-800 hover:bg-gray-700 text-gray-300 px-4 py-2 rounded-lg transition-colors"
+                className="bg-gray-800 hover:bg-gray-700 text-gray-300 px-6 py-2 rounded-lg transition-colors"
               >
                 Cancel
-              </button>
-              <button
-                onClick={handleAddCategory}
-                className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg transition-colors"
-              >
-                Add
               </button>
             </div>
           </div>
@@ -673,10 +674,10 @@ export default function AIToDoListApp({ user, token }: Props) {
               onChange={(e) => setEditCatName(e.target.value)}
               className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
-            <div className="flex flex-row gap-3 mt-2">
+            <div className="flex justify-center space-x-3">
               <button
                 onClick={handleRenameCategory}
-                className="flex-1 min-w-0 bg-blue-600 text-white font-semibold py-2 rounded-lg shadow hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-400 transition-colors"
+                className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
               >
                 Rename
               </button>
@@ -685,13 +686,13 @@ export default function AIToDoListApp({ user, token }: Props) {
                   handleDeleteCategory(activeCat);
                   setShowEditCategoryModal(false);
                 }}
-                className="flex-1 min-w-0 bg-red-600 text-white font-semibold py-2 rounded-lg shadow hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 transition-colors"
+                className="bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-red-700 transition-colors"
               >
                 Delete
               </button>
               <button
                 onClick={() => setShowEditCategoryModal(false)}
-                className="flex-1 min-w-0 bg-gray-800 text-gray-300 font-semibold py-2 rounded-lg shadow hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-600 transition-colors"
+                className="bg-gray-800 text-gray-300 px-6 py-2 rounded-lg hover:bg-gray-700 transition-colors"
               >
                 Cancel
               </button>
@@ -794,19 +795,35 @@ export default function AIToDoListApp({ user, token }: Props) {
                 />
               </div>
 
-              <div className="flex justify-end space-x-2">
-                <button
-                  onClick={() => setShowEmailSettings(false)}
-                  className="bg-gray-800 hover:bg-gray-700 text-gray-300 px-4 py-2 rounded-lg transition-colors"
-                >
-                  Close
-                </button>
+              <div className="flex justify-center space-x-3">
                 <button
                   onClick={handleUpdateSchedule}
                   disabled={savingSchedule}
-                  className="bg-blue-600 hover:bg-blue-500 disabled:bg-blue-800 disabled:text-gray-400 text-white px-4 py-2 rounded-lg transition-colors"
+                  className="bg-blue-600 hover:bg-blue-500 disabled:bg-blue-800 disabled:text-gray-400 text-white px-6 py-2 rounded-lg transition-colors"
                 >
                   {savingSchedule ? 'Saving...' : 'Save'}
+                </button>
+                <button
+                  onClick={async () => {
+                    // Reset form to original values without saving
+                    try {
+                      const response = await authenticatedFetch('/auth/me');
+                      if (response?.ok) {
+                        const userData = await response.json();
+                        const h = String(userData?.summary_hour ?? 9).padStart(2, '0');
+                        const m = String(userData?.summary_minute ?? 0).padStart(2, '0');
+                        setEmailTime(`${h}:${m}`);
+                        setEmailInstructions(userData?.email_instructions ?? '');
+                        setEmailEnabled(userData?.email_enabled ?? false);
+                      }
+                    } catch (err) {
+                      // If fetch fails, just close the modal
+                    }
+                    setShowEmailSettings(false);
+                  }}
+                  className="bg-gray-800 hover:bg-gray-700 text-gray-300 px-6 py-2 rounded-lg transition-colors"
+                >
+                  Cancel
                 </button>
               </div>
             </div>
@@ -852,22 +869,22 @@ export default function AIToDoListApp({ user, token }: Props) {
               placeholder="Ask for a new feature... Report a bug... Say hi!"
               className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 placeholder-gray-500 h-32 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
-            <div className="flex justify-end space-x-2">
+            <div className="flex justify-center space-x-3">
+              <button
+                onClick={handleSendContact}
+                disabled={sendingContact || !contactMessage.trim()}
+                className="bg-blue-600 hover:bg-blue-500 disabled:bg-blue-800 disabled:text-gray-400 text-white px-6 py-2 rounded-lg transition-colors"
+              >
+                {sendingContact ? 'Sending...' : 'Send'}
+              </button>
               <button
                 onClick={() => {
                   setShowContactModal(false);
                   setContactMessage('');
                 }}
-                className="bg-gray-800 hover:bg-gray-700 text-gray-300 px-4 py-2 rounded-lg transition-colors"
+                className="bg-gray-800 hover:bg-gray-700 text-gray-300 px-6 py-2 rounded-lg transition-colors"
               >
                 Cancel
-              </button>
-              <button
-                onClick={handleSendContact}
-                disabled={sendingContact || !contactMessage.trim()}
-                className="bg-blue-600 hover:bg-blue-500 disabled:bg-blue-800 disabled:text-gray-400 text-white px-4 py-2 rounded-lg transition-colors"
-              >
-                {sendingContact ? 'Sending...' : 'Send'}
               </button>
             </div>
           </div>
