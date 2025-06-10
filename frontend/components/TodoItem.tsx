@@ -46,69 +46,9 @@ export default function TodoItem({
               todo.text
             )}
           </p>
-          <div className="text-xs mt-1">
-            {editingCategory === todo._id ? (
-              <select
-                value={todo.category}
-                onChange={(e) => handleUpdateCategory(todo._id, e.target.value)}
-                onBlur={() => setEditingCategory(null)}
-                className="px-2 py-1 rounded mr-2 bg-gray-800 text-white border border-gray-600 text-xs"
-                autoFocus
-                onClick={(e) => (e.target as HTMLSelectElement).focus()}
-              >
-                {categories
-                  .sort((a, b) => {
-                    if (a === "General") return -1;
-                    if (b === "General") return 1;
-                    return a.localeCompare(b);
-                  })
-                  .map((cat) => (
-                    <option key={cat} value={cat}>
-                      {cat}
-                    </option>
-                  ))}
-              </select>
-            ) : (
-              <select
-                value={todo.category}
-                onChange={(e) => handleUpdateCategory(todo._id, e.target.value)}
-                className={`px-2 py-1 rounded mr-2 cursor-pointer text-xs appearance-none ${
-                  todo.completed ? "bg-gray-700 text-gray-500" : "bg-gray-600 text-gray-200"
-                }`}
-              >
-                {categories
-                  .sort((a, b) => {
-                    if (a === "General") return -1;
-                    if (b === "General") return 1;
-                    return a.localeCompare(b);
-                  })
-                  .map((cat) => (
-                    <option key={cat} value={cat}>
-                      {cat}
-                    </option>
-                  ))}
-              </select>
-            )}
-            <select
-              value={todo.priority}
-              onChange={(e) => handleUpdatePriority(todo._id, e.target.value)}
-              className={`px-2 py-1 rounded mr-2 cursor-pointer text-xs appearance-none min-w-16 ${
-                todo.completed ? "bg-gray-700 text-gray-500" : "bg-gray-600 text-gray-200"
-              }`}
-            >
-              <option value="High">High</option>
-              <option value="Medium">Medium</option>
-              <option value="Low">Low</option>
-            </select>
-            {todo.dueDate && (
-              <span className={`text-xs ${todo.completed ? "text-gray-500" : "text-gray-400"}`}>
-                {/* Ensure date string isn't shifted by timezone */}
-                Due: {new Date(`${todo.dueDate}T00:00:00`).toLocaleDateString()}
-              </span>
-            )}
-          </div>
         </div>
-        <div className="flex space-x-2 ml-3">
+
+        <div className="flex items-center space-x-2 ml-3">
           {!todo.completed ? (
             <button
               onClick={() => handleCompleteTodo(todo._id)}
@@ -131,6 +71,67 @@ export default function TodoItem({
             ×
           </button>
         </div>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2 mt-2 text-xs">
+        {editingCategory === todo._id ? (
+          <select
+            value={todo.category}
+            onChange={(e) => handleUpdateCategory(todo._id, e.target.value)}
+            onBlur={() => setEditingCategory(null)}
+            className="px-2 py-1 rounded bg-gray-800 text-white border border-gray-600 text-xs"
+            autoFocus
+            onClick={(e) => (e.target as HTMLSelectElement).focus()}
+          >
+            {categories
+              .sort((a, b) => {
+                if (a === "General") return -1;
+                if (b === "General") return 1;
+                return a.localeCompare(b);
+              })
+              .map((cat) => (
+                <option key={cat} value={cat}>
+                  {cat}
+                </option>
+              ))}
+          </select>
+        ) : (
+          <select
+            value={todo.category}
+            onChange={(e) => handleUpdateCategory(todo._id, e.target.value)}
+            className={`px-2 py-1 rounded cursor-pointer text-xs appearance-none ${
+              todo.completed ? "bg-gray-700 text-gray-500" : "bg-gray-600 text-gray-200"
+            }`}
+          >
+            {categories
+              .sort((a, b) => {
+                if (a === "General") return -1;
+                if (b === "General") return 1;
+                return a.localeCompare(b);
+              })
+              .map((cat) => (
+                <option key={cat} value={cat}>
+                  {cat}
+                </option>
+              ))}
+          </select>
+        )}
+        <select
+          value={todo.priority}
+          onChange={(e) => handleUpdatePriority(todo._id, e.target.value)}
+          className={`px-2 py-1 rounded cursor-pointer text-xs appearance-none min-w-16 ${
+            todo.completed ? "bg-gray-700 text-gray-500" : "bg-gray-600 text-gray-200"
+          }`}
+        >
+          <option value="High">High</option>
+          <option value="Medium">Medium</option>
+          <option value="Low">Low</option>
+        </select>
+        {todo.dueDate && (
+          <span className={`text-xs ${todo.completed ? "text-gray-500" : "text-gray-400"}`}>
+            Due: {new Date(`${todo.dueDate}T00:00:00`).toLocaleDateString()}
+          </span>
+        )}
       </div>
     </div>
   );
