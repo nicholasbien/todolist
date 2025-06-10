@@ -31,10 +31,26 @@ openai.api_key = os.getenv("OPENAI_API_KEY")
 logger = logging.getLogger(__name__)
 
 
-def create_summary_prompt(todos_json: str, user_name: str = "there", custom_instructions: str = "") -> str:
+def create_summary_prompt(
+    todos_json: str, user_name: str = "there", custom_instructions: str = "", user_timezone: str = "America/New_York"
+) -> str:
     """Create a prompt for generating a daily todo summary."""
-    # TODO: localize this to user's timezone
-    current_date = datetime.now().strftime("%B %d, %Y")
+    # Localize date to user's timezone
+    import pytz  # type: ignore
+
+    try:
+        tz = pytz.timezone(user_timezone)
+        current_datetime = datetime.now(tz)
+        current_date = current_datetime.strftime("%A, %B %d, %Y")
+    except Exception:
+        # Fallback to New York timezone if timezone is invalid
+        try:
+            tz = pytz.timezone("America/New_York")
+            current_date = datetime.now(tz).strftime("%A, %B %d, %Y")
+        except Exception:
+            # Final fallback to UTC
+            current_date = datetime.now().strftime("%A, %B %d, %Y")
+
     return f"""You are a helpful personal assistant creating a daily todo summary email.
 
 Today's date: {current_date}
@@ -74,7 +90,9 @@ Format as plain text email content (no HTML, no subject line).
 """
 
 
-async def generate_todo_summary(todos: list, user_name: str = "there", custom_instructions: str = "") -> str:
+async def generate_todo_summary(
+    todos: list, user_name: str = "there", custom_instructions: str = "", user_timezone: str = "America/New_York"
+) -> str:
     """
     Use OpenAI to generate a personalized todo summary.
     """
@@ -82,7 +100,7 @@ async def generate_todo_summary(todos: list, user_name: str = "there", custom_in
         # Convert todos to JSON for the prompt
         todos_json = json.dumps(todos, indent=2, default=str)
 
-        prompt = create_summary_prompt(todos_json, user_name, custom_instructions)
+        prompt = create_summary_prompt(todos_json, user_name, custom_instructions, user_timezone)
 
         # Use OpenAI to generate the summary
         client = openai.AsyncOpenAI(api_key=openai.api_key)
@@ -208,6 +226,13 @@ async def send_daily_summary(
 
             user = await users_collection.find_one({"_id": ObjectId(user_id)})
             custom_instructions = user.get("email_instructions", "") if user else ""
+            user_timezone = user.get("timezone", "America/New_York") if user else "America/New_York"
+        else:
+            # If custom_instructions is provided, we still need to get timezone
+            from auth import users_collection
+
+            user = await users_collection.find_one({"_id": ObjectId(user_id)})
+            user_timezone = user.get("timezone", "America/New_York") if user else "America/New_York"
 
         # Convert todos to dict format for processing
         todos_dict = [todo.dict() if hasattr(todo, "dict") else todo for todo in todos]
@@ -252,10 +277,22 @@ async def send_daily_summary(
 
         # Generate summary
         display_name = user_name or user_email.split("@")[0]
-        summary = await generate_todo_summary(limited_todos, display_name, custom_instructions or "")
+        summary = await generate_todo_summary(limited_todos, display_name, custom_instructions or "", user_timezone)
 
-        # Create subject with date
-        today = datetime.now().strftime("%B %d, %Y")
+        # Create subject with date in user's timezone
+        import pytz  # type: ignore
+
+        try:
+            tz = pytz.timezone(user_timezone)
+            today = datetime.now(tz).strftime("%A, %B %d, %Y")
+        except Exception:
+            # Fallback to New York timezone if timezone is invalid
+            try:
+                tz = pytz.timezone("America/New_York")
+                today = datetime.now(tz).strftime("%A, %B %d, %Y")
+            except Exception:
+                # Final fallback to UTC
+                today = datetime.now().strftime("%A, %B %d, %Y")
         subject = f"📋 Your Daily Todo Summary - {today}"
 
         # Send email

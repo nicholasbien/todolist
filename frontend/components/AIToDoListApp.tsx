@@ -30,6 +30,9 @@ export default function AIToDoListApp({ user, token }: Props) {
   const [savingSchedule, setSavingSchedule] = useState(false);
   const [emailInstructions, setEmailInstructions] = useState('');
   const [emailEnabled, setEmailEnabled] = useState(false);
+  const [showContactModal, setShowContactModal] = useState(false);
+  const [contactMessage, setContactMessage] = useState('');
+  const [sendingContact, setSendingContact] = useState(false);
 
   const handleOpenEmailSettings = async () => {
     try {
@@ -456,6 +459,34 @@ export default function AIToDoListApp({ user, token }: Props) {
     }
   };
 
+  // Send contact message
+  const handleSendContact = async () => {
+    if (!contactMessage.trim()) return;
+
+    try {
+      setSendingContact(true);
+      setError('');
+
+      const response = await authenticatedFetch('/contact', {
+        method: 'POST',
+        body: JSON.stringify({ message: contactMessage.trim() }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to send message');
+      }
+
+      setContactMessage('');
+      setShowContactModal(false);
+      setError(''); // Clear any errors
+    } catch (err) {
+      setError('Error sending message: ' + err.message);
+    } finally {
+      setSendingContact(false);
+    }
+  };
+
   // Filter and sort todos by category
   const allFilteredTodos = (activeCat === "All"
     ? todos
@@ -784,6 +815,49 @@ export default function AIToDoListApp({ user, token }: Props) {
           )}
         </button>
       </div>
+
+      {/* Contact Button */}
+      <div className="mt-8 flex justify-center">
+        <button
+          onClick={() => setShowContactModal(true)}
+          className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg transition-colors"
+        >
+          Contact
+        </button>
+      </div>
+
+      {/* Contact Modal */}
+      {showContactModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-gray-800 p-6 rounded-xl w-96 space-y-4 shadow-2xl border border-gray-700">
+            <h3 className="text-white text-lg font-bold mb-2">Contact Us</h3>
+            <textarea
+              value={contactMessage}
+              onChange={(e) => setContactMessage(e.target.value)}
+              placeholder="Ask for a new feature or report a bug"
+              className="w-full p-3 rounded-lg bg-gray-700 border border-gray-600 text-white placeholder-gray-400 h-32 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <div className="flex justify-end space-x-2">
+              <button
+                onClick={() => {
+                  setShowContactModal(false);
+                  setContactMessage('');
+                }}
+                className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSendContact}
+                disabled={sendingContact || !contactMessage.trim()}
+                className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white px-4 py-2 rounded-lg transition-colors"
+              >
+                {sendingContact ? 'Sending...' : 'Send'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -57,7 +57,7 @@ class User(BaseModel):
     summary_hour: Optional[int] = None
     summary_minute: Optional[int] = None
     email_instructions: str = ""
-    timezone: str = "UTC"
+    timezone: str = "America/New_York"
     email_enabled: bool = False
 
     class Config:
@@ -197,7 +197,7 @@ async def signup_user(email: str) -> dict:
                 summary_hour=None,
                 summary_minute=None,
                 email_instructions="",
-                timezone="UTC",
+                timezone="America/New_York",
                 email_enabled=False,
             )
             user_dict = user.dict(by_alias=True)
@@ -266,7 +266,7 @@ async def login_user(email: str, code: str) -> dict:
                 "summary_hour": user.get("summary_hour"),
                 "summary_minute": user.get("summary_minute"),
                 "email_instructions": user.get("email_instructions", ""),
-                "timezone": user.get("timezone", "UTC"),
+                "timezone": user.get("timezone", "America/New_York"),
                 "email_enabled": user.get("email_enabled", False),
             },
         }
@@ -301,7 +301,7 @@ async def verify_session(token: str) -> dict:
             "summary_hour": user.get("summary_hour"),
             "summary_minute": user.get("summary_minute"),
             "email_instructions": user.get("email_instructions", ""),
-            "timezone": user.get("timezone", "UTC"),
+            "timezone": user.get("timezone", "America/New_York"),
             "email_enabled": user.get("email_enabled", False),
         }
 
@@ -360,7 +360,7 @@ async def update_user_name(user_id: str, first_name: str) -> dict:
 
 
 async def update_user_summary_time(
-    user_id: str, email_enabled: bool, hour: int, minute: int, timezone: str = "UTC"
+    user_id: str, email_enabled: bool, hour: int, minute: int, timezone: str = "America/New_York"
 ) -> dict:
     """Update user's daily summary time, timezone, and email enabled status."""
     try:

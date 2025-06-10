@@ -2,7 +2,7 @@ import json
 import logging
 import os
 from datetime import datetime
-from typing import List, Optional
+from typing import List
 
 import httpx
 from auth import (
@@ -20,7 +20,6 @@ from auth import (
 )
 from bs4 import BeautifulSoup
 from categories import (
-    DEFAULT_CATEGORIES,
     Category,
     CategoryRename,
     add_category,
@@ -36,7 +35,7 @@ from email_summary import send_daily_summary
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from scheduler import get_scheduler_status, remove_user_schedule, start_scheduler, update_schedule_time
+from scheduler import get_scheduler_status, start_scheduler, update_schedule_time
 from todos import Todo, complete_todo, create_todo, delete_todo, get_todos, health_check, update_todo_fields
 
 # Set up logging with more detail
@@ -54,11 +53,6 @@ app.add_middleware(
     allow_methods=["*"],  # Allow all methods including DELETE and PUT
     allow_headers=["*"],
 )
-
-
-class ClassificationRequest(BaseModel):
-    text: str
-    categories: Optional[List[str]] = DEFAULT_CATEGORIES
 
 
 # Authentication dependency
@@ -328,7 +322,7 @@ async def api_scheduler_status():
 class UpdateScheduleRequest(BaseModel):
     hour: int
     minute: int
-    timezone: str = "UTC"
+    timezone: str = "America/New_York"
     email_enabled: bool = False
 
 
@@ -363,8 +357,9 @@ async def api_update_schedule(
         )
     else:
         # Remove the scheduled job if email is disabled
-        remove_user_schedule(current_user["user_id"])
+        from scheduler import remove_user_schedule
 
+        remove_user_schedule(current_user["user_id"])
     return {"message": "Schedule updated"}
 
 

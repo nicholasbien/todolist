@@ -27,6 +27,7 @@ const nextConfig = {
       { source: '/todos/:path*', destination: `${API_URL}/todos/:path*` },
       { source: '/categories/:path*', destination: `${API_URL}/categories/:path*` },
       { source: '/email/:path*', destination: `${API_URL}/email/:path*` },
+      { source: '/contact', destination: `${API_URL}/contact` },
     ];
   },
 };

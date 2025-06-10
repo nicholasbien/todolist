@@ -26,7 +26,9 @@ async def daily_summary_job(user_id: str, email: str, first_name: str = ""):
         logger.error("Error in daily summary job for %s: %s", email, e)
 
 
-def schedule_user_job(user_id: str, email: str, first_name: str, hour: int, minute: int, timezone: str = "UTC") -> None:
+def schedule_user_job(
+    user_id: str, email: str, first_name: str, hour: int, minute: int, timezone: str = "America/New_York"
+) -> None:
     """Schedule or reschedule a summary job for a user."""
     global scheduler
     if scheduler is None:
@@ -68,7 +70,7 @@ async def _load_jobs():
             user.get("first_name", ""),
             hour,
             minute,
-            user.get("timezone", "UTC"),
+            user.get("timezone", "America/New_York"),
         )
 
 
@@ -97,7 +99,7 @@ def stop_scheduler():
 
 
 def update_schedule_time(
-    user_id: str, email: str, first_name: str, hour: int, minute: int, timezone: str = "UTC"
+    user_id: str, email: str, first_name: str, hour: int, minute: int, timezone: str = "America/New_York"
 ) -> None:
     """Update a user's summary schedule."""
     schedule_user_job(user_id, email, first_name, hour, minute, timezone)
