@@ -1,4 +1,6 @@
-<img width="397" alt="image" src="https://github.com/user-attachments/assets/7b249e00-9f72-4b39-a37c-47b784470d9f" /> <img width="399" alt="image" src="https://github.com/user-attachments/assets/3b110583-f418-481f-9416-4e9ef840f2b3" />
+<img width="397" alt="image" src="https://github.com/user-attachments/assets/7b249e00-9f72-4b39-a37c-47b784470d9f" />
+<img width="397" alt="image" src="https://github.com/user-attachments/assets/9b421d87-df1a-41bb-8e6e-f53947b9e044" />
+
 
 
 # AI-Powered Todo List Application
