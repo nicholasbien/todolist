@@ -1,3 +1,5 @@
+<img width="397" alt="image" src="https://github.com/user-attachments/assets/7b249e00-9f72-4b39-a37c-47b784470d9f" />
+
 # AI-Powered Todo List Application
 
 A modern todo list application with AI-powered task classification, email verification authentication, and daily email summaries. Built with Next.js for the frontend and FastAPI for the backend.
