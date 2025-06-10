@@ -151,11 +151,11 @@ function LoginForm({ onLogin }: LoginFormProps) {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-      <div className="max-w-md w-full bg-white rounded-xl shadow-lg p-8">
+    <div className="min-h-screen bg-zinc-950 flex items-center justify-center p-4">
+      <div className="max-w-md w-full bg-black border border-gray-800 rounded-xl shadow-2xl p-8">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">todolist.nyc</h1>
-          <p className="text-gray-600">
+          <h1 className="text-3xl font-bold text-gray-100 mb-2">todolist.nyc</h1>
+          <p className="text-gray-400">
             {step === 'email'
               ? 'Enter your email to get started'
               : step === 'code'
@@ -166,21 +166,21 @@ function LoginForm({ onLogin }: LoginFormProps) {
         </div>
 
         {error && (
-          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-            <p className="text-red-700 text-sm">{error}</p>
+          <div className="mb-4 p-3 bg-red-900/20 border border-red-800 rounded-lg">
+            <p className="text-red-300 text-sm">{error}</p>
           </div>
         )}
 
         {message && step !== 'name' && (
-          <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
-            <p className="text-green-700 text-sm">{message}</p>
+          <div className="mb-4 p-3 bg-green-900/20 border border-green-800 rounded-lg">
+            <p className="text-green-300 text-sm">{message}</p>
           </div>
         )}
 
         {step === 'email' ? (
           <form onSubmit={handleEmailSubmit} className="space-y-6">
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="email" className="block text-sm font-medium text-gray-300 mb-2">
                 Email Address
               </label>
               <input
@@ -188,7 +188,7 @@ function LoginForm({ onLogin }: LoginFormProps) {
                 id="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                className="w-full px-4 py-2 border border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-gray-900 text-gray-100 placeholder-gray-500"
                 placeholder="Enter your email"
                 disabled={loading}
                 required

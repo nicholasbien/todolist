@@ -520,25 +520,25 @@ export default function AIToDoListApp({ user, token }: Props) {
     <div>
 
       {error && (
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+        <div className="bg-red-900/20 border border-red-800 text-red-300 px-4 py-3 rounded-xl mb-4">
           {error}
         </div>
       )}
 
 
       {showUpdatePrompt && (
-        <div className="bg-blue-100 border border-blue-400 text-blue-700 px-4 py-3 rounded mb-4 flex justify-between items-center">
+        <div className="bg-blue-900/20 border border-blue-800 text-blue-300 px-4 py-3 rounded-xl mb-4 flex justify-between items-center">
           <span>🔄 A new version is available!</span>
           <div className="space-x-2">
             <button
               onClick={handleUpdate}
-              className="bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600"
+              className="bg-blue-600 text-white px-3 py-1 rounded-lg text-sm hover:bg-blue-500 transition-colors"
             >
               Update Now
             </button>
             <button
               onClick={() => setShowUpdatePrompt(false)}
-              className="bg-gray-300 text-gray-700 px-3 py-1 rounded text-sm hover:bg-gray-400"
+              className="bg-gray-800 text-gray-300 px-3 py-1 rounded-lg text-sm hover:bg-gray-700 transition-colors"
             >
               Later
             </button>
@@ -554,13 +554,13 @@ export default function AIToDoListApp({ user, token }: Props) {
             value={newTodo}
             onChange={(e) => setNewTodo(e.target.value)}
             placeholder="Add a new task..."
-            className="flex-1 p-3 border border-gray-700 rounded bg-gray-800 text-white placeholder-gray-400"
+            className="flex-1 p-3 border border-gray-800 rounded-xl bg-black text-gray-100 placeholder-gray-500 focus:border-blue-500 focus:outline-none transition-colors"
             onKeyPress={(e) => e.key === 'Enter' && handleAddTodo()}
           />
           <button
             onClick={handleAddTodo}
             disabled={loading}
-            className="bg-blue-500 text-white w-12 h-12 rounded hover:bg-blue-600 disabled:bg-blue-300 flex items-center justify-center"
+            className="bg-blue-600 text-white w-12 h-12 rounded-xl hover:bg-blue-500 disabled:bg-blue-800 disabled:text-gray-400 flex items-center justify-center transition-colors shadow-lg"
           >
             {loading ? '...' : '+'}
           </button>
@@ -570,14 +570,14 @@ export default function AIToDoListApp({ user, token }: Props) {
       {/* Categories - Horizontal wrapping pills */}
       <div className="mb-6">
         <div className="flex items-center mb-3">
-          <h2 className="text-lg font-semibold">{activeCat}</h2>
+          <h2 className="text-lg font-semibold text-gray-100">{activeCat}</h2>
           {activeCat !== "All" && (
             <button
               onClick={() => {
                 setEditCatName(activeCat);
                 setShowEditCategoryModal(true);
               }}
-              className="ml-2 text-gray-400 hover:text-gray-200 text-sm border border-gray-500 px-2 py-1 rounded"
+              className="ml-2 text-gray-400 hover:text-gray-200 text-sm border border-gray-700 px-2 py-1 rounded-lg hover:border-gray-600 transition-colors"
             >
               Edit
             </button>
@@ -586,10 +586,10 @@ export default function AIToDoListApp({ user, token }: Props) {
         <div className="flex flex-wrap gap-2 mb-4">
           <button
             onClick={() => setActiveCat("All")}
-            className={`px-4 py-2 rounded-full text-base ${
+            className={`px-4 py-2 rounded-xl text-base transition-colors ${
               activeCat === "All"
-                ? "bg-blue-500 text-white"
-                : "bg-gray-700 text-white hover:bg-gray-600"
+                ? "bg-blue-600 text-white shadow-lg"
+                : "bg-gray-900 text-gray-300 hover:bg-gray-800 border border-gray-800"
             }`}
           >
             All
@@ -608,10 +608,10 @@ export default function AIToDoListApp({ user, token }: Props) {
             <button
               key={catName}
               onClick={() => setActiveCat(catName)}
-              className={`px-4 py-2 rounded-full text-base ${
+              className={`px-4 py-2 rounded-xl text-base transition-colors ${
                 catName === activeCat
-                  ? "bg-blue-500 text-white"
-                  : "bg-gray-700 text-white hover:bg-gray-600"
+                  ? "bg-blue-600 text-white shadow-lg"
+                  : "bg-gray-900 text-gray-300 hover:bg-gray-800 border border-gray-800"
               }`}
             >
               {catName}
@@ -620,7 +620,7 @@ export default function AIToDoListApp({ user, token }: Props) {
             })}
           <button
             onClick={() => setShowAddCategory(!showAddCategory)}
-            className="px-4 py-2 rounded-full text-base bg-gray-700 text-white hover:bg-gray-600"
+            className="px-4 py-2 rounded-xl text-base bg-gray-900 text-gray-300 hover:bg-gray-800 border border-gray-800 transition-colors"
           >
             +
           </button>
@@ -635,12 +635,12 @@ export default function AIToDoListApp({ user, token }: Props) {
               value={newCat}
               onChange={e => setNewCat(e.target.value)}
               onKeyPress={e => e.key === 'Enter' && handleAddCategory()}
-              className="flex-1 p-2 border border-gray-700 rounded text-sm bg-gray-800 text-white placeholder-gray-400"
+              className="flex-1 p-2 border border-gray-700 rounded-lg text-sm bg-black text-gray-100 placeholder-gray-500 focus:border-blue-500 focus:outline-none"
               autoFocus
             />
             <button
               onClick={handleAddCategory}
-              className="bg-gray-500 text-white px-3 py-2 rounded hover:bg-gray-600 text-sm"
+              className="bg-blue-600 text-white px-3 py-2 rounded-lg hover:bg-blue-500 text-sm transition-colors"
             >
               Add
             </button>
@@ -649,7 +649,7 @@ export default function AIToDoListApp({ user, token }: Props) {
                 setShowAddCategory(false);
                 setNewCat("");
               }}
-              className="bg-gray-300 text-gray-700 px-3 py-2 rounded hover:bg-gray-400 text-sm"
+              className="bg-gray-800 text-gray-300 px-3 py-2 rounded-lg hover:bg-gray-700 text-sm transition-colors"
             >
               Cancel
             </button>
@@ -658,14 +658,14 @@ export default function AIToDoListApp({ user, token }: Props) {
       </div>
 
       {showEditCategoryModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-gray-800 p-6 rounded-xl w-80 space-y-4 shadow-2xl border border-gray-700">
-            <h3 className="text-white text-lg font-bold mb-2">Edit Category</h3>
+        <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50">
+          <div className="bg-black border border-gray-800 p-6 rounded-xl w-80 space-y-4 shadow-2xl">
+            <h3 className="text-gray-100 text-lg font-bold mb-2">Edit Category</h3>
             <input
               type="text"
               value={editCatName}
               onChange={(e) => setEditCatName(e.target.value)}
-              className="w-full p-3 rounded-lg bg-gray-700 border border-gray-600 text-white text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
             <div className="flex flex-row gap-3 mt-2">
               <button
@@ -679,13 +679,13 @@ export default function AIToDoListApp({ user, token }: Props) {
                   handleDeleteCategory(activeCat);
                   setShowEditCategoryModal(false);
                 }}
-                className="flex-1 min-w-0 bg-blue-900 text-white font-semibold py-2 rounded-lg shadow hover:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-900 transition-colors"
+                className="flex-1 min-w-0 bg-red-600 text-white font-semibold py-2 rounded-lg shadow hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 transition-colors"
               >
                 Delete
               </button>
               <button
                 onClick={() => setShowEditCategoryModal(false)}
-                className="flex-1 min-w-0 bg-gray-300 text-gray-800 font-semibold py-2 rounded-lg shadow hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors"
+                className="flex-1 min-w-0 bg-gray-800 text-gray-300 font-semibold py-2 rounded-lg shadow hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-600 transition-colors"
               >
                 Cancel
               </button>
@@ -716,7 +716,7 @@ export default function AIToDoListApp({ user, token }: Props) {
         <div className="mt-6 flex justify-center">
           <button
             onClick={() => setShowCompleted(!showCompleted)}
-            className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg transition-colors"
+            className="bg-gray-900 hover:bg-gray-800 text-gray-300 px-4 py-2 rounded-lg transition-colors border border-gray-800"
           >
             {showCompleted ? 'Hide Completed' : 'Show Completed'} ({completedTodos.length})
           </button>
@@ -745,53 +745,62 @@ export default function AIToDoListApp({ user, token }: Props) {
       <div className="mt-8 flex justify-center">
         <button
           onClick={handleOpenEmailSettings}
-          className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg mr-4"
+          className="bg-gray-900 hover:bg-gray-800 text-gray-300 px-4 py-2 rounded-lg mr-4 border border-gray-800 transition-colors"
         >
           Email Settings
         </button>
         {showEmailSettings && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-gray-800 border border-gray-600 rounded-xl p-6 w-80 text-white space-y-2 shadow-2xl">
-              <label className="block text-sm">Daily Summary Time</label>
-              <input
-                type="time"
-                value={emailTime}
-                onChange={(e) => setEmailTime(e.target.value)}
-                className="w-full bg-gray-700 p-1 rounded"
-                disabled={!emailEnabled}
-              />
-              <label className="block text-sm mt-2">Custom Instructions</label>
-              <textarea
-                value={emailInstructions}
-                onChange={(e) => setEmailInstructions(e.target.value)}
-                className="w-full bg-gray-700 p-1 rounded h-24"
-                placeholder="Write like a Buddhist monk. Include a haiku at the end."
-              />
-              <div className="flex items-center space-x-2 mt-2">
+          <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50">
+            <div className="bg-black border border-gray-800 rounded-xl p-6 w-80 text-gray-100 space-y-4 shadow-2xl">
+              <h3 className="text-gray-100 text-lg font-bold mb-2">Email Settings</h3>
+
+              <div className="flex items-center space-x-2">
                 <input
                   type="checkbox"
                   id="emailEnabled"
                   checked={emailEnabled}
                   onChange={(e) => setEmailEnabled(e.target.checked)}
-                  className="w-4 h-4 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-500 focus:ring-2"
+                  className="w-4 h-4 text-blue-600 bg-gray-900 border-gray-700 rounded focus:ring-blue-500 focus:ring-2"
                 />
-                <label htmlFor="emailEnabled" className="text-sm">
+                <label htmlFor="emailEnabled" className="text-sm text-gray-300">
                   Enable daily email summaries
                 </label>
               </div>
-              <div className="flex justify-end space-x-2 mt-2">
+
+              <div>
+                <label className="block text-sm text-gray-300 mb-2">Daily Summary Time</label>
+                <input
+                  type="time"
+                  value={emailTime}
+                  onChange={(e) => setEmailTime(e.target.value)}
+                  className="w-full bg-gray-900 border border-gray-700 text-gray-100 p-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  disabled={!emailEnabled}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm text-gray-300 mb-2">Custom Instructions</label>
+                <textarea
+                  value={emailInstructions}
+                  onChange={(e) => setEmailInstructions(e.target.value)}
+                  className="w-full bg-gray-900 border border-gray-700 text-gray-100 placeholder-gray-500 p-2 rounded-lg h-24 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Write like a Buddhist monk. Include a haiku at the end."
+                />
+              </div>
+
+              <div className="flex justify-end space-x-2">
+                <button
+                  onClick={() => setShowEmailSettings(false)}
+                  className="bg-gray-800 hover:bg-gray-700 text-gray-300 px-4 py-2 rounded-lg transition-colors"
+                >
+                  Close
+                </button>
                 <button
                   onClick={handleUpdateSchedule}
                   disabled={savingSchedule}
-                  className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 px-3 py-1 rounded"
+                  className="bg-blue-600 hover:bg-blue-500 disabled:bg-blue-800 disabled:text-gray-400 text-white px-4 py-2 rounded-lg transition-colors"
                 >
                   {savingSchedule ? 'Saving...' : 'Save'}
-                </button>
-                <button
-                  onClick={() => setShowEmailSettings(false)}
-                  className="bg-gray-500 hover:bg-gray-600 px-3 py-1 rounded"
-                >
-                  Close
                 </button>
               </div>
             </div>
@@ -820,7 +829,7 @@ export default function AIToDoListApp({ user, token }: Props) {
       <div className="mt-8 flex justify-center">
         <button
           onClick={() => setShowContactModal(true)}
-          className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg transition-colors"
+          className="bg-gray-900 hover:bg-gray-800 text-gray-300 px-4 py-2 rounded-lg transition-colors border border-gray-800"
         >
           Contact
         </button>
@@ -828,14 +837,14 @@ export default function AIToDoListApp({ user, token }: Props) {
 
       {/* Contact Modal */}
       {showContactModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-gray-800 p-6 rounded-xl w-96 space-y-4 shadow-2xl border border-gray-700">
-            <h3 className="text-white text-lg font-bold mb-2">Contact Us</h3>
+        <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50">
+          <div className="bg-black border border-gray-800 p-6 rounded-xl w-96 space-y-4 shadow-2xl">
+            <h3 className="text-gray-100 text-lg font-bold mb-2">Contact Us</h3>
             <textarea
               value={contactMessage}
               onChange={(e) => setContactMessage(e.target.value)}
-              placeholder="Ask for a new feature or report a bug"
-              className="w-full p-3 rounded-lg bg-gray-700 border border-gray-600 text-white placeholder-gray-400 h-32 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="Ask for a new feature... Report a bug... Say hi!"
+              className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 placeholder-gray-500 h-32 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
             <div className="flex justify-end space-x-2">
               <button
@@ -843,14 +852,14 @@ export default function AIToDoListApp({ user, token }: Props) {
                   setShowContactModal(false);
                   setContactMessage('');
                 }}
-                className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg transition-colors"
+                className="bg-gray-800 hover:bg-gray-700 text-gray-300 px-4 py-2 rounded-lg transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={handleSendContact}
                 disabled={sendingContact || !contactMessage.trim()}
-                className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white px-4 py-2 rounded-lg transition-colors"
+                className="bg-blue-600 hover:bg-blue-500 disabled:bg-blue-800 disabled:text-gray-400 text-white px-4 py-2 rounded-lg transition-colors"
               >
                 {sendingContact ? 'Sending...' : 'Send'}
               </button>

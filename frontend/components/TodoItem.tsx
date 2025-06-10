@@ -24,11 +24,11 @@ export default function TodoItem({
   return (
     <div
       key={todo._id}
-      className={`p-4 border rounded-lg ${
+      className={`p-4 border rounded-xl ${
         todo.completed
-          ? "bg-gray-800 border-gray-800 text-gray-400"
-          : "bg-gray-700 text-white border-gray-700"
-      }`}
+          ? "bg-black border-gray-900 text-gray-500"
+          : "bg-gray-900 text-gray-100 border-gray-800"
+      } shadow-lg`}
     >
       <div className="flex justify-between items-start">
         <div className="flex-1">
@@ -52,21 +52,21 @@ export default function TodoItem({
           {!todo.completed ? (
             <button
               onClick={() => handleCompleteTodo(todo._id)}
-              className="text-green-600 hover:text-green-800 text-lg w-8 h-8 flex items-center justify-center"
+              className="text-green-400 hover:text-green-300 hover:bg-green-900/20 text-lg w-8 h-8 flex items-center justify-center rounded-lg transition-colors"
             >
               ✓
             </button>
           ) : (
             <button
               onClick={() => handleCompleteTodo(todo._id)}
-              className="text-yellow-600 hover:text-yellow-800 text-lg w-8 h-8 flex items-center justify-center"
+              className="text-yellow-400 hover:text-yellow-300 hover:bg-yellow-900/20 text-lg w-8 h-8 flex items-center justify-center rounded-lg transition-colors"
             >
               ↻
             </button>
           )}
           <button
             onClick={() => handleDeleteTodo(todo._id)}
-            className="text-red-600 hover:text-red-800 text-lg w-8 h-8 flex items-center justify-center"
+            className="text-red-400 hover:text-red-300 hover:bg-red-900/20 text-lg w-8 h-8 flex items-center justify-center rounded-lg transition-colors"
           >
             ×
           </button>
@@ -79,7 +79,7 @@ export default function TodoItem({
             value={todo.category}
             onChange={(e) => handleUpdateCategory(todo._id, e.target.value)}
             onBlur={() => setEditingCategory(null)}
-            className="px-2 py-1 rounded bg-gray-800 text-white border border-gray-600 text-xs"
+            className="px-3 py-1.5 rounded-lg bg-black text-white border border-gray-700 text-xs focus:border-blue-500 focus:outline-none"
             autoFocus
             onClick={(e) => (e.target as HTMLSelectElement).focus()}
           >
@@ -99,8 +99,8 @@ export default function TodoItem({
           <select
             value={todo.category}
             onChange={(e) => handleUpdateCategory(todo._id, e.target.value)}
-            className={`px-2 py-1 rounded cursor-pointer text-xs appearance-none ${
-              todo.completed ? "bg-gray-700 text-gray-500" : "bg-gray-600 text-gray-200"
+            className={`px-3 py-1.5 rounded-lg cursor-pointer text-xs appearance-none transition-colors ${
+              todo.completed ? "bg-black border border-gray-800 text-gray-500" : "bg-black border border-gray-700 text-gray-200 hover:border-gray-600"
             }`}
           >
             {categories
@@ -119,8 +119,8 @@ export default function TodoItem({
         <select
           value={todo.priority}
           onChange={(e) => handleUpdatePriority(todo._id, e.target.value)}
-          className={`px-2 py-1 rounded cursor-pointer text-xs appearance-none min-w-16 ${
-            todo.completed ? "bg-gray-700 text-gray-500" : "bg-gray-600 text-gray-200"
+          className={`px-3 py-1.5 rounded-lg cursor-pointer text-xs appearance-none min-w-16 transition-colors ${
+            todo.completed ? "bg-black border border-gray-800 text-gray-500" : "bg-black border border-gray-700 text-gray-200 hover:border-gray-600"
           }`}
         >
           <option value="High">High</option>
@@ -128,7 +128,7 @@ export default function TodoItem({
           <option value="Low">Low</option>
         </select>
         {todo.dueDate && (
-          <span className={`text-xs ${todo.completed ? "text-gray-500" : "text-gray-400"}`}>
+          <span className={`text-xs px-2 py-1 rounded-md ${todo.completed ? "text-gray-500 bg-gray-900" : "text-gray-300 bg-gray-800"}`}>
             Due: {new Date(`${todo.dueDate}T00:00:00`).toLocaleDateString()}
           </span>
         )}
