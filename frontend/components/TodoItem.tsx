@@ -129,7 +129,39 @@ export default function TodoItem({
         </select>
         {todo.dueDate && (
           <span className={`text-xs ${todo.completed ? "text-gray-500" : "text-gray-300"}`}>
-            Due: {new Date(`${todo.dueDate}T00:00:00`).toLocaleDateString()}
+            Due: {(() => {
+              const dueDate = new Date(`${todo.dueDate}T00:00:00`);
+              const today = new Date();
+              const tomorrow = new Date(today);
+              tomorrow.setDate(today.getDate() + 1);
+
+              // Reset times to midnight for comparison
+              const dueDateMidnight = new Date(dueDate);
+              dueDateMidnight.setHours(0, 0, 0, 0);
+              const todayMidnight = new Date(today);
+              todayMidnight.setHours(0, 0, 0, 0);
+              const tomorrowMidnight = new Date(tomorrow);
+              tomorrowMidnight.setHours(0, 0, 0, 0);
+
+              // Calculate days difference
+              const diffTime = dueDateMidnight.getTime() - todayMidnight.getTime();
+              const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+              if (diffDays === 0) {
+                return "Today";
+              } else if (diffDays === 1) {
+                return "Tomorrow";
+              } else if (diffDays > 1 && diffDays <= 7) {
+                // Day of the week for upcoming dates within a week
+                return dueDate.toLocaleDateString('en-US', { weekday: 'long' });
+              } else if (dueDate.getFullYear() === today.getFullYear()) {
+                // Same year, omit year
+                return dueDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+              } else {
+                // Different year, include year
+                return dueDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+              }
+            })()}
           </span>
         )}
       </div>
