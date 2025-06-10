@@ -144,13 +144,20 @@ export default function TodoItem({
               tomorrowMidnight.setHours(0, 0, 0, 0);
 
               // Calculate days difference
-              const diffTime = dueDateMidnight.getTime() - todayMidnight.getTime();
-              const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+              const diffTime =
+                dueDateMidnight.getTime() - todayMidnight.getTime();
+              const diffDays = Math.ceil(
+                diffTime / (1000 * 60 * 60 * 24)
+              );
 
               if (diffDays === 0) {
                 return "Today";
               } else if (diffDays === 1) {
                 return "Tomorrow";
+              } else if (diffDays === -1) {
+                return "Yesterday";
+              } else if (diffDays < -1) {
+                return `${Math.abs(diffDays)} days ago`;
               } else if (diffDays > 1 && diffDays <= 7) {
                 // Day of the week for upcoming dates within a week
                 return dueDate.toLocaleDateString('en-US', { weekday: 'long' });
