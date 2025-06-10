@@ -18,7 +18,7 @@ export default function AIToDoListApp({ user, token }: Props) {
   const [error, setError] = useState("");
   const [newCat, setNewCat] = useState("");
   const [activeCat, setActiveCat] = useState("All");
-  const [showAddCategory, setShowAddCategory] = useState(false);
+  const [showAddCategoryModal, setShowAddCategoryModal] = useState(false);
   const [showEditCategoryModal, setShowEditCategoryModal] = useState(false);
   const [editCatName, setEditCatName] = useState("");
   const [editingCategory, setEditingCategory] = useState(null);
@@ -184,7 +184,7 @@ export default function AIToDoListApp({ user, token }: Props) {
       // Refresh categories
       await fetchCategories();
       setNewCat("");
-      setShowAddCategory(false);
+      setShowAddCategoryModal(false);
       setError('');
     } catch (err) {
       setError('Error adding category: ' + err.message);
@@ -619,43 +619,49 @@ export default function AIToDoListApp({ user, token }: Props) {
               );
             })}
           <button
-            onClick={() => setShowAddCategory(!showAddCategory)}
+            onClick={() => setShowAddCategoryModal(true)}
             className="px-4 py-2 rounded-xl text-base bg-gray-900 text-gray-300 hover:bg-gray-800 border border-gray-800 transition-colors"
           >
             +
           </button>
         </div>
 
-        {/* Add category input - expandable */}
-        {showAddCategory && (
-          <div className="flex gap-2 mt-2">
+      </div>
+
+      {/* Add Category Modal */}
+      {showAddCategoryModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50">
+          <div className="bg-black border border-gray-800 p-6 rounded-xl w-80 space-y-4 shadow-2xl">
+            <h3 className="text-gray-100 text-lg font-bold mb-2">Add New Category</h3>
             <input
               type="text"
-              placeholder="New category"
+              placeholder="New category name"
               value={newCat}
               onChange={e => setNewCat(e.target.value)}
               onKeyPress={e => e.key === 'Enter' && handleAddCategory()}
-              className="flex-1 p-2 border border-gray-700 rounded-lg text-sm bg-black text-gray-100 placeholder-gray-500 focus:border-blue-500 focus:outline-none"
+              className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 placeholder-gray-500 text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
               autoFocus
             />
-            <button
-              onClick={handleAddCategory}
-              className="bg-blue-600 text-white px-3 py-2 rounded-lg hover:bg-blue-500 text-sm transition-colors"
-            >
-              Add
-            </button>
-            <button
-              onClick={() => {
-                setShowAddCategory(false);
-                setNewCat("");
-              }}
-              className="bg-gray-800 text-gray-300 px-3 py-2 rounded-lg hover:bg-gray-700 text-sm transition-colors"
-            >
-              Cancel
-            </button>
+            <div className="flex justify-end space-x-2">
+              <button
+                onClick={() => {
+                  setShowAddCategoryModal(false);
+                  setNewCat("");
+                }}
+                className="bg-gray-800 hover:bg-gray-700 text-gray-300 px-4 py-2 rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAddCategory}
+                className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg transition-colors"
+              >
+                Add
+              </button>
+            </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {showEditCategoryModal && (
         <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50">
