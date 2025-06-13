@@ -140,6 +140,34 @@ const clearQueue = async (userId) => {
   return userDbTx(effectiveUserId, QUEUE, 'readwrite', (s) => s.clear());
 };
 
+// ID mapping functions for persisting offline → server ID mappings
+const getIdMap = async (userId) => {
+  const authData = userId ? null : await getAuth();
+  const effectiveUserId = userId || (authData ? authData.userId : null);
+  try {
+    const result = await userDbTx(effectiveUserId, QUEUE, 'readonly', (s) => s.get('idMap'));
+    return result ? result.mappings : {};
+  } catch (e) {
+    return {};
+  }
+};
+
+const putIdMap = async (idMap, userId) => {
+  const authData = userId ? null : await getAuth();
+  const effectiveUserId = userId || (authData ? authData.userId : null);
+  return userDbTx(effectiveUserId, QUEUE, 'readwrite', (s) => s.put({ id: 'idMap', mappings: idMap }));
+};
+
+const clearIdMap = async (userId) => {
+  const authData = userId ? null : await getAuth();
+  const effectiveUserId = userId || (authData ? authData.userId : null);
+  try {
+    return userDbTx(effectiveUserId, QUEUE, 'readwrite', (s) => s.delete('idMap'));
+  } catch (e) {
+    // Ignore if doesn't exist
+  }
+};
+
 
 // Function to get authenticated headers
 async function getAuthHeaders() {
@@ -252,6 +280,8 @@ async function handleApiRequest(request) {
   // Check if this is an offline-generated ID that shouldn't go to server
   const isOfflineId = url.pathname.includes('offline_');
 
+  console.log(`🌐 API Request: ${request.method} ${url.pathname} | Online: ${online} | Offline ID: ${isOfflineId}`);
+
   if (online && !isOfflineId) {
     try {
       const response = await fetch(request.clone());
@@ -284,6 +314,9 @@ async function handleApiRequest(request) {
               await delTodo(t._id, authData.userId);
             }
           }
+          console.log('📊 Online GET /todos - Local todos IDs:', localTodos.map(t => t._id));
+          console.log('📊 Online GET /todos - Server todos IDs:', serverTodos.map(t => t._id));
+          console.log('📊 Online GET /todos - Offline-only todos IDs:', offlineOnlyTodos.map(t => t._id));
 
           // Save fresh server data to IndexedDB
           for (const todo of serverTodos) {
@@ -292,6 +325,8 @@ async function handleApiRequest(request) {
 
           // Merge server todos with any remaining offline todos
           const mergedTodos = [...serverTodos, ...offlineOnlyTodos];
+
+          console.log('📊 Online GET /todos - Final merged todos IDs:', mergedTodos.map(t => t._id));
 
           // Return the merged data
           return new Response(JSON.stringify(mergedTodos), {
@@ -341,6 +376,7 @@ async function handleApiRequest(request) {
       return offlineFallback(request, url);
     }
   }
+  console.log(`📱 Falling back to offline handler for: ${request.method} ${url.pathname}`);
   return offlineFallback(request, url);
 }
 
@@ -387,6 +423,7 @@ async function offlineFallback(request, url) {
   if (request.method === 'GET') {
     if (url.pathname === '/todos' || url.pathname.endsWith('/todos')) {
       const todos = await getTodos(authData ? authData.userId : null);
+      console.log('📱 Offline GET /todos - Todo IDs:', todos.map(t => t._id));
       return new Response(JSON.stringify(todos), { headers: { 'Content-Type': 'application/json' } });
     }
     if (url.pathname === '/categories' || url.pathname.endsWith('/categories')) {
@@ -430,6 +467,8 @@ async function offlineFallback(request, url) {
         todoData.link = text;
       }
 
+      console.log('📱 Offline POST /todos - Created todo with ID:', todoData._id);
+
       await putTodo(todoData, authData ? authData.userId : null);
       await addQueue({ type: 'CREATE', data: todoData }, authData ? authData.userId : null);
       return new Response(JSON.stringify(todoData), { headers: { 'Content-Type': 'application/json' } });
@@ -452,10 +491,13 @@ async function offlineFallback(request, url) {
     // Complete/uncomplete todo
     if (url.pathname.endsWith('/complete') && request.method === 'PUT') {
       const id = url.pathname.split('/')[2]; // Get ID from /todos/{id}/complete
+      console.log(`✅ Offline COMPLETE request for todo ID: ${id}`);
+
       const existingTodos = await getTodos(authData ? authData.userId : null);
       const existingTodo = existingTodos.find(t => t._id === id);
 
       if (existingTodo) {
+        console.log(`✅ Todo ${id} found in IndexedDB, updating completion status...`);
         const updated = { ...existingTodo, completed: !existingTodo.completed };
         if (updated.completed) {
           updated.dateCompleted = new Date().toISOString();
@@ -463,16 +505,45 @@ async function offlineFallback(request, url) {
           delete updated.dateCompleted;
         }
         await putTodo(updated, authData ? authData.userId : null);
-        await addQueue({ type: 'COMPLETE', data: { _id: id, completed: updated.completed } }, authData ? authData.userId : null);
+
+        // Only queue for server completion if it's not an offline-only todo
+        if (!id.startsWith('offline_')) {
+          await addQueue({ type: 'COMPLETE', data: { _id: id, completed: updated.completed } }, authData ? authData.userId : null);
+          console.log(`✅ Added server COMPLETE to queue for ${id} (completed: ${updated.completed})`);
+        } else {
+          console.log(`✅ Skipping server queue for offline-only todo ${id} (completed: ${updated.completed})`);
+        }
+
         return new Response(JSON.stringify({ message: 'Todo updated' }), { headers: { 'Content-Type': 'application/json' } });
+      } else {
+        console.log(`⚠️ Todo ${id} not found in IndexedDB for completion`);
       }
     }
 
     // Delete todo
     if (url.pathname.startsWith('/todos/') && request.method === 'DELETE') {
       const id = url.pathname.split('/')[2]; // Get ID from /todos/{id}
-      await delTodo(id, authData ? authData.userId : null);
-      await addQueue({ type: 'DELETE', data: { _id: id } }, authData ? authData.userId : null);
+      console.log(`🗑️ Offline DELETE request for todo ID: ${id}`);
+
+      // Check if todo exists before deleting
+      const existingTodos = await getTodos(authData ? authData.userId : null);
+      const todoExists = existingTodos.find(t => t._id === id);
+
+      if (todoExists) {
+        console.log(`🗑️ Todo ${id} found in IndexedDB, deleting...`);
+        await delTodo(id, authData ? authData.userId : null);
+
+        // Only queue for server deletion if it's not an offline-only todo
+        if (!id.startsWith('offline_')) {
+          await addQueue({ type: 'DELETE', data: { _id: id } }, authData ? authData.userId : null);
+          console.log(`🗑️ Added server DELETE to queue for ${id}`);
+        } else {
+          console.log(`🗑️ Skipping server queue for offline-only todo ${id}`);
+        }
+      } else {
+        console.log(`⚠️ Todo ${id} not found in IndexedDB`);
+      }
+
       return new Response(null, { status: 204 });
     }
 
@@ -591,6 +662,10 @@ async function syncQueue() {
     const queue = await readQueue(authData.userId);
     const headers = await getAuthHeaders();
 
+    // Load persistent ID mapping
+    let idMap = await getIdMap(authData.userId);
+    console.log('📋 Loaded ID mapping:', idMap);
+
   for (const op of queue) {
     try {
       let res;
@@ -606,35 +681,57 @@ async function syncQueue() {
             if (res && res.ok) {
               // Immediately replace offline todo with server version
               const serverTodo = await res.json();
+              console.log(`🔄 Sync SUCCESS: Replacing offline todo ${offlineId} with server todo ${serverTodo._id}`);
+
+              // Update ID mapping
+              idMap[offlineId] = serverTodo._id;
+              console.log(`🗺️ Added ID mapping: ${offlineId} -> ${serverTodo._id}`);
+
               await delTodo(offlineId, authData.userId); // Remove offline version
               await putTodo(serverTodo, authData.userId); // Add server version
-              console.log(`Synced offline todo ${offlineId} -> ${serverTodo._id}`);
+              console.log(`✅ Synced offline todo ${offlineId} -> ${serverTodo._id}`);
+            } else {
+              console.log(`❌ Sync FAILED: Offline todo ${offlineId} will be preserved`);
             }
           }
           break;
         case 'UPDATE':
-          if (!op.data._id.startsWith('offline_')) {
-            res = await fetch(`/todos/${op.data._id}`, {
+          // Check if we need to translate offline ID to server ID
+          let updateId = op.data._id;
+          if (updateId.startsWith('offline_') && idMap[updateId]) {
+            updateId = idMap[updateId];
+            console.log(`🗺️ Translating UPDATE ID: ${op.data._id} -> ${updateId}`);
+          }
+
+          if (!updateId.startsWith('offline_')) {
+            res = await fetch(`/todos/${updateId}`, {
               method: 'PUT',
               headers,
-              body: JSON.stringify(op.data),
+              body: JSON.stringify({ ...op.data, _id: updateId }),
             });
             if (res && res.ok) {
               // Update local copy with the changes
-              await putTodo(op.data, authData.userId);
+              await putTodo({ ...op.data, _id: updateId }, authData.userId);
             }
           }
           break;
         case 'COMPLETE':
-          if (!op.data._id.startsWith('offline_')) {
-            res = await fetch(`/todos/${op.data._id}/complete`, {
+          // Check if we need to translate offline ID to server ID
+          let completeId = op.data._id;
+          if (completeId.startsWith('offline_') && idMap[completeId]) {
+            completeId = idMap[completeId];
+            console.log(`🗺️ Translating COMPLETE ID: ${op.data._id} -> ${completeId}`);
+          }
+
+          if (!completeId.startsWith('offline_')) {
+            res = await fetch(`/todos/${completeId}/complete`, {
               method: 'PUT',
               headers
             });
             if (res && res.ok) {
               // Update local todo completion status
               const existingTodos = await getTodos(authData.userId);
-              const existingTodo = existingTodos.find(t => t._id === op.data._id);
+              const existingTodo = existingTodos.find(t => t._id === completeId);
               if (existingTodo) {
                 const updated = { ...existingTodo, completed: op.data.completed };
                 if (updated.completed) {
@@ -648,14 +745,21 @@ async function syncQueue() {
           }
           break;
         case 'DELETE':
-          if (!op.data._id.startsWith('offline_')) {
-            res = await fetch(`/todos/${op.data._id}`, {
+          // Check if we need to translate offline ID to server ID
+          let deleteId = op.data._id;
+          if (deleteId.startsWith('offline_') && idMap[deleteId]) {
+            deleteId = idMap[deleteId];
+            console.log(`🗺️ Translating DELETE ID: ${op.data._id} -> ${deleteId}`);
+          }
+
+          if (!deleteId.startsWith('offline_')) {
+            res = await fetch(`/todos/${deleteId}`, {
               method: 'DELETE',
               headers
             });
             if (res && res.ok) {
               // Remove from local storage
-              await delTodo(op.data._id, authData.userId);
+              await delTodo(deleteId, authData.userId);
             }
           }
           break;
@@ -698,6 +802,10 @@ async function syncQueue() {
       continue;
     }
   }
+
+    // Persist the updated ID mapping
+    await putIdMap(idMap, authData.userId);
+    console.log('📋 Saved updated ID mapping:', idMap);
 
     // Always clear queue after processing (prevents infinite retry loops)
     await clearQueue(authData.userId);
