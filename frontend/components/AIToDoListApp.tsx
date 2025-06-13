@@ -1,16 +1,20 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import TodoItem from "./TodoItem";
 
 interface Props {
   user: any;
   token: string;
+  onLogout?: () => void;
+  onShowEmailSettings?: () => void;
+  showEmailSettings?: boolean;
+  onCloseEmailSettings?: () => void;
 }
 
 /**
  * AI-Todo main component
  * Backend classifies tasks automatically when creating todos
  */
-export default function AIToDoListApp({ user, token }: Props) {
+export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettings, showEmailSettings, onCloseEmailSettings }: Props) {
   const [todos, setTodos] = useState([]);
   const [newTodo, setNewTodo] = useState("");
   const [categories, setCategories] = useState([]);
@@ -25,14 +29,10 @@ export default function AIToDoListApp({ user, token }: Props) {
   const [sendingEmail, setSendingEmail] = useState(false);
   const [showCompleted, setShowCompleted] = useState(false);
   const [showUpdatePrompt, setShowUpdatePrompt] = useState(false);
-  const [showEmailSettings, setShowEmailSettings] = useState(false);
   const [emailTime, setEmailTime] = useState('09:00');
   const [savingSchedule, setSavingSchedule] = useState(false);
   const [emailInstructions, setEmailInstructions] = useState('');
   const [emailEnabled, setEmailEnabled] = useState(false);
-  const [showContactModal, setShowContactModal] = useState(false);
-  const [contactMessage, setContactMessage] = useState('');
-  const [sendingContact, setSendingContact] = useState(false);
 
   const handleOpenEmailSettings = async () => {
     try {
@@ -44,7 +44,7 @@ export default function AIToDoListApp({ user, token }: Props) {
       setEmailTime(`${h}:${m}`);
       setEmailInstructions(userData?.email_instructions ?? '');
       setEmailEnabled(userData?.email_enabled ?? false);
-      setShowEmailSettings(true);
+      onShowEmailSettings?.();
       setError('');
     } catch (err) {
       setError('Error loading email settings: ' + (err.message || err));
@@ -154,6 +154,7 @@ export default function AIToDoListApp({ user, token }: Props) {
       });
     }
   }, []);
+
 
   // Function to handle app update
   const handleUpdate = () => {
@@ -460,33 +461,6 @@ export default function AIToDoListApp({ user, token }: Props) {
     }
   };
 
-  // Send contact message
-  const handleSendContact = async () => {
-    if (!contactMessage.trim()) return;
-
-    try {
-      setSendingContact(true);
-      setError('');
-
-      const response = await authenticatedFetch('/contact', {
-        method: 'POST',
-        body: JSON.stringify({ message: contactMessage.trim() }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || 'Failed to send message');
-      }
-
-      setContactMessage('');
-      setShowContactModal(false);
-      setError(''); // Clear any errors
-    } catch (err) {
-      setError('Error sending message: ' + err.message);
-    } finally {
-      setSendingContact(false);
-    }
-  };
 
   // Filter and sort todos by category
   const allFilteredTodos = (activeCat === "All"
@@ -748,15 +722,8 @@ export default function AIToDoListApp({ user, token }: Props) {
         </div>
       )}
 
-      {/* Email Settings Button */}
-      <div className="mt-8 flex justify-center">
-        <button
-          onClick={handleOpenEmailSettings}
-          className="bg-gray-900 hover:bg-gray-800 text-gray-300 px-4 py-2 rounded-lg mr-4 border border-gray-800 transition-colors"
-        >
-          Email Settings
-        </button>
-        {showEmailSettings && (
+      {/* Email Settings Modal */}
+      {showEmailSettings && (
           <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50">
             <div className="bg-black border border-gray-800 rounded-xl p-6 w-80 text-gray-100 space-y-4 shadow-2xl">
               <h3 className="text-gray-100 text-lg font-bold mb-2">Email Settings</h3>
@@ -819,77 +786,37 @@ export default function AIToDoListApp({ user, token }: Props) {
                     } catch (err) {
                       // If fetch fails, just close the modal
                     }
-                    setShowEmailSettings(false);
+                    onCloseEmailSettings?.();
                   }}
                   className="bg-gray-800 hover:bg-gray-700 text-gray-300 px-6 py-2 rounded-lg transition-colors"
                 >
                   Cancel
                 </button>
               </div>
+
+              <div className="flex justify-center mt-4">
+                <button
+                  onClick={handleSendEmailSummary}
+                  disabled={sendingEmail}
+                  className="bg-green-600 hover:bg-green-500 disabled:bg-green-800 disabled:text-gray-400 text-white px-6 py-2 rounded-lg transition-colors flex items-center space-x-2"
+                >
+                  {sendingEmail ? (
+                    <>
+                      <span className="animate-spin">⏳</span>
+                      <span>Sending...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>📧</span>
+                      <span>Send Email Now</span>
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
           </div>
         )}
-        <button
-          onClick={handleSendEmailSummary}
-          disabled={sendingEmail}
-          className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white px-6 py-2 rounded-lg transition-colors flex items-center space-x-2"
-        >
-          {sendingEmail ? (
-            <>
-              <span className="animate-spin">⏳</span>
-              <span>Sending Summary...</span>
-            </>
-          ) : (
-            <>
-              <span>📧</span>
-              <span>Send Email Summary</span>
-            </>
-          )}
-        </button>
-      </div>
 
-      {/* Contact Button */}
-      <div className="mt-8 flex justify-center">
-        <button
-          onClick={() => setShowContactModal(true)}
-          className="bg-gray-900 hover:bg-gray-800 text-gray-300 px-4 py-2 rounded-lg transition-colors border border-gray-800"
-        >
-          Contact
-        </button>
-      </div>
-
-      {/* Contact Modal */}
-      {showContactModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50">
-          <div className="bg-black border border-gray-800 p-6 rounded-xl w-96 space-y-4 shadow-2xl">
-            <h3 className="text-gray-100 text-lg font-bold mb-2">Contact Us</h3>
-            <textarea
-              value={contactMessage}
-              onChange={(e) => setContactMessage(e.target.value)}
-              placeholder="Ask for a new feature... Report a bug... Say hi!"
-              className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 placeholder-gray-500 h-32 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            <div className="flex justify-center space-x-3">
-              <button
-                onClick={handleSendContact}
-                disabled={sendingContact || !contactMessage.trim()}
-                className="bg-blue-600 hover:bg-blue-500 disabled:bg-blue-800 disabled:text-gray-400 text-white px-6 py-2 rounded-lg transition-colors"
-              >
-                {sendingContact ? 'Sending...' : 'Send'}
-              </button>
-              <button
-                onClick={() => {
-                  setShowContactModal(false);
-                  setContactMessage('');
-                }}
-                className="bg-gray-800 hover:bg-gray-700 text-gray-300 px-6 py-2 rounded-lg transition-colors"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

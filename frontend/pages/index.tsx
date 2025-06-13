@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useOffline } from '../context/OfflineContext';
 import dynamic from 'next/dynamic';
 import Head from 'next/head';
@@ -280,6 +280,12 @@ export default function Home() {
   const [isChecking, setIsChecking] = useState(true);
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(null);
+  const [showSettingsDropdown, setShowSettingsDropdown] = useState(false);
+  const [showContactModal, setShowContactModal] = useState(false);
+  const [showEmailSettings, setShowEmailSettings] = useState(false);
+  const [contactMessage, setContactMessage] = useState('');
+  const [sendingContact, setSendingContact] = useState(false);
+  const settingsDropdownRef = useRef(null);
   const isOffline = useOffline();
 
   useEffect(() => {
@@ -303,6 +309,20 @@ export default function Home() {
     // OfflineProvider handles network status updates
   }, []);
 
+  // Handle click outside settings dropdown
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (settingsDropdownRef.current && !settingsDropdownRef.current.contains(event.target)) {
+        setShowSettingsDropdown(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
   const handleLogin = (userData, userToken) => {
     setUser(userData);
     setToken(userToken);
@@ -315,6 +335,32 @@ export default function Home() {
     setUser(null);
     setToken(null);
     setIsAuthenticated(false);
+  };
+
+  const handleSendContact = async () => {
+    if (!contactMessage.trim()) return;
+
+    try {
+      setSendingContact(true);
+
+      const response = await fetch('/contact', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ message: contactMessage.trim() }),
+      });
+
+      if (response.ok) {
+        setContactMessage('');
+        setShowContactModal(false);
+      }
+    } catch (err) {
+      console.error('Error sending message:', err);
+    } finally {
+      setSendingContact(false);
+    }
   };
 
   if (!isClient || isChecking) {
@@ -355,15 +401,88 @@ export default function Home() {
               {isOffline && <span className="mr-2" title="Offline">📴</span>}
               <span className="text-sm text-gray-400">Hello, {user?.first_name || user?.email}</span>
             </div>
-            <button
-              onClick={handleLogout}
-              className="text-blue-400 hover:text-blue-300 text-sm underline"
-            >
-              Logout
-            </button>
+            <div className="relative" ref={settingsDropdownRef}>
+              <button
+                onClick={() => setShowSettingsDropdown(!showSettingsDropdown)}
+                className="text-blue-400 hover:text-blue-300 text-sm underline"
+              >
+                Settings
+              </button>
+
+              {showSettingsDropdown && (
+                <div className="absolute right-0 mt-2 w-48 bg-black border border-gray-800 rounded-lg shadow-2xl z-50">
+                  <button
+                    onClick={() => {
+                      setShowSettingsDropdown(false);
+                      setShowEmailSettings(true);
+                    }}
+                    className="w-full text-left px-4 py-3 text-gray-300 hover:bg-gray-900 hover:text-gray-100 transition-colors rounded-t-lg"
+                  >
+                    Email Settings
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowSettingsDropdown(false);
+                      setShowContactModal(true);
+                    }}
+                    className="w-full text-left px-4 py-3 text-gray-300 hover:bg-gray-900 hover:text-gray-100 transition-colors"
+                  >
+                    Contact
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowSettingsDropdown(false);
+                      handleLogout();
+                    }}
+                    className="w-full text-left px-4 py-3 text-red-400 hover:bg-red-900/20 hover:text-red-300 transition-colors rounded-b-lg"
+                  >
+                    Logout
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
-        <AIToDoListApp user={user} token={token} />
+        <AIToDoListApp
+          user={user}
+          token={token}
+          showEmailSettings={showEmailSettings}
+          onShowEmailSettings={() => setShowEmailSettings(true)}
+          onCloseEmailSettings={() => setShowEmailSettings(false)}
+        />
+
+        {/* Contact Modal */}
+        {showContactModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50">
+            <div className="bg-black border border-gray-800 p-6 rounded-xl w-96 space-y-4 shadow-2xl">
+              <h3 className="text-gray-100 text-lg font-bold mb-2">Contact Us</h3>
+              <textarea
+                value={contactMessage}
+                onChange={(e) => setContactMessage(e.target.value)}
+                placeholder="Ask for a new feature... Report a bug... Say hi!"
+                className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 placeholder-gray-500 h-32 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <div className="flex justify-center space-x-3">
+                <button
+                  onClick={handleSendContact}
+                  disabled={sendingContact || !contactMessage.trim()}
+                  className="bg-blue-600 hover:bg-blue-500 disabled:bg-blue-800 disabled:text-gray-400 text-white px-6 py-2 rounded-lg transition-colors"
+                >
+                  {sendingContact ? 'Sending...' : 'Send'}
+                </button>
+                <button
+                  onClick={() => {
+                    setShowContactModal(false);
+                    setContactMessage('');
+                  }}
+                  className="bg-gray-800 hover:bg-gray-700 text-gray-300 px-6 py-2 rounded-lg transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </main>
     </>

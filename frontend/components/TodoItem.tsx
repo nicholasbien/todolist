@@ -64,8 +64,8 @@ export default function TodoItem({
       <div className="flex justify-between items-start">
         <div className="flex-1">
           <p className={`text-base transition-all duration-200 ${
-            todo.completed || isCompleting ? "line-through" : ""
-          } ${isDeleting ? "opacity-50" : ""}`}>
+            isDeleting ? "opacity-50" : ""
+          }`}>
             {todo.link ? (
               <a
                 href={todo.link}
