@@ -228,7 +228,8 @@ self.addEventListener('fetch', (event) => {
   const isApi =
     url.origin === self.location.origin &&
     (url.pathname.startsWith('/todos') ||
-      url.pathname.startsWith('/categories'));
+      url.pathname.startsWith('/categories') ||
+      url.pathname.startsWith('/email'));
 
   if (isApi) {
     event.respondWith(handleApiRequest(event.request));
