@@ -338,20 +338,24 @@ describe('Integration Tests', () => {
     expect(queue[1].type).toBe('COMPLETE');
 
     // Mock server responses
-    const serverTodo = { ...offlineTodo, _id: 'server_123', created_offline: false };
+    const serverTodo = { ...offlineTodo, _id: 'server_123', completed: true, created_offline: false };
     global.fetch = jest.fn()
       .mockResolvedValueOnce({ ok: true, json: async () => serverTodo })  // CREATE
+      .mockResolvedValueOnce({ ok: true })  // COMPLETE
       .mockResolvedValueOnce({ ok: true, json: async () => [serverTodo] }); // Final GET
 
     // Sync
     await sw.syncQueue();
 
-    // Verify CREATE was synced but COMPLETE was skipped (offline ID)
+    // Verify CREATE and COMPLETE were both synced using server ID
     expect(fetch).toHaveBeenCalledWith('/todos', expect.objectContaining({ method: 'POST' }));
-    expect(fetch).toHaveBeenCalledWith('/todos', expect.objectContaining({ headers: expect.any(Object) }));
+    expect(fetch).toHaveBeenCalledWith('/todos/server_123/complete', expect.objectContaining({ method: 'PUT' }));
 
-    // Verify queue cleared
+    // Verify queue cleared and todo stored with server id
     const finalQueue = await sw.readQueue('user1');
     expect(finalQueue).toHaveLength(0);
+    const todos = await sw.getTodos('user1');
+    const synced = todos.find((t: any) => t._id === 'server_123');
+    expect(synced.completed).toBe(true);
   });
 });

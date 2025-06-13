@@ -556,6 +556,7 @@ async function syncQueue() {
 
   const queue = await readQueue(authData.userId);
   const headers = await getAuthHeaders();
+  const idMap = {};
 
   for (const op of queue) {
     try {
@@ -573,34 +574,46 @@ async function syncQueue() {
               const serverTodo = await res.json();
               await delTodo(_id, authData.userId);
               await putTodo(serverTodo, authData.userId);
+              idMap[_id] = serverTodo._id;
+              for (const later of queue) {
+                if (later.data && later.data._id === _id) {
+                  later.data._id = serverTodo._id;
+                }
+              }
             }
           }
           break;
-        case 'UPDATE':
-          if (!op.data._id.startsWith('offline_')) {
-            await fetch(`/todos/${op.data._id}`, {
+        case 'UPDATE': {
+          const id = idMap[op.data._id] || op.data._id;
+          if (!id.startsWith('offline_')) {
+            await fetch(`/todos/${id}`, {
               method: 'PUT',
               headers,
-              body: JSON.stringify(op.data),
+              body: JSON.stringify({ ...op.data, _id: id }),
             });
           }
           break;
-        case 'COMPLETE':
-          if (!op.data._id.startsWith('offline_')) {
-            await fetch(`/todos/${op.data._id}/complete`, {
+        }
+        case 'COMPLETE': {
+          const id = idMap[op.data._id] || op.data._id;
+          if (!id.startsWith('offline_')) {
+            await fetch(`/todos/${id}/complete`, {
               method: 'PUT',
               headers
             });
           }
           break;
-        case 'DELETE':
-          if (!op.data._id.startsWith('offline_')) {
-            await fetch(`/todos/${op.data._id}`, {
+        }
+        case 'DELETE': {
+          const id = idMap[op.data._id] || op.data._id;
+          if (!id.startsWith('offline_')) {
+            await fetch(`/todos/${id}`, {
               method: 'DELETE',
               headers
             });
           }
           break;
+        }
         case 'CREATE_CATEGORY':
           res = await fetch('/categories', {
             method: 'POST',
