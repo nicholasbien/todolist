@@ -452,7 +452,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
       }
 
 
-      setShowEmailSettings(false);
+      onCloseEmailSettings?.();
       setError('');
     } catch (err) {
       setError('Error updating schedule: ' + err.message);

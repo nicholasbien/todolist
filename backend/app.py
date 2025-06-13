@@ -373,6 +373,32 @@ async def api_update_instructions(
     return await update_user_email_instructions(current_user["user_id"], req.instructions)
 
 
+class ContactRequest(BaseModel):
+    message: str
+
+
+@app.post("/contact")
+async def api_contact(
+    req: ContactRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    """Send contact message to admin email."""
+    try:
+        logger.info("Contact message from %s", current_user["email"])
+
+        # Import email sending function
+        from email_summary import send_contact_message
+
+        await send_contact_message(
+            sender_email=current_user["email"], sender_name=current_user.get("first_name", ""), message=req.message
+        )
+
+        return {"message": "Contact message sent successfully"}
+    except Exception as e:
+        logger.error(f"Error sending contact message: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to send contact message")
+
+
 if __name__ == "__main__":
     import uvicorn
 

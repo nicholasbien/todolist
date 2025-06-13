@@ -301,3 +301,35 @@ async def send_daily_summary(
     except Exception as e:
         logger.error(f"Failed to send daily summary to {user_email}: {e}")
         return False
+
+
+async def send_contact_message(sender_email: str, sender_name: str, message: str) -> bool:
+    """Send a contact message to the admin email."""
+    try:
+        # Format the contact message
+        subject = f"📞 Contact Form Message from {sender_name or sender_email}"
+
+        email_body = f"""
+Hello,
+
+You have received a new contact form message from your todolist.nyc application.
+
+**From:** {sender_name or 'User'} ({sender_email})
+**Sent:** {datetime.now().strftime('%B %d, %Y at %I:%M %p')}
+
+**Message:**
+{message}
+
+---
+This message was sent from the contact form on todolist.nyc
+        """.strip()
+
+        # Send email to the admin (FROM_EMAIL)
+        if not FROM_EMAIL:
+            logger.error("FROM_EMAIL not configured - cannot send contact message")
+            return False
+        return await send_email(FROM_EMAIL, subject, email_body)
+
+    except Exception as e:
+        logger.error(f"Failed to send contact message from {sender_email}: {e}")
+        return False
