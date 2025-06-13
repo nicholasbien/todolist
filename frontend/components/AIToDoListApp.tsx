@@ -127,6 +127,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
       const m = String(user.summary_minute ?? 0).padStart(2, '0');
       setEmailTime(`${h}:${m}`);
       setEmailInstructions(user.email_instructions ?? '');
+      setEmailEnabled(user.email_enabled ?? false);
     }
   }, [user]);
 
