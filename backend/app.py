@@ -28,6 +28,7 @@ from categories import (
     init_default_categories,
     rename_category,
 )
+from chatbot import answer_question
 
 # Import the classification function and todo management
 from classify import classify_task
@@ -377,6 +378,10 @@ class ContactRequest(BaseModel):
     message: str
 
 
+class ChatRequest(BaseModel):
+    question: str
+
+
 @app.post("/contact")
 async def api_contact(
     req: ContactRequest,
@@ -397,6 +402,21 @@ async def api_contact(
     except Exception as e:
         logger.error(f"Error sending contact message: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to send contact message")
+
+
+@app.post("/chat")
+async def api_chat(
+    req: ChatRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    """Answer user questions about their todos using OpenAI."""
+    try:
+        todos = await get_todos(current_user["user_id"])
+        answer = await answer_question(req.question, todos)
+        return {"answer": answer}
+    except Exception as e:
+        logger.error(f"Chatbot error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to generate answer")
 
 
 if __name__ == "__main__":
