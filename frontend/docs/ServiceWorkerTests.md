@@ -1,7 +1,7 @@
-# Service Worker Test Documentation
+# Service Worker Offline Sync Documentation
 
 ## Overview
-The service worker tests provide comprehensive coverage of all offline functionality, ensuring robust todo and category operations with proper user isolation and sync capabilities.
+The service worker provides robust offline-first functionality with a simplified sync strategy that eliminates duplicates and ensures data consistency. The system uses a "sync-first, clean-refresh" approach that prioritizes server data as the source of truth while preserving offline work.
 
 ## Test Categories
 

@@ -231,7 +231,8 @@ self.addEventListener('fetch', (event) => {
     (url.pathname.startsWith('/todos') ||
       url.pathname.startsWith('/categories') ||
       url.pathname.startsWith('/email') ||
-      url.pathname.startsWith('/contact'));
+      url.pathname.startsWith('/contact') ||
+      url.pathname.startsWith('/auth/'));
 
   if (isApi) {
     event.respondWith(handleApiRequest(event.request));
@@ -258,29 +259,34 @@ async function handleApiRequest(request) {
         const cache = await caches.open(API_CACHE);
         cache.put(request, response.clone());
 
-        // For GET /todos, sync pending operations first, then merge server data
+        // For GET /todos, use simple strategy: sync first, then fetch fresh
         if (url.pathname === '/todos') {
           const authData = await getAuth();
           if (!authData || !authData.userId) return response; // No user context
 
-          // Sync pending offline operations BEFORE processing server data
+          // Sync pending offline operations FIRST
           await syncQueue();
 
-          const serverTodos = await response.clone().json();
+          // After sync, fetch fresh data from server (may be different now)
+          const freshResponse = await fetch(request.clone());
+          if (!freshResponse.ok) return response; // Fallback to original response
 
-          // Save all server todos to IndexedDB for offline access
-          for (const todo of serverTodos) {
+          const freshTodos = await freshResponse.json();
+
+          // Save fresh server data to IndexedDB (this is now the complete truth)
+          // Clear all existing todos first to avoid any stale data
+          const allLocalTodos = await getTodos(authData.userId);
+          for (const localTodo of allLocalTodos) {
+            await delTodo(localTodo._id, authData.userId);
+          }
+
+          // Add fresh server todos
+          for (const todo of freshTodos) {
             await putTodo(todo, authData.userId);
           }
 
-          // Get offline-only todos (not yet synced)
-          const offlineTodos = await getTodos(authData.userId);
-          const offlineOnlyTodos = offlineTodos.filter(t => t._id.startsWith('offline_'));
-
-          // Merge server todos with offline-only todos
-          const mergedTodos = [...serverTodos, ...offlineOnlyTodos];
-
-          return new Response(JSON.stringify(mergedTodos), {
+          // Return the fresh server data (no merging needed)
+          return new Response(JSON.stringify(freshTodos), {
             headers: { 'Content-Type': 'application/json' }
           });
         }
@@ -557,6 +563,8 @@ async function syncQueue() {
   const queue = await readQueue(authData.userId);
   const headers = await getAuthHeaders();
 
+  let hasChanges = false;
+
   for (const op of queue) {
     try {
       let res;
@@ -569,11 +577,7 @@ async function syncQueue() {
               headers,
               body: JSON.stringify(payload),
             });
-            if (res.ok) {
-              const serverTodo = await res.json();
-              await delTodo(_id, authData.userId);
-              await putTodo(serverTodo, authData.userId);
-            }
+            if (res && res.ok) hasChanges = true;
           }
           break;
         case 'UPDATE':
@@ -634,15 +638,30 @@ async function syncQueue() {
   }
 
   // Always clear queue after processing (prevents infinite retry loops)
-  // Final GET /todos ensures data consistency regardless of individual operation failures
   await clearQueue(authData.userId);
-  try {
-    const res = await fetch('/todos', { headers });
-    if (res.ok) {
-      const todos = await res.json();
-      for (const t of todos) await putTodo(t, authData.userId);
+
+  // If any changes were made, refresh IndexedDB with clean slate approach
+  if (hasChanges) {
+    try {
+      const res = await fetch('/todos', { headers });
+      if (res.ok) {
+        const freshTodos = await res.json();
+
+        // Clean slate - remove all existing todos
+        const allLocalTodos = await getTodos(authData.userId);
+        for (const localTodo of allLocalTodos) {
+          await delTodo(localTodo._id, authData.userId);
+        }
+
+        // Add fresh server todos
+        for (const todo of freshTodos) {
+          await putTodo(todo, authData.userId);
+        }
+      }
+    } catch (e) {
+      console.log('Failed to refresh todos after sync:', e);
     }
-  } catch (e) {}
+  }
 }
 
 self.addEventListener('message', (event) => {

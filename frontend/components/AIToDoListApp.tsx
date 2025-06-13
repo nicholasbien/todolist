@@ -156,6 +156,30 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
     }
   }, []);
 
+  // Handle online/offline events
+  useEffect(() => {
+    const handleOnline = () => {
+      console.log('Browser came back online');
+      // The service worker handles sync automatically when GET /todos is called
+      // Just trigger a single fetch which will handle sync + refresh internally
+      if (token && user) {
+        fetchTodos();
+      }
+    };
+
+    const handleOffline = () => {
+      console.log('Browser went offline');
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, [token, user, fetchTodos]);
+
 
   // Function to handle app update
   const handleUpdate = () => {
