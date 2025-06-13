@@ -507,12 +507,28 @@ async function offlineFallback(request, url) {
         }
         await putTodo(updated, authData ? authData.userId : null);
 
-        // Only queue for server completion if it's not an offline-only todo
-        if (!id.startsWith('offline_')) {
+        // Handle offline todo completion - update the queued CREATE operation
+        if (id.startsWith('offline_')) {
+          // Update the CREATE operation in queue with completion status
+          const queue = await readQueue(authData ? authData.userId : null);
+          const updatedQueue = queue.map(op => {
+            if (op.type === 'CREATE' && op.data._id === id) {
+              console.log(`✅ Updating queued CREATE operation for ${id} with completion status`);
+              return { ...op, data: { ...op.data, completed: updated.completed, dateCompleted: updated.dateCompleted } };
+            }
+            return op;
+          });
+
+          if (JSON.stringify(queue) !== JSON.stringify(updatedQueue)) {
+            await clearQueue(authData ? authData.userId : null);
+            for (const op of updatedQueue) {
+              await addQueue(op, authData ? authData.userId : null);
+            }
+          }
+          console.log(`✅ Offline todo ${id} completion status updated in CREATE queue`);
+        } else {
           await addQueue({ type: 'COMPLETE', data: { _id: id, completed: updated.completed } }, authData ? authData.userId : null);
           console.log(`✅ Added server COMPLETE to queue for ${id} (completed: ${updated.completed})`);
-        } else {
-          console.log(`✅ Skipping server queue for offline-only todo ${id} (completed: ${updated.completed})`);
         }
 
         return new Response(JSON.stringify({ message: 'Todo updated' }), { headers: { 'Content-Type': 'application/json' } });
@@ -534,12 +550,22 @@ async function offlineFallback(request, url) {
         console.log(`🗑️ Todo ${id} found in IndexedDB, deleting...`);
         await delTodo(id, authData ? authData.userId : null);
 
-        // Only queue for server deletion if it's not an offline-only todo
-        if (!id.startsWith('offline_')) {
+        // Check if there's a pending CREATE for this offline todo
+        if (id.startsWith('offline_')) {
+          // Remove the CREATE operation from queue to prevent resurrection
+          const queue = await readQueue(authData ? authData.userId : null);
+          const filteredQueue = queue.filter(op => !(op.type === 'CREATE' && op.data._id === id));
+          if (filteredQueue.length !== queue.length) {
+            console.log(`🗑️ Removed pending CREATE operation for deleted offline todo ${id}`);
+            await clearQueue(authData ? authData.userId : null);
+            for (const op of filteredQueue) {
+              await addQueue(op, authData ? authData.userId : null);
+            }
+          }
+          console.log(`🗑️ Offline todo ${id} deleted and CREATE operation cancelled`);
+        } else {
           await addQueue({ type: 'DELETE', data: { _id: id } }, authData ? authData.userId : null);
           console.log(`🗑️ Added server DELETE to queue for ${id}`);
-        } else {
-          console.log(`🗑️ Skipping server queue for offline-only todo ${id}`);
         }
       } else {
         console.log(`⚠️ Todo ${id} not found in IndexedDB`);
