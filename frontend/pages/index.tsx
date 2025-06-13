@@ -404,9 +404,10 @@ export default function Home() {
             <div className="relative" ref={settingsDropdownRef}>
               <button
                 onClick={() => setShowSettingsDropdown(!showSettingsDropdown)}
-                className="text-blue-400 hover:text-blue-300 text-sm underline"
+                className="text-blue-400 hover:text-blue-300 text-lg w-8 h-8 flex items-center justify-center rounded-lg transition-colors"
+                title="Settings"
               >
-                Settings
+                ⚙️
               </button>
 
               {showSettingsDropdown && (
