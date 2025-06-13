@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 
 interface TodoItemProps {
   todo: any;
@@ -21,18 +21,51 @@ export default function TodoItem({
   handleCompleteTodo,
   handleDeleteTodo,
 }: TodoItemProps) {
+  const [isCompleting, setIsCompleting] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [shouldAnimate, setShouldAnimate] = useState(false);
+
+  useEffect(() => {
+    setShouldAnimate(true);
+  }, []);
+
+  const handleCompleteClick = async () => {
+    setIsCompleting(true);
+    // Brief delay to show completion state
+    setTimeout(() => {
+      handleCompleteTodo(todo._id);
+    }, 300);
+  };
+
+  const handleDeleteClick = async () => {
+    setIsDeleting(true);
+    // Brief delay for fade out animation
+    setTimeout(() => {
+      handleDeleteTodo(todo._id);
+    }, 300);
+  };
+
+
   return (
     <div
       key={todo._id}
-      className={`p-4 border rounded-xl ${
-        todo.completed
+      className={`p-4 border rounded-xl transition-all duration-300 ease-in-out ${
+        shouldAnimate ? 'opacity-100 transform translate-y-0' : 'opacity-0 transform translate-y-2'
+      } ${
+        isDeleting
+          ? "opacity-0 transform scale-95 bg-red-900/20 border-red-800"
+          : isCompleting
+          ? "bg-green-900/30 border-green-600 text-green-200 transform scale-[1.02]"
+          : todo.completed
           ? "bg-black border-gray-900 text-gray-500"
           : "bg-gray-900 text-gray-100 border-gray-800"
       } shadow-lg`}
     >
       <div className="flex justify-between items-start">
         <div className="flex-1">
-          <p className={`text-base ${todo.completed ? "line-through" : ""}`}>
+          <p className={`text-base transition-all duration-200 ${
+            todo.completed || isCompleting ? "line-through" : ""
+          } ${isDeleting ? "opacity-50" : ""}`}>
             {todo.link ? (
               <a
                 href={todo.link}
@@ -51,22 +84,32 @@ export default function TodoItem({
         <div className="flex items-center space-x-2 ml-3">
           {!todo.completed ? (
             <button
-              onClick={() => handleCompleteTodo(todo._id)}
-              className="text-green-400 hover:text-green-300 hover:bg-green-900/20 text-lg w-8 h-8 flex items-center justify-center rounded-lg transition-colors"
+              onClick={handleCompleteClick}
+              disabled={isCompleting}
+              className={`text-lg w-8 h-8 flex items-center justify-center rounded-lg transition-all duration-200 ${
+                isCompleting
+                  ? "text-green-200 bg-green-900/40 scale-110"
+                  : "text-green-400 hover:text-green-300 hover:bg-green-900/20"
+              }`}
             >
               ✓
             </button>
           ) : (
             <button
-              onClick={() => handleCompleteTodo(todo._id)}
+              onClick={handleCompleteClick}
               className="text-yellow-400 hover:text-yellow-300 hover:bg-yellow-900/20 text-lg w-8 h-8 flex items-center justify-center rounded-lg transition-colors"
             >
               ↻
             </button>
           )}
           <button
-            onClick={() => handleDeleteTodo(todo._id)}
-            className="text-red-400 hover:text-red-300 hover:bg-red-900/20 text-lg w-8 h-8 flex items-center justify-center rounded-lg transition-colors"
+            onClick={handleDeleteClick}
+            disabled={isDeleting}
+            className={`text-lg w-8 h-8 flex items-center justify-center rounded-lg transition-all duration-200 ${
+              isDeleting
+                ? "text-red-200 bg-red-900/40 scale-110"
+                : "text-red-400 hover:text-red-300 hover:bg-red-900/20"
+            }`}
           >
             ×
           </button>
