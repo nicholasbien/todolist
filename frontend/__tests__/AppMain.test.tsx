@@ -34,6 +34,6 @@ describe('AppMain', () => {
       </AuthProvider>
     );
 
-    await waitFor(() => expect(screen.getByText(/Send Email Summary/i)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByPlaceholderText(/Add a new task/i)).toBeInTheDocument());
   });
 });

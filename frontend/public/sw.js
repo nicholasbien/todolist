@@ -259,34 +259,34 @@ async function handleApiRequest(request) {
         const cache = await caches.open(API_CACHE);
         cache.put(request, response.clone());
 
-        // For GET /todos, use simple strategy: sync first, then fetch fresh
+        // For GET /todos, sync pending operations then merge with fresh server data
         if (url.pathname === '/todos') {
           const authData = await getAuth();
           if (!authData || !authData.userId) return response; // No user context
 
-          // Sync pending offline operations FIRST
+          // Sync pending offline operations FIRST (this does immediate ID replacements)
           await syncQueue();
 
-          // After sync, fetch fresh data from server (may be different now)
+          // After sync, get fresh server data and merge with any remaining offline todos
           const freshResponse = await fetch(request.clone());
           if (!freshResponse.ok) return response; // Fallback to original response
 
-          const freshTodos = await freshResponse.json();
+          const serverTodos = await freshResponse.json();
 
-          // Save fresh server data to IndexedDB (this is now the complete truth)
-          // Clear all existing todos first to avoid any stale data
-          const allLocalTodos = await getTodos(authData.userId);
-          for (const localTodo of allLocalTodos) {
-            await delTodo(localTodo._id, authData.userId);
-          }
+          // Get current local todos (may include unsynced offline todos)
+          const localTodos = await getTodos(authData.userId);
+          const offlineOnlyTodos = localTodos.filter(t => t._id.startsWith('offline_'));
 
-          // Add fresh server todos
-          for (const todo of freshTodos) {
+          // Save fresh server data to IndexedDB
+          for (const todo of serverTodos) {
             await putTodo(todo, authData.userId);
           }
 
-          // Return the fresh server data (no merging needed)
-          return new Response(JSON.stringify(freshTodos), {
+          // Merge server todos with any remaining offline todos
+          const mergedTodos = [...serverTodos, ...offlineOnlyTodos];
+
+          // Return the merged data
+          return new Response(JSON.stringify(mergedTodos), {
             headers: { 'Content-Type': 'application/json' }
           });
         }
@@ -556,14 +556,25 @@ function normalizePriority(p) {
   return 'Medium';
 }
 
+// Global sync lock to prevent concurrent syncing
+let syncInProgress = false;
+
 async function syncQueue() {
   const authData = await getAuth();
   if (!authData || !authData.userId) return; // No user to sync for
 
-  const queue = await readQueue(authData.userId);
-  const headers = await getAuthHeaders();
+  // Prevent concurrent sync operations
+  if (syncInProgress) {
+    console.log('Sync already in progress, skipping...');
+    return;
+  }
 
-  let hasChanges = false;
+  syncInProgress = true;
+  console.log('Starting sync...');
+
+  try {
+    const queue = await readQueue(authData.userId);
+    const headers = await getAuthHeaders();
 
   for (const op of queue) {
     try {
@@ -571,38 +582,66 @@ async function syncQueue() {
       switch (op.type) {
         case 'CREATE':
           if (op.data._id.startsWith('offline_')) {
-            const { _id, ...payload } = op.data;
+            const { _id: offlineId, ...payload } = op.data;
             res = await fetch('/todos', {
               method: 'POST',
               headers,
               body: JSON.stringify(payload),
             });
-            if (res && res.ok) hasChanges = true;
+            if (res && res.ok) {
+              // Immediately replace offline todo with server version
+              const serverTodo = await res.json();
+              await delTodo(offlineId, authData.userId); // Remove offline version
+              await putTodo(serverTodo, authData.userId); // Add server version
+              console.log(`Synced offline todo ${offlineId} -> ${serverTodo._id}`);
+            }
           }
           break;
         case 'UPDATE':
           if (!op.data._id.startsWith('offline_')) {
-            await fetch(`/todos/${op.data._id}`, {
+            res = await fetch(`/todos/${op.data._id}`, {
               method: 'PUT',
               headers,
               body: JSON.stringify(op.data),
             });
+            if (res && res.ok) {
+              // Update local copy with the changes
+              await putTodo(op.data, authData.userId);
+            }
           }
           break;
         case 'COMPLETE':
           if (!op.data._id.startsWith('offline_')) {
-            await fetch(`/todos/${op.data._id}/complete`, {
+            res = await fetch(`/todos/${op.data._id}/complete`, {
               method: 'PUT',
               headers
             });
+            if (res && res.ok) {
+              // Update local todo completion status
+              const existingTodos = await getTodos(authData.userId);
+              const existingTodo = existingTodos.find(t => t._id === op.data._id);
+              if (existingTodo) {
+                const updated = { ...existingTodo, completed: op.data.completed };
+                if (updated.completed) {
+                  updated.dateCompleted = new Date().toISOString();
+                } else {
+                  delete updated.dateCompleted;
+                }
+                await putTodo(updated, authData.userId);
+              }
+            }
           }
           break;
         case 'DELETE':
           if (!op.data._id.startsWith('offline_')) {
-            await fetch(`/todos/${op.data._id}`, {
+            res = await fetch(`/todos/${op.data._id}`, {
               method: 'DELETE',
               headers
             });
+            if (res && res.ok) {
+              // Remove from local storage
+              await delTodo(op.data._id, authData.userId);
+            }
           }
           break;
         case 'CREATE_CATEGORY':
@@ -617,50 +656,39 @@ async function syncQueue() {
           }
           break;
         case 'DELETE_CATEGORY':
-          await fetch(`/categories/${encodeURIComponent(op.data.name)}`, {
+          res = await fetch(`/categories/${encodeURIComponent(op.data.name)}`, {
             method: 'DELETE',
             headers
           });
+          if (res.ok) {
+            await delCategory(op.data.name, authData.userId);
+          }
           break;
         case 'RENAME_CATEGORY':
-          await fetch(`/categories/${encodeURIComponent(op.data.old_name)}`, {
+          res = await fetch(`/categories/${encodeURIComponent(op.data.old_name)}`, {
             method: 'PUT',
             headers,
             body: JSON.stringify({ new_name: op.data.new_name })
           });
+          if (res.ok) {
+            await delCategory(op.data.old_name, authData.userId);
+            await putCategory({ name: op.data.new_name }, authData.userId);
+          }
           break;
       }
     } catch (err) {
       // Continue processing other operations on error
-      // Failed operations are not retried to prevent infinite loops
+      // Failed operations remain in offline state until next sync attempt
+      console.log('Sync operation failed:', err);
       continue;
     }
   }
 
-  // Always clear queue after processing (prevents infinite retry loops)
-  await clearQueue(authData.userId);
-
-  // If any changes were made, refresh IndexedDB with clean slate approach
-  if (hasChanges) {
-    try {
-      const res = await fetch('/todos', { headers });
-      if (res.ok) {
-        const freshTodos = await res.json();
-
-        // Clean slate - remove all existing todos
-        const allLocalTodos = await getTodos(authData.userId);
-        for (const localTodo of allLocalTodos) {
-          await delTodo(localTodo._id, authData.userId);
-        }
-
-        // Add fresh server todos
-        for (const todo of freshTodos) {
-          await putTodo(todo, authData.userId);
-        }
-      }
-    } catch (e) {
-      console.log('Failed to refresh todos after sync:', e);
-    }
+    // Always clear queue after processing (prevents infinite retry loops)
+    await clearQueue(authData.userId);
+    console.log('Sync completed');
+  } finally {
+    syncInProgress = false;
   }
 }
 

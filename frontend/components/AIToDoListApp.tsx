@@ -180,7 +180,6 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
     };
   }, [token, user, fetchTodos]);
 
-
   // Function to handle app update
   const handleUpdate = () => {
     window.location.reload();

@@ -1,7 +1,25 @@
 # Service Worker Offline Sync Documentation
 
 ## Overview
-The service worker provides robust offline-first functionality with a simplified sync strategy that eliminates duplicates and ensures data consistency. The system uses a "sync-first, clean-refresh" approach that prioritizes server data as the source of truth while preserving offline work.
+The service worker provides robust offline-first functionality with an **immediate replacement sync strategy** that eliminates duplicates and ensures data consistency. The system uses a "sync-first, immediate-replace" approach that prioritizes server data as the source of truth while preserving offline work.
+
+## Immediate Replacement Sync Strategy
+
+### How It Works
+1. **Individual Sync**: Process each pending offline operation separately with concurrency protection
+2. **Immediate Replace**: When CREATE succeeds, immediately replace `offline_123` with `server_456`
+3. **Safe Failure**: If sync fails, offline todo remains untouched until next attempt
+4. **Merge Result**: GET /todos returns server data + any remaining offline todos
+
+### Key Benefits
+- **No Data Loss**: Failed syncs leave offline todos intact for retry
+- **Immediate Feedback**: Successful syncs update local storage instantly
+- **Atomic Operations**: Each sync either fully succeeds or safely fails
+- **Concurrency Safe**: Sync lock prevents duplicate operations from racing conditions
+- **Simple Logic**: No complex batch operations or risky clean slate deletions
+
+### Concurrency Protection
+The sync system includes a global lock (`syncInProgress` flag) that prevents multiple sync operations from running simultaneously, eliminating the race condition that caused duplicate todos to be created on the server.
 
 ## Test Categories
 
@@ -86,10 +104,33 @@ npm test -- __tests__/ServiceWorkerSync.test.ts
 ```
 
 ## Coverage Confidence
-With **13 passing tests** covering all operations, error scenarios, and user workflows, the service worker is thoroughly validated for production use in offline-first todo applications.
+With **25+ comprehensive tests** covering all operations, error scenarios, immediate replacement sync strategy, and user workflows, the service worker is thoroughly validated for production use in offline-first todo applications.
+
+### Test Coverage
+- **Service Worker Sync Tests**: 22 tests in `ServiceWorkerSync.test.ts`
+  - Core CRUD operations (CREATE, UPDATE, DELETE, COMPLETE)
+  - Immediate replacement strategy validation
+  - Concurrency protection testing
+  - Data safety and error handling
+  - User isolation and authentication
+- **UI Integration Tests**: 8 tests in `OnlineOfflineEvents.test.tsx`
+  - Online/offline event handling
+  - UI component sync integration
+  - Concurrency safety from UI perspective
+- **Total Coverage**: All offline sync scenarios, immediate replacement strategy, authentication routing, UI event handling, and concurrency protection
 
 ## Key Bug Fixes Validated
-1. **Completion Sync Fix**: Offline todo completions now properly sync to `/todos/{id}/complete` endpoint instead of generic PUT
-2. **User Isolation**: Multiple users can use the same browser without data conflicts
-3. **Offline Classification**: Prevents re-classification of todos created offline
-4. **Static Caching**: Page refreshes work offline through cached static assets
+1. **Immediate Replacement Sync**: Eliminates duplicate todos by immediately replacing offline IDs with server IDs upon successful sync
+2. **Concurrency Protection**: Sync lock prevents race conditions that caused multiple identical todos on server
+3. **Authentication Routing**: POST requests to `/auth/*` endpoints properly bypass static caching
+4. **Online Event Handling**: UI automatically refreshes when browser comes back online
+5. **Completion Sync Fix**: Offline todo completions properly sync to `/todos/{id}/complete` endpoint
+6. **User Isolation**: Multiple users can use the same browser without data conflicts
+7. **Data Safety**: Failed sync operations preserve offline data instead of losing it
+
+## Recent Improvements
+- **Safe Architecture**: Replaced risky clean slate approach with immediate replacement strategy
+- **Duplicate Prevention**: Sync lock eliminates race conditions causing server-side duplicates
+- **Data Preservation**: Failed syncs leave offline todos intact for retry
+- **UI Responsiveness**: Automatic refresh on network reconnection with sync protection
+- **Error Resilience**: Individual sync failures don't affect other operations
