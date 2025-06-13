@@ -97,6 +97,7 @@ const putTodo = async (todo, userId) => {
   return userDbTx(effectiveUserId, TODOS, 'readwrite', (s) => s.put(todo));
 };
 
+
 const delTodo = async (id, userId) => {
   const authData = userId ? null : await getAuth();
   const effectiveUserId = userId || (authData ? authData.userId : null);
@@ -257,10 +258,13 @@ async function handleApiRequest(request) {
         const cache = await caches.open(API_CACHE);
         cache.put(request, response.clone());
 
-        // For GET /todos, sync server data to IndexedDB and merge with offline todos
+        // For GET /todos, sync pending operations first, then merge server data
         if (url.pathname === '/todos') {
           const authData = await getAuth();
           if (!authData || !authData.userId) return response; // No user context
+
+          // Sync pending offline operations BEFORE processing server data
+          await syncQueue();
 
           const serverTodos = await response.clone().json();
 
@@ -306,6 +310,8 @@ async function handleApiRequest(request) {
           });
         }
       }
+
+      // Trigger sync for non-GET requests
       if (request.method !== 'GET' && response.ok) {
         syncQueue();
       }
