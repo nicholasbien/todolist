@@ -277,6 +277,14 @@ async function handleApiRequest(request) {
           const localTodos = await getTodos(authData.userId);
           const offlineOnlyTodos = localTodos.filter(t => t._id.startsWith('offline_'));
 
+          // Remove any non-offline todos that no longer exist on the server
+          const serverIds = new Set(serverTodos.map(t => t._id));
+          for (const t of localTodos) {
+            if (!t._id.startsWith('offline_') && !serverIds.has(t._id)) {
+              await delTodo(t._id, authData.userId);
+            }
+          }
+
           // Save fresh server data to IndexedDB
           for (const todo of serverTodos) {
             await putTodo(todo, authData.userId);
@@ -298,15 +306,22 @@ async function handleApiRequest(request) {
 
           const serverCategories = await response.clone().json(); // Array of strings like ["Work", "Personal"]
 
+          const localCategories = await getCategories(authData.userId);
+          const offlineOnlyCategories = localCategories.filter(c => c.name.startsWith('offline_'));
+          const offlineOnlyNames = offlineOnlyCategories.map(c => c.name);
+
+          // Remove any local categories that are not on the server and not offline entries
+          const serverSet = new Set(serverCategories);
+          for (const c of localCategories) {
+            if (!c.name.startsWith('offline_') && !serverSet.has(c.name)) {
+              await delCategory(c.name, authData.userId);
+            }
+          }
+
           // Save all server categories to IndexedDB for offline access (as objects)
           for (const categoryName of serverCategories) {
             await putCategory({ name: categoryName }, authData.userId);
           }
-
-          // Get offline-only categories (not yet synced)
-          const offlineCategories = await getCategories(authData.userId);
-          const offlineOnlyCategories = offlineCategories.filter(c => c.name.startsWith('offline_'));
-          const offlineOnlyNames = offlineOnlyCategories.map(c => c.name);
 
           // Merge server categories with offline-only categories (return as strings)
           const mergedCategories = [...serverCategories, ...offlineOnlyNames];
