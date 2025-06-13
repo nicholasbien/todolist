@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import TodoItem from "./TodoItem";
+import TodoChatbot from "./TodoChatbot";
 
 interface Props {
   user: any;
@@ -745,6 +746,8 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
           ))}
         </div>
       )}
+
+      <TodoChatbot token={token} />
 
       {/* Email Settings Modal */}
       {showEmailSettings && (
