@@ -412,7 +412,9 @@ async def api_chat(
     """Answer user questions about their todos using OpenAI."""
     try:
         todos = await get_todos(current_user["user_id"])
-        answer = await answer_question(req.question, todos)
+        # Convert Todo objects to dictionaries for JSON serialization
+        todos_dict = [todo.dict() if hasattr(todo, "dict") else todo for todo in todos]
+        answer = await answer_question(req.question, todos_dict)
         return {"answer": answer}
     except Exception as e:
         logger.error(f"Chatbot error: {e}")

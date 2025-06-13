@@ -260,6 +260,7 @@ self.addEventListener('fetch', (event) => {
       url.pathname.startsWith('/categories') ||
       url.pathname.startsWith('/email') ||
       url.pathname.startsWith('/contact') ||
+      url.pathname.startsWith('/chat') ||
       url.pathname.startsWith('/auth/'));
 
   if (isApi) {

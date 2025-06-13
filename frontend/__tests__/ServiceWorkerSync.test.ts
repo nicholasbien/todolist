@@ -439,6 +439,7 @@ describe('Immediate Replacement Sync Strategy', () => {
       { pathname: '/categories', expected: true },
       { pathname: '/email/send', expected: true },
       { pathname: '/contact', expected: true },
+      { pathname: '/chat', expected: true },
       { pathname: '/static/file.js', expected: false },
       { pathname: '/', expected: false }
     ];
@@ -448,6 +449,7 @@ describe('Immediate Replacement Sync Strategy', () => {
                    pathname.startsWith('/categories') ||
                    pathname.startsWith('/email') ||
                    pathname.startsWith('/contact') ||
+                   pathname.startsWith('/chat') ||
                    pathname.startsWith('/auth/');
 
       expect(isApi).toBe(expected);
