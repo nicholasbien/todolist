@@ -18,19 +18,17 @@ if not api_key:
 client = OpenAI(api_key=api_key, timeout=5.0, max_retries=0)
 
 
-async def answer_question(question: str, todos: List[dict]) -> str:
-    """Use OpenAI to answer a question about the provided todos."""
+async def answer_question(question: str, todos: List[dict], history: List[dict]) -> str:
+    """Use OpenAI to answer a question about the provided todos with context."""
     try:
         system_prompt = (
             "You are a helpful assistant who answers questions about the user's todo list. "
             "Use the following JSON data to inform your responses:\n" + json.dumps(todos)
         )
+        messages = [{"role": "system", "content": system_prompt}] + history + [{"role": "user", "content": question}]
         completion = client.chat.completions.create(
             model="gpt-4.1-nano",
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": question},
-            ],
+            messages=messages,
             temperature=0,
         )
         return completion.choices[0].message.content.strip()
