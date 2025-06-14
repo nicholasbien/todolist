@@ -6,7 +6,7 @@ interface ChatbotProps {
 
 export default function TodoChatbot({ token }: ChatbotProps) {
   const [question, setQuestion] = useState('');
-  const [answer, setAnswer] = useState('');
+  const [messages, setMessages] = useState<{ role: string; content: string }[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -28,7 +28,12 @@ export default function TodoChatbot({ token }: ChatbotProps) {
         throw new Error(data.detail || 'Failed to get response');
       }
       const data = await resp.json();
-      setAnswer(data.answer);
+      setMessages((prev) => [
+        ...prev,
+        { role: 'user', content: question },
+        { role: 'assistant', content: data.answer },
+      ]);
+      setQuestion('');
     } catch (err: any) {
       setError(err.message || 'Error');
     } finally {
@@ -53,9 +58,12 @@ export default function TodoChatbot({ token }: ChatbotProps) {
       >
         {loading ? 'Thinking...' : 'Ask'}
       </button>
-      {answer && (
-        <p className="mt-3 text-gray-300 whitespace-pre-wrap">{answer}</p>
-      )}
+      {messages.map((msg, idx) => (
+        <p key={idx} className="mt-3 text-gray-300 whitespace-pre-wrap">
+          <strong>{msg.role === 'user' ? 'You: ' : 'Bot: '}</strong>
+          {msg.content}
+        </p>
+      ))}
       {error && (
         <p className="mt-3 text-red-400">{error}</p>
       )}

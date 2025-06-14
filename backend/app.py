@@ -1,8 +1,9 @@
 import json
 import logging
 import os
+from collections import defaultdict
 from datetime import datetime
-from typing import List
+from typing import Dict, List
 
 import httpx
 from auth import (
@@ -44,6 +45,10 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="AI Todo List API")
+
+# In-memory conversation history
+conversations: Dict[str, List[dict]] = defaultdict(list)
+MAX_HISTORY = 20
 
 
 # Enable CORS - specifically for the Next.js frontend
@@ -414,7 +419,17 @@ async def api_chat(
         todos = await get_todos(current_user["user_id"])
         # Convert Todo objects to dictionaries for JSON serialization
         todos_dict = [todo.dict() if hasattr(todo, "dict") else todo for todo in todos]
-        answer = await answer_question(req.question, todos_dict)
+
+        history = conversations[current_user["user_id"]]
+        answer = await answer_question(req.question, todos_dict, history)
+
+        history.append({"role": "user", "content": req.question})
+        history.append({"role": "assistant", "content": answer})
+        if len(history) > MAX_HISTORY:
+            conversations[current_user["user_id"]] = history[-MAX_HISTORY:]
+        else:
+            conversations[current_user["user_id"]] = history
+
         return {"answer": answer}
     except Exception as e:
         logger.error(f"Chatbot error: {e}")
