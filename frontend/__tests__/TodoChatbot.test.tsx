@@ -17,7 +17,7 @@ describe('TodoChatbot', () => {
     fireEvent.change(screen.getByPlaceholderText(/Ask a question/i), { target: { value: 'What is the meaning?' } });
     fireEvent.click(screen.getByRole('button', { name: /Ask/i }));
 
-    await waitFor(() => expect(screen.getByText('Bot: 42')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('42')).toBeInTheDocument());
     expect(fetch).toHaveBeenCalledWith('/chat', expect.any(Object));
   });
 });

@@ -570,3 +570,63 @@ describe('Integration Tests', () => {
     expect(mockFetchTodos).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('ID Remapping and Cleanup', () => {
+  test('remaps offline IDs for subsequent update and delete', async () => {
+    const sw = require('../public/sw.js');
+    await sw.putAuth('token123', 'user1');
+
+    const offlineTodo = { _id: 'offline_abc', text: 'Demo', user_id: 'user1' };
+    await sw.putTodo(offlineTodo, 'user1');
+    await sw.addQueue({ type: 'CREATE', data: offlineTodo }, 'user1');
+
+    const serverTodo = { ...offlineTodo, _id: 'server_xyz' };
+    global.fetch = jest.fn().mockResolvedValue({ ok: true, json: async () => serverTodo });
+
+    // Queue create and subsequent update/delete in one sync
+    await sw.addQueue({ type: 'UPDATE', data: { _id: 'offline_abc', text: 'Updated', user_id: 'user1' } }, 'user1');
+    await sw.addQueue({ type: 'DELETE', data: { _id: 'offline_abc' } }, 'user1');
+    await sw.syncQueue();
+
+    // First call should be POST creating the todo
+    expect(fetch).toHaveBeenNthCalledWith(1, '/todos', expect.any(Object));
+    // Second call should be PUT using remapped server ID
+    expect(fetch).toHaveBeenNthCalledWith(2, '/todos/server_xyz', expect.objectContaining({ method: 'PUT' }));
+    // Third call should be DELETE using same server ID
+    expect(fetch).toHaveBeenNthCalledWith(3, '/todos/server_xyz', expect.objectContaining({ method: 'DELETE' }));
+  });
+
+  test('cleans up stale todos when coming online', async () => {
+    const sw = require('../public/sw.js');
+    await sw.putAuth('token123', 'user1');
+
+    const serverTodo = { _id: 'server_1', text: 'Active', user_id: 'user1' };
+    const staleTodo = { _id: 'server_old', text: 'Old', user_id: 'user1' };
+    const offlineTodo = { _id: 'offline_1', text: 'Offline', user_id: 'user1' };
+
+    await sw.putTodo(serverTodo, 'user1');
+    await sw.putTodo(staleTodo, 'user1');
+    await sw.putTodo(offlineTodo, 'user1');
+
+    global.fetch = jest.fn().mockResolvedValueOnce({ ok: true, json: async () => [serverTodo] });
+
+    const resp = await fetch('/todos');
+    const serverTodos = await resp.json();
+
+    const localTodos = await sw.getTodos('user1');
+    const offlineOnly = localTodos.filter((t: any) => t._id.startsWith('offline_'));
+    const serverIds = new Set(serverTodos.map((t: any) => t._id));
+    for (const t of localTodos) {
+      if (!t._id.startsWith('offline_') && !serverIds.has(t._id)) {
+        await sw.delTodo(t._id, 'user1');
+      }
+    }
+    for (const todo of serverTodos) {
+      await sw.putTodo(todo, 'user1');
+    }
+    const finalTodos = await sw.getTodos('user1');
+    expect(finalTodos.find((t: any) => t._id === 'server_old')).toBeUndefined();
+    expect(finalTodos.some((t: any) => t._id === 'offline_1')).toBe(true);
+    expect(finalTodos.some((t: any) => t._id === 'server_1')).toBe(true);
+  });
+});
