@@ -552,10 +552,12 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
     });
 
   const completedTodos = allFilteredTodos
-    .filter(todo => todo.completed)
+    .filter((todo) => todo.completed)
     .sort((a, b) => {
       // Sort completed todos by completion date (most recent first)
-      return new Date(b.dateAdded).getTime() - new Date(a.dateAdded).getTime();
+      const dateA = a.dateCompleted || a.dateAdded;
+      const dateB = b.dateCompleted || b.dateAdded;
+      return new Date(dateB).getTime() - new Date(dateA).getTime();
     });
 
 
