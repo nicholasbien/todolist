@@ -287,6 +287,19 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
     }
   };
 
+  const handleDeleteSpace = async (id) => {
+    try {
+      await authenticatedFetch(`/spaces/${id}`, { method: 'DELETE' });
+      await fetchSpaces();
+      if (activeSpace && activeSpace._id === id) {
+        const updated = spaces.filter(s => s._id !== id);
+        setActiveSpace(updated.length ? updated[0] : null);
+      }
+    } catch (err) {
+      console.error('Error deleting space', err);
+    }
+  };
+
   // Delete category
   const handleDeleteCategory = async (name) => {
     try {
@@ -643,7 +656,22 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
       {/* Spaces */}
       <div className="mb-6">
         <div className="flex items-center mb-3">
-          <h2 className="text-lg font-semibold text-gray-100">Space</h2>
+          <h2 className="text-lg font-semibold text-gray-100">
+            {activeSpace ? activeSpace.name : 'Space'}
+          </h2>
+          {activeSpace && activeSpace.name !== 'Default' && (
+            <button
+              onClick={() => {
+                setSpaceToEdit(activeSpace);
+                setEditSpaceName(activeSpace.name);
+                setEditSpaceEmails('');
+                setShowEditSpaceModal(true);
+              }}
+              className="ml-2 text-gray-400 hover:text-gray-200 text-sm border border-gray-700 px-2 py-1 rounded-lg hover:border-gray-600 transition-colors"
+            >
+              Edit
+            </button>
+          )}
           <button
             onClick={() => setShowAddSpaceModal(true)}
             className="ml-2 text-gray-400 hover:text-gray-200 text-sm border border-gray-700 px-2 py-1 rounded-lg hover:border-gray-600 transition-colors"
@@ -653,31 +681,17 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
         </div>
         <div className="flex flex-wrap gap-2 mb-4">
           {spaces.map(space => (
-            <div key={space._id} className="flex items-center space-x-1">
-              <button
-                onClick={() => setActiveSpace(space)}
-                className={`px-4 py-2 rounded-xl text-base transition-colors ${
-                  activeSpace && space._id === activeSpace._id
-                    ? 'bg-blue-600 text-white shadow-lg'
-                    : 'bg-gray-900 text-gray-300 hover:bg-gray-800 border border-gray-800'
-                }`}
-              >
-                {space.name}
-              </button>
-              {space.name !== 'Default' && (
-                <button
-                  onClick={() => {
-                    setSpaceToEdit(space);
-                    setEditSpaceName(space.name);
-                    setEditSpaceEmails('');
-                    setShowEditSpaceModal(true);
-                  }}
-                  className="text-gray-400 hover:text-gray-200 text-xs"
-                >
-                  Edit
-                </button>
-              )}
-            </div>
+            <button
+              key={space._id}
+              onClick={() => setActiveSpace(space)}
+              className={`px-4 py-2 rounded-xl text-base transition-colors ${
+                activeSpace && space._id === activeSpace._id
+                  ? 'bg-blue-600 text-white shadow-lg'
+                  : 'bg-gray-900 text-gray-300 hover:bg-gray-800 border border-gray-800'
+              }`}
+            >
+              {space.name}
+            </button>
           ))}
         </div>
       </div>
@@ -752,11 +766,13 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
               placeholder="Space name"
               value={newSpaceName}
               onChange={e => setNewSpaceName(e.target.value)}
+              onKeyPress={e => e.key === 'Enter' && handleAddSpace()}
               className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 placeholder-gray-500 text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
+              autoFocus
             />
             <div className="flex justify-center space-x-3">
-              <button onClick={handleAddSpace} className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-2 rounded-lg transition-colors">Create</button>
-              <button onClick={() => setShowAddSpaceModal(false)} className="bg-gray-800 hover:bg-gray-700 text-gray-300 px-6 py-2 rounded-lg transition-colors">Cancel</button>
+              <button onClick={handleAddSpace} className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-2 rounded-lg transition-colors">Add</button>
+              <button onClick={() => { setShowAddSpaceModal(false); setNewSpaceName(''); }} className="bg-gray-800 hover:bg-gray-700 text-gray-300 px-6 py-2 rounded-lg transition-colors">Cancel</button>
             </div>
           </div>
         </div>
@@ -781,6 +797,9 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
             />
             <div className="flex justify-center space-x-3">
               <button onClick={handleUpdateSpace} className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-2 rounded-lg transition-colors">Save</button>
+              {spaceToEdit && (
+                <button onClick={() => { handleDeleteSpace(spaceToEdit._id); setShowEditSpaceModal(false); }} className="bg-red-600 hover:bg-red-500 text-white px-6 py-2 rounded-lg transition-colors">Delete</button>
+              )}
               <button onClick={() => setShowEditSpaceModal(false)} className="bg-gray-800 hover:bg-gray-700 text-gray-300 px-6 py-2 rounded-lg transition-colors">Cancel</button>
             </div>
           </div>

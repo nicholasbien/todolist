@@ -38,7 +38,7 @@ from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from scheduler import get_scheduler_status, start_scheduler, update_schedule_time
-from spaces import create_space, get_spaces_for_user, invite_members, rename_space
+from spaces import create_space, delete_space, get_spaces_for_user, invite_members, rename_space
 from todos import Todo, complete_todo, create_todo, delete_todo, get_todos, health_check, update_todo_fields
 
 # Set up logging with more detail
@@ -335,6 +335,11 @@ async def api_invite_members(space_id: str, req: InviteRequest, current_user: di
 @app.put("/spaces/{space_id}")
 async def api_update_space(space_id: str, req: SpaceUpdateRequest, current_user: dict = Depends(get_current_user)):
     return await rename_space(space_id, current_user["user_id"], req.name)
+
+
+@app.delete("/spaces/{space_id}")
+async def api_delete_space(space_id: str, current_user: dict = Depends(get_current_user)):
+    return await delete_space(space_id, current_user["user_id"])
 
 
 # Email summary endpoints
