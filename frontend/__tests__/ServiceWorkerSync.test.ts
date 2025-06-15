@@ -596,6 +596,35 @@ describe('ID Remapping and Cleanup', () => {
     expect(fetch).toHaveBeenNthCalledWith(3, '/todos/server_xyz', expect.objectContaining({ method: 'DELETE' }));
   });
 
+  test('offline create then complete syncs both operations', async () => {
+    const sw = require('../public/sw.js');
+    await sw.putAuth('token123', 'user1');
+
+    const offlineTodo = { _id: 'offline_new', text: 'Demo', completed: false, user_id: 'user1' };
+    await sw.putTodo(offlineTodo, 'user1');
+    await sw.addQueue({ type: 'CREATE', data: offlineTodo }, 'user1');
+
+    // Mark complete while still offline
+    const completedTodo = { ...offlineTodo, completed: true };
+    await sw.putTodo(completedTodo, 'user1');
+    await sw.addQueue({ type: 'COMPLETE', data: { _id: 'offline_new', completed: true } }, 'user1');
+
+    const serverTodo = { ...offlineTodo, _id: 'server_new' };
+    global.fetch = jest.fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => serverTodo })
+      .mockResolvedValueOnce({ ok: true });
+
+    await sw.syncQueue();
+
+    expect(fetch).toHaveBeenNthCalledWith(1, '/todos', expect.objectContaining({ method: 'POST' }));
+    expect(fetch).toHaveBeenNthCalledWith(2, '/todos/server_new/complete', expect.objectContaining({ method: 'PUT' }));
+
+    const todos = await sw.getTodos('user1');
+    expect(todos).toHaveLength(1);
+    expect(todos[0]._id).toBe('server_new');
+    expect(todos[0].completed).toBe(true);
+  });
+
   test('cleans up stale todos when coming online', async () => {
     const sw = require('../public/sw.js');
     await sw.putAuth('token123', 'user1');
