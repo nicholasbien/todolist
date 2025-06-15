@@ -261,12 +261,12 @@ async def send_daily_summary(
 
         uncompleted_todos.sort(key=uncompleted_sort_key)
 
-        # Sort completed todos by dateAdded (most recent first) - same as UI
+        # Sort completed todos by dateCompleted (most recent first)
         def completed_sort_key(todo):
-            date_added = todo.get("dateAdded")
+            date_completed = todo.get("dateCompleted") or todo.get("dateAdded")
             try:
-                added_dt = datetime.fromisoformat(date_added.replace("Z", "+00:00"))
-                return -added_dt.timestamp()  # Negative for descending order (most recent first)
+                completed_dt = datetime.fromisoformat(date_completed.replace("Z", "+00:00"))
+                return -completed_dt.timestamp()  # Negative for descending order
             except (ValueError, AttributeError):
                 return 0
 
