@@ -38,7 +38,10 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
   const [activeSpace, setActiveSpace] = useState(null);
   const [showAddSpaceModal, setShowAddSpaceModal] = useState(false);
   const [newSpaceName, setNewSpaceName] = useState('');
-  const [newSpaceEmails, setNewSpaceEmails] = useState('');
+  const [showEditSpaceModal, setShowEditSpaceModal] = useState(false);
+  const [editSpaceName, setEditSpaceName] = useState('');
+  const [editSpaceEmails, setEditSpaceEmails] = useState('');
+  const [spaceToEdit, setSpaceToEdit] = useState<any>(null);
 
   const handleOpenEmailSettings = async () => {
     try {
@@ -243,19 +246,44 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
     const spaceName = newSpaceName.trim();
     if (!spaceName) return;
     try {
-      const emails = newSpaceEmails.split(',').map((e) => e.trim()).filter((e) => e);
       const response = await authenticatedFetch('/spaces', {
         method: 'POST',
-        body: JSON.stringify({ name: spaceName, member_emails: emails })
+        body: JSON.stringify({ name: spaceName })
       });
       if (response.ok) {
         await fetchSpaces();
         setShowAddSpaceModal(false);
         setNewSpaceName('');
-        setNewSpaceEmails('');
       }
     } catch (err) {
       console.error('Error creating space', err);
+    }
+  };
+
+  const handleUpdateSpace = async () => {
+    if (!spaceToEdit) return;
+    const trimmedName = editSpaceName.trim();
+    try {
+      if (trimmedName && trimmedName !== spaceToEdit.name) {
+        await authenticatedFetch(`/spaces/${spaceToEdit._id}`, {
+          method: 'PUT',
+          body: JSON.stringify({ name: trimmedName })
+        });
+      }
+      const emails = editSpaceEmails.split(',').map(e => e.trim()).filter(e => e);
+      if (emails.length) {
+        await authenticatedFetch(`/spaces/${spaceToEdit._id}/invite`, {
+          method: 'POST',
+          body: JSON.stringify({ emails })
+        });
+      }
+      await fetchSpaces();
+    } catch (err) {
+      console.error('Error updating space', err);
+    } finally {
+      setShowEditSpaceModal(false);
+      setEditSpaceEmails('');
+      setSpaceToEdit(null);
     }
   };
 
@@ -625,17 +653,31 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
         </div>
         <div className="flex flex-wrap gap-2 mb-4">
           {spaces.map(space => (
-            <button
-              key={space._id}
-              onClick={() => setActiveSpace(space)}
-              className={`px-4 py-2 rounded-xl text-base transition-colors ${
-                activeSpace && space._id === activeSpace._id
-                  ? 'bg-blue-600 text-white shadow-lg'
-                  : 'bg-gray-900 text-gray-300 hover:bg-gray-800 border border-gray-800'
-              }`}
-            >
-              {space.name}
-            </button>
+            <div key={space._id} className="flex items-center space-x-1">
+              <button
+                onClick={() => setActiveSpace(space)}
+                className={`px-4 py-2 rounded-xl text-base transition-colors ${
+                  activeSpace && space._id === activeSpace._id
+                    ? 'bg-blue-600 text-white shadow-lg'
+                    : 'bg-gray-900 text-gray-300 hover:bg-gray-800 border border-gray-800'
+                }`}
+              >
+                {space.name}
+              </button>
+              {space.name !== 'Default' && (
+                <button
+                  onClick={() => {
+                    setSpaceToEdit(space);
+                    setEditSpaceName(space.name);
+                    setEditSpaceEmails('');
+                    setShowEditSpaceModal(true);
+                  }}
+                  className="text-gray-400 hover:text-gray-200 text-xs"
+                >
+                  Edit
+                </button>
+              )}
+            </div>
           ))}
         </div>
       </div>
@@ -712,16 +754,34 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
               onChange={e => setNewSpaceName(e.target.value)}
               className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 placeholder-gray-500 text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
-            <input
-              type="text"
-              placeholder="Invite emails comma separated"
-              value={newSpaceEmails}
-              onChange={e => setNewSpaceEmails(e.target.value)}
-              className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 placeholder-gray-500 text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
             <div className="flex justify-center space-x-3">
               <button onClick={handleAddSpace} className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-2 rounded-lg transition-colors">Create</button>
               <button onClick={() => setShowAddSpaceModal(false)} className="bg-gray-800 hover:bg-gray-700 text-gray-300 px-6 py-2 rounded-lg transition-colors">Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showEditSpaceModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50">
+          <div className="bg-black border border-gray-800 p-6 rounded-xl w-80 space-y-4 shadow-2xl">
+            <h3 className="text-gray-100 text-lg font-bold mb-2">Edit Space</h3>
+            <input
+              type="text"
+              value={editSpaceName}
+              onChange={e => setEditSpaceName(e.target.value)}
+              className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <input
+              type="text"
+              placeholder="Invite emails comma separated"
+              value={editSpaceEmails}
+              onChange={e => setEditSpaceEmails(e.target.value)}
+              className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 placeholder-gray-500 text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <div className="flex justify-center space-x-3">
+              <button onClick={handleUpdateSpace} className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-2 rounded-lg transition-colors">Save</button>
+              <button onClick={() => setShowEditSpaceModal(false)} className="bg-gray-800 hover:bg-gray-700 text-gray-300 px-6 py-2 rounded-lg transition-colors">Cancel</button>
             </div>
           </div>
         </div>
