@@ -38,7 +38,7 @@ from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from scheduler import get_scheduler_status, start_scheduler, update_schedule_time
-from spaces import create_space, get_spaces_for_user
+from spaces import create_space, get_spaces_for_user, invite_members, rename_space
 from todos import Todo, complete_todo, create_todo, delete_todo, get_todos, health_check, update_todo_fields
 
 # Set up logging with more detail
@@ -305,7 +305,14 @@ async def api_delete_category(name: str):
 
 class SpaceCreateRequest(BaseModel):
     name: str
-    member_emails: List[str] = []
+
+
+class InviteRequest(BaseModel):
+    emails: List[str]
+
+
+class SpaceUpdateRequest(BaseModel):
+    name: str
 
 
 # Space management endpoints
@@ -316,7 +323,18 @@ async def api_get_spaces(current_user: dict = Depends(get_current_user)):
 
 @app.post("/spaces")
 async def api_create_space_endpoint(req: SpaceCreateRequest, current_user: dict = Depends(get_current_user)):
-    return await create_space(req.name, current_user["user_id"], req.member_emails)
+    return await create_space(req.name, current_user["user_id"])
+
+
+@app.post("/spaces/{space_id}/invite")
+async def api_invite_members(space_id: str, req: InviteRequest, current_user: dict = Depends(get_current_user)):
+    await invite_members(space_id, current_user["email"], req.emails)
+    return {"message": "Invitations sent"}
+
+
+@app.put("/spaces/{space_id}")
+async def api_update_space(space_id: str, req: SpaceUpdateRequest, current_user: dict = Depends(get_current_user)):
+    return await rename_space(space_id, current_user["user_id"], req.name)
 
 
 # Email summary endpoints
@@ -418,7 +436,9 @@ async def api_contact(
         from email_summary import send_contact_message
 
         await send_contact_message(
-            sender_email=current_user["email"], sender_name=current_user.get("first_name", ""), message=req.message
+            sender_email=current_user["email"],
+            sender_name=current_user.get("first_name", ""),
+            message=req.message,
         )
 
         return {"message": "Contact message sent successfully"}

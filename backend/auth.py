@@ -13,6 +13,7 @@ from fastapi import HTTPException
 from mongomock_motor import AsyncMongoMockClient
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, EmailStr, Field
+from spaces import add_user_to_pending_spaces
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -243,6 +244,9 @@ async def login_user(email: str, code: str) -> dict:
             },
         )
 
+        # Add user to any spaces they were invited to
+        await add_user_to_pending_spaces(str(user["_id"]), email)
+
         # Create session
         token = generate_session_token()
         expires_at = datetime.now() + timedelta(hours=JWT_EXPIRATION_HOURS)
@@ -360,7 +364,11 @@ async def update_user_name(user_id: str, first_name: str) -> dict:
 
 
 async def update_user_summary_time(
-    user_id: str, email_enabled: bool, hour: int, minute: int, timezone: str = "America/New_York"
+    user_id: str,
+    email_enabled: bool,
+    hour: int,
+    minute: int,
+    timezone: str = "America/New_York",
 ) -> dict:
     """Update user's daily summary time, timezone, and email enabled status."""
     try:
@@ -381,7 +389,12 @@ async def update_user_summary_time(
 
         status = "enabled" if email_enabled else "disabled" if email_enabled is False else "unchanged"
         logger.info(
-            "Updated summary time for user %s to %02d:%02d %s (email %s)", user_id, hour, minute, timezone, status
+            "Updated summary time for user %s to %02d:%02d %s (email %s)",
+            user_id,
+            hour,
+            minute,
+            timezone,
+            status,
         )
 
         return {"message": "Summary settings updated"}

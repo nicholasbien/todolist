@@ -2,7 +2,7 @@ import logging
 import os
 from typing import List, Optional
 
-from auth import users_collection
+import auth
 from bson import ObjectId
 from dotenv import load_dotenv
 from fastapi import HTTPException
@@ -27,6 +27,7 @@ class Space(BaseModel):
     name: str
     owner_id: str
     member_ids: List[str] = []
+    pending_emails: List[str] = []
 
     class Config:
         arbitrary_types_allowed = True
@@ -48,14 +49,9 @@ async def ensure_default_space(user_id: str) -> str:
     return str(result.inserted_id)
 
 
-async def create_space(name: str, owner_id: str, member_emails: List[str]) -> Space:
-    """Create a new collaboration space."""
+async def create_space(name: str, owner_id: str) -> Space:
+    """Create a new space owned by the given user."""
     member_ids = [owner_id]
-    for email in member_emails:
-        user = await users_collection.find_one({"email": email})
-        if not user:
-            raise HTTPException(status_code=404, detail=f"User not found: {email}")
-        member_ids.append(str(user["_id"]))
 
     space = Space(name=name, owner_id=owner_id, member_ids=list(set(member_ids)))
     space_dict = space.dict(by_alias=True)
@@ -82,3 +78,63 @@ async def user_in_space(user_id: str, space_id: str) -> bool:
     if not space:
         raise HTTPException(status_code=404, detail="Space not found")
     return user_id in space.get("member_ids", [])
+
+
+async def invite_members(space_id: str, inviter_email: str, emails: List[str]) -> None:
+    """Invite users to a space via email."""
+    space = await spaces_collection.find_one({"_id": ObjectId(space_id)})
+    if not space:
+        raise HTTPException(status_code=404, detail="Space not found")
+
+    pending = set(space.get("pending_emails", []))
+    member_ids = set(space.get("member_ids", []))
+
+    for email in emails:
+        user = await auth.users_collection.find_one({"email": email})
+        if user:
+            member_ids.add(str(user["_id"]))
+        else:
+            pending.add(email)
+
+        # Send invitation email (best effort)
+        try:
+            from email_summary import send_email
+
+            subject = "You've been invited to a todo space"
+            body = (
+                f"{inviter_email} has invited you to collaborate on the space '{space['name']}'."
+                "\nSign up to access the shared todos."
+            )
+            await send_email(email, subject, body)
+        except Exception:
+            logger.error("Failed to send invite email to %s", email)
+
+    await spaces_collection.update_one(
+        {"_id": ObjectId(space_id)},
+        {"$set": {"member_ids": list(member_ids), "pending_emails": list(pending)}},
+    )
+
+
+async def add_user_to_pending_spaces(user_id: str, email: str) -> None:
+    """Add the user to any spaces where their email was invited."""
+    cursor = spaces_collection.find({"pending_emails": email})
+    async for space in cursor:
+        await spaces_collection.update_one(
+            {"_id": space["_id"]},
+            {"$addToSet": {"member_ids": user_id}, "$pull": {"pending_emails": email}},
+        )
+
+
+async def rename_space(space_id: str, user_id: str, new_name: str) -> Space:
+    """Rename a space. Only the owner may rename a space."""
+    space = await spaces_collection.find_one({"_id": ObjectId(space_id)})
+    if not space:
+        raise HTTPException(status_code=404, detail="Space not found")
+    if space.get("owner_id") != user_id:
+        raise HTTPException(status_code=403, detail="Only the owner can rename the space")
+
+    await spaces_collection.update_one({"_id": ObjectId(space_id)}, {"$set": {"name": new_name}})
+
+    updated = await spaces_collection.find_one({"_id": ObjectId(space_id)})
+    updated["_id"] = str(updated["_id"])
+    return Space(**updated)
