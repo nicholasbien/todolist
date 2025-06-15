@@ -138,3 +138,30 @@ async def rename_space(space_id: str, user_id: str, new_name: str) -> Space:
     updated = await spaces_collection.find_one({"_id": ObjectId(space_id)})
     updated["_id"] = str(updated["_id"])
     return Space(**updated)
+
+
+async def is_default_space(space_id: str, user_id: str) -> bool:
+    """Check if the given space is the user's Default space."""
+    space = await spaces_collection.find_one({"_id": ObjectId(space_id), "owner_id": user_id})
+    return bool(space and space.get("name") == "Default")
+
+
+async def delete_space(space_id: str, user_id: str) -> dict:
+    """Delete a space and move todos to each member's Default space."""
+    space = await spaces_collection.find_one({"_id": ObjectId(space_id)})
+    if not space:
+        raise HTTPException(status_code=404, detail="Space not found")
+    if space.get("owner_id") != user_id:
+        raise HTTPException(status_code=403, detail="Only the owner can delete the space")
+    if space.get("name") == "Default":
+        raise HTTPException(status_code=400, detail="Cannot delete the Default space")
+
+    from todos import todos_collection  # Circular import
+
+    member_ids = space.get("member_ids", [])
+    for m_id in member_ids:
+        default_id = await ensure_default_space(m_id)
+        await todos_collection.update_many({"space_id": space_id, "user_id": m_id}, {"$set": {"space_id": default_id}})
+
+    await spaces_collection.delete_one({"_id": ObjectId(space_id)})
+    return {"message": "Space deleted"}

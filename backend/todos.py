@@ -9,7 +9,7 @@ from fastapi import HTTPException
 from mongomock_motor import AsyncMongoMockClient
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, Field
-from spaces import user_in_space
+from spaces import is_default_space, user_in_space
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -73,13 +73,21 @@ async def create_todo(todo: Todo):
 async def get_todos(user_id: str, space_id: Optional[str] | None = None):
     try:
         todos = []
-        query = {}
+        query: dict = {"user_id": user_id}
         if space_id:
             if not await user_in_space(user_id, space_id):
                 raise HTTPException(status_code=403, detail="Not in space")
-            query["space_id"] = space_id
-        else:
-            query["user_id"] = user_id
+            if await is_default_space(space_id, user_id):
+                query = {
+                    "user_id": user_id,
+                    "$or": [
+                        {"space_id": space_id},
+                        {"space_id": None},
+                        {"space_id": {"$exists": False}},
+                    ],
+                }
+            else:
+                query["space_id"] = space_id
         cursor = todos_collection.find(query)
         async for todo in cursor:
             # Ensure _id is properly converted to string
