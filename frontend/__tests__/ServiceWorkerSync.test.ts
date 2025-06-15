@@ -658,4 +658,53 @@ describe('ID Remapping and Cleanup', () => {
     expect(finalTodos.some((t: any) => t._id === 'offline_1')).toBe(true);
     expect(finalTodos.some((t: any) => t._id === 'server_1')).toBe(true);
   });
+
+  test('persisted idMap survives interrupted create between syncs', async () => {
+    const sw = require('../public/sw.js');
+    await sw.putAuth('token123', 'user1');
+
+    const offlineTodo = {
+      _id: 'offline_map',
+      text: 'Demo',
+      category: 'General',
+      priority: 'Medium',
+      dateAdded: new Date().toISOString(),
+      dueDate: null,
+      completed: false,
+      user_id: 'user1',
+    };
+
+    await sw.putTodo(offlineTodo, 'user1');
+    await sw.addQueue({ type: 'CREATE', data: offlineTodo }, 'user1');
+    await sw.addQueue(
+      { type: 'UPDATE', data: { _id: 'offline_map', text: 'Updated', user_id: 'user1' } },
+      'user1'
+    );
+
+    const serverTodo = { ...offlineTodo, _id: 'server_map' };
+
+    // Manually persist ID mapping as if CREATE succeeded earlier
+    const db = await sw.openUserDB('user1');
+    const tx = db.transaction(['queue'], 'readwrite');
+    const store = tx.objectStore('queue');
+    await new Promise((resolve) => {
+      const req = store.put({ id: 'idMap', mappings: { offline_map: 'server_map' } });
+      req.onsuccess = () => resolve(null);
+    });
+
+    global.fetch = jest.fn().mockResolvedValue({ ok: true, json: async () => serverTodo });
+
+    await sw.syncQueue();
+
+    expect(fetch).toHaveBeenNthCalledWith(
+      1,
+      '/todos',
+      expect.any(Object)
+    );
+    expect(fetch).toHaveBeenNthCalledWith(
+      2,
+      '/todos/server_map',
+      expect.objectContaining({ method: 'PUT' })
+    );
+  });
 });
