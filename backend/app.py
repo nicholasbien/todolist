@@ -38,6 +38,7 @@ from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from scheduler import get_scheduler_status, start_scheduler, update_schedule_time
+from spaces import create_space, get_spaces_for_user
 from todos import Todo, complete_todo, create_todo, delete_todo, get_todos, health_check, update_todo_fields
 
 # Set up logging with more detail
@@ -139,9 +140,9 @@ async def api_update_name(request: UpdateNameRequest, current_user: dict = Depen
 
 # Add todo management endpoints
 @app.get("/todos", response_model=List[Todo])
-async def api_get_todos(current_user: dict = Depends(get_current_user)):
-    logger.info(f"Fetching todos for user: {current_user['email']}")
-    result = await get_todos(current_user["user_id"])
+async def api_get_todos(space_id: str | None = None, current_user: dict = Depends(get_current_user)):
+    logger.info(f"Fetching todos for user: {current_user['email']} in space {space_id}")
+    result = await get_todos(current_user["user_id"], space_id)
     logger.info(f"Fetched {len(result)} todos")
     return result
 
@@ -153,8 +154,9 @@ async def api_create_todo(request: Request, current_user: dict = Depends(get_cur
         body = await request.json()
         logger.info(f"Received todo creation request: {json.dumps(body)}")
 
-        # Add user_id to the todo
         body["user_id"] = current_user["user_id"]
+        if "space_id" not in body:
+            body["space_id"] = None
 
         # Determine the text to classify
         text = body.get("text", "").strip()
@@ -299,6 +301,22 @@ async def api_delete_category(name: str):
     """Delete a category."""
     logger.info(f"Deleting category: {name}")
     return await delete_category(name)
+
+
+class SpaceCreateRequest(BaseModel):
+    name: str
+    member_emails: List[str] = []
+
+
+# Space management endpoints
+@app.get("/spaces")
+async def api_get_spaces(current_user: dict = Depends(get_current_user)):
+    return await get_spaces_for_user(current_user["user_id"])
+
+
+@app.post("/spaces")
+async def api_create_space_endpoint(req: SpaceCreateRequest, current_user: dict = Depends(get_current_user)):
+    return await create_space(req.name, current_user["user_id"], req.member_emails)
 
 
 # Email summary endpoints
