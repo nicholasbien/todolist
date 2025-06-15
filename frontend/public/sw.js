@@ -714,6 +714,9 @@ async function syncQueue() {
               idMap[offlineId] = serverTodo._id;
               console.log(`🗺️ Added ID mapping: ${offlineId} -> ${serverTodo._id}`);
 
+              // Persist mapping immediately in case sync is interrupted
+              await putIdMap(idMap, authData.userId);
+
               await delTodo(offlineId, authData.userId); // Remove offline version
               await putTodo(serverTodo, authData.userId); // Add server version
               console.log(`✅ Synced offline todo ${offlineId} -> ${serverTodo._id}`);
