@@ -34,6 +34,11 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
   const [savingSchedule, setSavingSchedule] = useState(false);
   const [emailInstructions, setEmailInstructions] = useState('');
   const [emailEnabled, setEmailEnabled] = useState(false);
+  const [spaces, setSpaces] = useState([]);
+  const [activeSpace, setActiveSpace] = useState(null);
+  const [showAddSpaceModal, setShowAddSpaceModal] = useState(false);
+  const [newSpaceName, setNewSpaceName] = useState('');
+  const [newSpaceEmails, setNewSpaceEmails] = useState('');
 
   const handleOpenEmailSettings = async () => {
     try {
@@ -74,6 +79,21 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
     return response;
   }, [token]);
 
+  const fetchSpaces = useCallback(async () => {
+    try {
+      const response = await authenticatedFetch('/spaces');
+      if (response?.ok) {
+        const data = await response.json();
+        setSpaces(data);
+        if (!activeSpace && data.length > 0) {
+          setActiveSpace(data[0]);
+        }
+      }
+    } catch (err) {
+      console.error('Error loading spaces', err);
+    }
+  }, [authenticatedFetch, activeSpace]);
+
   // Fetch categories from MongoDB
   const fetchCategories = useCallback(async () => {
     try {
@@ -91,7 +111,8 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
   // Fetch todos from MongoDB
   const fetchTodos = useCallback(async () => {
     try {
-      const response = await authenticatedFetch('/todos');
+      const url = activeSpace ? `/todos?space_id=${activeSpace._id}` : '/todos';
+      const response = await authenticatedFetch(url);
       if (!response?.ok) {
         throw new Error('Failed to fetch todos');
       }
@@ -100,12 +121,13 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
     } catch (err) {
       setError('Error loading todos: ' + err.message);
     }
-  }, [authenticatedFetch]);
+  }, [authenticatedFetch, activeSpace]);
 
 
   // Load todos and categories when token is available
   useEffect(() => {
     if (token && user) {
+      fetchSpaces();
       fetchTodos();
       fetchCategories();
 
@@ -119,7 +141,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
       }
 
     }
-  }, [token, user, fetchTodos, fetchCategories]);
+  }, [token, user, fetchSpaces, fetchTodos, fetchCategories]);
 
   // Update email time when user info loads
   useEffect(() => {
@@ -217,6 +239,26 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
     }
   };
 
+  const handleAddSpace = async () => {
+    const spaceName = newSpaceName.trim();
+    if (!spaceName) return;
+    try {
+      const emails = newSpaceEmails.split(',').map((e) => e.trim()).filter((e) => e);
+      const response = await authenticatedFetch('/spaces', {
+        method: 'POST',
+        body: JSON.stringify({ name: spaceName, member_emails: emails })
+      });
+      if (response.ok) {
+        await fetchSpaces();
+        setShowAddSpaceModal(false);
+        setNewSpaceName('');
+        setNewSpaceEmails('');
+      }
+    } catch (err) {
+      console.error('Error creating space', err);
+    }
+  };
+
   // Delete category
   const handleDeleteCategory = async (name) => {
     try {
@@ -289,7 +331,8 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
       const todo: any = {
         text: newTodo,
         dateAdded: localISOString,
-        completed: false
+        completed: false,
+        space_id: activeSpace ? activeSpace._id : null
       };
 
       // Store link if it's a URL so backend can fetch title
@@ -567,6 +610,34 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
         </div>
       </div>
 
+      {/* Spaces */}
+      <div className="mb-6">
+        <div className="flex items-center mb-3">
+          <h2 className="text-lg font-semibold text-gray-100">Space</h2>
+          <button
+            onClick={() => setShowAddSpaceModal(true)}
+            className="ml-2 text-gray-400 hover:text-gray-200 text-sm border border-gray-700 px-2 py-1 rounded-lg hover:border-gray-600 transition-colors"
+          >
+            +
+          </button>
+        </div>
+        <div className="flex flex-wrap gap-2 mb-4">
+          {spaces.map(space => (
+            <button
+              key={space._id}
+              onClick={() => setActiveSpace(space)}
+              className={`px-4 py-2 rounded-xl text-base transition-colors ${
+                activeSpace && space._id === activeSpace._id
+                  ? 'bg-blue-600 text-white shadow-lg'
+                  : 'bg-gray-900 text-gray-300 hover:bg-gray-800 border border-gray-800'
+              }`}
+            >
+              {space.name}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* Categories - Horizontal wrapping pills */}
       <div className="mb-6">
         <div className="flex items-center mb-3">
@@ -627,6 +698,32 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
         </div>
 
       </div>
+
+      {showAddSpaceModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50">
+          <div className="bg-black border border-gray-800 p-6 rounded-xl w-80 space-y-4 shadow-2xl">
+            <h3 className="text-gray-100 text-lg font-bold mb-2">Create Space</h3>
+            <input
+              type="text"
+              placeholder="Space name"
+              value={newSpaceName}
+              onChange={e => setNewSpaceName(e.target.value)}
+              className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 placeholder-gray-500 text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <input
+              type="text"
+              placeholder="Invite emails comma separated"
+              value={newSpaceEmails}
+              onChange={e => setNewSpaceEmails(e.target.value)}
+              className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 placeholder-gray-500 text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <div className="flex justify-center space-x-3">
+              <button onClick={handleAddSpace} className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-2 rounded-lg transition-colors">Create</button>
+              <button onClick={() => setShowAddSpaceModal(false)} className="bg-gray-800 hover:bg-gray-700 text-gray-300 px-6 py-2 rounded-lg transition-colors">Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Add Category Modal */}
       {showAddCategoryModal && (
