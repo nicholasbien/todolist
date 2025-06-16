@@ -391,6 +391,12 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
         space_id: activeSpace ? activeSpace._id : null
       };
 
+      // If a category is selected (not "All"), skip AI classification on backend
+      if (activeCat !== 'All') {
+        todo.category = activeCat;
+        todo.priority = 'Medium';
+      }
+
       // Store link if it's a URL so backend can fetch title
       if (isUrl(newTodo)) {
         todo.link = newTodo;
@@ -693,26 +699,6 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
         </div>
       </div>
 
-      {/* Add new todo */}
-      <div className="mb-6">
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={newTodo}
-            onChange={(e) => setNewTodo(e.target.value)}
-            placeholder="Add a new task..."
-            className="flex-1 p-3 border border-gray-800 rounded-xl bg-black text-gray-100 placeholder-gray-500 focus:border-blue-500 focus:outline-none transition-colors"
-            onKeyPress={(e) => e.key === 'Enter' && handleAddTodo()}
-          />
-          <button
-            onClick={handleAddTodo}
-            disabled={loading}
-            className="bg-blue-600 text-white w-12 h-12 rounded-xl hover:bg-blue-500 disabled:bg-blue-800 disabled:text-gray-400 flex items-center justify-center transition-colors shadow-lg"
-          >
-            {loading ? '...' : '+'}
-          </button>
-        </div>
-      </div>
 
       {/* Categories - Horizontal wrapping pills */}
       <div className="mb-6">
@@ -775,6 +761,27 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
           </button>
         </div>
 
+      </div>
+
+      {/* Add new todo */}
+      <div className="mb-6">
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={newTodo}
+            onChange={(e) => setNewTodo(e.target.value)}
+            placeholder="Add a new task..."
+            className="flex-1 p-3 border border-gray-800 rounded-xl bg-black text-gray-100 placeholder-gray-500 focus:border-blue-500 focus:outline-none transition-colors"
+            onKeyPress={(e) => e.key === 'Enter' && handleAddTodo()}
+          />
+          <button
+            onClick={handleAddTodo}
+            disabled={loading}
+            className="bg-blue-600 text-white w-12 h-12 rounded-xl hover:bg-blue-500 disabled:bg-blue-800 disabled:text-gray-400 flex items-center justify-center transition-colors shadow-lg"
+          >
+            {loading ? '...' : '+'}
+          </button>
+        </div>
       </div>
 
       {showAddSpaceModal && (
