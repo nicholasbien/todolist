@@ -106,3 +106,22 @@ async def test_category_management(client, test_email):
     todos = get_todos_resp.json()
     todo = next(t for t in todos if t["_id"] == todo_id)
     assert todo["category"] == "General"
+
+
+@pytest.mark.asyncio
+async def test_add_todo_with_selected_category(client, test_email):
+    """Ensure classification is skipped when category provided."""
+    token = await get_token(client, test_email)
+    headers = {"Authorization": f"Bearer {token}"}
+    todo_payload = {
+        "text": "Walk the dog",
+        "dateAdded": datetime.now().isoformat(),
+        "category": "Work",
+    }
+    with patch("app.classify_task") as mock_classify:
+        create_resp = await client.post("/todos", json=todo_payload, headers=headers)
+        assert create_resp.status_code == 200
+        todo = create_resp.json()
+        assert todo["category"] == "Work"
+        assert todo["priority"] == "Medium"
+        mock_classify.assert_not_called()
