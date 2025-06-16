@@ -40,7 +40,8 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
   const [newSpaceName, setNewSpaceName] = useState('');
   const [showEditSpaceModal, setShowEditSpaceModal] = useState(false);
   const [editSpaceName, setEditSpaceName] = useState('');
-  const [editSpaceEmails, setEditSpaceEmails] = useState('');
+  const [editSpaceCollaborative, setEditSpaceCollaborative] = useState(true);
+  const [inviteEmails, setInviteEmails] = useState<string[]>(['']);
   const [spaceToEdit, setSpaceToEdit] = useState<any>(null);
 
   const handleOpenEmailSettings = async () => {
@@ -276,13 +277,11 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
     if (!spaceToEdit) return;
     const trimmedName = editSpaceName.trim();
     try {
-      if (trimmedName && trimmedName !== spaceToEdit.name) {
-        await authenticatedFetch(`/spaces/${spaceToEdit._id}`, {
-          method: 'PUT',
-          body: JSON.stringify({ name: trimmedName })
-        });
-      }
-      const emails = editSpaceEmails.split(',').map(e => e.trim()).filter(e => e);
+      await authenticatedFetch(`/spaces/${spaceToEdit._id}`, {
+        method: 'PUT',
+        body: JSON.stringify({ name: trimmedName || spaceToEdit.name, collaborative: editSpaceCollaborative })
+      });
+      const emails = inviteEmails.map(e => e.trim()).filter(e => e);
       if (emails.length) {
         await authenticatedFetch(`/spaces/${spaceToEdit._id}/invite`, {
           method: 'POST',
@@ -294,7 +293,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
       console.error('Error updating space', err);
     } finally {
       setShowEditSpaceModal(false);
-      setEditSpaceEmails('');
+      setInviteEmails(['']);
       setSpaceToEdit(null);
     }
   };
@@ -659,7 +658,10 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
               onClick={() => {
                 setSpaceToEdit(activeSpace);
                 setEditSpaceName(activeSpace.name);
-                setEditSpaceEmails('');
+                const isCollab = (activeSpace.member_ids?.length ?? 0) > 1 ||
+                  (activeSpace.pending_emails?.length ?? 0) > 0;
+                setEditSpaceCollaborative(isCollab);
+                setInviteEmails(['']);
                 setShowEditSpaceModal(true);
               }}
               className="ml-2 text-gray-400 hover:text-gray-200 text-sm border border-gray-700 px-2 py-1 rounded-lg hover:border-gray-600 transition-colors"
@@ -683,7 +685,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
             </button>
           ))}
           <button
-            onClick={() => setShowAddSpaceModal(true)}
+            onClick={() => { setShowAddSpaceModal(true); }}
             className="px-4 py-2 rounded-xl text-base bg-gray-900 text-gray-300 hover:bg-gray-800 border border-gray-800 transition-colors"
           >
             +
@@ -806,13 +808,39 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
               onChange={e => setEditSpaceName(e.target.value)}
               className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
-            <input
-              type="text"
-              placeholder="Invite emails comma separated"
-              value={editSpaceEmails}
-              onChange={e => setEditSpaceEmails(e.target.value)}
-              className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 placeholder-gray-500 text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+            <label className="flex items-center space-x-2 text-gray-300">
+              <input
+                type="checkbox"
+                checked={editSpaceCollaborative}
+                onChange={e => setEditSpaceCollaborative(e.target.checked)}
+              />
+              <span>Collaborative</span>
+            </label>
+            {editSpaceCollaborative && (
+              <div className="space-y-2">
+                {inviteEmails.map((email, idx) => (
+                  <input
+                    key={idx}
+                    type="text"
+                    placeholder="Invite email"
+                    value={email}
+                    onChange={e => {
+                      const updated = [...inviteEmails];
+                      updated[idx] = e.target.value;
+                      setInviteEmails(updated);
+                    }}
+                    className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 placeholder-gray-500 text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                ))}
+                <button
+                  type="button"
+                  onClick={() => setInviteEmails([...inviteEmails, ''])}
+                  className="text-gray-300 border border-gray-700 px-2 py-1 rounded-lg hover:bg-gray-800"
+                >
+                  +
+                </button>
+              </div>
+            )}
             <div className="flex justify-center space-x-3">
               <button onClick={handleUpdateSpace} className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-2 rounded-lg transition-colors">Save</button>
               {spaceToEdit && (

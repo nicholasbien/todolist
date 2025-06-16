@@ -50,7 +50,11 @@ async def create_space(name: str, owner_id: str) -> Space:
     """Create a new space owned by the given user."""
     member_ids = [owner_id]
 
-    space = Space(name=name, owner_id=owner_id, member_ids=list(set(member_ids)))
+    space = Space(
+        name=name,
+        owner_id=owner_id,
+        member_ids=list(set(member_ids)),
+    )
     space_dict = space.dict(by_alias=True)
     space_dict.pop("_id", None)
     result = await spaces_collection.insert_one(space_dict)
@@ -159,15 +163,24 @@ async def add_user_to_pending_spaces(user_id: str, email: str) -> None:
         )
 
 
-async def rename_space(space_id: str, user_id: str, new_name: str) -> Space:
-    """Rename a space. Only the owner may rename a space."""
+async def update_space(
+    space_id: str, user_id: str, new_name: Optional[str] = None, collaborative: Optional[bool] = None
+) -> Space:
+    """Update a space's name or collaborative flag. Only the owner may update."""
     space = await spaces_collection.find_one({"_id": ObjectId(space_id)})
     if not space:
         raise HTTPException(status_code=404, detail="Space not found")
     if space.get("owner_id") != user_id:
         raise HTTPException(status_code=403, detail="Only the owner can rename the space")
 
-    await spaces_collection.update_one({"_id": ObjectId(space_id)}, {"$set": {"name": new_name}})
+    update: dict = {}
+    if new_name is not None:
+        update["name"] = new_name
+    if collaborative is False:
+        update["member_ids"] = [space["owner_id"]]
+        update["pending_emails"] = []
+    if update:
+        await spaces_collection.update_one({"_id": ObjectId(space_id)}, {"$set": update})
 
     updated = await spaces_collection.find_one({"_id": ObjectId(space_id)})
     updated["_id"] = str(updated["_id"])
