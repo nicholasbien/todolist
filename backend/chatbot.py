@@ -27,7 +27,7 @@ async def answer_question(question: str, todos: List[dict], history: List[dict])
         )
         messages = [{"role": "system", "content": system_prompt}] + history + [{"role": "user", "content": question}]
         completion = client.chat.completions.create(
-            model="gpt-4.1-nano",
+            model="gpt-4.1-mini",
             messages=messages,
             temperature=0,
         )
