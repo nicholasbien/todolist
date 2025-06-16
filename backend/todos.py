@@ -1,7 +1,7 @@
 import logging
 import os
 from datetime import datetime
-from typing import Any, Dict, Optional
+from typing import Dict, Optional
 
 from bson import ObjectId
 from dotenv import load_dotenv
@@ -73,7 +73,7 @@ async def create_todo(todo: Todo):
 async def get_todos(user_id: str, space_id: Optional[str] | None = None):
     try:
         todos = []
-        query: Dict[str, Any] = {"space_id": space_id}
+        query: Dict[str, Optional[str]] = {"space_id": space_id}
         if space_id:
             try:
                 is_member = await user_in_space(user_id, space_id)
