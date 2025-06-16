@@ -3,25 +3,39 @@
 
 
 
-# AI-Powered Todo List Application
+# AI-Powered Collaborative Todo List Application
 
-A modern todo list application with AI-powered task classification, email verification authentication, and daily email summaries. Built with Next.js for the frontend and FastAPI for the backend.
+A modern collaborative todo list application with AI-powered task classification, multi-user spaces, email verification authentication, and daily email summaries. Built with Next.js for the frontend and FastAPI for the backend.
 
 ## Features
 
+### Core Functionality
 - **AI-powered task classification** using OpenAI GPT-4.1-nano
+- **Multi-user collaboration spaces** - Create shared workspaces and invite team members
 - **Email verification authentication** with JWT sessions
+- **Space-specific categories** - Each space has its own set of categories
 - **Daily email summaries** with AI-generated insights
 - **Customizable email instructions** for personalized summaries
-- **Category and priority management**
+
+### Collaboration Features
+- **Default personal spaces** - Every user gets a private "Default" space
+- **Shared team spaces** - Create collaborative spaces and invite others by email
+- **Real-time collaboration** - Multiple users can work in the same space
+- **Access control** - Space ownership and membership management
+- **Data isolation** - Complete separation of todos and categories between spaces
+
+### Task Management
+- **Category and priority management** with space-specific categories
 - **Due date tracking** with upcoming deadlines highlighted in daily summaries
 - **Day-of-week aware date parsing** for more accurate due dates
 - **Link support** - Add a URL as a task and its page title is fetched automatically
 - **Progressive Web App (PWA)** - Install on iPhone/Android like a native app
 - **Offline functionality** - Works without internet connection
-- **User isolation** - Each user sees only their own todos
+
+### Technical Features
 - **Modern, responsive UI** with Tailwind CSS
 - **Comprehensive testing** with pytest and manual testing
+- **Legacy data migration** - Automatic migration of existing data to space system
 
 ## Prerequisites
 
@@ -47,7 +61,7 @@ Then configure your environment variables (see below) and start the servers.
 .
 ├── frontend/                 # Next.js React frontend
 │   ├── components/           # React components
-│   │   ├── AIToDoListApp.jsx # Main todo interface
+│   │   ├── AIToDoListApp.tsx # Main todo and spaces interface
 │   │   └── AuthForm.jsx      # Login/signup form
 │   ├── context/             # Authentication context
 │   ├── pages/               # Next.js pages
@@ -55,11 +69,15 @@ Then configure your environment variables (see below) and start the servers.
 ├── backend/                 # FastAPI Python backend
 │   ├── app.py               # Main FastAPI application
 │   ├── auth.py              # Authentication system
-│   ├── todos.py             # Todo CRUD operations
+│   ├── spaces.py            # Multi-user space collaboration
+│   ├── todos.py             # Space-aware todo CRUD operations
+│   ├── categories.py        # Space-specific category management
 │   ├── classify.py          # AI task classification
 │   ├── email_summary.py     # Daily email summaries
 │   ├── scheduler.py         # Background job scheduling
 │   ├── tests/               # Automated pytest tests
+│   │   ├── test_spaces.py   # Space collaboration tests
+│   │   └── test_space_categories.py # Space-specific category tests
 │   └── manual_tests/        # Manual interactive tests
 ├── setup.sh                 # Automated setup script
 └── deploy.sh                # Railway deployment script
@@ -315,14 +333,21 @@ python3 -c "import secrets; print(secrets.token_urlsafe(32))"
 - `GET /auth/me` - Get current user info
 - `POST /auth/update-name` - Update user's first name
 
-### Todos
-- `GET /todos` - Get user's todos
-- `POST /todos` - Create new todo
+### Spaces (Collaboration)
+- `GET /spaces` - List user's accessible spaces
+- `POST /spaces` - Create new shared space
+- `PUT /spaces/{id}` - Rename space (owner only)
+- `DELETE /spaces/{id}` - Delete space (owner only)
+- `POST /spaces/{id}/invite` - Invite users to space by email
+
+### Todos (Space-Aware)
+- `GET /todos?space_id={id}` - Get todos for specific space
+- `POST /todos` - Create new todo with space context
 - `PUT /todos/{id}` - Update todo
 - `PUT /todos/{id}/complete` - Toggle completion
 - `DELETE /todos/{id}` - Delete todo
 
-### Categories
+### Categories (Space-Specific)
 - `GET /categories?space_id={id}` - Get categories for a space
 - `POST /categories` - Add new category to a space (`{ "name": "Work", "space_id": "..." }`)
 - `PUT /categories/{name}?space_id={id}` - Rename category within a space

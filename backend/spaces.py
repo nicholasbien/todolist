@@ -74,6 +74,9 @@ async def get_spaces_for_user(user_id: str) -> List[Space]:
     async for doc in cursor:
         doc["_id"] = str(doc["_id"])
         spaces.append(Space(**doc))
+
+    # Sort spaces with "Default" first, then alphabetically
+    spaces.sort(key=lambda s: (s.name != "Default", s.name))
     return spaces
 
 

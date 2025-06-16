@@ -12,6 +12,14 @@ async def get_token(client, email):
     return resp.json()["token"]
 
 
+async def create_test_space(client, token, name="Test Space"):
+    """Helper to create a test space and return its ID"""
+    headers = {"Authorization": f"Bearer {token}"}
+    resp = await client.post("/spaces", json={"name": name}, headers=headers)
+    assert resp.status_code == 200
+    return resp.json()["_id"]
+
+
 @pytest.mark.asyncio
 async def test_create_space(client, test_email, test_email2):
     token1 = await get_token(client, test_email)
