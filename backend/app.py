@@ -3,7 +3,7 @@ import logging
 import os
 from collections import defaultdict
 from datetime import datetime
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 import httpx
 from auth import (
@@ -20,7 +20,15 @@ from auth import (
     verify_session,
 )
 from bs4 import BeautifulSoup
-from categories import Category, CategoryRename, add_category, delete_category, get_categories, rename_category
+from categories import (
+    Category,
+    CategoryRename,
+    add_category,
+    delete_category,
+    get_categories,
+    init_default_categories,
+    rename_category,
+)
 from chatbot import answer_question
 
 # Import the classification function and todo management
@@ -264,46 +272,50 @@ async def startup_event():
     """Initialize default categories, cleanup expired sessions, and start scheduler."""
     # Skip startup tasks in test environment
     if not os.getenv("USE_MOCK_DB"):
+        # Initialize default categories for default space (no space_id)
+        await init_default_categories()
         await cleanup_expired_sessions()
         start_scheduler()
 
 
 # Category management endpoints
 @app.get("/categories", response_model=List[str])
-async def api_get_categories(space_id: str, current_user: dict = Depends(get_current_user)):
-    """Get categories for a space."""
-    if not await user_in_space(current_user["user_id"], space_id):
+async def api_get_categories(space_id: Optional[str] = None, current_user: dict = Depends(get_current_user)):
+    """Get categories for a space, or default categories if no space_id provided."""
+    if space_id is not None and not await user_in_space(current_user["user_id"], space_id):
         raise HTTPException(status_code=403, detail="Not in space")
-    logger.info("Fetching categories for space %s", space_id)
+    logger.info("Fetching categories for space %s", space_id or "default")
     return await get_categories(space_id)
 
 
 @app.post("/categories")
 async def api_add_category(category: Category, current_user: dict = Depends(get_current_user)):
     """Add a new category to a space."""
-    if not await user_in_space(current_user["user_id"], category.space_id):
+    if category.space_id is not None and not await user_in_space(current_user["user_id"], category.space_id):
         raise HTTPException(status_code=403, detail="Not in space")
-    logger.info("Adding new category %s to space %s", category.name, category.space_id)
+    logger.info("Adding new category %s to space %s", category.name, category.space_id or "default")
     return await add_category(category)
 
 
 @app.put("/categories/{name}")
 async def api_rename_category(
-    name: str, space_id: str, body: CategoryRename, current_user: dict = Depends(get_current_user)
+    name: str, body: CategoryRename, space_id: Optional[str] = None, current_user: dict = Depends(get_current_user)
 ):
     """Rename an existing category within a space."""
-    if not await user_in_space(current_user["user_id"], space_id):
+    if space_id is not None and not await user_in_space(current_user["user_id"], space_id):
         raise HTTPException(status_code=403, detail="Not in space")
-    logger.info("Renaming category %s to %s in space %s", name, body.new_name, space_id)
+    logger.info("Renaming category %s to %s in space %s", name, body.new_name, space_id or "default")
     return await rename_category(name, body.new_name, space_id)
 
 
 @app.delete("/categories/{name}")
-async def api_delete_category(name: str, space_id: str, current_user: dict = Depends(get_current_user)):
+async def api_delete_category(
+    name: str, space_id: Optional[str] = None, current_user: dict = Depends(get_current_user)
+):
     """Delete a category from a space."""
-    if not await user_in_space(current_user["user_id"], space_id):
+    if space_id is not None and not await user_in_space(current_user["user_id"], space_id):
         raise HTTPException(status_code=403, detail="Not in space")
-    logger.info("Deleting category %s from space %s", name, space_id)
+    logger.info("Deleting category %s from space %s", name, space_id or "default")
     return await delete_category(name, space_id)
 
 
