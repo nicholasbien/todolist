@@ -305,6 +305,8 @@ SMTP_PASSWORD=your_app_password
 
 # Optional
 ADMIN_EMAIL=your_email@gmail.com
+# Public URL of your site for invite links
+WEBSITE_URL=https://your-site-url.com
 ```
 
 ### Frontend (.env.local)
