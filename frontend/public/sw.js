@@ -281,7 +281,7 @@ async function handleApiRequest(request) {
   // Check if this is an offline-generated ID that shouldn't go to server
   const isOfflineId = url.pathname.includes('offline_');
 
-  console.log(`🌐 API Request: ${request.method} ${url.pathname} | Online: ${online} | Offline ID: ${isOfflineId}`);
+  // console.log(`🌐 API Request: ${request.method} ${url.pathname} | Online: ${online} | Offline ID: ${isOfflineId}`);
 
   if (online && !isOfflineId) {
     try {
@@ -315,9 +315,9 @@ async function handleApiRequest(request) {
               await delTodo(t._id, authData.userId);
             }
           }
-          console.log('📊 Online GET /todos - Local todos IDs:', localTodos.map(t => t._id));
-          console.log('📊 Online GET /todos - Server todos IDs:', serverTodos.map(t => t._id));
-          console.log('📊 Online GET /todos - Offline-only todos IDs:', offlineOnlyTodos.map(t => t._id));
+          // console.log('📊 Online GET /todos - Local todos IDs:', localTodos.map(t => t._id));
+          // console.log('📊 Online GET /todos - Server todos IDs:', serverTodos.map(t => t._id));
+          // console.log('📊 Online GET /todos - Offline-only todos IDs:', offlineOnlyTodos.map(t => t._id));
 
           // Save fresh server data to IndexedDB
           for (const todo of serverTodos) {
@@ -327,7 +327,7 @@ async function handleApiRequest(request) {
           // Merge server todos with any remaining offline todos
           const mergedTodos = [...serverTodos, ...offlineOnlyTodos];
 
-          console.log('📊 Online GET /todos - Final merged todos IDs:', mergedTodos.map(t => t._id));
+          // console.log('📊 Online GET /todos - Final merged todos IDs:', mergedTodos.map(t => t._id));
 
           // Return the merged data
           return new Response(JSON.stringify(mergedTodos), {
@@ -468,7 +468,7 @@ async function offlineFallback(request, url) {
         todoData.link = text;
       }
 
-      console.log('📱 Offline POST /todos - Created todo with ID:', todoData._id);
+      // console.log('📱 Offline POST /todos - Created todo with ID:', todoData._id);
 
       await putTodo(todoData, authData ? authData.userId : null);
       await addQueue({ type: 'CREATE', data: todoData }, authData ? authData.userId : null);
@@ -492,13 +492,13 @@ async function offlineFallback(request, url) {
     // Complete/uncomplete todo
     if (url.pathname.endsWith('/complete') && request.method === 'PUT') {
       const id = url.pathname.split('/')[2]; // Get ID from /todos/{id}/complete
-      console.log(`✅ Offline COMPLETE request for todo ID: ${id}`);
+      // console.log(`✅ Offline COMPLETE request for todo ID: ${id}`);
 
       const existingTodos = await getTodos(authData ? authData.userId : null);
       const existingTodo = existingTodos.find(t => t._id === id);
 
       if (existingTodo) {
-        console.log(`✅ Todo ${id} found in IndexedDB, updating completion status...`);
+        // console.log(`✅ Todo ${id} found in IndexedDB, updating completion status...`);
         const updated = { ...existingTodo, completed: !existingTodo.completed };
         if (updated.completed) {
           updated.dateCompleted = new Date().toISOString();
@@ -513,7 +513,7 @@ async function offlineFallback(request, url) {
           const queue = await readQueue(authData ? authData.userId : null);
           const updatedQueue = queue.map(op => {
             if (op.type === 'CREATE' && op.data._id === id) {
-              console.log(`✅ Updating queued CREATE operation for ${id} with completion status`);
+              // console.log(`✅ Updating queued CREATE operation for ${id} with completion status`);
               return { ...op, data: { ...op.data, completed: updated.completed, dateCompleted: updated.dateCompleted } };
             }
             return op;
@@ -525,10 +525,10 @@ async function offlineFallback(request, url) {
               await addQueue(op, authData ? authData.userId : null);
             }
           }
-          console.log(`✅ Offline todo ${id} completion status updated in CREATE queue`);
+          // console.log(`✅ Offline todo ${id} completion status updated in CREATE queue`);
         } else {
           await addQueue({ type: 'COMPLETE', data: { _id: id, completed: updated.completed } }, authData ? authData.userId : null);
-          console.log(`✅ Added server COMPLETE to queue for ${id} (completed: ${updated.completed})`);
+          // console.log(`✅ Added server COMPLETE to queue for ${id} (completed: ${updated.completed})`);
         }
 
         return new Response(JSON.stringify({ message: 'Todo updated' }), { headers: { 'Content-Type': 'application/json' } });
@@ -683,7 +683,7 @@ async function syncQueue() {
   }
 
   syncInProgress = true;
-  console.log('Starting sync...');
+  // console.log('Starting sync...');
 
   try {
     const queue = await readQueue(authData.userId);
@@ -691,7 +691,7 @@ async function syncQueue() {
 
     // Load persistent ID mapping
     let idMap = await getIdMap(authData.userId);
-    console.log('📋 Loaded ID mapping:', idMap);
+    // console.log('📋 Loaded ID mapping:', idMap);
 
   for (const op of queue) {
     try {
@@ -835,11 +835,11 @@ async function syncQueue() {
 
     // Persist the updated ID mapping
     await putIdMap(idMap, authData.userId);
-    console.log('📋 Saved updated ID mapping:', idMap);
+    // console.log('📋 Saved updated ID mapping:', idMap);
 
     // Always clear queue after processing (prevents infinite retry loops)
     await clearQueue(authData.userId);
-    console.log('Sync completed');
+    // console.log('Sync completed');
   } finally {
     syncInProgress = false;
   }
