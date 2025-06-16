@@ -63,13 +63,16 @@ async def test_category_management(client, test_email):
     """Test adding and deleting categories with todo reassignment."""
     token = await get_token(client, test_email)
     headers = {"Authorization": f"Bearer {token}"}
+    spaces_resp = await client.get("/spaces", headers=headers)
+    assert spaces_resp.status_code == 200
+    default_space = spaces_resp.json()[0]["_id"]
 
     # Add category
-    add_resp = await client.post("/categories", json={"name": "Errands"})
+    add_resp = await client.post("/categories", json={"name": "Errands", "space_id": default_space}, headers=headers)
     assert add_resp.status_code == 200
 
     # Ensure category exists
-    categories_resp = await client.get("/categories")
+    categories_resp = await client.get(f"/categories?space_id={default_space}", headers=headers)
     assert categories_resp.status_code == 200
     categories = categories_resp.json()
     assert "Errands" in categories
@@ -80,12 +83,13 @@ async def test_category_management(client, test_email):
         "dateAdded": datetime.now().isoformat(),
     }
     with patch("app.classify_task", new=AsyncMock(return_value={"category": "Errands", "priority": "Medium"})):
+        todo_payload["space_id"] = default_space
         create_resp = await client.post("/todos", json=todo_payload, headers=headers)
         assert create_resp.status_code == 200
         todo_id = create_resp.json()["_id"]
 
     # Delete category and ensure todo updated to General
-    delete_resp = await client.delete("/categories/Errands")
+    delete_resp = await client.delete(f"/categories/Errands?space_id={default_space}", headers=headers)
     assert delete_resp.status_code == 200
 
     get_todos_resp = await client.get("/todos", headers=headers)

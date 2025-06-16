@@ -20,15 +20,7 @@ from auth import (
     verify_session,
 )
 from bs4 import BeautifulSoup
-from categories import (
-    Category,
-    CategoryRename,
-    add_category,
-    delete_category,
-    get_categories,
-    init_default_categories,
-    rename_category,
-)
+from categories import Category, CategoryRename, add_category, delete_category, get_categories, rename_category
 from chatbot import answer_question
 
 # Import the classification function and todo management
@@ -38,7 +30,7 @@ from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from scheduler import get_scheduler_status, start_scheduler, update_schedule_time
-from spaces import create_space, delete_space, get_spaces_for_user, invite_members, rename_space
+from spaces import create_space, delete_space, get_spaces_for_user, invite_members, rename_space, user_in_space
 from todos import Todo, complete_todo, create_todo, delete_todo, get_todos, health_check, update_todo_fields
 
 # Set up logging with more detail
@@ -194,8 +186,11 @@ async def api_create_todo(request: Request, current_user: dict = Depends(get_cur
         # Only classify if not created offline (offline todos are already classified)
         if not body.get("created_offline", False):
             try:
+                categories_list = await get_categories(body.get("space_id")) if body.get("space_id") else []
                 classification = await classify_task(
-                    classify_text, body.get("categories", []), body.get("dateAdded", "")
+                    classify_text,
+                    categories_list,
+                    body.get("dateAdded", ""),
                 )
                 body["category"] = classification.get("category", "General")
                 body["priority"] = classification.get("priority", "Medium")
@@ -269,38 +264,47 @@ async def startup_event():
     """Initialize default categories, cleanup expired sessions, and start scheduler."""
     # Skip startup tasks in test environment
     if not os.getenv("USE_MOCK_DB"):
-        await init_default_categories()
         await cleanup_expired_sessions()
         start_scheduler()
 
 
 # Category management endpoints
 @app.get("/categories", response_model=List[str])
-async def api_get_categories():
-    """Get all categories."""
-    logger.info("Fetching all categories")
-    return await get_categories()
+async def api_get_categories(space_id: str, current_user: dict = Depends(get_current_user)):
+    """Get categories for a space."""
+    if not await user_in_space(current_user["user_id"], space_id):
+        raise HTTPException(status_code=403, detail="Not in space")
+    logger.info("Fetching categories for space %s", space_id)
+    return await get_categories(space_id)
 
 
 @app.post("/categories")
-async def api_add_category(category: Category):
-    """Add a new category."""
-    logger.info(f"Adding new category: {category.name}")
+async def api_add_category(category: Category, current_user: dict = Depends(get_current_user)):
+    """Add a new category to a space."""
+    if not await user_in_space(current_user["user_id"], category.space_id):
+        raise HTTPException(status_code=403, detail="Not in space")
+    logger.info("Adding new category %s to space %s", category.name, category.space_id)
     return await add_category(category)
 
 
 @app.put("/categories/{name}")
-async def api_rename_category(name: str, body: CategoryRename):
-    """Rename an existing category."""
-    logger.info(f"Renaming category {name} to {body.new_name}")
-    return await rename_category(name, body.new_name)
+async def api_rename_category(
+    name: str, space_id: str, body: CategoryRename, current_user: dict = Depends(get_current_user)
+):
+    """Rename an existing category within a space."""
+    if not await user_in_space(current_user["user_id"], space_id):
+        raise HTTPException(status_code=403, detail="Not in space")
+    logger.info("Renaming category %s to %s in space %s", name, body.new_name, space_id)
+    return await rename_category(name, body.new_name, space_id)
 
 
 @app.delete("/categories/{name}")
-async def api_delete_category(name: str):
-    """Delete a category."""
-    logger.info(f"Deleting category: {name}")
-    return await delete_category(name)
+async def api_delete_category(name: str, space_id: str, current_user: dict = Depends(get_current_user)):
+    """Delete a category from a space."""
+    if not await user_in_space(current_user["user_id"], space_id):
+        raise HTTPException(status_code=403, detail="Not in space")
+    logger.info("Deleting category %s from space %s", name, space_id)
+    return await delete_category(name, space_id)
 
 
 class SpaceCreateRequest(BaseModel):

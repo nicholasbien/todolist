@@ -4,6 +4,7 @@ from typing import List, Optional
 
 import auth
 from bson import ObjectId
+from categories import init_default_categories
 from dotenv import load_dotenv
 from fastapi import HTTPException
 from mongomock_motor import AsyncMongoMockClient
@@ -45,8 +46,10 @@ async def ensure_default_space(user_id: str) -> str:
     space_dict = space.dict(by_alias=True)
     space_dict.pop("_id", None)
     result = await spaces_collection.insert_one(space_dict)
+    space_id = str(result.inserted_id)
+    await init_default_categories(space_id)
     logger.info("Created Default space for user %s", user_id)
-    return str(result.inserted_id)
+    return space_id
 
 
 async def create_space(name: str, owner_id: str) -> Space:
@@ -59,6 +62,7 @@ async def create_space(name: str, owner_id: str) -> Space:
     result = await spaces_collection.insert_one(space_dict)
     created = await spaces_collection.find_one({"_id": result.inserted_id})
     created["_id"] = str(created["_id"])
+    await init_default_categories(created["_id"])
     return Space(**created)
 
 

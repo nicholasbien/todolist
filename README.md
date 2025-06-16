@@ -323,10 +323,10 @@ python3 -c "import secrets; print(secrets.token_urlsafe(32))"
 - `DELETE /todos/{id}` - Delete todo
 
 ### Categories
-- `GET /categories` - Get all categories
-- `POST /categories` - Add new category
-- `PUT /categories/{name}` - Rename category
-- `DELETE /categories/{name}` - Delete category
+- `GET /categories?space_id={id}` - Get categories for a space
+- `POST /categories` - Add new category to a space (`{ "name": "Work", "space_id": "..." }`)
+- `PUT /categories/{name}?space_id={id}` - Rename category within a space
+- `DELETE /categories/{name}?space_id={id}` - Delete category from a space
 
 ### AI Classification - now handled fully on the backend as part of adding task
 Todos are automatically classified when created. You can also use
