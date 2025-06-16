@@ -36,20 +36,11 @@ class Space(BaseModel):
         allow_population_by_field_name = True
 
 
-async def ensure_default_space(user_id: str) -> str:
-    """Ensure the user has a Default space and return its ID."""
-    existing = await spaces_collection.find_one({"owner_id": user_id, "name": "Default"})
-    if existing:
-        return str(existing["_id"])
-
-    space = Space(name="Default", owner_id=user_id, member_ids=[user_id])
-    space_dict = space.dict(by_alias=True)
-    space_dict.pop("_id", None)
-    result = await spaces_collection.insert_one(space_dict)
-    space_id = str(result.inserted_id)
-    await init_default_categories(space_id)
-    logger.info("Created Default space for user %s", user_id)
-    return space_id
+async def ensure_default_categories(user_id: str) -> None:
+    """Ensure the user has default categories (space_id = None)."""
+    # Initialize default categories for the default space if none exist
+    await init_default_categories(None)
+    logger.info("Ensured default categories for user %s", user_id)
 
 
 async def create_space(name: str, owner_id: str) -> Space:
@@ -67,7 +58,10 @@ async def create_space(name: str, owner_id: str) -> Space:
 
 
 async def get_spaces_for_user(user_id: str) -> List[Space]:
-    await ensure_default_space(user_id)
+    # Ensure default categories exist for space_id = None
+    await ensure_default_categories(user_id)
+
+    # Get user's actual spaces from database
     query = {"member_ids": user_id}
     cursor = spaces_collection.find(query)
     spaces = []
@@ -75,12 +69,30 @@ async def get_spaces_for_user(user_id: str) -> List[Space]:
         doc["_id"] = str(doc["_id"])
         spaces.append(Space(**doc))
 
-    # Sort spaces with "Default" first, then alphabetically
-    spaces.sort(key=lambda s: (s.name != "Default", s.name))
+    # Add virtual "Default" space (space_id = None) at the beginning
+    default_space = Space(
+        id=None,  # This represents space_id = None
+        name="Default",
+        owner_id=user_id,
+        member_ids=[user_id],
+        pending_emails=[],
+    )
+    spaces.insert(0, default_space)
+
+    # Sort remaining spaces alphabetically (Default is already first)
+    if len(spaces) > 1:
+        remaining_spaces = spaces[1:]
+        remaining_spaces.sort(key=lambda s: s.name)
+        spaces = [spaces[0]] + remaining_spaces
+
     return spaces
 
 
 async def user_in_space(user_id: str, space_id: str) -> bool:
+    # Handle default space (space_id = None) - only the user themselves has access
+    if space_id is None:
+        return True  # User always has access to their own default space
+
     space = await spaces_collection.find_one({"_id": ObjectId(space_id)})
     if not space:
         raise HTTPException(status_code=404, detail="Space not found")
@@ -154,7 +166,7 @@ async def is_default_space(space_id: str, user_id: str) -> bool:
 
 
 async def delete_space(space_id: str, user_id: str) -> dict:
-    """Delete a space and move todos to each member's Default space."""
+    """Delete a space and all its todos and categories."""
     space = await spaces_collection.find_one({"_id": ObjectId(space_id)})
     if not space:
         raise HTTPException(status_code=404, detail="Space not found")
@@ -163,12 +175,18 @@ async def delete_space(space_id: str, user_id: str) -> dict:
     if space.get("name") == "Default":
         raise HTTPException(status_code=400, detail="Cannot delete the Default space")
 
-    from todos import todos_collection  # Circular import
+    # Import here to avoid circular imports
+    from categories import categories_collection
+    from todos import todos_collection
 
-    member_ids = space.get("member_ids", [])
-    for m_id in member_ids:
-        default_id = await ensure_default_space(m_id)
-        await todos_collection.update_many({"space_id": space_id, "user_id": m_id}, {"$set": {"space_id": default_id}})
+    # Delete all todos in this space
+    todos_result = await todos_collection.delete_many({"space_id": space_id})
 
+    # Delete all categories in this space
+    categories_result = await categories_collection.delete_many({"space_id": space_id})
+
+    # Delete the space itself
     await spaces_collection.delete_one({"_id": ObjectId(space_id)})
-    return {"message": "Space deleted"}
+
+    message = f"Space deleted with {todos_result.deleted_count} todos and {categories_result.deleted_count} categories"
+    return {"message": message}

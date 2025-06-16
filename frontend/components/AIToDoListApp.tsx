@@ -116,7 +116,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
   // Fetch todos from MongoDB
   const fetchTodos = useCallback(async () => {
     try {
-      const url = activeSpace ? `/todos?space_id=${activeSpace._id}` : '/todos';
+      const url = activeSpace && activeSpace._id ? `/todos?space_id=${activeSpace._id}` : '/todos';
       const response = await authenticatedFetch(url);
       if (!response?.ok) {
         throw new Error('Failed to fetch todos');

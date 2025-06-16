@@ -51,7 +51,7 @@ class Category(BaseModel):
 
 
 async def get_categories(space_id: Optional[str] = None) -> List[str]:
-    """Get all categories for a space, or default space categories if space_id is None."""
+    """Get all categories for a space."""
     try:
         # Query for categories with matching space_id (including None)
         cursor = categories_collection.find({"space_id": space_id}, {"name": 1, "_id": 0})
@@ -59,10 +59,6 @@ async def get_categories(space_id: Optional[str] = None) -> List[str]:
         categories = []
         async for doc in cursor:
             categories.append(doc["name"])
-
-        # If no categories found for default space, return default categories
-        if space_id is None and not categories:
-            return DEFAULT_CATEGORIES.copy()
 
         return categories
     except Exception as e:
