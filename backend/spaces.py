@@ -122,8 +122,15 @@ async def invite_members(space_id: str, inviter_email: str, emails: List[str]) -
         try:
             from email_summary import send_email
 
+            # Get inviter's first name
+            inviter_user = await auth.users_collection.find_one({"email": inviter_email})
+            if inviter_user and inviter_user.get("name"):
+                inviter_display = f"{inviter_user['name']} ({inviter_email})"
+            else:
+                inviter_display = inviter_email
+
             subject = "You've been invited to a todo space"
-            body = f"{inviter_email} has invited you to collaborate on the space '{space['name']}'.\n"
+            body = f"{inviter_display} has invited you to collaborate on the space '{space['name']}'.\n"
             if WEBSITE_URL:
                 body += f"Sign up at {WEBSITE_URL} to access the shared todos."
             else:
