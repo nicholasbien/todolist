@@ -21,6 +21,9 @@ client = AsyncMongoMockClient() if USE_MOCK_DB else AsyncIOMotorClient(MONGODB_U
 db = client.todo_db
 spaces_collection = db.spaces
 
+# Link to the frontend for invite emails (provided via env var)
+WEBSITE_URL = os.getenv("WEBSITE_URL")
+
 
 class Space(BaseModel):
     id: Optional[str] = Field(alias="_id", default=None)
@@ -101,10 +104,11 @@ async def invite_members(space_id: str, inviter_email: str, emails: List[str]) -
             from email_summary import send_email
 
             subject = "You've been invited to a todo space"
-            body = (
-                f"{inviter_email} has invited you to collaborate on the space '{space['name']}'."
-                "\nSign up to access the shared todos."
-            )
+            body = f"{inviter_email} has invited you to collaborate on the space '{space['name']}'.\n"
+            if WEBSITE_URL:
+                body += f"Sign up at {WEBSITE_URL} to access the shared todos."
+            else:
+                body += "Sign up to access the shared todos."
             await send_email(email, subject, body)
         except Exception:
             logger.error("Failed to send invite email to %s", email)
