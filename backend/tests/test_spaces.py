@@ -136,3 +136,39 @@ async def test_private_clears_pending_invites(client, test_email, test_email3):
 
     resp = await client.get("/spaces", headers=headers3)
     assert all(s["_id"] != space_id for s in resp.json())
+
+
+@pytest.mark.asyncio
+async def test_invite_emails_sent_only_once(client, test_email, test_email2, test_email3, monkeypatch):
+    token1 = await get_token(client, test_email)
+    headers1 = {"Authorization": f"Bearer {token1}"}
+
+    space_id = await create_test_space(client, token1)
+
+    sent = []
+
+    async def fake_send_email(to_email: str, subject: str, body: str) -> bool:
+        sent.append(to_email)
+        return True
+
+    monkeypatch.setattr("email_summary.send_email", fake_send_email)
+
+    # Initial invite
+    resp = await client.post(
+        f"/spaces/{space_id}/invite",
+        json={"emails": [test_email2]},
+        headers=headers1,
+    )
+    assert resp.status_code == 200
+    assert sent == [test_email2]
+
+    sent.clear()
+
+    # Invite same email again plus a new one
+    resp2 = await client.post(
+        f"/spaces/{space_id}/invite",
+        json={"emails": [test_email2, test_email3]},
+        headers=headers1,
+    )
+    assert resp2.status_code == 200
+    assert sent == [test_email3]
