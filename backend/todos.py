@@ -1,7 +1,7 @@
 import logging
 import os
 from datetime import datetime
-from typing import Optional
+from typing import Any, Dict, Optional
 
 from bson import ObjectId
 from dotenv import load_dotenv
@@ -9,7 +9,7 @@ from fastapi import HTTPException
 from mongomock_motor import AsyncMongoMockClient
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, Field
-from spaces import is_default_space, user_in_space
+from spaces import user_in_space
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -73,21 +73,26 @@ async def create_todo(todo: Todo):
 async def get_todos(user_id: str, space_id: Optional[str] | None = None):
     try:
         todos = []
-        query: dict = {"user_id": user_id}
+        query: Dict[str, Any] = {"space_id": space_id}
         if space_id:
-            if not await user_in_space(user_id, space_id):
+            try:
+                is_member = await user_in_space(user_id, space_id)
+                if not is_member:
+                    raise HTTPException(status_code=403, detail="Not in space")
+            except HTTPException as e:
+                # If it's a 404 (space not found), convert to 403 for security
+                if e.status_code == 404:
+                    raise HTTPException(status_code=403, detail="Not in space")
+                # If it's already 403, re-raise as is
+                raise
+            except Exception:
+                # Any other error should be treated as access denied
                 raise HTTPException(status_code=403, detail="Not in space")
-            if await is_default_space(space_id, user_id):
-                query = {
-                    "user_id": user_id,
-                    "$or": [
-                        {"space_id": space_id},
-                        {"space_id": None},
-                        {"space_id": {"$exists": False}},
-                    ],
-                }
-            else:
-                query["space_id"] = space_id
+            # In collaborative spaces, show todos from ALL members
+            # Don't filter on user
+        else:
+            # In default space, only show user's own todos
+            query["user_id"] = user_id
         cursor = todos_collection.find(query)
         async for todo in cursor:
             # Ensure _id is properly converted to string
@@ -95,6 +100,9 @@ async def get_todos(user_id: str, space_id: Optional[str] | None = None):
             todo_obj = Todo(**todo)
             todos.append(todo_obj)
         return todos
+    except HTTPException:
+        # Re-raise HTTP exceptions (like 403) without conversion
+        raise
     except Exception as e:
         logger.error(f"Error fetching todos: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error fetching todos: {str(e)}")

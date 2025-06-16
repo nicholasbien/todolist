@@ -91,12 +91,16 @@ async def get_spaces_for_user(user_id: str) -> List[Space]:
     return spaces
 
 
-async def user_in_space(user_id: str, space_id: str) -> bool:
+async def user_in_space(user_id: str, space_id: Optional[str]) -> bool:
     # Handle default space (space_id = None) - only the user themselves has access
     if space_id is None:
         return True  # User always has access to their own default space
 
-    space = await spaces_collection.find_one({"_id": ObjectId(space_id)})
+    try:
+        space = await spaces_collection.find_one({"_id": ObjectId(space_id)})
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid space ID")
+
     if not space:
         raise HTTPException(status_code=404, detail="Space not found")
     return user_id in space.get("member_ids", [])

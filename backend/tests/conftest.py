@@ -60,3 +60,9 @@ def test_email():
 def test_email2():
     """Second test email for user isolation tests."""
     return "pytest2@example.com"
+
+
+@pytest.fixture
+def test_email3():
+    """Third test email for collaboration tests."""
+    return "pytest3@example.com"

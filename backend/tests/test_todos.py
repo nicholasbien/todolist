@@ -65,14 +65,17 @@ async def test_category_management(client, test_email):
     headers = {"Authorization": f"Bearer {token}"}
     spaces_resp = await client.get("/spaces", headers=headers)
     assert spaces_resp.status_code == 200
-    default_space = spaces_resp.json()[0]["_id"]
+    default_space = spaces_resp.json()[0]["_id"]  # This will be None for default space
 
-    # Add category
+    # Add category to default space (space_id = None)
     add_resp = await client.post("/categories", json={"name": "Errands", "space_id": default_space}, headers=headers)
     assert add_resp.status_code == 200
 
-    # Ensure category exists
-    categories_resp = await client.get(f"/categories?space_id={default_space}", headers=headers)
+    # Ensure category exists (for default space, don't pass space_id)
+    if default_space is None:
+        categories_resp = await client.get("/categories", headers=headers)
+    else:
+        categories_resp = await client.get(f"/categories?space_id={default_space}", headers=headers)
     assert categories_resp.status_code == 200
     categories = categories_resp.json()
     assert "Errands" in categories
@@ -89,10 +92,16 @@ async def test_category_management(client, test_email):
         todo_id = create_resp.json()["_id"]
 
     # Delete category and ensure todo updated to General
-    delete_resp = await client.delete(f"/categories/Errands?space_id={default_space}", headers=headers)
+    if default_space is None:
+        delete_resp = await client.delete("/categories/Errands", headers=headers)
+    else:
+        delete_resp = await client.delete(f"/categories/Errands?space_id={default_space}", headers=headers)
     assert delete_resp.status_code == 200
 
-    get_todos_resp = await client.get("/todos", headers=headers)
+    if default_space is None:
+        get_todos_resp = await client.get("/todos", headers=headers)
+    else:
+        get_todos_resp = await client.get(f"/todos?space_id={default_space}", headers=headers)
     assert get_todos_resp.status_code == 200
     todos = get_todos_resp.json()
     todo = next(t for t in todos if t["_id"] == todo_id)
