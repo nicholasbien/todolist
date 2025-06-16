@@ -119,11 +119,21 @@ async def invite_members(space_id: str, inviter_email: str, emails: List[str]) -
     pending = set(space.get("pending_emails", []))
     member_ids = set(space.get("member_ids", []))
 
-    for email in emails:
+    # Deduplicate input emails
+    unique_emails = set(emails)
+
+    for email in unique_emails:
         user = await auth.users_collection.find_one({"email": email})
         if user:
-            member_ids.add(str(user["_id"]))
+            user_id = str(user["_id"])
+            if user_id in member_ids:
+                # Already a member - don't send another invite
+                continue
+            member_ids.add(user_id)
         else:
+            if email in pending:
+                # Already invited and pending
+                continue
             pending.add(email)
 
         # Send invitation email (best effort)
