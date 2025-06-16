@@ -632,6 +632,49 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
         </div>
       )}
 
+      {/* Spaces */}
+      <div className="mb-6">
+        <div className="flex items-center mb-3">
+          <h2 className="text-lg font-semibold text-gray-100">
+            Space: {activeSpace ? activeSpace.name : 'None'}
+          </h2>
+          {activeSpace && activeSpace.name !== 'Default' && (
+            <button
+              onClick={() => {
+                setSpaceToEdit(activeSpace);
+                setEditSpaceName(activeSpace.name);
+                setEditSpaceEmails('');
+                setShowEditSpaceModal(true);
+              }}
+              className="ml-2 text-gray-400 hover:text-gray-200 text-sm border border-gray-700 px-2 py-1 rounded-lg hover:border-gray-600 transition-colors"
+            >
+              Edit
+            </button>
+          )}
+        </div>
+        <div className="flex flex-wrap gap-2 mb-4">
+          {spaces.map(space => (
+            <button
+              key={space._id}
+              onClick={() => setActiveSpace(space)}
+              className={`px-4 py-2 rounded-xl text-base transition-colors ${
+                activeSpace && space._id === activeSpace._id
+                  ? 'bg-blue-600 text-white shadow-lg'
+                  : 'bg-gray-900 text-gray-300 hover:bg-gray-800 border border-gray-800'
+              }`}
+            >
+              {space.name}
+            </button>
+          ))}
+          <button
+            onClick={() => setShowAddSpaceModal(true)}
+            className="px-4 py-2 rounded-xl text-base bg-gray-900 text-gray-300 hover:bg-gray-800 border border-gray-800 transition-colors"
+          >
+            +
+          </button>
+        </div>
+      </div>
+
       {/* Add new todo */}
       <div className="mb-6">
         <div className="flex gap-2">
@@ -653,53 +696,12 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
         </div>
       </div>
 
-      {/* Spaces */}
-      <div className="mb-6">
-        <div className="flex items-center mb-3">
-          <h2 className="text-lg font-semibold text-gray-100">
-            {activeSpace ? activeSpace.name : 'Space'}
-          </h2>
-          {activeSpace && activeSpace.name !== 'Default' && (
-            <button
-              onClick={() => {
-                setSpaceToEdit(activeSpace);
-                setEditSpaceName(activeSpace.name);
-                setEditSpaceEmails('');
-                setShowEditSpaceModal(true);
-              }}
-              className="ml-2 text-gray-400 hover:text-gray-200 text-sm border border-gray-700 px-2 py-1 rounded-lg hover:border-gray-600 transition-colors"
-            >
-              Edit
-            </button>
-          )}
-          <button
-            onClick={() => setShowAddSpaceModal(true)}
-            className="ml-2 text-gray-400 hover:text-gray-200 text-sm border border-gray-700 px-2 py-1 rounded-lg hover:border-gray-600 transition-colors"
-          >
-            +
-          </button>
-        </div>
-        <div className="flex flex-wrap gap-2 mb-4">
-          {spaces.map(space => (
-            <button
-              key={space._id}
-              onClick={() => setActiveSpace(space)}
-              className={`px-4 py-2 rounded-xl text-base transition-colors ${
-                activeSpace && space._id === activeSpace._id
-                  ? 'bg-blue-600 text-white shadow-lg'
-                  : 'bg-gray-900 text-gray-300 hover:bg-gray-800 border border-gray-800'
-              }`}
-            >
-              {space.name}
-            </button>
-          ))}
-        </div>
-      </div>
-
       {/* Categories - Horizontal wrapping pills */}
       <div className="mb-6">
         <div className="flex items-center mb-3">
-          <h2 className="text-lg font-semibold text-gray-100">{activeCat}</h2>
+          <h2 className="text-lg font-semibold text-gray-100">
+            Category: {activeCat}
+          </h2>
           {activeCat !== "All" && (
             <button
               onClick={() => {
