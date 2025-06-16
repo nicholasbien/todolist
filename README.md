@@ -9,7 +9,7 @@ A modern todo list application with AI-powered task classification, email verifi
 
 ## Features
 
-- **AI-powered task classification** using OpenAI GPT-4o-mini
+- **AI-powered task classification** using OpenAI GPT-4.1-nano
 - **Email verification authentication** with JWT sessions
 - **Daily email summaries** with AI-generated insights
 - **Customizable email instructions** for personalized summaries
