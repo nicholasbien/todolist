@@ -21,7 +21,15 @@ load_dotenv()
 
 # MongoDB connection
 MONGODB_URL = os.getenv("MONGODB_URL", "mongodb://localhost:27017")
-client = AsyncIOMotorClient(MONGODB_URL)
+USE_MOCK_DB = os.getenv("USE_MOCK_DB", "false").lower() == "true"
+
+if USE_MOCK_DB:
+    from mongomock_motor import AsyncMongoMockClient
+
+    client = AsyncMongoMockClient()
+else:
+    client = AsyncIOMotorClient(MONGODB_URL)
+
 db = client.todo_db
 categories_collection = db.categories
 
@@ -94,8 +102,8 @@ async def delete_category(name: str, space_id: Optional[str] = None) -> dict:
         if not existing:
             raise HTTPException(status_code=404, detail="Category not found")
 
-        # Access todos collection directly to avoid circular import
-        todos_collection = db.todos
+        # Import todos collection to avoid circular import issues
+        from todos import todos_collection
 
         # Update todos
         todo_query = {"category": name, "space_id": space_id}
@@ -137,8 +145,8 @@ async def rename_category(old_name: str, new_name: str, space_id: Optional[str] 
 
         await categories_collection.update_one(query, {"$set": {"name": new_name}})
 
-        # Access todos collection directly to avoid circular import
-        todos_collection = db.todos
+        # Import todos collection to avoid circular import issues
+        from todos import todos_collection
 
         # Update todos
         todo_query = {"category": old_name, "space_id": space_id}
@@ -151,6 +159,17 @@ async def rename_category(old_name: str, new_name: str, space_id: Optional[str] 
     except Exception as e:
         logger.error(f"Error renaming category: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error renaming category: {str(e)}")
+
+
+# Migrate legacy categories to have space_id field
+async def migrate_legacy_categories() -> None:
+    try:
+        # Update all categories that don't have space_id field to have space_id: None
+        result = await categories_collection.update_many({"space_id": {"$exists": False}}, {"$set": {"space_id": None}})
+        if result.modified_count > 0:
+            logger.info("Migrated %d legacy categories to have space_id: None", result.modified_count)
+    except Exception as e:
+        logger.error(f"Error migrating legacy categories: {str(e)}")
 
 
 # Initialize default categories for a space if none exist

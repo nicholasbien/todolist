@@ -203,6 +203,17 @@ async def update_todo_fields(todo_id: str, updates: dict, user_id: str):
         raise HTTPException(status_code=500, detail=f"Error updating todo: {str(e)}")
 
 
+# Migrate legacy todos to have space_id field
+async def migrate_legacy_todos() -> None:
+    try:
+        # Update all todos that don't have space_id field to have space_id: None
+        result = await todos_collection.update_many({"space_id": {"$exists": False}}, {"$set": {"space_id": None}})
+        if result.modified_count > 0:
+            logger.info("Migrated %d legacy todos to have space_id: None", result.modified_count)
+    except Exception as e:
+        logger.error(f"Error migrating legacy todos: {str(e)}")
+
+
 async def health_check():
     try:
         await db.command("ping")

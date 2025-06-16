@@ -100,7 +100,9 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
   // Fetch categories from MongoDB
   const fetchCategories = useCallback(async () => {
     try {
-      const response = await authenticatedFetch('/categories');
+      const spaceId = activeSpace?._id || null;
+      const url = spaceId ? `/categories?space_id=${spaceId}` : '/categories';
+      const response = await authenticatedFetch(url);
       if (!response?.ok) {
         throw new Error('Failed to fetch categories');
       }
@@ -109,7 +111,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
     } catch (err) {
       setError('Error loading categories: ' + err.message);
     }
-  }, [authenticatedFetch]);
+  }, [authenticatedFetch, activeSpace]);
 
   // Fetch todos from MongoDB
   const fetchTodos = useCallback(async () => {
@@ -145,6 +147,13 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
 
     }
   }, [token, user, fetchSpaces, fetchTodos, fetchCategories]);
+
+  // Refetch categories when active space changes
+  useEffect(() => {
+    if (token && user && activeSpace) {
+      fetchCategories();
+    }
+  }, [activeSpace, fetchCategories, token, user]);
 
   // Update email time when user info loads
   useEffect(() => {
@@ -224,7 +233,10 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
     try {
       const response = await authenticatedFetch('/categories', {
         method: 'POST',
-        body: JSON.stringify({ name }),
+        body: JSON.stringify({
+          name,
+          space_id: activeSpace?._id || null
+        }),
       });
 
       if (!response.ok) {
@@ -303,7 +315,9 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
   // Delete category
   const handleDeleteCategory = async (name) => {
     try {
-      const response = await authenticatedFetch(`/categories/${encodeURIComponent(name)}`, {
+      const spaceId = activeSpace?._id || null;
+      const url = spaceId ? `/categories/${encodeURIComponent(name)}?space_id=${spaceId}` : `/categories/${encodeURIComponent(name)}`;
+      const response = await authenticatedFetch(url, {
         method: 'DELETE',
       });
 
@@ -333,7 +347,9 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
     }
 
     try {
-      const response = await authenticatedFetch(`/categories/${encodeURIComponent(activeCat)}`, {
+      const spaceId = activeSpace?._id || null;
+      const url = spaceId ? `/categories/${encodeURIComponent(activeCat)}?space_id=${spaceId}` : `/categories/${encodeURIComponent(activeCat)}`;
+      const response = await authenticatedFetch(url, {
         method: 'PUT',
         body: JSON.stringify({ new_name: trimmed }),
       });

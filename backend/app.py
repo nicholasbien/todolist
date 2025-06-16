@@ -27,6 +27,7 @@ from categories import (
     delete_category,
     get_categories,
     init_default_categories,
+    migrate_legacy_categories,
     rename_category,
 )
 from chatbot import answer_question
@@ -272,6 +273,12 @@ async def startup_event():
     """Initialize default categories, cleanup expired sessions, and start scheduler."""
     # Skip startup tasks in test environment
     if not os.getenv("USE_MOCK_DB"):
+        # Migrate legacy data to have space_id fields
+        await migrate_legacy_categories()
+        # Also migrate legacy todos
+        from todos import migrate_legacy_todos
+
+        await migrate_legacy_todos()
         # Initialize default categories for default space (no space_id)
         await init_default_categories()
         await cleanup_expired_sessions()

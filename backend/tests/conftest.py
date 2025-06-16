@@ -24,6 +24,7 @@ async def client():
     # Reset database connections to avoid event loop issues between tests
     import auth
     import categories
+    import spaces
     import todos
     from mongomock_motor import AsyncMongoMockClient
 
@@ -40,6 +41,10 @@ async def client():
     categories.client = AsyncMongoMockClient()
     categories.db = categories.client.todo_db
     categories.categories_collection = categories.db.categories
+
+    spaces.client = AsyncMongoMockClient()
+    spaces.db = spaces.client.todo_db
+    spaces.spaces_collection = spaces.db.spaces
 
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://testserver") as async_client:
         yield async_client
