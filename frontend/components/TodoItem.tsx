@@ -9,6 +9,7 @@ interface TodoItemProps {
   handleUpdatePriority: (id: string, priority: string) => void;
   handleCompleteTodo: (id: string) => void;
   handleDeleteTodo: (id: string) => void;
+  isCollaborative: boolean;
 }
 
 export default function TodoItem({
@@ -20,6 +21,7 @@ export default function TodoItem({
   handleUpdatePriority,
   handleCompleteTodo,
   handleDeleteTodo,
+  isCollaborative,
 }: TodoItemProps) {
   const [isCompleting, setIsCompleting] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -212,6 +214,7 @@ export default function TodoItem({
                 return dueDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
               }
             })()}
+            {isCollaborative && todo.first_name ? ` Added by: ${todo.first_name}` : ''}
           </span>
         )}
       </div>

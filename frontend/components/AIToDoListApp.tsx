@@ -944,6 +944,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
             handleUpdatePriority={handleUpdatePriority}
             handleCompleteTodo={handleCompleteTodo}
             handleDeleteTodo={handleDeleteTodo}
+            isCollaborative={(activeSpace?.member_ids?.length ?? 0) > 1}
           />
         ))}
       </div>
@@ -973,6 +974,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
               handleUpdatePriority={handleUpdatePriority}
               handleCompleteTodo={handleCompleteTodo}
               handleDeleteTodo={handleDeleteTodo}
+              isCollaborative={(activeSpace?.member_ids?.length ?? 0) > 1}
             />
           ))}
         </div>
