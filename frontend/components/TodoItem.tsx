@@ -214,7 +214,11 @@ export default function TodoItem({
                 return dueDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
               }
             })()}
-            {isCollaborative && todo.first_name ? ` Added by: ${todo.first_name}` : ''}
+          </span>
+        )}
+        {isCollaborative && todo.first_name && (
+          <span className={`text-xs ${todo.completed ? "text-gray-500" : "text-gray-300"}`}>
+            Added by: {todo.first_name}
           </span>
         )}
       </div>
