@@ -197,6 +197,19 @@ async def update_space(
     return Space(**updated)
 
 
+async def leave_space(space_id: str, user_id: str) -> dict:
+    """Remove a user from a space's member list."""
+    space = await spaces_collection.find_one({"_id": ObjectId(space_id)})
+    if not space:
+        raise HTTPException(status_code=404, detail="Space not found")
+    if space.get("owner_id") == user_id:
+        raise HTTPException(status_code=400, detail="Owner cannot leave their own space")
+    if user_id not in space.get("member_ids", []):
+        raise HTTPException(status_code=400, detail="User is not a member of this space")
+    await spaces_collection.update_one({"_id": ObjectId(space_id)}, {"$pull": {"member_ids": user_id}})
+    return {"message": "Left space"}
+
+
 async def is_default_space(space_id: str, user_id: str) -> bool:
     """Check if the given space is the user's Default space."""
     space = await spaces_collection.find_one({"_id": ObjectId(space_id), "owner_id": user_id})
