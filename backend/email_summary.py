@@ -9,6 +9,7 @@ import smtplib
 from datetime import datetime, timedelta
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from typing import Dict, List
 
 import openai
 from bson import ObjectId
@@ -32,9 +33,9 @@ logger = logging.getLogger(__name__)
 
 
 def create_summary_prompt(
-    todos_json: str, user_name: str = "there", custom_instructions: str = "", user_timezone: str = "America/New_York"
+    spaces_json: str, user_name: str = "there", custom_instructions: str = "", user_timezone: str = "America/New_York"
 ) -> str:
-    """Create a prompt for generating a daily todo summary."""
+    """Create a prompt for generating a daily todo summary with space context."""
     # Localize date to user's timezone
     import pytz  # type: ignore
 
@@ -55,10 +56,10 @@ def create_summary_prompt(
 
 Today's date: {current_date}
 
-Given the following JSON data of todos, create a warm, encouraging daily summary email.
+Given the following JSON data of todos organized by collaboration space, create a warm, encouraging daily summary email.
 
-Todo Data:
-{todos_json}
+Todo Data (grouped by space):
+{spaces_json}
 
 Instructions:
 1. Address the user as "{user_name}" if provided, otherwise use "there"
@@ -84,6 +85,7 @@ Instructions:
    - Recent momentum and progress patterns
 8. Keep it concise but personal (2-3 paragraphs max)
 9. End with a motivational note for the day ahead
+10. If referring to tasks in a specific space, only mention todos from that space
 {custom_instructions}
 
 Format as plain text email content (no HTML, no subject line).
@@ -91,16 +93,14 @@ Format as plain text email content (no HTML, no subject line).
 
 
 async def generate_todo_summary(
-    todos: list, user_name: str = "there", custom_instructions: str = "", user_timezone: str = "America/New_York"
+    spaces_data: list, user_name: str = "there", custom_instructions: str = "", user_timezone: str = "America/New_York"
 ) -> str:
-    """
-    Use OpenAI to generate a personalized todo summary.
-    """
+    """Use OpenAI to generate a personalized todo summary."""
     try:
-        # Convert todos to JSON for the prompt
-        todos_json = json.dumps(todos, indent=2, default=str)
+        # Convert spaces and their todos to JSON for the prompt
+        spaces_json = json.dumps(spaces_data, indent=2, default=str)
 
-        prompt = create_summary_prompt(todos_json, user_name, custom_instructions, user_timezone)
+        prompt = create_summary_prompt(spaces_json, user_name, custom_instructions, user_timezone)
 
         # Use OpenAI to generate the summary
         client = openai.AsyncOpenAI(api_key=openai.api_key)
@@ -122,15 +122,18 @@ async def generate_todo_summary(
     except Exception as e:
         logger.error(f"Error generating summary with OpenAI: {e}")
         # Fallback to a simple summary
-        return create_simple_summary(todos, user_name)
+        return create_simple_summary(spaces_data, user_name)
 
 
-def create_simple_summary(todos: list, user_name: str = "there") -> str:
-    """
-    Create a simple fallback summary without AI.
-    """
-    completed = [t for t in todos if t.get("completed", False)]
-    pending = [t for t in todos if not t.get("completed", False)]
+def create_simple_summary(spaces_data: list, user_name: str = "there") -> str:
+    """Create a simple fallback summary without AI."""
+    # Flatten todos from all spaces
+    all_todos = []
+    for space in spaces_data:
+        all_todos.extend(space.get("todos", []))
+
+    completed = [t for t in all_todos if t.get("completed", False)]
+    pending = [t for t in all_todos if not t.get("completed", False)]
 
     high_priority = [t for t in pending if t.get("priority", "").lower() == "high"]
     due_soon = [
@@ -218,8 +221,20 @@ async def send_daily_summary(
     Generate and send daily summary for a specific user.
     """
     try:
-        # Get user's todos
-        todos = await get_todos(user_id)
+        # Get user's todos for all spaces
+        from spaces import get_spaces_for_user
+
+        spaces = await get_spaces_for_user(user_id)
+        spaces_data = []
+        all_todos = []
+        for space in spaces:
+            space_todos = await get_todos(user_id, space.id)
+            todos_dict = [t.dict() if hasattr(t, "dict") else t for t in space_todos]
+            spaces_data.append({"space": space.name, "todos": todos_dict})
+            for t in todos_dict:
+                t_copy = dict(t)
+                t_copy["_space"] = space.name
+                all_todos.append(t_copy)
 
         if custom_instructions is None:
             from auth import users_collection
@@ -234,12 +249,9 @@ async def send_daily_summary(
             user = await users_collection.find_one({"_id": ObjectId(user_id)})
             user_timezone = user.get("timezone", "America/New_York") if user else "America/New_York"
 
-        # Convert todos to dict format for processing
-        todos_dict = [todo.dict() if hasattr(todo, "dict") else todo for todo in todos]
-
         # Filter out invalid todos (those without dateAdded)
-        valid_todos_dict = [todo for todo in todos_dict if todo.get("dateAdded")]
-        logger.info(f"Filtered {len(todos_dict) - len(valid_todos_dict)} todos with missing dateAdded")
+        valid_todos_dict = [todo for todo in all_todos if todo.get("dateAdded")]
+        logger.info(f"Filtered {len(all_todos) - len(valid_todos_dict)} todos with missing dateAdded")
 
         # Separate completed and uncompleted tasks from valid todos
         completed_todos = [todo for todo in valid_todos_dict if todo.get("completed", False)]
@@ -273,11 +285,18 @@ async def send_daily_summary(
         completed_todos.sort(key=completed_sort_key)
 
         # Take up to 40 uncompleted and up to 20 completed tasks
-        limited_todos = uncompleted_todos[:40] + completed_todos[:20]
+        limited = uncompleted_todos[:40] + completed_todos[:20]
+
+        # Regroup limited todos by space
+        limited_by_space: Dict[str, List[dict]] = {}
+        for todo in limited:
+            space_name = todo.pop("_space", "Default")
+            limited_by_space.setdefault(space_name, []).append(todo)
+        limited_spaces = [{"space": name, "todos": items} for name, items in limited_by_space.items()]
 
         # Generate summary
         display_name = user_name or user_email.split("@")[0]
-        summary = await generate_todo_summary(limited_todos, display_name, custom_instructions or "", user_timezone)
+        summary = await generate_todo_summary(limited_spaces, display_name, custom_instructions or "", user_timezone)
 
         # Create subject with date in user's timezone
         import pytz  # type: ignore
