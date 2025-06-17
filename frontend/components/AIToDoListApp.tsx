@@ -43,6 +43,8 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
   const [editSpaceCollaborative, setEditSpaceCollaborative] = useState(true);
   const [inviteEmails, setInviteEmails] = useState<string[]>(['']);
   const [spaceToEdit, setSpaceToEdit] = useState<any>(null);
+  const [spaceMembers, setSpaceMembers] = useState<any[]>([]);
+  const [pendingInvites, setPendingInvites] = useState<string[]>([]);
 
   const handleOpenEmailSettings = async () => {
     try {
@@ -98,6 +100,24 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
     }
   }, [authenticatedFetch, activeSpace]);
 
+  const fetchMembers = useCallback(async () => {
+    if (!activeSpace || !activeSpace._id) {
+      setSpaceMembers([]);
+      setPendingInvites([]);
+      return;
+    }
+    try {
+      const resp = await authenticatedFetch(`/spaces/${activeSpace._id}/members`);
+      if (resp?.ok) {
+        const data = await resp.json();
+        setSpaceMembers(data.members || []);
+        setPendingInvites(data.pending_invites || []);
+      }
+    } catch (err) {
+      console.error('Error loading members', err);
+    }
+  }, [authenticatedFetch, activeSpace]);
+
   // Fetch categories from MongoDB
   const fetchCategories = useCallback(async () => {
     try {
@@ -136,6 +156,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
       fetchSpaces();
       fetchTodos();
       fetchCategories();
+      fetchMembers();
 
       // Send auth info to service worker for offline sync
       if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
@@ -147,14 +168,15 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
       }
 
     }
-  }, [token, user, fetchSpaces, fetchTodos, fetchCategories]);
+  }, [token, user, fetchSpaces, fetchTodos, fetchCategories, fetchMembers]);
 
-  // Refetch categories when active space changes
+  // Refetch categories and members when active space changes
   useEffect(() => {
     if (token && user && activeSpace) {
       fetchCategories();
+      fetchMembers();
     }
-  }, [activeSpace, fetchCategories, token, user]);
+  }, [activeSpace, fetchCategories, fetchMembers, token, user]);
 
   // Update email time when user info loads
   useEffect(() => {
@@ -698,6 +720,20 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
           </button>
         </div>
       </div>
+
+      {activeSpace && activeSpace._id && (
+        <div className="mb-6 ml-4">
+          <h3 className="text-sm font-semibold text-gray-400 mb-1">Members:</h3>
+          <ul className="text-gray-300 text-sm space-y-1">
+            {spaceMembers.map((m) => (
+              <li key={m.id}>{m.first_name || m.email} ({m.email})</li>
+            ))}
+            {pendingInvites.map((email) => (
+              <li key={email} className="italic">{email} (pending)</li>
+            ))}
+          </ul>
+        </div>
+      )}
 
 
       {/* Categories - Horizontal wrapping pills */}
