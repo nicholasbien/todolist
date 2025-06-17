@@ -1,5 +1,5 @@
-const STATIC_CACHE = 'todo-static-v34';
-const API_CACHE = 'todo-api-v34';
+const STATIC_CACHE = 'todo-static-v35';
+const API_CACHE = 'todo-api-v35';
 
 const GLOBAL_DB_NAME = 'TodoGlobalDB';
 const USER_DB_PREFIX = 'TodoUserDB_';
@@ -258,6 +258,7 @@ self.addEventListener('fetch', (event) => {
     url.origin === self.location.origin &&
     (url.pathname.startsWith('/todos') ||
       url.pathname.startsWith('/categories') ||
+      url.pathname.startsWith('/spaces') ||
       url.pathname.startsWith('/email') ||
       url.pathname.startsWith('/contact') ||
       url.pathname.startsWith('/chat') ||
@@ -277,6 +278,17 @@ self.addEventListener('fetch', (event) => {
 async function handleApiRequest(request) {
   const online = self.navigator.onLine;
   const url = new URL(request.url);
+
+  // TEMPORARILY DISABLED: Offline functionality disabled until spaces support is implemented
+  // This prevents data integrity issues with the spaces collaboration system
+  if (!online) {
+    return new Response(JSON.stringify({
+      error: 'Offline functionality is temporarily disabled. Please check your internet connection.'
+    }), {
+      status: 503,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
 
   // Check if this is an offline-generated ID that shouldn't go to server
   const isOfflineId = url.pathname.includes('offline_');
