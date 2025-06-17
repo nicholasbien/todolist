@@ -333,6 +333,19 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
     }
   };
 
+  const handleLeaveSpace = async (id) => {
+    try {
+      await authenticatedFetch(`/spaces/${id}/leave`, { method: 'POST' });
+      await fetchSpaces();
+      if (activeSpace && activeSpace._id === id) {
+        const updated = spaces.filter(s => s._id !== id);
+        setActiveSpace(updated.length ? updated[0] : null);
+      }
+    } catch (err) {
+      console.error('Error leaving space', err);
+    }
+  };
+
   // Delete category
   const handleDeleteCategory = async (name) => {
     try {
@@ -844,53 +857,67 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
       {showEditSpaceModal && (
         <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50">
           <div className="bg-black border border-gray-800 p-6 rounded-xl w-80 space-y-4 shadow-2xl">
-            <h3 className="text-gray-100 text-lg font-bold mb-2">Edit Space</h3>
-            <input
-              type="text"
-              value={editSpaceName}
-              onChange={e => setEditSpaceName(e.target.value)}
-              className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            <label className="flex items-center space-x-2 text-gray-300">
-              <input
-                type="checkbox"
-                checked={editSpaceCollaborative}
-                onChange={e => setEditSpaceCollaborative(e.target.checked)}
-              />
-              <span>Collaborative</span>
-            </label>
-            {editSpaceCollaborative && (
-              <div className="space-y-2">
-                {inviteEmails.map((email, idx) => (
+            {spaceToEdit && (spaceToEdit.owner_id === (user.id || user._id)) ? (
+              <>
+                <h3 className="text-gray-100 text-lg font-bold mb-2">Edit Space</h3>
+                <input
+                  type="text"
+                  value={editSpaceName}
+                  onChange={e => setEditSpaceName(e.target.value)}
+                  className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <label className="flex items-center space-x-2 text-gray-300">
                   <input
-                    key={idx}
-                    type="text"
-                    placeholder="Invite email"
-                    value={email}
-                    onChange={e => {
-                      const updated = [...inviteEmails];
-                      updated[idx] = e.target.value;
-                      setInviteEmails(updated);
-                    }}
-                    className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 placeholder-gray-500 text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    type="checkbox"
+                    checked={editSpaceCollaborative}
+                    onChange={e => setEditSpaceCollaborative(e.target.checked)}
                   />
-                ))}
-                <button
-                  type="button"
-                  onClick={() => setInviteEmails([...inviteEmails, ''])}
-                  className="text-gray-300 border border-gray-700 px-2 py-1 rounded-lg hover:bg-gray-800"
-                >
-                  +
-                </button>
-              </div>
+                  <span>Collaborative</span>
+                </label>
+                {editSpaceCollaborative && (
+                  <div className="space-y-2">
+                    {inviteEmails.map((email, idx) => (
+                      <input
+                        key={idx}
+                        type="text"
+                        placeholder="Invite email"
+                        value={email}
+                        onChange={e => {
+                          const updated = [...inviteEmails];
+                          updated[idx] = e.target.value;
+                          setInviteEmails(updated);
+                        }}
+                        className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 placeholder-gray-500 text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    ))}
+                    <button
+                      type="button"
+                      onClick={() => setInviteEmails([...inviteEmails, ''])}
+                      className="text-gray-300 border border-gray-700 px-2 py-1 rounded-lg hover:bg-gray-800"
+                    >
+                      +
+                    </button>
+                  </div>
+                )}
+                <div className="flex justify-center space-x-3">
+                  <button onClick={handleUpdateSpace} className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-2 rounded-lg transition-colors">Save</button>
+                  {spaceToEdit && (
+                    <button onClick={() => { handleDeleteSpace(spaceToEdit._id); setShowEditSpaceModal(false); }} className="bg-red-600 hover:bg-red-500 text-white px-6 py-2 rounded-lg transition-colors">Delete</button>
+                  )}
+                  <button onClick={() => setShowEditSpaceModal(false)} className="bg-gray-800 hover:bg-gray-700 text-gray-300 px-6 py-2 rounded-lg transition-colors">Cancel</button>
+                </div>
+              </>
+            ) : (
+              <>
+                <h3 className="text-gray-100 text-lg font-bold mb-2">Space Options</h3>
+                <div className="flex justify-center space-x-3">
+                  {spaceToEdit && (
+                    <button onClick={() => { handleLeaveSpace(spaceToEdit._id); setShowEditSpaceModal(false); }} className="bg-red-600 hover:bg-red-500 text-white px-6 py-2 rounded-lg transition-colors">Leave</button>
+                  )}
+                  <button onClick={() => setShowEditSpaceModal(false)} className="bg-gray-800 hover:bg-gray-700 text-gray-300 px-6 py-2 rounded-lg transition-colors">Cancel</button>
+                </div>
+              </>
             )}
-            <div className="flex justify-center space-x-3">
-              <button onClick={handleUpdateSpace} className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-2 rounded-lg transition-colors">Save</button>
-              {spaceToEdit && (
-                <button onClick={() => { handleDeleteSpace(spaceToEdit._id); setShowEditSpaceModal(false); }} className="bg-red-600 hover:bg-red-500 text-white px-6 py-2 rounded-lg transition-colors">Delete</button>
-              )}
-              <button onClick={() => setShowEditSpaceModal(false)} className="bg-gray-800 hover:bg-gray-700 text-gray-300 px-6 py-2 rounded-lg transition-colors">Cancel</button>
-            </div>
           </div>
         </div>
       )}
