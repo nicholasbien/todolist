@@ -341,6 +341,7 @@ python3 -c "import secrets; print(secrets.token_urlsafe(32))"
 - `PUT /spaces/{id}` - Rename space (owner only)
 - `DELETE /spaces/{id}` - Delete space (owner only)
 - `POST /spaces/{id}/invite` - Invite users to space by email
+- `GET /spaces/{id}/members` - List member names and emails
 
 ### Todos (Space-Aware)
 - `GET /todos?space_id={id}` - Get todos for specific space

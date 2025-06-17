@@ -218,3 +218,25 @@ async def delete_space(space_id: str, user_id: str) -> dict:
 
     message = f"Space deleted with {todos_result.deleted_count} todos and {categories_result.deleted_count} categories"
     return {"message": message}
+
+
+async def list_space_members(space_id: str) -> dict:
+    """Return names and emails for all members of a space."""
+    space = await spaces_collection.find_one({"_id": ObjectId(space_id)})
+    if not space:
+        raise HTTPException(status_code=404, detail="Space not found")
+
+    member_ids = [ObjectId(mid) for mid in space.get("member_ids", [])]
+    members_cursor = auth.users_collection.find({"_id": {"$in": member_ids}})
+
+    members = []
+    async for user in members_cursor:
+        members.append(
+            {
+                "id": str(user["_id"]),
+                "email": user["email"],
+                "first_name": user.get("first_name", ""),
+            }
+        )
+
+    return {"members": members, "pending_invites": space.get("pending_emails", [])}

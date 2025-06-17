@@ -39,7 +39,15 @@ from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from scheduler import get_scheduler_status, start_scheduler, update_schedule_time
-from spaces import create_space, delete_space, get_spaces_for_user, invite_members, update_space, user_in_space
+from spaces import (
+    create_space,
+    delete_space,
+    get_spaces_for_user,
+    invite_members,
+    list_space_members,
+    update_space,
+    user_in_space,
+)
 from todos import Todo, complete_todo, create_todo, delete_todo, get_todos, health_check, update_todo_fields
 
 # Set up logging with more detail
@@ -357,6 +365,13 @@ async def api_create_space_endpoint(req: SpaceCreateRequest, current_user: dict 
 async def api_invite_members(space_id: str, req: InviteRequest, current_user: dict = Depends(get_current_user)):
     await invite_members(space_id, current_user["email"], req.emails)
     return {"message": "Invitations sent"}
+
+
+@app.get("/spaces/{space_id}/members")
+async def api_list_members(space_id: str, current_user: dict = Depends(get_current_user)):
+    if not await user_in_space(current_user["user_id"], space_id):
+        raise HTTPException(status_code=403, detail="Not authorized")
+    return await list_space_members(space_id)
 
 
 @app.put("/spaces/{space_id}")

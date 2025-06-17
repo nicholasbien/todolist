@@ -136,3 +136,28 @@ async def test_private_clears_pending_invites(client, test_email, test_email3):
 
     resp = await client.get("/spaces", headers=headers3)
     assert all(s["_id"] != space_id for s in resp.json())
+
+
+@pytest.mark.asyncio
+async def test_list_space_members(client, test_email, test_email2):
+    token1 = await get_token(client, test_email)
+    headers1 = {"Authorization": f"Bearer {token1}"}
+
+    create_resp = await client.post("/spaces", json={"name": "Roster"}, headers=headers1)
+    space_id = create_resp.json()["_id"]
+
+    await client.post(
+        f"/spaces/{space_id}/invite",
+        json={"emails": [test_email2]},
+        headers=headers1,
+    )
+
+    token2 = await get_token(client, test_email2)
+    headers2 = {"Authorization": f"Bearer {token2}"}
+
+    members_resp = await client.get(f"/spaces/{space_id}/members", headers=headers2)
+    assert members_resp.status_code == 200
+    data = members_resp.json()
+    emails = [m["email"] for m in data["members"]]
+    assert test_email in emails
+    assert test_email2 in emails
