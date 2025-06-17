@@ -3,6 +3,7 @@ import os
 from datetime import datetime
 from typing import Dict, Optional
 
+import auth
 from bson import ObjectId
 from dotenv import load_dotenv
 from fastapi import HTTPException
@@ -38,6 +39,7 @@ class Todo(BaseModel):
     completed: bool = False
     dateCompleted: Optional[str] = None
     user_id: str
+    first_name: Optional[str] = None
     space_id: Optional[str] = None
     created_offline: bool = False
 
@@ -64,6 +66,15 @@ async def create_todo(todo: Todo):
 
         # Convert ObjectId to string
         created_todo["_id"] = str(created_todo["_id"])
+
+        # Add user's first name for collaborative spaces
+        try:
+            user = await auth.users_collection.find_one({"_id": ObjectId(created_todo["user_id"])})
+            if user:
+                created_todo["first_name"] = user.get("first_name", "")
+        except Exception:
+            created_todo["first_name"] = ""
+
         return Todo(**created_todo)
     except Exception as e:
         logger.error(f"Error creating todo: {str(e)}")
@@ -97,6 +108,15 @@ async def get_todos(user_id: str, space_id: Optional[str] | None = None):
         async for todo in cursor:
             # Ensure _id is properly converted to string
             todo["_id"] = str(todo["_id"])
+
+            # Add user's first name
+            try:
+                user = await auth.users_collection.find_one({"_id": ObjectId(todo["user_id"])})
+                if user:
+                    todo["first_name"] = user.get("first_name", "")
+            except Exception:
+                todo["first_name"] = ""
+
             todo_obj = Todo(**todo)
             todos.append(todo_obj)
         return todos
