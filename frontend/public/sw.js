@@ -388,8 +388,8 @@ async function handleStaticRequest(request) {
     // Try network first for static files
     const response = await fetch(request);
 
-    // Cache successful responses
-    if (response.ok) {
+    // Cache successful responses (only for GET requests)
+    if (response.ok && request.method === 'GET') {
       const cache = await caches.open(STATIC_CACHE);
       cache.put(request, response.clone());
     }
