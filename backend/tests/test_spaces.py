@@ -139,11 +139,9 @@ async def test_private_clears_pending_invites(client, test_email, test_email3):
 
 
 @pytest.mark.asyncio
-async def test_invite_emails_sent_only_once(client, test_email, test_email2, test_email3, monkeypatch):
+async def test_invite_and_member_listing(client, test_email, test_email2, test_email3, monkeypatch):
     token1 = await get_token(client, test_email)
     headers1 = {"Authorization": f"Bearer {token1}"}
-
-    space_id = await create_test_space(client, token1)
 
     sent = []
 
@@ -153,6 +151,11 @@ async def test_invite_emails_sent_only_once(client, test_email, test_email2, tes
 
     monkeypatch.setattr("email_summary.send_email", fake_send_email)
 
+    # Create space
+    create_resp = await client.post("/spaces", json={"name": "Roster"}, headers=headers1)
+    assert create_resp.status_code == 200
+    space_id = create_resp.json()["_id"]
+
     # Initial invite
     resp = await client.post(
         f"/spaces/{space_id}/invite",
@@ -161,6 +164,16 @@ async def test_invite_emails_sent_only_once(client, test_email, test_email2, tes
     )
     assert resp.status_code == 200
     assert sent == [test_email2]
+
+    # Ensure invited member can see correct members
+    token2 = await get_token(client, test_email2)
+    headers2 = {"Authorization": f"Bearer {token2}"}
+    members_resp = await client.get(f"/spaces/{space_id}/members", headers=headers2)
+    assert members_resp.status_code == 200
+    data = members_resp.json()
+    emails = [m["email"] for m in data["members"]]
+    assert test_email in emails
+    assert test_email2 in emails
 
     sent.clear()
 
