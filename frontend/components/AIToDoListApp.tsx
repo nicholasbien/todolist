@@ -745,7 +745,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
         </div>
       </div>
 
-      {activeSpace && activeSpace._id && spaceMembers.length > 0 && (
+      {activeSpace && activeSpace._id && spaceMembers.length > 1 && (
         <div className="mb-6 ml-4">
           <h3 className="text-sm font-semibold text-gray-400 mb-1">Members:</h3>
           <ul className="text-gray-300 text-sm space-y-1">
