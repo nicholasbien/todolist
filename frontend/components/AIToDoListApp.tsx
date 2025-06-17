@@ -176,6 +176,8 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
       fetchCategories();
       fetchMembers();
     }
+    // Reset category filter when switching spaces
+    setActiveCat('All');
   }, [activeSpace, fetchCategories, fetchMembers, token, user]);
 
   // Update email time when user info loads
