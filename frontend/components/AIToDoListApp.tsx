@@ -46,6 +46,9 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
   const [spaceMembers, setSpaceMembers] = useState<any[]>([]);
   const [pendingInvites, setPendingInvites] = useState<string[]>([]);
 
+  // Track latest todos fetch to avoid race conditions when switching spaces
+  const todosFetchIdRef = useRef(0);
+
   const handleOpenEmailSettings = async () => {
     try {
       const response = await authenticatedFetch('/auth/me');
@@ -136,6 +139,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
 
   // Fetch todos from MongoDB
   const fetchTodos = useCallback(async () => {
+    const fetchId = ++todosFetchIdRef.current;
     try {
       const url = activeSpace && activeSpace._id ? `/todos?space_id=${activeSpace._id}` : '/todos';
       const response = await authenticatedFetch(url);
@@ -143,9 +147,13 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
         throw new Error('Failed to fetch todos');
       }
       const data = await response.json();
-      setTodos(data);
+      if (fetchId === todosFetchIdRef.current) {
+        setTodos(data);
+      }
     } catch (err) {
-      setError('Error loading todos: ' + err.message);
+      if (fetchId === todosFetchIdRef.current) {
+        setError('Error loading todos: ' + err.message);
+      }
     }
   }, [authenticatedFetch, activeSpace]);
 
@@ -175,8 +183,9 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
     if (token && user && activeSpace) {
       fetchCategories();
       fetchMembers();
+      fetchTodos();
     }
-  }, [activeSpace, fetchCategories, fetchMembers, token, user]);
+  }, [activeSpace, fetchCategories, fetchMembers, fetchTodos, token, user]);
 
   // Update email time when user info loads
   useEffect(() => {
