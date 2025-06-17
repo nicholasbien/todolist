@@ -372,7 +372,7 @@ async def api_invite_members(space_id: str, req: InviteRequest, current_user: di
 async def api_list_members(space_id: str, current_user: dict = Depends(get_current_user)):
     if not await user_in_space(current_user["user_id"], space_id):
         raise HTTPException(status_code=403, detail="Not authorized")
-    return await list_space_members(space_id)
+    return await list_space_members(space_id, current_user["user_id"])
 
 
 @app.post("/spaces/{space_id}/leave")

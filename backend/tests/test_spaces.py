@@ -171,9 +171,11 @@ async def test_invite_and_member_listing(client, test_email, test_email2, test_e
     members_resp = await client.get(f"/spaces/{space_id}/members", headers=headers2)
     assert members_resp.status_code == 200
     data = members_resp.json()
-    emails = [m["email"] for m in data["members"]]
-    assert test_email in emails
-    assert test_email2 in emails
+    # Non-owners can see members but only first names (no email field)
+    assert len(data["members"]) == 2
+    for member in data["members"]:
+        assert "first_name" in member
+        assert "email" not in member  # Non-owners can't see emails
 
     sent.clear()
 

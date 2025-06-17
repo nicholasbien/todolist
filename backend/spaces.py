@@ -31,7 +31,6 @@ class Space(BaseModel):
     name: str
     owner_id: str
     member_ids: List[str] = []
-    pending_emails: List[str] = []
 
     class Config:
         arbitrary_types_allowed = True
@@ -82,7 +81,6 @@ async def get_spaces_for_user(user_id: str) -> List[Space]:
         name="Default",
         owner_id=user_id,
         member_ids=[user_id],
-        pending_emails=[],
     )
     spaces.insert(0, default_space)
 
@@ -243,23 +241,40 @@ async def delete_space(space_id: str, user_id: str) -> dict:
     return {"message": message}
 
 
-async def list_space_members(space_id: str) -> dict:
-    """Return names and emails for all members of a space."""
+async def list_space_members(space_id: str, current_user_id: str) -> dict:
+    """Return member information based on user's role in the space."""
     space = await spaces_collection.find_one({"_id": ObjectId(space_id)})
     if not space:
         raise HTTPException(status_code=404, detail="Space not found")
+
+    is_owner = space.get("owner_id") == current_user_id
 
     member_ids = [ObjectId(mid) for mid in space.get("member_ids", [])]
     members_cursor = auth.users_collection.find({"_id": {"$in": member_ids}})
 
     members = []
     async for user in members_cursor:
-        members.append(
-            {
-                "id": str(user["_id"]),
-                "email": user["email"],
-                "first_name": user.get("first_name", ""),
-            }
-        )
+        if is_owner:
+            # Owners can see emails and pending invites
+            members.append(
+                {
+                    "id": str(user["_id"]),
+                    "email": user["email"],
+                    "first_name": user.get("first_name", ""),
+                }
+            )
+        else:
+            # Non-owners can only see first names
+            members.append(
+                {
+                    "id": str(user["_id"]),
+                    "first_name": user.get("first_name", ""),
+                }
+            )
 
-    return {"members": members, "pending_invites": space.get("pending_emails", [])}
+    # Only owners can see pending invites
+    result = {"members": members}
+    if is_owner:
+        result["pending_invites"] = space.get("pending_emails", [])
+
+    return result
