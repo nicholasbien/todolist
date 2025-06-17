@@ -501,12 +501,15 @@ async def api_chat(
 ):
     """Answer user questions about their todos using OpenAI."""
     try:
-        todos = await get_todos(current_user["user_id"])
-        # Convert Todo objects to dictionaries for JSON serialization
-        todos_dict = [todo.dict() if hasattr(todo, "dict") else todo for todo in todos]
+        spaces = await get_spaces_for_user(current_user["user_id"])
+        spaces_data = []
+        for space in spaces:
+            todos = await get_todos(current_user["user_id"], space.id)
+            todos_dict = [todo.dict() if hasattr(todo, "dict") else todo for todo in todos]
+            spaces_data.append({"space": space.name, "todos": todos_dict})
 
         history = conversations[current_user["user_id"]]
-        answer = await answer_question(req.question, todos_dict, history)
+        answer = await answer_question(req.question, spaces_data, history)
 
         history.append({"role": "user", "content": req.question})
         history.append({"role": "assistant", "content": answer})
