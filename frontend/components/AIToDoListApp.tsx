@@ -726,10 +726,10 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
           <h3 className="text-sm font-semibold text-gray-400 mb-1">Members:</h3>
           <ul className="text-gray-300 text-sm space-y-1">
             {spaceMembers.map((m) => (
-              <li key={m.id}>{m.first_name || m.email} ({m.email})</li>
+              <li key={m.id}>{m.first_name || 'User'}</li>
             ))}
             {pendingInvites.map((email) => (
-              <li key={email} className="italic">{email} (pending)</li>
+              <li key={email} className="italic">{email.split('@')[0]} (pending)</li>
             ))}
           </ul>
         </div>
