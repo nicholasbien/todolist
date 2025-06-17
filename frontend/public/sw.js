@@ -9,7 +9,7 @@ const CATEGORIES = 'categories';
 const QUEUE = 'queue';
 const AUTH = 'auth';
 
-const DEFAULT_CATEGORIES = ['Work', 'Personal', 'Shopping', 'Finance', 'Health', 'General'];
+const DEFAULT_CATEGORIES = ['General'];
 
 // Static files to cache for offline use
 const STATIC_FILES = [
