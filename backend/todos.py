@@ -27,6 +27,15 @@ db = client.todo_db
 todos_collection = db.todos
 
 
+async def init_todo_indexes() -> None:
+    """Create indexes used in frequent queries."""
+    try:
+        await todos_collection.create_index("user_id")
+        await todos_collection.create_index("space_id")
+    except Exception as e:
+        logger.error(f"Error creating indexes: {e}")
+
+
 # Pydantic models
 class Todo(BaseModel):
     id: Optional[str] = Field(alias="_id", default=None)
