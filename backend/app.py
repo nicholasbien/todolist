@@ -15,6 +15,7 @@ from auth import (
     logout_user,
     signup_user,
     update_user_email_instructions,
+    update_user_email_spaces,
     update_user_name,
     update_user_summary_time,
     verify_session,
@@ -427,6 +428,10 @@ class UpdateInstructionsRequest(BaseModel):
     instructions: str
 
 
+class UpdateEmailSpacesRequest(BaseModel):
+    space_ids: List[str]
+
+
 @app.post("/email/update-schedule")
 async def api_update_schedule(
     req: UpdateScheduleRequest,
@@ -468,6 +473,16 @@ async def api_update_instructions(
     """Update custom summary instructions for the current user."""
     logger.info("Instructions update requested by %s", current_user["email"])
     return await update_user_email_instructions(current_user["user_id"], req.instructions)
+
+
+@app.post("/email/update-spaces")
+async def api_update_email_spaces(
+    req: UpdateEmailSpacesRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    """Update which spaces are included in the user's daily summary emails."""
+    logger.info("Email spaces update requested by %s", current_user["email"])
+    return await update_user_email_spaces(current_user["user_id"], req.space_ids)
 
 
 class ContactRequest(BaseModel):

@@ -368,6 +368,7 @@ the manual endpoint if needed:
 - `POST /email/send-summary` - Send daily summary to current user
 - `GET /email/scheduler-status` - Check scheduler status
 - `POST /email/update-instructions` - Set custom instructions for summaries
+- `POST /email/update-spaces` - Choose which spaces are included in summaries
 
 ## Deployment
 

@@ -5,7 +5,7 @@ import smtplib
 from datetime import datetime, timedelta
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from typing import Optional
+from typing import List, Optional
 
 from bson import ObjectId
 from dotenv import load_dotenv
@@ -60,6 +60,7 @@ class User(BaseModel):
     email_instructions: str = ""
     timezone: str = "America/New_York"
     email_enabled: bool = False
+    email_spaces: List[str] = []
 
     class Config:
         arbitrary_types_allowed = True
@@ -272,6 +273,7 @@ async def login_user(email: str, code: str) -> dict:
                 "email_instructions": user.get("email_instructions", ""),
                 "timezone": user.get("timezone", "America/New_York"),
                 "email_enabled": user.get("email_enabled", False),
+                "email_spaces": user.get("email_spaces", []),
             },
         }
 
@@ -307,6 +309,7 @@ async def verify_session(token: str) -> dict:
             "email_instructions": user.get("email_instructions", ""),
             "timezone": user.get("timezone", "America/New_York"),
             "email_enabled": user.get("email_enabled", False),
+            "email_spaces": user.get("email_spaces", []),
         }
 
     except HTTPException:
@@ -426,6 +429,30 @@ async def update_user_email_instructions(user_id: str, instructions: str) -> dic
     except Exception as e:
         logger.error(f"Error in update_user_email_instructions: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to update email instructions")
+
+
+async def update_user_email_spaces(user_id: str, space_ids: List[str]) -> dict:
+    """Update the list of spaces included in daily summaries."""
+    try:
+        unique_ids = list(dict.fromkeys(space_ids))
+
+        result = await users_collection.update_one(
+            {"_id": ObjectId(user_id)},
+            {"$set": {"email_spaces": unique_ids}},
+        )
+
+        if result.matched_count == 0:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        logger.info("Updated email spaces for user %s", user_id)
+
+        return {"message": "Email spaces updated"}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error in update_user_email_spaces: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to update email spaces")
 
 
 async def cleanup_expired_sessions():
