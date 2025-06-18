@@ -289,9 +289,10 @@ async def startup_event():
         # Migrate legacy data to have space_id fields
         await migrate_legacy_categories()
         # Also migrate legacy todos
-        from todos import migrate_legacy_todos
+        from todos import init_todo_indexes, migrate_legacy_todos
 
         await migrate_legacy_todos()
+        await init_todo_indexes()
         # Initialize default categories for default space (no space_id)
         await init_default_categories()
         await cleanup_expired_sessions()
