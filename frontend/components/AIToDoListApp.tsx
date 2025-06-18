@@ -34,6 +34,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
   const [savingSchedule, setSavingSchedule] = useState(false);
   const [emailInstructions, setEmailInstructions] = useState('');
   const [emailEnabled, setEmailEnabled] = useState(false);
+  const [emailSpaceIds, setEmailSpaceIds] = useState<string[]>([]);
   const [spaces, setSpaces] = useState([]);
   const [activeSpace, setActiveSpace] = useState(null);
   const [showAddSpaceModal, setShowAddSpaceModal] = useState(false);
@@ -59,6 +60,10 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
       setEmailTime(`${h}:${m}`);
       setEmailInstructions(userData?.email_instructions ?? '');
       setEmailEnabled(userData?.email_enabled ?? false);
+      setEmailSpaceIds(userData?.email_spaces ?? []);
+      if (spaces.length === 0) {
+        await fetchSpaces();
+      }
       onShowEmailSettings?.();
       setError('');
     } catch (err) {
@@ -627,6 +632,16 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
         throw new Error(errorData.detail || 'Failed to update instructions');
       }
 
+      const resp3 = await authenticatedFetch('/email/update-spaces', {
+        method: 'POST',
+        body: JSON.stringify({ space_ids: emailSpaceIds }),
+      });
+
+      if (!resp3.ok) {
+        const errorData = await resp3.json();
+        throw new Error(errorData.detail || 'Failed to update email spaces');
+      }
+
 
       onCloseEmailSettings?.();
       setError('');
@@ -1096,6 +1111,34 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
                 />
               </div>
 
+              <div>
+                <label className="block text-sm text-gray-300 mb-2">Spaces to Include</label>
+                <div className="max-h-32 overflow-y-auto space-y-1">
+                  {spaces.map((space) => (
+                    <div key={space._id || 'default'} className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        id={`space-${space._id || 'default'}`}
+                        disabled={!emailEnabled || space.name === 'Default'}
+                        checked={space.name === 'Default' || emailSpaceIds.includes(space._id)}
+                        onChange={(e) => {
+                          const id = space._id;
+                          if (e.target.checked) {
+                            setEmailSpaceIds(Array.from(new Set([...emailSpaceIds, id])));
+                          } else {
+                            setEmailSpaceIds(emailSpaceIds.filter((sid) => sid !== id));
+                          }
+                        }}
+                        className="w-4 h-4 text-blue-600 bg-gray-900 border-gray-700 rounded focus:ring-blue-500 focus:ring-2"
+                      />
+                      <label htmlFor={`space-${space._id || 'default'}`} className="text-sm text-gray-300">
+                        {space.name}
+                      </label>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
               <div className="flex justify-center space-x-3">
                 <button
                   onClick={handleUpdateSchedule}
@@ -1116,6 +1159,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
                         setEmailTime(`${h}:${m}`);
                         setEmailInstructions(userData?.email_instructions ?? '');
                         setEmailEnabled(userData?.email_enabled ?? false);
+                        setEmailSpaceIds(userData?.email_spaces ?? []);
                       }
                     } catch (err) {
                       // If fetch fails, just close the modal

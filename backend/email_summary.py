@@ -221,10 +221,16 @@ async def send_daily_summary(
     Generate and send daily summary for a specific user.
     """
     try:
-        # Get user's todos for all spaces
+        from auth import users_collection
         from spaces import get_spaces_for_user
 
+        user = await users_collection.find_one({"_id": ObjectId(user_id)})
+
+        # Get user's todos for all spaces
         spaces = await get_spaces_for_user(user_id)
+        if user and user.get("email_spaces"):
+            allowed = set(user.get("email_spaces", []))
+            spaces = [s for s in spaces if s.id is None or s.id in allowed]
         spaces_data = []
         all_todos = []
         for space in spaces:
@@ -237,16 +243,9 @@ async def send_daily_summary(
                 all_todos.append(t_copy)
 
         if custom_instructions is None:
-            from auth import users_collection
-
-            user = await users_collection.find_one({"_id": ObjectId(user_id)})
             custom_instructions = user.get("email_instructions", "") if user else ""
             user_timezone = user.get("timezone", "America/New_York") if user else "America/New_York"
         else:
-            # If custom_instructions is provided, we still need to get timezone
-            from auth import users_collection
-
-            user = await users_collection.find_one({"_id": ObjectId(user_id)})
             user_timezone = user.get("timezone", "America/New_York") if user else "America/New_York"
 
         # Filter out invalid todos (those without dateAdded)
