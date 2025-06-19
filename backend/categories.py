@@ -34,7 +34,14 @@ db = client.todo_db
 categories_collection = db.categories
 
 # Shared default categories
-DEFAULT_CATEGORIES = ["General"]
+DEFAULT_CATEGORIES = [
+    "Work",
+    "Personal",
+    "Shopping",
+    "Finance",
+    "Health",
+    "General",
+]
 
 
 # Pydantic model

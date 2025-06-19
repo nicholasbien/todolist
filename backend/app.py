@@ -214,7 +214,9 @@ async def api_create_todo(request: Request, current_user: dict = Depends(get_cur
                 body["category"] = classification.get("category", "General")
                 body["priority"] = classification.get("priority", "Medium")
                 if classification.get("text"):
-                    body["text"] = classification["text"]
+                    cleaned = classification["text"].strip()
+                    if len(cleaned) >= len(classify_text) - 5:
+                        body["text"] = cleaned
                 if classification.get("dueDate"):
                     body["dueDate"] = classification["dueDate"]
             except Exception as e:

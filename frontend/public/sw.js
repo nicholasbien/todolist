@@ -1,11 +1,12 @@
-const STATIC_CACHE = 'todo-static-v35';
-const API_CACHE = 'todo-api-v35';
+const STATIC_CACHE = 'todo-static-v36';
+const API_CACHE = 'todo-api-v36';
 
 const GLOBAL_DB_NAME = 'TodoGlobalDB';
 const USER_DB_PREFIX = 'TodoUserDB_';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 const TODOS = 'todos';
 const CATEGORIES = 'categories';
+const SPACES = 'spaces';
 const QUEUE = 'queue';
 const AUTH = 'auth';
 
@@ -48,6 +49,9 @@ function openUserDB(userId) {
       }
       if (!db.objectStoreNames.contains(CATEGORIES)) {
         db.createObjectStore(CATEGORIES, { keyPath: 'name' });
+      }
+      if (!db.objectStoreNames.contains(SPACES)) {
+        db.createObjectStore(SPACES, { keyPath: '_id' });
       }
       if (!db.objectStoreNames.contains(QUEUE)) {
         db.createObjectStore(QUEUE, { keyPath: 'id', autoIncrement: true });
@@ -120,6 +124,24 @@ const delCategory = async (name, userId) => {
   const authData = userId ? null : await getAuth();
   const effectiveUserId = userId || (authData ? authData.userId : null);
   return userDbTx(effectiveUserId, CATEGORIES, 'readwrite', (s) => s.delete(name));
+};
+
+const getSpaces = async (userId) => {
+  const authData = userId ? null : await getAuth();
+  const effectiveUserId = userId || (authData ? authData.userId : null);
+  return userDbTx(effectiveUserId, SPACES, 'readonly', (s) => s.getAll());
+};
+
+const putSpace = async (space, userId) => {
+  const authData = userId ? null : await getAuth();
+  const effectiveUserId = userId || (authData ? authData.userId : null);
+  return userDbTx(effectiveUserId, SPACES, 'readwrite', (s) => s.put(space));
+};
+
+const delSpace = async (id, userId) => {
+  const authData = userId ? null : await getAuth();
+  const effectiveUserId = userId || (authData ? authData.userId : null);
+  return userDbTx(effectiveUserId, SPACES, 'readwrite', (s) => s.delete(id));
 };
 
 const addQueue = async (action, userId) => {
@@ -203,6 +225,19 @@ async function syncServerDataToLocal() {
       console.log('Failed to sync categories:', err);
     }
 
+    // Fetch and store spaces
+    try {
+      const spacesResponse = await fetch('/spaces', { headers });
+      if (spacesResponse.ok) {
+        const serverSpaces = await spacesResponse.json();
+        for (const space of serverSpaces) {
+          await putSpace(space, authData.userId);
+        }
+      }
+    } catch (err) {
+      console.log('Failed to sync spaces:', err);
+    }
+
     // Fetch and store todos
     try {
       const todosResponse = await fetch('/todos', { headers });
@@ -265,7 +300,7 @@ self.addEventListener('fetch', (event) => {
       url.pathname.startsWith('/auth/'));
 
   if (isApi) {
-    event.respondWith(handleApiRequest(event.request));
+    event.respondWith(handleApiRequest(event.request, event));
     return;
   }
 
@@ -275,20 +310,11 @@ self.addEventListener('fetch', (event) => {
   }
 });
 
-async function handleApiRequest(request) {
+async function handleApiRequest(request, event) {
   const online = self.navigator.onLine;
   const url = new URL(request.url);
 
-  // TEMPORARILY DISABLED: Offline functionality disabled until spaces support is implemented
-  // This prevents data integrity issues with the spaces collaboration system
-  if (!online) {
-    return new Response(JSON.stringify({
-      error: 'Offline functionality is temporarily disabled. Please check your internet connection.'
-    }), {
-      status: 503,
-      headers: { 'Content-Type': 'application/json' }
-    });
-  }
+  // Check if this is an offline-generated ID that shouldn't go to server
 
   // Check if this is an offline-generated ID that shouldn't go to server
   const isOfflineId = url.pathname.includes('offline_');
@@ -302,49 +328,36 @@ async function handleApiRequest(request) {
         const cache = await caches.open(API_CACHE);
         cache.put(request, response.clone());
 
-        // For GET /todos, sync pending operations then merge with fresh server data
+        // For GET /todos, return cached data and update in background
         if (url.pathname === '/todos') {
           const authData = await getAuth();
-          if (!authData || !authData.userId) return response; // No user context
-
-          // Sync pending offline operations FIRST (this does immediate ID replacements)
-          await syncQueue();
-
-          // After sync, get fresh server data and merge with any remaining offline todos
-          const freshResponse = await fetch(request.clone());
-          if (!freshResponse.ok) return response; // Fallback to original response
-
-          const serverTodos = await freshResponse.json();
-
-          // Get current local todos (may include unsynced offline todos)
-          const localTodos = await getTodos(authData.userId);
-          const offlineOnlyTodos = localTodos.filter(t => t._id.startsWith('offline_'));
-
-          // Remove any non-offline todos that no longer exist on the server
-          const serverIds = new Set(serverTodos.map(t => t._id));
-          for (const t of localTodos) {
-            if (!t._id.startsWith('offline_') && !serverIds.has(t._id)) {
-              await delTodo(t._id, authData.userId);
-            }
+          if (authData && authData.userId) {
+            const cachedTodos = await getTodos(authData.userId);
+            event.waitUntil((async () => {
+              try {
+                await syncQueue();
+                const fresh = await fetch(request.clone());
+                if (fresh.ok) {
+                  const serverTodos = await fresh.clone().json();
+                  const localTodos = await getTodos(authData.userId);
+                  const serverIds = new Set(serverTodos.map(t => t._id));
+                  for (const t of localTodos) {
+                    if (!t._id.startsWith('offline_') && !serverIds.has(t._id)) {
+                      await delTodo(t._id, authData.userId);
+                    }
+                  }
+                  for (const todo of serverTodos) {
+                    await putTodo(todo, authData.userId);
+                  }
+                }
+              } catch (err) {
+                console.log('Background sync failed:', err);
+              }
+            })());
+            return new Response(JSON.stringify(cachedTodos), {
+              headers: { 'Content-Type': 'application/json' }
+            });
           }
-          // console.log('📊 Online GET /todos - Local todos IDs:', localTodos.map(t => t._id));
-          // console.log('📊 Online GET /todos - Server todos IDs:', serverTodos.map(t => t._id));
-          // console.log('📊 Online GET /todos - Offline-only todos IDs:', offlineOnlyTodos.map(t => t._id));
-
-          // Save fresh server data to IndexedDB
-          for (const todo of serverTodos) {
-            await putTodo(todo, authData.userId);
-          }
-
-          // Merge server todos with any remaining offline todos
-          const mergedTodos = [...serverTodos, ...offlineOnlyTodos];
-
-          // console.log('📊 Online GET /todos - Final merged todos IDs:', mergedTodos.map(t => t._id));
-
-          // Return the merged data
-          return new Response(JSON.stringify(mergedTodos), {
-            headers: { 'Content-Type': 'application/json' }
-          });
         }
 
         // For GET /categories, sync server data to IndexedDB and merge with offline categories
@@ -375,6 +388,19 @@ async function handleApiRequest(request) {
           const mergedCategories = [...serverCategories, ...offlineOnlyNames];
 
           return new Response(JSON.stringify(mergedCategories), {
+            headers: { 'Content-Type': 'application/json' }
+          });
+        }
+
+        // For GET /spaces, sync server data to IndexedDB
+        if (url.pathname === '/spaces') {
+          const authData = await getAuth();
+          if (!authData || !authData.userId) return response;
+          const serverSpaces = await response.clone().json();
+          for (const space of serverSpaces) {
+            await putSpace(space, authData.userId);
+          }
+          return new Response(JSON.stringify(serverSpaces), {
             headers: { 'Content-Type': 'application/json' }
           });
         }
@@ -439,6 +465,10 @@ async function offlineFallback(request, url) {
       console.log('📱 Offline GET /todos - Todo IDs:', todos.map(t => t._id));
       return new Response(JSON.stringify(todos), { headers: { 'Content-Type': 'application/json' } });
     }
+    if (url.pathname === '/spaces' || url.pathname.endsWith('/spaces')) {
+      const spaces = await getSpaces(authData ? authData.userId : null);
+      return new Response(JSON.stringify(spaces), { headers: { 'Content-Type': 'application/json' } });
+    }
     if (url.pathname === '/categories' || url.pathname.endsWith('/categories')) {
       const offlineCategories = await getCategories(authData ? authData.userId : null);
 
@@ -473,6 +503,7 @@ async function offlineFallback(request, url) {
         completed: false,
         user_id: authData ? authData.userId : 'offline_user',
         created_offline: true,
+        space_id: data.space_id || null,
       };
 
       // If it's a URL, store it as a link (title fetching will happen when synced)
@@ -879,10 +910,15 @@ if (typeof module !== 'undefined') {
     getCategories,
     putCategory,
     delCategory,
+    getSpaces,
+    putSpace,
+    delSpace,
     addQueue,
     readQueue,
     clearQueue,
     getAuthHeaders,
     syncQueue,
+    handleApiRequest,
+    offlineFallback,
   };
 }
