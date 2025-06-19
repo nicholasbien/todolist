@@ -73,6 +73,22 @@ async def print_database():
                 print(f"  {field}: {value}")
             print("-" * 20)
 
+    # Print spaces collection
+    print("\nSPACES COLLECTION:")
+    print("-" * 40)
+    spaces_collection = db.spaces
+    spaces_count = await spaces_collection.count_documents({})
+    print(f"Total spaces: {spaces_count}")
+    print()
+
+    if spaces_count > 0:
+        async for space in spaces_collection.find().sort("name", 1):
+            print(f"Document {space['_id']}:")
+            print("All fields:")
+            for field, value in space.items():
+                print(f"  {field}: {value}")
+            print("-" * 20)
+
     # List all collections in the database
     print("\nALL COLLECTIONS IN DATABASE:")
     print("-" * 40)
