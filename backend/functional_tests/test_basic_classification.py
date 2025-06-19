@@ -1,7 +1,11 @@
 import os
+import sys
+from pathlib import Path
 
 import pytest
-from classify import classify_task
+
+sys.path.append(str(Path(__file__).resolve().parents[1]))  # noqa: E402
+from classify import classify_task  # noqa: E402
 
 pytestmark = pytest.mark.skipif(
     not os.getenv("OPENAI_API_KEY"),
