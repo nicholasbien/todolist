@@ -399,11 +399,17 @@ async function handleApiRequest(request, event) {
             if (authData && authData.userId) {
               const serverSpaces = await response.clone().json();
               for (const space of serverSpaces) {
-                // Only cache spaces with valid _id (skip Default space without ID)
-                if (space && space._id && typeof space._id === 'string' && space._id.trim() !== '') {
-                  await putSpace(space, authData.userId);
-                } else {
-                  console.log('Skipping space with invalid _id:', space);
+                if (space) {
+                  let spaceToCache = { ...space };
+
+                  // Handle Default space or spaces without valid _id
+                  if (!space._id || typeof space._id !== 'string' || space._id.trim() === '') {
+                    // Create a special ID for Default space or spaces without ID
+                    spaceToCache._id = `default_space_${authData.userId}`;
+                    console.log('Creating special ID for space without _id:', spaceToCache);
+                  }
+
+                  await putSpace(spaceToCache, authData.userId);
                 }
               }
             }
@@ -476,7 +482,15 @@ async function offlineFallback(request, url) {
     }
     if (url.pathname === '/spaces' || url.pathname.endsWith('/spaces')) {
       const spaces = await getSpaces(authData ? authData.userId : null);
-      return new Response(JSON.stringify(spaces), { headers: { 'Content-Type': 'application/json' } });
+      // Restore Default space to original form (remove special ID)
+      const spacesToReturn = spaces.map(space => {
+        if (space._id && space._id.startsWith('default_space_')) {
+          const { _id, ...spaceWithoutId } = space;
+          return spaceWithoutId; // Return Default space without the special ID
+        }
+        return space;
+      });
+      return new Response(JSON.stringify(spacesToReturn), { headers: { 'Content-Type': 'application/json' } });
     }
     if (url.pathname === '/categories' || url.pathname.endsWith('/categories')) {
       const offlineCategories = await getCategories(authData ? authData.userId : null);
