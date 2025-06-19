@@ -50,3 +50,33 @@ test('offline GET /spaces returns cached spaces', async () => {
   expect(spaces).toHaveLength(1);
   expect(spaces[0]._id).toBe('s1');
 });
+
+test('offline space creation works', async () => {
+  const sw = require('../public/sw.js');
+  await sw.putAuth('token123', 'user1');
+
+  const request = new Request('/spaces', {
+    method: 'POST',
+    body: JSON.stringify({ name: 'Test Space' }),
+  });
+
+  const resp = await sw.offlineFallback(request, new URL('http://localhost/spaces'));
+  const space = await resp.json();
+
+  expect(space.name).toBe('Test Space');
+  expect(space._id).toMatch(/^offline_space_/);
+  expect(space.owner_id).toBe('user1');
+  expect(space.member_ids).toEqual(['user1']);
+  expect(space.created_offline).toBe(true);
+
+  // Verify space is stored in IndexedDB
+  const spaces = await sw.getSpaces('user1');
+  expect(spaces).toHaveLength(1);
+  expect(spaces[0].name).toBe('Test Space');
+
+  // Verify space creation is queued for sync
+  const queue = await sw.readQueue('user1');
+  expect(queue).toHaveLength(1);
+  expect(queue[0].type).toBe('CREATE_SPACE');
+  expect(queue[0].data.name).toBe('Test Space');
+});

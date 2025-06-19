@@ -394,15 +394,24 @@ async function handleApiRequest(request, event) {
 
         // For GET /spaces, sync server data to IndexedDB
         if (url.pathname === '/spaces') {
-          const authData = await getAuth();
-          if (!authData || !authData.userId) return response;
-          const serverSpaces = await response.clone().json();
-          for (const space of serverSpaces) {
-            await putSpace(space, authData.userId);
+          try {
+            const authData = await getAuth();
+            if (authData && authData.userId) {
+              const serverSpaces = await response.clone().json();
+              for (const space of serverSpaces) {
+                // Only cache spaces with valid _id (skip Default space without ID)
+                if (space && space._id && typeof space._id === 'string' && space._id.trim() !== '') {
+                  await putSpace(space, authData.userId);
+                } else {
+                  console.log('Skipping space with invalid _id:', space);
+                }
+              }
+            }
+          } catch (err) {
+            console.log('Failed to cache spaces:', err);
           }
-          return new Response(JSON.stringify(serverSpaces), {
-            headers: { 'Content-Type': 'application/json' }
-          });
+          // Always return the original server response
+          return response;
         }
       }
 
@@ -615,6 +624,22 @@ async function offlineFallback(request, url) {
       }
 
       return new Response(null, { status: 204 });
+    }
+
+    // Create new space
+    if ((url.pathname === '/spaces' || url.pathname.endsWith('/spaces')) && request.method === 'POST') {
+      const spaceName = data.name || `offline_space_${Date.now()}`;
+      const newSpace = {
+        _id: `offline_space_${Date.now()}`,
+        name: spaceName,
+        owner_id: authData ? authData.userId : 'offline_user',
+        member_ids: [authData ? authData.userId : 'offline_user'],
+        created_offline: true
+      };
+
+      await putSpace(newSpace, authData ? authData.userId : null);
+      await addQueue({ type: 'CREATE_SPACE', data: newSpace }, authData ? authData.userId : null);
+      return new Response(JSON.stringify(newSpace), { headers: { 'Content-Type': 'application/json' } });
     }
 
     // Create new category
@@ -836,6 +861,34 @@ async function syncQueue() {
             }
           }
           break;
+        case 'CREATE_SPACE':
+          if (op.data._id.startsWith('offline_space_')) {
+            const { _id: offlineId, created_offline, ...payload } = op.data;
+            res = await fetch('/spaces', {
+              method: 'POST',
+              headers,
+              body: JSON.stringify(payload),
+            });
+            if (res && res.ok) {
+              // Replace offline space with server version
+              const serverSpace = await res.json();
+              console.log(`🔄 Sync SUCCESS: Replacing offline space ${offlineId} with server space ${serverSpace._id}`);
+
+              // Update ID mapping
+              idMap[offlineId] = serverSpace._id;
+              console.log(`🗺️ Added space ID mapping: ${offlineId} -> ${serverSpace._id}`);
+
+              // Persist mapping immediately
+              await putIdMap(idMap, authData.userId);
+
+              await delSpace(offlineId, authData.userId); // Remove offline version
+              await putSpace(serverSpace, authData.userId); // Add server version
+              console.log(`✅ Synced offline space ${offlineId} -> ${serverSpace._id}`);
+            } else {
+              console.log(`❌ Sync FAILED: Offline space ${offlineId} will be preserved`);
+            }
+          }
+          break;
         case 'CREATE_CATEGORY':
           res = await fetch('/categories', {
             method: 'POST',
@@ -920,5 +973,9 @@ if (typeof module !== 'undefined') {
     syncQueue,
     handleApiRequest,
     offlineFallback,
+    getIdMap,
+    putIdMap,
+    clearIdMap,
+    normalizePriority,
   };
 }
