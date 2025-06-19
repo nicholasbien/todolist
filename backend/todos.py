@@ -30,8 +30,12 @@ todos_collection = db.todos
 async def init_todo_indexes() -> None:
     """Create indexes used in frequent queries."""
     try:
+        # Index by user for quick lookup in the default space
         await todos_collection.create_index("user_id")
+        # Index by space for collaborative spaces
         await todos_collection.create_index("space_id")
+        # Compound index for common queries filtering by both
+        await todos_collection.create_index([("space_id", 1), ("user_id", 1)])
     except Exception as e:
         logger.error(f"Error creating indexes: {e}")
 
@@ -114,20 +118,20 @@ async def get_todos(user_id: str, space_id: Optional[str] | None = None):
             # In default space, only show user's own todos
             query["user_id"] = user_id
         cursor = todos_collection.find(query)
-        async for todo in cursor:
-            # Ensure _id is properly converted to string
+        raw_todos = await cursor.to_list(length=None)
+
+        # Lookup all users in one query to avoid N+1 pattern
+        user_ids = {ObjectId(t["user_id"]) for t in raw_todos}
+        user_map = {}
+        if user_ids:
+            async for u in auth.users_collection.find({"_id": {"$in": list(user_ids)}}):
+                user_map[str(u["_id"])] = u.get("first_name", "")
+
+        for todo in raw_todos:
             todo["_id"] = str(todo["_id"])
+            todo["first_name"] = user_map.get(todo["user_id"], "")
+            todos.append(Todo(**todo))
 
-            # Add user's first name
-            try:
-                user = await auth.users_collection.find_one({"_id": ObjectId(todo["user_id"])})
-                if user:
-                    todo["first_name"] = user.get("first_name", "")
-            except Exception:
-                todo["first_name"] = ""
-
-            todo_obj = Todo(**todo)
-            todos.append(todo_obj)
         return todos
     except HTTPException:
         # Re-raise HTTP exceptions (like 403) without conversion

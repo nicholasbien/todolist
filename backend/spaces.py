@@ -22,6 +22,16 @@ client = AsyncMongoMockClient() if USE_MOCK_DB else AsyncIOMotorClient(MONGODB_U
 db = client.todo_db
 spaces_collection = db.spaces
 
+
+async def init_space_indexes() -> None:
+    """Create indexes used in frequent queries."""
+    try:
+        await spaces_collection.create_index("owner_id")
+        await spaces_collection.create_index("member_ids")
+    except Exception as e:
+        logger.error(f"Error creating indexes: {e}")
+
+
 # Link to the frontend for invite emails (provided via env var)
 WEBSITE_URL = os.getenv("WEBSITE_URL")
 

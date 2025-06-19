@@ -214,6 +214,9 @@ async def api_create_todo(request: Request, current_user: dict = Depends(get_cur
                 body["category"] = classification.get("category", "General")
                 body["priority"] = classification.get("priority", "Medium")
                 if classification.get("text"):
+                    # TODO: AI is over-aggressively cleaning text, removing "by User X" as date keywords
+                    # This causes "Todo by User 1" to become just "Todo". Need to fix AI prompt
+                    # to be more precise about date keyword detection vs meaningful content
                     body["text"] = classification["text"]
                 if classification.get("dueDate"):
                     body["dueDate"] = classification["dueDate"]
@@ -289,10 +292,12 @@ async def startup_event():
         # Migrate legacy data to have space_id fields
         await migrate_legacy_categories()
         # Also migrate legacy todos
+        from spaces import init_space_indexes
         from todos import init_todo_indexes, migrate_legacy_todos
 
         await migrate_legacy_todos()
         await init_todo_indexes()
+        await init_space_indexes()
         # Initialize default categories for default space (no space_id)
         await init_default_categories()
         await cleanup_expired_sessions()
