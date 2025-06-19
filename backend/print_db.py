@@ -3,20 +3,16 @@
 Script to print out the entire todo database in a readable format.
 """
 import asyncio
-import os
 
+from db import MONGODB_URL, client, db
 from dotenv import load_dotenv
-from motor.motor_asyncio import AsyncIOMotorClient
 
 # Load environment variables
 load_dotenv()
 
 
 async def print_database():
-    # MongoDB connection
-    MONGODB_URL = os.getenv("MONGODB_URL", "mongodb://localhost:27017")
-    client = AsyncIOMotorClient(MONGODB_URL)
-    db = client.todo_db
+    # Use shared database connection
 
     print("=" * 60)
     print("TODO DATABASE CONTENTS")

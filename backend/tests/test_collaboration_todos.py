@@ -1,3 +1,5 @@
+from unittest.mock import AsyncMock, patch
+
 import pytest
 from tests.test_auth import get_verification_code_from_db
 
@@ -75,13 +77,30 @@ async def test_collaborative_todo_visibility(client, test_email, test_email2):
     invite_resp = await client.post(f"/spaces/{space_id}/invite", json={"emails": [test_email2]}, headers=headers1)
     assert invite_resp.status_code == 200
 
-    # User 1 creates a todo in the space
-    todo1_resp = await client.post("/todos", json={"text": "Todo by User 1", "space_id": space_id}, headers=headers1)
-    assert todo1_resp.status_code == 200
+    with patch(
+        "app.classify_task",
+        new=AsyncMock(
+            side_effect=[
+                {"category": "General", "priority": "Low", "dueDate": None, "text": "Todo by User 1"},
+                {"category": "General", "priority": "Low", "dueDate": None, "text": "Todo by User 2"},
+            ]
+        ),
+    ):
+        # User 1 creates a todo in the space
+        todo1_resp = await client.post(
+            "/todos",
+            json={"text": "Todo by User 1", "space_id": space_id},
+            headers=headers1,
+        )
+        assert todo1_resp.status_code == 200
 
-    # User 2 creates a todo in the space
-    todo2_resp = await client.post("/todos", json={"text": "Todo by User 2", "space_id": space_id}, headers=headers2)
-    assert todo2_resp.status_code == 200
+        # User 2 creates a todo in the space
+        todo2_resp = await client.post(
+            "/todos",
+            json={"text": "Todo by User 2", "space_id": space_id},
+            headers=headers2,
+        )
+        assert todo2_resp.status_code == 200
 
     # User 1 should see both todos
     user1_todos_resp = await client.get(f"/todos?space_id={space_id}", headers=headers1)

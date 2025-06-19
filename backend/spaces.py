@@ -5,10 +5,9 @@ from typing import List, Optional
 import auth
 from bson import ObjectId
 from categories import init_default_categories
+from db import db
 from dotenv import load_dotenv
 from fastapi import HTTPException
-from mongomock_motor import AsyncMongoMockClient
-from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, Field
 
 load_dotenv()
@@ -16,11 +15,17 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-MONGODB_URL = os.getenv("MONGODB_URL", "mongodb://localhost:27017")
-USE_MOCK_DB = os.getenv("USE_MOCK_DB", "false").lower() == "true"
-client = AsyncMongoMockClient() if USE_MOCK_DB else AsyncIOMotorClient(MONGODB_URL)
-db = client.todo_db
 spaces_collection = db.spaces
+
+
+async def init_space_indexes() -> None:
+    """Create indexes used for space queries."""
+    try:
+        await spaces_collection.create_index("owner_id")
+        await spaces_collection.create_index("member_ids")
+    except Exception as e:
+        logger.error(f"Error creating space indexes: {e}")
+
 
 # Link to the frontend for invite emails (provided via env var)
 WEBSITE_URL = os.getenv("WEBSITE_URL")

@@ -1,14 +1,12 @@
 import logging
-import os
 from datetime import datetime
 from typing import Dict, Optional
 
 import auth
 from bson import ObjectId
+from db import db
 from dotenv import load_dotenv
 from fastapi import HTTPException
-from mongomock_motor import AsyncMongoMockClient
-from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, Field
 from spaces import user_in_space
 
@@ -19,11 +17,7 @@ logger = logging.getLogger(__name__)
 # Load environment variables
 load_dotenv()
 
-# MongoDB connection
-MONGODB_URL = os.getenv("MONGODB_URL", "mongodb://localhost:27017")
-USE_MOCK_DB = os.getenv("USE_MOCK_DB", "false").lower() == "true"
-client = AsyncMongoMockClient() if USE_MOCK_DB else AsyncIOMotorClient(MONGODB_URL)
-db = client.todo_db
+# MongoDB connection provided by shared database module
 todos_collection = db.todos
 
 

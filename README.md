@@ -37,6 +37,8 @@ A modern collaborative todo list application with AI-powered task classification
 - **Modern, responsive UI** with Tailwind CSS
 - **Comprehensive testing** with pytest and manual testing
 - **Legacy data migration** - Automatic migration of existing data to space system
+- **Shared MongoDB client** used across backend modules for efficiency
+- **Indexed collections** for fast queries on todos, users, and spaces
 
 ## Prerequisites
 
