@@ -47,8 +47,10 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
   const [spaceMembers, setSpaceMembers] = useState<any[]>([]);
   const [pendingInvites, setPendingInvites] = useState<string[]>([]);
 
-  // Track latest todos fetch to avoid race conditions when switching spaces
+  // Track latest fetch requests to avoid race conditions when switching spaces
   const todosFetchIdRef = useRef(0);
+  const categoriesFetchIdRef = useRef(0);
+  const membersFetchIdRef = useRef(0);
 
   const handleOpenEmailSettings = async () => {
     try {
@@ -109,25 +111,33 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
   }, [authenticatedFetch, activeSpace]);
 
   const fetchMembers = useCallback(async () => {
+    const fetchId = ++membersFetchIdRef.current;
     if (!activeSpace || !activeSpace._id) {
-      setSpaceMembers([]);
-      setPendingInvites([]);
+      if (fetchId === membersFetchIdRef.current) {
+        setSpaceMembers([]);
+        setPendingInvites([]);
+      }
       return;
     }
     try {
       const resp = await authenticatedFetch(`/spaces/${activeSpace._id}/members`);
       if (resp?.ok) {
         const data = await resp.json();
-        setSpaceMembers(data.members || []);
-        setPendingInvites(data.pending_invites || []);
+        if (fetchId === membersFetchIdRef.current) {
+          setSpaceMembers(data.members || []);
+          setPendingInvites(data.pending_invites || []);
+        }
       }
     } catch (err) {
-      console.error('Error loading members', err);
+      if (fetchId === membersFetchIdRef.current) {
+        console.error('Error loading members', err);
+      }
     }
   }, [authenticatedFetch, activeSpace]);
 
   // Fetch categories from MongoDB
   const fetchCategories = useCallback(async () => {
+    const fetchId = ++categoriesFetchIdRef.current;
     try {
       const spaceId = activeSpace?._id || null;
       const url = spaceId ? `/categories?space_id=${spaceId}` : '/categories';
@@ -136,9 +146,13 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
         throw new Error('Failed to fetch categories');
       }
       const data = await response.json();
-      setCategories(data);
+      if (fetchId === categoriesFetchIdRef.current) {
+        setCategories(data);
+      }
     } catch (err) {
-      setError('Error loading categories: ' + err.message);
+      if (fetchId === categoriesFetchIdRef.current) {
+        setError('Error loading categories: ' + err.message);
+      }
     }
   }, [authenticatedFetch, activeSpace]);
 
