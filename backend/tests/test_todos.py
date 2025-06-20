@@ -35,8 +35,15 @@ async def test_todo_crud_flow(client, test_email):
         mock_classify.assert_awaited_once()
         todo_id = todo["_id"]
 
-    # Retrieve todos
-    get_resp = await client.get("/todos", headers=headers)
+    # Retrieve todos from default space
+    # Note: After migration, we need to get todos from the user's default space
+    spaces_resp = await client.get("/spaces", headers=headers)
+    assert spaces_resp.status_code == 200
+    spaces = spaces_resp.json()
+    default_space = next((s for s in spaces if s.get("is_default", False)), None)
+    assert default_space is not None
+
+    get_resp = await client.get(f"/todos?space_id={default_space['_id']}", headers=headers)
     assert get_resp.status_code == 200
     todos = get_resp.json()
     assert any(t["_id"] == todo_id for t in todos)

@@ -1,9 +1,12 @@
 # mypy: ignore-errors
 import os
+import sys
+from pathlib import Path
 
 import pytest
 
-from backend.classify import classify_task
+sys.path.append(str(Path(__file__).resolve().parents[1]))  # noqa: E402
+from classify import classify_task  # noqa: E402
 
 # Skip all tests in this file if OPENAI_API_KEY is not set
 pytestmark = pytest.mark.skipif(

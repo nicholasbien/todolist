@@ -24,14 +24,17 @@ todos_collection = db.todos
 async def init_todo_indexes() -> None:
     """Create indexes used in frequent queries for optimal performance."""
     try:
-        # Single field indexes for basic queries
+        # Index by user for quick lookup in the default space
         await todos_collection.create_index("user_id")
+        # Index by space for collaborative spaces
         await todos_collection.create_index("space_id")
         await todos_collection.create_index("completed")
 
         # Compound indexes for common query patterns
         # Most todos queries filter by user_id + space_id together
         await todos_collection.create_index([("user_id", 1), ("space_id", 1)])
+        # Also add the reverse compound index for space-first queries
+        await todos_collection.create_index([("space_id", 1), ("user_id", 1)])
 
         # Queries for completed/uncompleted todos within a space
         await todos_collection.create_index([("user_id", 1), ("space_id", 1), ("completed", 1)])
@@ -74,7 +77,17 @@ async def create_todo(todo: Todo):
         todo_dict = todo.dict(by_alias=True)
         todo_dict.pop("_id", None)
 
-        if todo.space_id and not await user_in_space(todo.user_id, todo.space_id):
+        # If no space_id provided, assign to user's default space
+        if not todo.space_id:
+            from spaces import spaces_collection
+
+            default_space = await spaces_collection.find_one({"owner_id": todo.user_id, "is_default": True})
+            if default_space:
+                todo_dict["space_id"] = str(default_space["_id"])
+
+        # Check space access using the final space_id (either provided or assigned)
+        final_space_id = todo_dict.get("space_id")
+        if final_space_id and not await user_in_space(todo.user_id, final_space_id):
             raise HTTPException(status_code=403, detail="Not in space")
 
         result = await todos_collection.insert_one(todo_dict)
@@ -125,20 +138,20 @@ async def get_todos(user_id: str, space_id: Optional[str] | None = None):
             # In default space, only show user's own todos
             query["user_id"] = user_id
         cursor = todos_collection.find(query)
-        async for todo in cursor:
-            # Ensure _id is properly converted to string
+        raw_todos = await cursor.to_list(length=None)
+
+        # Lookup all users in one query to avoid N+1 pattern
+        user_ids = {ObjectId(t["user_id"]) for t in raw_todos}
+        user_map = {}
+        if user_ids:
+            async for u in auth.users_collection.find({"_id": {"$in": list(user_ids)}}):
+                user_map[str(u["_id"])] = u.get("first_name", "")
+
+        for todo in raw_todos:
             todo["_id"] = str(todo["_id"])
+            todo["first_name"] = user_map.get(todo["user_id"], "")
+            todos.append(Todo(**todo))
 
-            # Add user's first name
-            try:
-                user = await auth.users_collection.find_one({"_id": ObjectId(todo["user_id"])})
-                if user:
-                    todo["first_name"] = user.get("first_name", "")
-            except Exception:
-                todo["first_name"] = ""
-
-            todo_obj = Todo(**todo)
-            todos.append(todo_obj)
         return todos
     except HTTPException:
         # Re-raise HTTP exceptions (like 403) without conversion

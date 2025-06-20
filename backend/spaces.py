@@ -44,6 +44,7 @@ class Space(BaseModel):
     name: str
     owner_id: str
     member_ids: List[str] = []
+    is_default: bool = False
 
     class Config:
         arbitrary_types_allowed = True
@@ -93,39 +94,15 @@ async def get_spaces_for_user(user_id: str) -> List[Space]:
     for space in spaces:
         logger.info(f"DEBUG: Space from DB - ID: {space.id}, Name: {space.name}, Owner: {space.owner_id}")
 
-    # Check if there's already a "Default" space in the database
-    existing_default = next((s for s in spaces if s.name == "Default"), None)
-    if existing_default:
-        logger.warning(f"DEBUG: Found existing Default space in database with ID: {existing_default.id}")
-        # If there's already a Default space in database, don't add virtual one
-        # Just ensure it's at the beginning
-        spaces = [s for s in spaces if s.name != "Default"]  # Remove from current position
-        spaces.insert(0, existing_default)  # Add at beginning
-    else:
-        # Add virtual "Default" space (space_id = None) at the beginning
-        default_space = Space(
-            id=None,  # This represents space_id = None
-            name="Default",
-            owner_id=user_id,
-            member_ids=[user_id],
-        )
-        logger.info(f"DEBUG: Creating virtual Default space for user {user_id}")
-        spaces.insert(0, default_space)
+    # Sort spaces with default first, then alphabetically
+    default_spaces = [s for s in spaces if s.is_default]
+    other_spaces = [s for s in spaces if not s.is_default]
+    other_spaces.sort(key=lambda s: s.name)
 
-    # Sort remaining spaces alphabetically (Default is already first)
-    if len(spaces) > 1:
-        remaining_spaces = spaces[1:]
-        remaining_spaces.sort(key=lambda s: s.name)
-        spaces = [spaces[0]] + remaining_spaces
-
-    return spaces
+    return default_spaces + other_spaces
 
 
-async def user_in_space(user_id: str, space_id: Optional[str]) -> bool:
-    # Handle default space (space_id = None) - only the user themselves has access
-    if space_id is None:
-        return True  # User always has access to their own default space
-
+async def user_in_space(user_id: str, space_id: str) -> bool:
     try:
         space = await spaces_collection.find_one({"_id": ObjectId(space_id)})
     except Exception:
@@ -306,3 +283,103 @@ async def list_space_members(space_id: str, current_user_id: str) -> dict:
         result["pending_invites"] = space.get("pending_emails", [])
 
     return result
+
+
+# Migration to convert conceptual default spaces to actual space documents
+async def migrate_default_spaces() -> None:
+    """
+    One-time migration to convert conceptual default spaces (space_id=None)
+    to actual default space documents with proper space_id values.
+    """
+    try:
+        from categories import categories_collection
+        from todos import todos_collection
+
+        # Find all users who have todos with space_id=None
+        user_ids = set()
+        todos_cursor = todos_collection.find({"space_id": None})
+        async for todo in todos_cursor:
+            if "user_id" in todo:
+                user_ids.add(todo["user_id"])
+            else:
+                logger.warning(f"Todo {todo.get('_id')} missing user_id field, skipping")
+
+        if not user_ids:
+            logger.info("No users found with default space data to migrate")
+            return
+
+        logger.info(f"Migrating default spaces for {len(user_ids)} users")
+
+        # Create default space for each user and update their data
+        for user_id in user_ids:
+            # Check if user already has a default space
+            existing_default = await spaces_collection.find_one({"owner_id": user_id, "name": "Default"})
+
+            if existing_default:
+                default_space_id = str(existing_default["_id"])
+                # Ensure existing default space has is_default flag
+                await spaces_collection.update_one({"_id": existing_default["_id"]}, {"$set": {"is_default": True}})
+                logger.info(f"User {user_id} already has default space: {default_space_id}")
+            else:
+                # Create new default space
+                default_space = {
+                    "name": "Default",
+                    "owner_id": user_id,
+                    "member_ids": [user_id],
+                    "pending_emails": [],
+                    "is_default": True,
+                }
+
+                result = await spaces_collection.insert_one(default_space)
+                default_space_id = str(result.inserted_id)
+                logger.info(f"Created default space {default_space_id} for user {user_id}")
+
+            # Update todos to use the new default space_id
+            todos_result = await todos_collection.update_many(
+                {"user_id": user_id, "space_id": None}, {"$set": {"space_id": default_space_id}}
+            )
+
+            if todos_result.modified_count > 0:
+                logger.info(f"Updated {todos_result.modified_count} todos for user {user_id}")
+
+        # Migrate categories from space_id=None to default spaces
+        # First, get all default categories
+        default_categories_cursor = categories_collection.find({"space_id": None})
+        default_categories = []
+        async for category in default_categories_cursor:
+            default_categories.append(category["name"])
+
+        # Create these categories for each user's default space
+        for user_id in user_ids:
+            default_space = await spaces_collection.find_one({"owner_id": user_id, "name": "Default"})
+
+            if default_space:
+                default_space_id = str(default_space["_id"])
+
+                for category_name in default_categories:
+                    # Check if category already exists for this space
+                    existing = await categories_collection.find_one(
+                        {"name": category_name, "space_id": default_space_id}
+                    )
+
+                    if not existing:
+                        await categories_collection.insert_one({"name": category_name, "space_id": default_space_id})
+
+        # Remove the old categories with space_id=None
+        categories_result = await categories_collection.delete_many({"space_id": None})
+        logger.info(f"Removed {categories_result.deleted_count} categories with space_id=None")
+
+        # Verify migration
+        remaining_todos = await todos_collection.count_documents({"space_id": None})
+        remaining_categories = await categories_collection.count_documents({"space_id": None})
+
+        if remaining_todos == 0 and remaining_categories == 0:
+            logger.info("✅ Default space migration completed successfully")
+        else:
+            logger.warning(
+                f"⚠️ Migration incomplete: {remaining_todos} todos and "
+                f"{remaining_categories} categories still have space_id=None"
+            )
+
+    except Exception as e:
+        logger.error(f"Error migrating default spaces: {str(e)}")

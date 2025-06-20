@@ -171,8 +171,19 @@ class TestAuthenticationWithDatabase:
         todo = create_response.json()
         todo_id = todo["_id"]
 
-        # Get todos
-        get_response = await client.get("/todos", headers=headers)
+        # Get todos from default space
+        # Note: After migration, todos are stored in actual default spaces, not space_id=None
+        # So we need to get the user's default space ID to fetch todos
+        spaces_response = await client.get("/spaces", headers=headers)
+        assert spaces_response.status_code == 200
+        spaces = spaces_response.json()
+
+        # Find the default space
+        default_space = next((s for s in spaces if s.get("is_default", False)), None)
+        assert default_space is not None, "User should have a default space"
+
+        # Get todos from the default space
+        get_response = await client.get(f"/todos?space_id={default_space['_id']}", headers=headers)
         assert get_response.status_code == 200
         todos = get_response.json()
         assert len(todos) >= 1
@@ -193,6 +204,78 @@ class TestAuthenticationWithDatabase:
         # Verify token is invalid after logout
         me_after_logout = await client.get("/auth/me", headers=headers)
         assert me_after_logout.status_code == 401
+
+    @pytest.mark.asyncio
+    async def test_user_has_default_space_on_login(self, client, test_email):
+        """Test that user automatically gets a default space when they log in."""
+        # Sign up
+        signup_response = await client.post("/auth/signup", json={"email": test_email})
+        assert signup_response.status_code == 200
+
+        # Get verification code
+        code = await get_verification_code_from_db(test_email)
+        if not code:
+            pytest.skip("Could not retrieve verification code")
+
+        # Login
+        login_response = await client.post("/auth/login", json={"email": test_email, "code": code})
+        assert login_response.status_code == 200
+        token = login_response.json()["token"]
+        headers = {"Authorization": f"Bearer {token}"}
+
+        # Check that user has spaces and at least one is a default space
+        spaces_response = await client.get("/spaces", headers=headers)
+        assert spaces_response.status_code == 200
+        spaces = spaces_response.json()
+
+        # User should have at least one space
+        assert len(spaces) >= 1
+
+        # First space should be the default space
+        default_space = spaces[0]
+        assert default_space["name"] == "Default"
+        assert default_space["is_default"] is True
+        assert default_space["owner_id"]  # Should have an owner_id
+
+    @pytest.mark.asyncio
+    async def test_first_todo_assigned_to_default_space(self, client, test_email):
+        """Test that user's first todo gets assigned to their default space."""
+        # Sign up and login
+        await client.post("/auth/signup", json={"email": test_email})
+        code = await get_verification_code_from_db(test_email)
+        if not code:
+            pytest.skip("Could not retrieve verification code")
+
+        login_response = await client.post("/auth/login", json={"email": test_email, "code": code})
+        token = login_response.json()["token"]
+        headers = {"Authorization": f"Bearer {token}"}
+
+        # Get user's default space
+        spaces_response = await client.get("/spaces", headers=headers)
+        spaces = spaces_response.json()
+        default_space = spaces[0]  # First space should be default
+        default_space_id = default_space["_id"]
+
+        # Create a todo (should automatically go to default space)
+        todo_data = {
+            "text": "Test todo",
+            "category": "General",
+            "priority": "Medium",
+            "dateAdded": "2024-01-01T00:00:00Z",
+            "completed": False,
+        }
+
+        create_response = await client.post("/todos", json=todo_data, headers=headers)
+        assert create_response.status_code == 200
+
+        # Get todos and verify it's in the default space
+        todos_response = await client.get(f"/todos?space_id={default_space_id}", headers=headers)
+        assert todos_response.status_code == 200
+        todos = todos_response.json()
+
+        assert len(todos) == 1
+        assert todos[0]["text"] == "Test todo"
+        assert todos[0]["space_id"] == default_space_id
 
     @pytest.mark.asyncio
     async def test_user_isolation(self, client, test_email, test_email2):
