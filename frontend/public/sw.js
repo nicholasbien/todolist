@@ -324,6 +324,7 @@ self.addEventListener('fetch', (event) => {
     url.origin === self.location.origin &&
     (url.pathname.startsWith('/todos') ||
       url.pathname.startsWith('/categories') ||
+      url.pathname.startsWith('/spaces') ||
       url.pathname.startsWith('/email') ||
       url.pathname.startsWith('/contact') ||
       url.pathname.startsWith('/auth/'));
