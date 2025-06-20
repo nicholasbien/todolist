@@ -67,6 +67,14 @@ async def create_todo(todo: Todo):
         todo_dict = todo.dict(by_alias=True)
         todo_dict.pop("_id", None)
 
+        # If no space_id provided, assign to user's default space
+        if not todo.space_id:
+            from spaces import spaces_collection
+
+            default_space = await spaces_collection.find_one({"owner_id": todo.user_id, "is_default": True})
+            if default_space:
+                todo_dict["space_id"] = str(default_space["_id"])
+
         if todo.space_id and not await user_in_space(todo.user_id, todo.space_id):
             raise HTTPException(status_code=403, detail="Not in space")
 
