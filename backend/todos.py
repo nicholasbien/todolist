@@ -1,14 +1,12 @@
 import logging
-import os
 from datetime import datetime
 from typing import Dict, Optional
 
 import auth
 from bson import ObjectId
+from db import db
 from dotenv import load_dotenv
 from fastapi import HTTPException
-from mongomock_motor import AsyncMongoMockClient
-from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, Field
 from spaces import user_in_space
 
@@ -19,25 +17,37 @@ logger = logging.getLogger(__name__)
 # Load environment variables
 load_dotenv()
 
-# MongoDB connection
-MONGODB_URL = os.getenv("MONGODB_URL", "mongodb://localhost:27017")
-USE_MOCK_DB = os.getenv("USE_MOCK_DB", "false").lower() == "true"
-client = AsyncMongoMockClient() if USE_MOCK_DB else AsyncIOMotorClient(MONGODB_URL)
-db = client.todo_db
+# MongoDB connection provided by shared database module
 todos_collection = db.todos
 
 
 async def init_todo_indexes() -> None:
-    """Create indexes used in frequent queries."""
+    """Create indexes used in frequent queries for optimal performance."""
     try:
         # Index by user for quick lookup in the default space
         await todos_collection.create_index("user_id")
         # Index by space for collaborative spaces
         await todos_collection.create_index("space_id")
-        # Compound index for common queries filtering by both
+        await todos_collection.create_index("completed")
+
+        # Compound indexes for common query patterns
+        # Most todos queries filter by user_id + space_id together
+        await todos_collection.create_index([("user_id", 1), ("space_id", 1)])
+        # Also add the reverse compound index for space-first queries
         await todos_collection.create_index([("space_id", 1), ("user_id", 1)])
+
+        # Queries for completed/uncompleted todos within a space
+        await todos_collection.create_index([("user_id", 1), ("space_id", 1), ("completed", 1)])
+
+        # Queries sorted by date (most recent first)
+        await todos_collection.create_index([("user_id", 1), ("space_id", 1), ("dateAdded", -1)])
+
+        # Queries by category within a space
+        await todos_collection.create_index([("user_id", 1), ("space_id", 1), ("category", 1)])
+
+        logger.info("Todo indexes created successfully")
     except Exception as e:
-        logger.error(f"Error creating indexes: {e}")
+        logger.error(f"Error creating todo indexes: {e}")
 
 
 # Pydantic models
@@ -75,7 +85,9 @@ async def create_todo(todo: Todo):
             if default_space:
                 todo_dict["space_id"] = str(default_space["_id"])
 
-        if todo.space_id and not await user_in_space(todo.user_id, todo.space_id):
+        # Check space access using the final space_id (either provided or assigned)
+        final_space_id = todo_dict.get("space_id")
+        if final_space_id and not await user_in_space(todo.user_id, final_space_id):
             raise HTTPException(status_code=403, detail="Not in space")
 
         result = await todos_collection.insert_one(todo_dict)

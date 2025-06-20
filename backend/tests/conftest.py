@@ -24,27 +24,22 @@ async def client():
     # Reset database connections to avoid event loop issues between tests
     import auth
     import categories
+    import db
     import spaces
     import todos
     from mongomock_motor import AsyncMongoMockClient
 
     # Recreate database connections in the current event loop context
-    auth.client = AsyncMongoMockClient()
-    auth.db = auth.client.todo_db
-    auth.users_collection = auth.db.users
-    auth.sessions_collection = auth.db.sessions
+    # This ensures each test gets a fresh database connection in the correct event loop
+    db.client = AsyncMongoMockClient()
+    db.db = db.client.todo_db
 
-    todos.client = AsyncMongoMockClient()
-    todos.db = todos.client.todo_db
-    todos.todos_collection = todos.db.todos
-
-    categories.client = AsyncMongoMockClient()
-    categories.db = categories.client.todo_db
-    categories.categories_collection = categories.db.categories
-
-    spaces.client = AsyncMongoMockClient()
-    spaces.db = spaces.client.todo_db
-    spaces.spaces_collection = spaces.db.spaces
+    # Update all module collection references to use the new shared connection
+    auth.users_collection = db.db.users
+    auth.sessions_collection = db.db.sessions
+    todos.todos_collection = db.db.todos
+    categories.categories_collection = db.db.categories
+    spaces.spaces_collection = db.db.spaces
 
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://testserver") as async_client:
         yield async_client

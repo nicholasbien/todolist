@@ -171,8 +171,19 @@ class TestAuthenticationWithDatabase:
         todo = create_response.json()
         todo_id = todo["_id"]
 
-        # Get todos
-        get_response = await client.get("/todos", headers=headers)
+        # Get todos from default space
+        # Note: After migration, todos are stored in actual default spaces, not space_id=None
+        # So we need to get the user's default space ID to fetch todos
+        spaces_response = await client.get("/spaces", headers=headers)
+        assert spaces_response.status_code == 200
+        spaces = spaces_response.json()
+
+        # Find the default space
+        default_space = next((s for s in spaces if s.get("is_default", False)), None)
+        assert default_space is not None, "User should have a default space"
+
+        # Get todos from the default space
+        get_response = await client.get(f"/todos?space_id={default_space['_id']}", headers=headers)
         assert get_response.status_code == 200
         todos = get_response.json()
         assert len(todos) >= 1
