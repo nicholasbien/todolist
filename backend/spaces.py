@@ -5,10 +5,9 @@ from typing import List, Optional
 import auth
 from bson import ObjectId
 from categories import init_default_categories
+from db import db
 from dotenv import load_dotenv
 from fastapi import HTTPException
-from mongomock_motor import AsyncMongoMockClient
-from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, Field
 
 load_dotenv()
@@ -16,20 +15,24 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-MONGODB_URL = os.getenv("MONGODB_URL", "mongodb://localhost:27017")
-USE_MOCK_DB = os.getenv("USE_MOCK_DB", "false").lower() == "true"
-client = AsyncMongoMockClient() if USE_MOCK_DB else AsyncIOMotorClient(MONGODB_URL)
-db = client.todo_db
 spaces_collection = db.spaces
 
 
 async def init_space_indexes() -> None:
-    """Create indexes used in frequent queries."""
+    """Create indexes used for space queries and member lookups."""
     try:
+        # Single field indexes
         await spaces_collection.create_index("owner_id")
-        await spaces_collection.create_index("member_ids")
+        await spaces_collection.create_index("member_ids")  # Array index for membership queries
+        await spaces_collection.create_index("pending_emails")  # Array index for pending invites
+
+        # Compound indexes for common patterns
+        # Finding spaces owned by user OR where user is a member (union queries)
+        await spaces_collection.create_index([("owner_id", 1), ("member_ids", 1)])
+
+        logger.info("Space indexes created successfully")
     except Exception as e:
-        logger.error(f"Error creating indexes: {e}")
+        logger.error(f"Error creating space indexes: {e}")
 
 
 # Link to the frontend for invite emails (provided via env var)
@@ -85,6 +88,11 @@ async def get_spaces_for_user(user_id: str) -> List[Space]:
     async for doc in cursor:
         doc["_id"] = str(doc["_id"])
         spaces.append(Space(**doc))
+
+    # DEBUG: Log found spaces from database
+    logger.info(f"DEBUG: Found {len(spaces)} spaces in database for user {user_id}")
+    for space in spaces:
+        logger.info(f"DEBUG: Space from DB - ID: {space.id}, Name: {space.name}, Owner: {space.owner_id}")
 
     # Sort spaces with default first, then alphabetically
     default_spaces = [s for s in spaces if s.is_default]

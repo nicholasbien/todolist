@@ -8,10 +8,9 @@ from email.mime.text import MIMEText
 from typing import List, Optional
 
 from bson import ObjectId
+from db import db
 from dotenv import load_dotenv
 from fastapi import HTTPException
-from mongomock_motor import AsyncMongoMockClient
-from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, EmailStr, Field
 from spaces import add_user_to_pending_spaces
 
@@ -22,13 +21,29 @@ logger = logging.getLogger(__name__)
 # Load environment variables
 load_dotenv()
 
-# MongoDB connection
-MONGODB_URL = os.getenv("MONGODB_URL", "mongodb://localhost:27017")
-USE_MOCK_DB = os.getenv("USE_MOCK_DB", "false").lower() == "true"
-client = AsyncMongoMockClient() if USE_MOCK_DB else AsyncIOMotorClient(MONGODB_URL)
-db = client.todo_db
+# MongoDB connection provided by shared database module
 users_collection = db.users
 sessions_collection = db.sessions
+
+
+async def init_auth_indexes() -> None:
+    """Create indexes used for authentication and session management."""
+    try:
+        # User collection indexes
+        await users_collection.create_index("email", unique=True)  # Unique constraint for login
+
+        # Session collection indexes
+        await sessions_collection.create_index("token", unique=True)  # Fast token lookup
+        await sessions_collection.create_index("user_id")  # Find sessions by user
+        await sessions_collection.create_index("expires_at")  # Cleanup expired sessions efficiently
+
+        # Compound index for session validation (token + expiry check)
+        await sessions_collection.create_index([("token", 1), ("expires_at", 1)])
+
+        logger.info("Auth indexes created successfully")
+    except Exception as e:
+        logger.error(f"Error creating auth indexes: {e}")
+
 
 # JWT settings
 JWT_SECRET = os.getenv("JWT_SECRET")

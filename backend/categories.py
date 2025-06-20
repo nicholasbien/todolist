@@ -1,10 +1,9 @@
 import logging
-import os
 from typing import List, Optional
 
+from db import db
 from dotenv import load_dotenv
 from fastapi import HTTPException
-from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel
 
 
@@ -19,22 +18,26 @@ logger = logging.getLogger(__name__)
 # Load environment variables
 load_dotenv()
 
-# MongoDB connection
-MONGODB_URL = os.getenv("MONGODB_URL", "mongodb://localhost:27017")
-USE_MOCK_DB = os.getenv("USE_MOCK_DB", "false").lower() == "true"
-
-if USE_MOCK_DB:
-    from mongomock_motor import AsyncMongoMockClient
-
-    client = AsyncMongoMockClient()
-else:
-    client = AsyncIOMotorClient(MONGODB_URL)
-
-db = client.todo_db
+# MongoDB connection provided by shared database module
 categories_collection = db.categories
 
 # Shared default categories
-DEFAULT_CATEGORIES = ["General"]
+DEFAULT_CATEGORIES = ["Work", "Personal", "Shopping", "Finance", "Health", "General"]
+
+
+async def init_category_indexes() -> None:
+    """Create indexes used for category queries."""
+    try:
+        # Single field indexes
+        await categories_collection.create_index("space_id")
+        await categories_collection.create_index("name")
+
+        # Compound index for space-specific category queries
+        await categories_collection.create_index([("space_id", 1), ("name", 1)], unique=True)
+
+        logger.info("Category indexes created successfully")
+    except Exception as e:
+        logger.error(f"Error creating category indexes: {e}")
 
 
 # Pydantic model
