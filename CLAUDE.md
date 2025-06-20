@@ -108,6 +108,10 @@ Both frontend and backend require OpenAI API keys:
 - **Error Handling**: Comprehensive error handling for network requests and space operations
 - **Data Isolation**: Complete separation of todos and categories between spaces
 
+## Known Issues / TODOs
+
+- **Category API Consistency**: Backend should return category objects with `_id` fields instead of just strings. Currently returns `["Work", "Personal"]` but should return `[{"_id": "cat123", "name": "Work", "space_id": "space456"}]` to match todos and spaces API patterns.
+
 ## API Endpoints
 
 ### Spaces

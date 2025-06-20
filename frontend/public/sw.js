@@ -3,7 +3,7 @@ const API_CACHE = 'todo-api-v36';
 
 const GLOBAL_DB_NAME = 'TodoGlobalDB';
 const USER_DB_PREFIX = 'TodoUserDB_';
-const DB_VERSION = 3;
+const DB_VERSION = 4;
 const TODOS = 'todos';
 const CATEGORIES = 'categories';
 const SPACES = 'spaces';
@@ -48,7 +48,7 @@ function openUserDB(userId) {
         db.createObjectStore(TODOS, { keyPath: '_id' });
       }
       if (!db.objectStoreNames.contains(CATEGORIES)) {
-        db.createObjectStore(CATEGORIES, { keyPath: 'id', autoIncrement: true });
+        db.createObjectStore(CATEGORIES, { keyPath: '_id' });
       }
       if (!db.objectStoreNames.contains(SPACES)) {
         db.createObjectStore(SPACES, { keyPath: '_id' });
@@ -159,6 +159,12 @@ const putCategory = async (category, userId) => {
     console.warn('Category created without space_id:', category.name);
   }
 
+  // Generate _id if not provided (using name + space_id for uniqueness)
+  if (!categoryWithSpace._id) {
+    const spaceIdPart = categoryWithSpace.space_id || 'null';
+    categoryWithSpace._id = `${categoryWithSpace.name}_${spaceIdPart}`;
+  }
+
   return userDbTx(effectiveUserId, CATEGORIES, 'readwrite', (s) => s.put(categoryWithSpace));
 };
 
@@ -166,13 +172,11 @@ const delCategory = async (name, userId, spaceId = null) => {
   const authData = userId ? null : await getAuth();
   const effectiveUserId = userId || (authData ? authData.userId : null);
 
-  // Find and delete categories matching name and space_id
-  const allCategories = await userDbTx(effectiveUserId, CATEGORIES, 'readonly', (s) => s.getAll());
-  const toDelete = allCategories.filter(c => c.name === name && c.space_id === spaceId);
+  // Generate the _id for the category to delete
+  const spaceIdPart = spaceId || 'null';
+  const categoryId = `${name}_${spaceIdPart}`;
 
-  for (const category of toDelete) {
-    await userDbTx(effectiveUserId, CATEGORIES, 'readwrite', (s) => s.delete(category.id));
-  }
+  return userDbTx(effectiveUserId, CATEGORIES, 'readwrite', (s) => s.delete(categoryId));
 };
 
 const addQueue = async (action, userId) => {
@@ -256,13 +260,26 @@ async function syncServerDataToLocal() {
       console.log('Failed to sync spaces:', err);
     }
 
-    // Fetch and store categories (now space-aware)
+    // Fetch and store categories (space-aware)
     try {
-      const categoriesResponse = await fetch('/categories', { headers });
-      if (categoriesResponse.ok) {
-        const serverCategories = await categoriesResponse.json();
-        for (const categoryName of serverCategories) {
-          await putCategory({ name: categoryName, space_id: null }, authData.userId);
+      // Get all user spaces first
+      const spacesResponse = await fetch('/spaces', { headers });
+      if (spacesResponse.ok) {
+        const userSpaces = await spacesResponse.json();
+
+        // Fetch categories for each space
+        for (const space of userSpaces) {
+          try {
+            const categoriesResponse = await fetch(`/categories?space_id=${space._id}`, { headers });
+            if (categoriesResponse.ok) {
+              const spaceCategories = await categoriesResponse.json();
+              for (const categoryName of spaceCategories) {
+                await putCategory({ name: categoryName, space_id: space._id }, authData.userId);
+              }
+            }
+          } catch (err) {
+            console.log(`Failed to sync categories for space ${space._id}:`, err);
+          }
         }
       }
     } catch (err) {
@@ -339,6 +356,72 @@ self.addEventListener('fetch', (event) => {
   // This prevents the service worker from interfering with static files during development
 });
 
+// Background sync function - runs after returning cached data
+async function backgroundSync(request, userId, spaceId) {
+  try {
+    const url = new URL(request.url);
+
+    // First sync any pending offline operations
+    await syncQueue();
+
+    // Then fetch fresh data from server and update cache
+    const response = await fetch(request.clone());
+    if (!response.ok) return; // Don't update cache if server error
+
+    if (url.pathname === '/todos') {
+      const serverTodos = await response.json();
+
+      // Update IndexedDB with fresh server data
+      const localTodos = await getTodos(userId, spaceId);
+      const offlineOnlyTodos = localTodos.filter(t => t._id.startsWith('offline_'));
+
+      // Remove stale server todos from cache
+      const serverIds = new Set(serverTodos.map(t => t._id));
+      for (const todo of localTodos) {
+        if (!todo._id.startsWith('offline_') && !serverIds.has(todo._id)) {
+          await delTodo(todo._id, userId);
+        }
+      }
+
+      // Save fresh server todos to cache
+      for (const todo of serverTodos) {
+        await putTodo(todo, userId);
+      }
+
+    } else if (url.pathname === '/categories') {
+      const serverCategories = await response.json();
+
+      // Update cached categories
+      const localCategories = await getCategories(userId, spaceId);
+      const serverSet = new Set(serverCategories);
+
+      // Remove stale categories
+      for (const category of localCategories) {
+        if (!category.name.startsWith('offline_') && !serverSet.has(category.name)) {
+          await delCategory(category.name, userId, spaceId);
+        }
+      }
+
+      // Save fresh server categories
+      for (const categoryName of serverCategories) {
+        await putCategory({ name: categoryName, space_id: spaceId }, userId);
+      }
+
+    } else if (url.pathname === '/spaces') {
+      const serverSpaces = await response.json();
+
+      // Save all server spaces to IndexedDB
+      for (const space of serverSpaces) {
+        await putSpace(space, userId);
+      }
+    }
+
+    console.log(`🔄 Background sync completed for ${url.pathname}`);
+  } catch (error) {
+    console.log(`❌ Background sync failed for ${request.url}:`, error);
+  }
+}
+
 async function handleApiRequest(request) {
   const online = self.navigator.onLine;
   const url = new URL(request.url);
@@ -347,7 +430,47 @@ async function handleApiRequest(request) {
   const spaceId = url.searchParams.get('space_id');
 
   // Check if this is an offline-generated ID that shouldn't go to server
-  const isOfflineId = url.pathname.includes('offline_');
+  const isOfflineId = url.pathname.includes('offline_') ||
+                      (spaceId && spaceId.startsWith('offline_'));
+
+  // CACHE-FIRST: For GET requests, return cached data immediately, then sync in background
+  if (request.method === 'GET' && (url.pathname === '/todos' || url.pathname === '/categories' || url.pathname === '/spaces')) {
+    const authData = await getAuth();
+    if (authData && authData.userId) {
+      let cachedData = null;
+
+      // Return cached data immediately for instant UI
+      if (url.pathname === '/todos') {
+        const cachedTodos = await getTodos(authData.userId, spaceId);
+        cachedData = cachedTodos;
+      } else if (url.pathname === '/categories') {
+        const cachedCategories = await getCategories(authData.userId, spaceId);
+        if (cachedCategories.length > 0) {
+          cachedData = cachedCategories.map(c => c.name);
+        } else {
+          // No cached categories - let request fall through to server
+          cachedData = null;
+        }
+      } else if (url.pathname === '/spaces') {
+        const cachedSpaces = await getSpaces(authData.userId);
+        cachedData = cachedSpaces;
+      }
+
+      // Only return cached data if we actually have some
+      if (cachedData !== null) {
+        // Start background sync (don't await - let it run in background)
+        if (online && !isOfflineId) {
+          backgroundSync(request, authData.userId, spaceId);
+        }
+
+        // Return cached data immediately
+        return new Response(JSON.stringify(cachedData), {
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+      // If no cached data, let request fall through to server
+    }
+  }
 
   if (online && !isOfflineId) {
     try {
@@ -518,13 +641,9 @@ async function offlineFallback(request, url) {
     if (url.pathname === '/categories' || url.pathname.endsWith('/categories')) {
       const offlineCategories = await getCategories(authData ? authData.userId : null, spaceId);
 
-      // If we have stored categories, return their names; otherwise use defaults
-      if (offlineCategories && offlineCategories.length > 0) {
-        const categoryNames = offlineCategories.map(c => c.name);
-        return new Response(JSON.stringify(categoryNames), { headers: { 'Content-Type': 'application/json' } });
-      } else {
-        return new Response(JSON.stringify(DEFAULT_CATEGORIES), { headers: { 'Content-Type': 'application/json' } });
-      }
+      // Return stored categories or empty array if none exist
+      const categoryNames = offlineCategories.length > 0 ? offlineCategories.map(c => c.name) : [];
+      return new Response(JSON.stringify(categoryNames), { headers: { 'Content-Type': 'application/json' } });
     }
   }
 
@@ -659,6 +778,17 @@ async function offlineFallback(request, url) {
       }
 
       return new Response(null, { status: 204 });
+    }
+
+    // Create new space - NOT SUPPORTED YET
+    // TODO: Implement offline space creation when frontend routing is fixed
+    if ((url.pathname === '/spaces' || url.pathname.endsWith('/spaces')) && request.method === 'POST') {
+      return new Response(JSON.stringify({
+        error: 'Creating spaces offline is not supported yet. Please go online to create spaces.'
+      }), {
+        status: 503,
+        headers: { 'Content-Type': 'application/json' }
+      });
     }
 
     // Create new category
@@ -968,5 +1098,12 @@ if (typeof module !== 'undefined') {
     clearQueue,
     getAuthHeaders,
     syncQueue,
+    backgroundSync,
+    handleApiRequest,
+    offlineFallback,
+    getIdMap,
+    putIdMap,
+    clearIdMap,
+    normalizePriority,
   };
 }

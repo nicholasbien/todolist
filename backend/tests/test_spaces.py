@@ -21,7 +21,13 @@ async def create_test_space(client, token, name="Test Space"):
 
 
 @pytest.mark.asyncio
-async def test_create_space(client, test_email, test_email2):
+async def test_create_space(client, test_email, test_email2, monkeypatch):
+    # Mock email sending to prevent actual emails
+    async def fake_send_email(to_email: str, subject: str, body: str) -> bool:
+        return True
+
+    monkeypatch.setattr("email_summary.send_email", fake_send_email)
+
     token1 = await get_token(client, test_email)
     headers1 = {"Authorization": f"Bearer {token1}"}
 
@@ -46,7 +52,13 @@ async def test_create_space(client, test_email, test_email2):
 
 
 @pytest.mark.asyncio
-async def test_edit_space(client, test_email, test_email2):
+async def test_edit_space(client, test_email, test_email2, monkeypatch):
+    # Mock email sending to prevent actual emails
+    async def fake_send_email(to_email: str, subject: str, body: str) -> bool:
+        return True
+
+    monkeypatch.setattr("email_summary.send_email", fake_send_email)
+
     token1 = await get_token(client, test_email)
     headers1 = {"Authorization": f"Bearer {token1}"}
 
@@ -75,7 +87,13 @@ async def test_edit_space(client, test_email, test_email2):
 
 
 @pytest.mark.asyncio
-async def test_make_space_private_removes_members(client, test_email, test_email2):
+async def test_make_space_private_removes_members(client, test_email, test_email2, monkeypatch):
+    # Mock email sending to prevent actual emails
+    async def fake_send_email(to_email: str, subject: str, body: str) -> bool:
+        return True
+
+    monkeypatch.setattr("email_summary.send_email", fake_send_email)
+
     token1 = await get_token(client, test_email)
     headers1 = {"Authorization": f"Bearer {token1}"}
 
@@ -112,7 +130,13 @@ async def test_make_space_private_removes_members(client, test_email, test_email
 
 
 @pytest.mark.asyncio
-async def test_private_clears_pending_invites(client, test_email, test_email3):
+async def test_private_clears_pending_invites(client, test_email, test_email3, monkeypatch):
+    # Mock email sending to prevent actual emails
+    async def fake_send_email(to_email: str, subject: str, body: str) -> bool:
+        return True
+
+    monkeypatch.setattr("email_summary.send_email", fake_send_email)
+
     token1 = await get_token(client, test_email)
     headers1 = {"Authorization": f"Bearer {token1}"}
 
