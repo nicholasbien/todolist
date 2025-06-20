@@ -339,6 +339,72 @@ self.addEventListener('fetch', (event) => {
   // This prevents the service worker from interfering with static files during development
 });
 
+// Background sync function - runs after returning cached data
+async function backgroundSync(request, userId, spaceId) {
+  try {
+    const url = new URL(request.url);
+
+    // First sync any pending offline operations
+    await syncQueue();
+
+    // Then fetch fresh data from server and update cache
+    const response = await fetch(request.clone());
+    if (!response.ok) return; // Don't update cache if server error
+
+    if (url.pathname === '/todos') {
+      const serverTodos = await response.json();
+
+      // Update IndexedDB with fresh server data
+      const localTodos = await getTodos(userId, spaceId);
+      const offlineOnlyTodos = localTodos.filter(t => t._id.startsWith('offline_'));
+
+      // Remove stale server todos from cache
+      const serverIds = new Set(serverTodos.map(t => t._id));
+      for (const todo of localTodos) {
+        if (!todo._id.startsWith('offline_') && !serverIds.has(todo._id)) {
+          await delTodo(todo._id, userId);
+        }
+      }
+
+      // Save fresh server todos to cache
+      for (const todo of serverTodos) {
+        await putTodo(todo, userId);
+      }
+
+    } else if (url.pathname === '/categories') {
+      const serverCategories = await response.json();
+
+      // Update cached categories
+      const localCategories = await getCategories(userId, spaceId);
+      const serverSet = new Set(serverCategories);
+
+      // Remove stale categories
+      for (const category of localCategories) {
+        if (!category.name.startsWith('offline_') && !serverSet.has(category.name)) {
+          await delCategory(category.name, userId, spaceId);
+        }
+      }
+
+      // Save fresh server categories
+      for (const categoryName of serverCategories) {
+        await putCategory({ name: categoryName, space_id: spaceId }, userId);
+      }
+
+    } else if (url.pathname === '/spaces') {
+      const serverSpaces = await response.json();
+
+      // Save all server spaces to IndexedDB
+      for (const space of serverSpaces) {
+        await putSpace(space, userId);
+      }
+    }
+
+    console.log(`🔄 Background sync completed for ${url.pathname}`);
+  } catch (error) {
+    console.log(`❌ Background sync failed for ${request.url}:`, error);
+  }
+}
+
 async function handleApiRequest(request) {
   const online = self.navigator.onLine;
   const url = new URL(request.url);
@@ -348,6 +414,36 @@ async function handleApiRequest(request) {
 
   // Check if this is an offline-generated ID that shouldn't go to server
   const isOfflineId = url.pathname.includes('offline_');
+
+  // CACHE-FIRST: For GET requests, return cached data immediately, then sync in background
+  if (request.method === 'GET' && (url.pathname === '/todos' || url.pathname === '/categories' || url.pathname === '/spaces')) {
+    const authData = await getAuth();
+    if (authData && authData.userId) {
+      let cachedData = null;
+
+      // Return cached data immediately for instant UI
+      if (url.pathname === '/todos') {
+        const cachedTodos = await getTodos(authData.userId, spaceId);
+        cachedData = cachedTodos;
+      } else if (url.pathname === '/categories') {
+        const cachedCategories = await getCategories(authData.userId, spaceId);
+        cachedData = cachedCategories.length > 0 ? cachedCategories.map(c => c.name) : DEFAULT_CATEGORIES;
+      } else if (url.pathname === '/spaces') {
+        const cachedSpaces = await getSpaces(authData.userId);
+        cachedData = cachedSpaces;
+      }
+
+      // Start background sync (don't await - let it run in background)
+      if (online && !isOfflineId) {
+        backgroundSync(request, authData.userId, spaceId);
+      }
+
+      // Return cached data immediately
+      return new Response(JSON.stringify(cachedData), {
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+  }
 
   if (online && !isOfflineId) {
     try {
@@ -968,5 +1064,7 @@ if (typeof module !== 'undefined') {
     clearQueue,
     getAuthHeaders,
     syncQueue,
+    backgroundSync,
+    handleApiRequest,
   };
 }

@@ -17,7 +17,11 @@ global.structuredClone = (obj) => JSON.parse(JSON.stringify(obj));
 // Mock self for service worker environment
 global.self = {
   location: { origin: 'http://localhost:3000' },
-  navigator: { onLine: true },
+  navigator: {
+    get onLine() { return this._onLine; },
+    set onLine(value) { this._onLine = value; },
+    _onLine: true
+  },
   addEventListener: jest.fn(),
   skipWaiting: jest.fn(),
   clients: { claim: jest.fn() }
@@ -34,8 +38,53 @@ global.caches = {
   delete: jest.fn().mockResolvedValue(true)
 };
 
-// Mock fetch
+// Mock fetch and web APIs
 global.fetch = jest.fn();
+
+// Mock Request API
+global.Request = class Request {
+  constructor(url, options = {}) {
+    this.url = url;
+    this.method = options.method || 'GET';
+    this.headers = options.headers || {};
+    this.body = options.body;
+  }
+
+  clone() {
+    return new Request(this.url, {
+      method: this.method,
+      headers: this.headers,
+      body: this.body
+    });
+  }
+};
+
+// Mock Response API
+global.Response = class Response {
+  constructor(body, options = {}) {
+    this.body = body;
+    this.status = options.status || 200;
+    this.statusText = options.statusText || 'OK';
+    this.headers = options.headers || {};
+    this.ok = this.status >= 200 && this.status < 300;
+  }
+
+  async json() {
+    return JSON.parse(this.body);
+  }
+
+  async text() {
+    return this.body;
+  }
+
+  clone() {
+    return new Response(this.body, {
+      status: this.status,
+      statusText: this.statusText,
+      headers: this.headers
+    });
+  }
+};
 
 // Import service worker functions
 const {
@@ -48,6 +97,8 @@ const {
   delTodo,
   getSpaces,
   putSpace,
+  handleApiRequest,
+  backgroundSync,
   delSpace,
   getCategories,
   putCategory,
@@ -365,5 +416,454 @@ describe('Service Worker Regression Tests', () => {
     expect(spaceBTodos).toHaveLength(1);
     expect(spaceATodos.every(t => t.space_id === 'space-a')).toBe(true);
     expect(spaceBTodos.every(t => t.space_id === 'space-b')).toBe(true);
+  });
+});
+
+describe('Cache-First API Handling', () => {
+  beforeEach(async () => {
+    // Reset mocks
+    jest.clearAllMocks();
+    global.self.navigator._onLine = true;
+
+    // Clear all databases to prevent test contamination
+    const testUserId = 'test-user';
+    try {
+      const allTodos = await getTodos(testUserId);
+      for (const todo of allTodos) {
+        await delTodo(todo._id, testUserId);
+      }
+
+      const allCategories = await getCategories(testUserId);
+      for (const category of allCategories) {
+        await delCategory(category.name, testUserId);
+      }
+
+      const allSpaces = await getSpaces(testUserId);
+      for (const space of allSpaces) {
+        await delSpace(space._id, testUserId);
+      }
+    } catch (e) {
+      // Ignore cleanup errors
+    }
+  });
+
+  test('returns cached todos immediately for GET /todos', async () => {
+    const testUserId = 'test-user';
+    const testToken = 'test-token';
+    const spaceId = 'test-space';
+
+    // Set up auth
+    await putAuth(testToken, testUserId);
+
+    // Pre-populate cache with test data
+    const cachedTodos = [
+      { _id: '1', text: 'Cached Todo 1', space_id: spaceId },
+      { _id: '2', text: 'Cached Todo 2', space_id: spaceId }
+    ];
+
+    for (const todo of cachedTodos) {
+      await putTodo(todo, testUserId);
+    }
+
+    // Create test request
+    const request = new Request(`http://localhost:3000/todos?space_id=${spaceId}`, {
+      method: 'GET'
+    });
+
+    // Call handleApiRequest
+    const response = await handleApiRequest(request);
+    const responseData = await response.json();
+
+    // Should return cached data immediately
+    expect(responseData).toHaveLength(2);
+    expect(responseData[0].text).toBe('Cached Todo 1');
+    expect(responseData[1].text).toBe('Cached Todo 2');
+  });
+
+  test('returns cached categories immediately for GET /categories', async () => {
+    const testUserId = 'test-user';
+    const testToken = 'test-token';
+    const spaceId = 'test-space';
+
+    // Set up auth
+    await putAuth(testToken, testUserId);
+
+    // Pre-populate cache with categories
+    const cachedCategories = [
+      { name: 'Work', space_id: spaceId },
+      { name: 'Personal', space_id: spaceId }
+    ];
+
+    for (const category of cachedCategories) {
+      await putCategory(category, testUserId);
+    }
+
+    // Mock server response for background sync
+    global.fetch.mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve(['Work', 'Personal', 'Shopping']),
+      clone: () => ({
+        ok: true,
+        json: () => Promise.resolve(['Work', 'Personal', 'Shopping'])
+      })
+    });
+
+    // Create test request
+    const request = new Request(`http://localhost:3000/categories?space_id=${spaceId}`, {
+      method: 'GET'
+    });
+
+    // Call handleApiRequest
+    const response = await handleApiRequest(request);
+    const responseData = await response.json();
+
+    // Should return cached category names immediately
+    expect(responseData).toEqual(['Work', 'Personal']);
+
+    // Background sync should have been triggered
+    expect(global.fetch).toHaveBeenCalled();
+  });
+
+  test('returns cached spaces immediately for GET /spaces', async () => {
+    const testUserId = 'test-user';
+    const testToken = 'test-token';
+
+    // Set up auth
+    await putAuth(testToken, testUserId);
+
+    // Pre-populate cache with spaces
+    const cachedSpaces = [
+      { _id: 'space-1', name: 'Default', is_default: true },
+      { _id: 'space-2', name: 'Work Space', is_default: false }
+    ];
+
+    for (const space of cachedSpaces) {
+      await putSpace(space, testUserId);
+    }
+
+    // Mock server response for background sync
+    global.fetch.mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve([...cachedSpaces, { _id: 'space-3', name: 'New Space' }]),
+      clone: () => ({
+        ok: true,
+        json: () => Promise.resolve([...cachedSpaces, { _id: 'space-3', name: 'New Space' }])
+      })
+    });
+
+    // Create test request
+    const request = new Request('http://localhost:3000/spaces', {
+      method: 'GET'
+    });
+
+    // Call handleApiRequest
+    const response = await handleApiRequest(request);
+    const responseData = await response.json();
+
+    // Should return cached spaces immediately
+    expect(responseData).toHaveLength(2);
+    expect(responseData[0].name).toBe('Default');
+    expect(responseData[1].name).toBe('Work Space');
+
+    // Background sync should have been triggered
+    expect(global.fetch).toHaveBeenCalled();
+  });
+
+  test('falls back to default categories when no cached categories exist', async () => {
+    const testUserId = 'test-user-clean'; // Use different user to avoid contamination
+    const testToken = 'test-token';
+    const spaceId = 'test-space-clean';
+
+    // Set up auth
+    await putAuth(testToken, testUserId);
+
+    // Ensure no categories exist for this user/space
+    const existingCategories = await getCategories(testUserId, spaceId);
+    for (const category of existingCategories) {
+      await delCategory(category.name, testUserId, spaceId);
+    }
+
+    // Verify no categories exist
+    const verifyEmpty = await getCategories(testUserId, spaceId);
+    expect(verifyEmpty).toHaveLength(0);
+
+    // Create test request (no cached categories)
+    const request = new Request(`http://localhost:3000/categories?space_id=${spaceId}`, {
+      method: 'GET'
+    });
+
+    // Call handleApiRequest
+    const response = await handleApiRequest(request);
+    const responseData = await response.json();
+
+    // Should return default categories when no cache exists
+    expect(responseData).toEqual(['General']); // From DEFAULT_CATEGORIES in sw.js
+  });
+
+  test('handles offline mode by returning cached data only', async () => {
+    const testUserId = 'test-user-offline';
+    const testToken = 'test-token';
+    const spaceId = 'test-space-offline';
+
+    // Set offline mode BEFORE any operations
+    global.self.navigator._onLine = false;
+
+    // Set up auth
+    await putAuth(testToken, testUserId);
+
+    // Pre-populate cache
+    const cachedTodos = [
+      { _id: '1', text: 'Offline Todo', space_id: spaceId }
+    ];
+
+    for (const todo of cachedTodos) {
+      await putTodo(todo, testUserId);
+    }
+
+    // Reset fetch mock call count to ensure clean test
+    jest.clearAllMocks();
+
+    // Create test request
+    const request = new Request(`http://localhost:3000/todos?space_id=${spaceId}`, {
+      method: 'GET'
+    });
+
+    // Call handleApiRequest
+    const response = await handleApiRequest(request);
+    const responseData = await response.json();
+
+    // Should return cached data
+    expect(responseData).toHaveLength(1);
+    expect(responseData[0].text).toBe('Offline Todo');
+
+    // No network request should be made when offline
+    expect(global.fetch).not.toHaveBeenCalled();
+
+    // Reset to online for other tests
+    global.self.navigator._onLine = true;
+  });
+
+  test('background sync updates cache through handleApiRequest', async () => {
+    const testUserId = 'test-user';
+    const testToken = 'test-token';
+    const spaceId = 'test-space';
+
+    // Set up auth
+    await putAuth(testToken, testUserId);
+
+    // Pre-populate cache with old data
+    const oldTodos = [
+      { _id: '1', text: 'Old Todo', space_id: spaceId }
+    ];
+
+    for (const todo of oldTodos) {
+      await putTodo(todo, testUserId);
+    }
+
+    // Mock server response with updated data (for background sync)
+    const updatedTodos = [
+      { _id: '1', text: 'Updated Todo', space_id: spaceId },
+      { _id: '2', text: 'New Todo', space_id: spaceId }
+    ];
+
+    global.fetch.mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve(updatedTodos),
+      clone: () => ({
+        ok: true,
+        json: () => Promise.resolve(updatedTodos)
+      })
+    });
+
+    // Create test request and call handleApiRequest
+    const request = new Request(`http://localhost:3000/todos?space_id=${spaceId}`, {
+      method: 'GET'
+    });
+
+    // This should return cached data immediately and trigger background sync
+    const response = await handleApiRequest(request);
+    const responseData = await response.json();
+
+    // Should return old cached data immediately
+    expect(responseData).toHaveLength(1);
+    expect(responseData[0].text).toBe('Old Todo');
+
+    // Background sync should have been triggered
+    expect(global.fetch).toHaveBeenCalled();
+  });
+});
+
+describe('Background Sync', () => {
+  beforeEach(async () => {
+    jest.clearAllMocks();
+
+    // Clear all databases to prevent test contamination
+    const testUserId = 'test-user';
+    try {
+      const allTodos = await getTodos(testUserId);
+      for (const todo of allTodos) {
+        await delTodo(todo._id, testUserId);
+      }
+
+      const allCategories = await getCategories(testUserId);
+      for (const category of allCategories) {
+        await delCategory(category.name, testUserId);
+      }
+
+      const allSpaces = await getSpaces(testUserId);
+      for (const space of allSpaces) {
+        await delSpace(space._id, testUserId);
+      }
+    } catch (e) {
+      // Ignore cleanup errors
+    }
+  });
+
+  test('backgroundSync updates todos cache with fresh server data', async () => {
+    const testUserId = 'test-user';
+    const spaceId = 'test-space';
+
+    // Pre-populate cache with stale data
+    const staleData = [
+      { _id: '1', text: 'Stale Todo', space_id: spaceId }
+    ];
+
+    for (const todo of staleData) {
+      await putTodo(todo, testUserId);
+    }
+
+    // Mock server response with fresh data
+    const freshData = [
+      { _id: '1', text: 'Fresh Todo', space_id: spaceId },
+      { _id: '2', text: 'New Fresh Todo', space_id: spaceId }
+    ];
+
+    global.fetch.mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve(freshData)
+    });
+
+    // Create mock request
+    const mockRequest = {
+      url: `http://localhost:3000/todos?space_id=${spaceId}`,
+      clone: function() { return this; }
+    };
+
+    // Call backgroundSync directly
+    await backgroundSync(mockRequest, testUserId, spaceId);
+
+    // Verify cache was updated with fresh data
+    const updatedCache = await getTodos(testUserId, spaceId);
+    expect(updatedCache).toHaveLength(2);
+    expect(updatedCache.find(t => t._id === '1').text).toBe('Fresh Todo');
+    expect(updatedCache.find(t => t._id === '2').text).toBe('New Fresh Todo');
+
+    // Verify fetch was called
+    expect(global.fetch).toHaveBeenCalledWith(mockRequest);
+  });
+
+  test('backgroundSync updates categories cache with fresh server data', async () => {
+    const testUserId = 'test-user';
+    const spaceId = 'test-space';
+
+    // Pre-populate cache with stale categories
+    const staleCategories = [
+      { name: 'Old Category', space_id: spaceId }
+    ];
+
+    for (const category of staleCategories) {
+      await putCategory(category, testUserId);
+    }
+
+    // Mock server response with fresh categories
+    const freshCategories = ['Work', 'Personal', 'Shopping'];
+
+    global.fetch.mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve(freshCategories)
+    });
+
+    // Create mock request
+    const mockRequest = {
+      url: `http://localhost:3000/categories?space_id=${spaceId}`,
+      clone: function() { return this; }
+    };
+
+    // Call backgroundSync directly
+    await backgroundSync(mockRequest, testUserId, spaceId);
+
+    // Verify cache was updated with fresh categories
+    const updatedCache = await getCategories(testUserId, spaceId);
+    const categoryNames = updatedCache.map(c => c.name);
+    expect(categoryNames).toEqual(expect.arrayContaining(['Work', 'Personal', 'Shopping']));
+    expect(categoryNames).not.toContain('Old Category');
+
+    // Verify fetch was called
+    expect(global.fetch).toHaveBeenCalledWith(mockRequest);
+  });
+
+  test('backgroundSync handles server errors gracefully', async () => {
+    const testUserId = 'test-user';
+    const spaceId = 'test-space';
+
+    // Pre-populate cache
+    const originalData = [
+      { _id: '1', text: 'Original Todo', space_id: spaceId }
+    ];
+
+    for (const todo of originalData) {
+      await putTodo(todo, testUserId);
+    }
+
+    // Mock server error
+    global.fetch.mockResolvedValueOnce({
+      ok: false,
+      status: 500
+    });
+
+    // Create mock request
+    const mockRequest = {
+      url: `http://localhost:3000/todos?space_id=${spaceId}`,
+      clone: function() { return this; }
+    };
+
+    // Call backgroundSync - should not throw
+    await expect(backgroundSync(mockRequest, testUserId, spaceId)).resolves.not.toThrow();
+
+    // Verify cache remains unchanged
+    const cache = await getTodos(testUserId, spaceId);
+    expect(cache).toHaveLength(1);
+    expect(cache[0].text).toBe('Original Todo');
+  });
+
+  test('backgroundSync handles network errors gracefully', async () => {
+    const testUserId = 'test-user';
+    const spaceId = 'test-space';
+
+    // Pre-populate cache
+    const originalData = [
+      { _id: '1', text: 'Original Todo', space_id: spaceId }
+    ];
+
+    for (const todo of originalData) {
+      await putTodo(todo, testUserId);
+    }
+
+    // Mock network error
+    global.fetch.mockRejectedValueOnce(new Error('Network error'));
+
+    // Create mock request
+    const mockRequest = {
+      url: `http://localhost:3000/todos?space_id=${spaceId}`,
+      clone: function() { return this; }
+    };
+
+    // Call backgroundSync - should not throw
+    await expect(backgroundSync(mockRequest, testUserId, spaceId)).resolves.not.toThrow();
+
+    // Verify cache remains unchanged
+    const cache = await getTodos(testUserId, spaceId);
+    expect(cache).toHaveLength(1);
+    expect(cache[0].text).toBe('Original Todo');
   });
 });
