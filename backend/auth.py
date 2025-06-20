@@ -248,6 +248,9 @@ async def login_user(email: str, code: str) -> dict:
         # Add user to any spaces they were invited to
         await add_user_to_pending_spaces(str(user["_id"]), email)
 
+        # Ensure user has a default space
+        await ensure_user_has_default_space(str(user["_id"]))
+
         # Create session
         token = generate_session_token()
         expires_at = datetime.now() + timedelta(hours=JWT_EXPIRATION_HOURS)
@@ -364,6 +367,32 @@ async def update_user_name(user_id: str, first_name: str) -> dict:
     except Exception as e:
         logger.error(f"Error in update_user_name: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to update name: {str(e)}")
+
+
+async def ensure_user_has_default_space(user_id: str) -> None:
+    """Ensure the user has a default space, creating one if needed."""
+    try:
+        # Import here to avoid circular imports
+        from spaces import spaces_collection
+
+        # Check if user already has a default space
+        existing_default = await spaces_collection.find_one({"owner_id": user_id, "is_default": True})
+
+        if not existing_default:
+            # Create default space
+            default_space = {
+                "name": "Default",
+                "owner_id": user_id,
+                "member_ids": [user_id],
+                "pending_emails": [],
+                "is_default": True,
+            }
+
+            result = await spaces_collection.insert_one(default_space)
+            logger.info(f"Created default space {result.inserted_id} for user {user_id}")
+
+    except Exception as e:
+        logger.error(f"Error ensuring default space for user {user_id}: {str(e)}")
 
 
 async def update_user_summary_time(
