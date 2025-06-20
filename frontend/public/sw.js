@@ -1,11 +1,12 @@
-const STATIC_CACHE = 'todo-static-v35';
-const API_CACHE = 'todo-api-v35';
+const STATIC_CACHE = 'todo-static-v36';
+const API_CACHE = 'todo-api-v36';
 
 const GLOBAL_DB_NAME = 'TodoGlobalDB';
 const USER_DB_PREFIX = 'TodoUserDB_';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 const TODOS = 'todos';
 const CATEGORIES = 'categories';
+const SPACES = 'spaces';
 const QUEUE = 'queue';
 const AUTH = 'auth';
 
@@ -47,7 +48,10 @@ function openUserDB(userId) {
         db.createObjectStore(TODOS, { keyPath: '_id' });
       }
       if (!db.objectStoreNames.contains(CATEGORIES)) {
-        db.createObjectStore(CATEGORIES, { keyPath: 'name' });
+        db.createObjectStore(CATEGORIES, { keyPath: 'id', autoIncrement: true });
+      }
+      if (!db.objectStoreNames.contains(SPACES)) {
+        db.createObjectStore(SPACES, { keyPath: '_id' });
       }
       if (!db.objectStoreNames.contains(QUEUE)) {
         db.createObjectStore(QUEUE, { keyPath: 'id', autoIncrement: true });
@@ -85,10 +89,18 @@ const getAuth = () => globalDbTx(AUTH, 'readonly', (s) => s.get('token'));
 const putAuth = (token, userId) => globalDbTx(AUTH, 'readwrite', (s) => s.put({ key: 'token', token, userId }));
 
 // User-specific operations
-const getTodos = async (userId) => {
+const getTodos = async (userId, spaceId = null) => {
   const authData = userId ? null : await getAuth();
   const effectiveUserId = userId || (authData ? authData.userId : null);
-  return userDbTx(effectiveUserId, TODOS, 'readonly', (s) => s.getAll());
+  const allTodos = await userDbTx(effectiveUserId, TODOS, 'readonly', (s) => s.getAll());
+
+  if (spaceId) {
+    // Filter by space_id
+    return allTodos.filter(t => t.space_id === spaceId);
+  } else {
+    // Return all todos
+    return allTodos;
+  }
 };
 
 const putTodo = async (todo, userId) => {
@@ -104,22 +116,63 @@ const delTodo = async (id, userId) => {
   return userDbTx(effectiveUserId, TODOS, 'readwrite', (s) => s.delete(id));
 };
 
-const getCategories = async (userId) => {
+const getSpaces = async (userId) => {
   const authData = userId ? null : await getAuth();
   const effectiveUserId = userId || (authData ? authData.userId : null);
-  return userDbTx(effectiveUserId, CATEGORIES, 'readonly', (s) => s.getAll());
+  return userDbTx(effectiveUserId, SPACES, 'readonly', (s) => s.getAll());
+};
+
+const putSpace = async (space, userId) => {
+  const authData = userId ? null : await getAuth();
+  const effectiveUserId = userId || (authData ? authData.userId : null);
+  return userDbTx(effectiveUserId, SPACES, 'readwrite', (s) => s.put(space));
+};
+
+const delSpace = async (id, userId) => {
+  const authData = userId ? null : await getAuth();
+  const effectiveUserId = userId || (authData ? authData.userId : null);
+  return userDbTx(effectiveUserId, SPACES, 'readwrite', (s) => s.delete(id));
+};
+
+const getCategories = async (userId, spaceId = null) => {
+  const authData = userId ? null : await getAuth();
+  const effectiveUserId = userId || (authData ? authData.userId : null);
+  const allCategories = await userDbTx(effectiveUserId, CATEGORIES, 'readonly', (s) => s.getAll());
+
+  if (spaceId) {
+    // Get categories for specific space
+    return allCategories.filter(c => c.space_id === spaceId);
+  } else {
+    // Get all categories
+    return allCategories;
+  }
 };
 
 const putCategory = async (category, userId) => {
   const authData = userId ? null : await getAuth();
   const effectiveUserId = userId || (authData ? authData.userId : null);
-  return userDbTx(effectiveUserId, CATEGORIES, 'readwrite', (s) => s.put(category));
+  // Ensure category has space_id (default to null for backward compatibility)
+  const categoryWithSpace = { space_id: null, ...category };
+
+  // Log warning if no space_id provided (should be rare after migration)
+  if (!category.space_id) {
+    console.warn('Category created without space_id:', category.name);
+  }
+
+  return userDbTx(effectiveUserId, CATEGORIES, 'readwrite', (s) => s.put(categoryWithSpace));
 };
 
-const delCategory = async (name, userId) => {
+const delCategory = async (name, userId, spaceId = null) => {
   const authData = userId ? null : await getAuth();
   const effectiveUserId = userId || (authData ? authData.userId : null);
-  return userDbTx(effectiveUserId, CATEGORIES, 'readwrite', (s) => s.delete(name));
+
+  // Find and delete categories matching name and space_id
+  const allCategories = await userDbTx(effectiveUserId, CATEGORIES, 'readonly', (s) => s.getAll());
+  const toDelete = allCategories.filter(c => c.name === name && c.space_id === spaceId);
+
+  for (const category of toDelete) {
+    await userDbTx(effectiveUserId, CATEGORIES, 'readwrite', (s) => s.delete(category.id));
+  }
 };
 
 const addQueue = async (action, userId) => {
@@ -190,13 +243,26 @@ async function syncServerDataToLocal() {
 
     const headers = await getAuthHeaders();
 
-    // Fetch and store categories
+    // Fetch and store spaces first
+    try {
+      const spacesResponse = await fetch('/spaces', { headers });
+      if (spacesResponse.ok) {
+        const serverSpaces = await spacesResponse.json();
+        for (const space of serverSpaces) {
+          await putSpace(space, authData.userId);
+        }
+      }
+    } catch (err) {
+      console.log('Failed to sync spaces:', err);
+    }
+
+    // Fetch and store categories (now space-aware)
     try {
       const categoriesResponse = await fetch('/categories', { headers });
       if (categoriesResponse.ok) {
         const serverCategories = await categoriesResponse.json();
         for (const categoryName of serverCategories) {
-          await putCategory({ name: categoryName }, authData.userId);
+          await putCategory({ name: categoryName, space_id: null }, authData.userId);
         }
       }
     } catch (err) {
@@ -253,7 +319,7 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
-  // Handle API requests
+  // Only handle API requests, let all other requests go through normally
   const isApi =
     url.origin === self.location.origin &&
     (url.pathname.startsWith('/todos') ||
@@ -269,31 +335,19 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Handle static file requests (including page navigation)
-  if (url.origin === self.location.origin) {
-    event.respondWith(handleStaticRequest(event.request));
-  }
+  // Let all non-API requests pass through to the network normally
+  // This prevents the service worker from interfering with static files during development
 });
 
 async function handleApiRequest(request) {
   const online = self.navigator.onLine;
   const url = new URL(request.url);
 
-  // TEMPORARILY DISABLED: Offline functionality disabled until spaces support is implemented
-  // This prevents data integrity issues with the spaces collaboration system
-  if (!online) {
-    return new Response(JSON.stringify({
-      error: 'Offline functionality is temporarily disabled. Please check your internet connection.'
-    }), {
-      status: 503,
-      headers: { 'Content-Type': 'application/json' }
-    });
-  }
+  // Extract space_id from query parameters
+  const spaceId = url.searchParams.get('space_id');
 
   // Check if this is an offline-generated ID that shouldn't go to server
   const isOfflineId = url.pathname.includes('offline_');
-
-  // console.log(`🌐 API Request: ${request.method} ${url.pathname} | Online: ${online} | Offline ID: ${isOfflineId}`);
 
   if (online && !isOfflineId) {
     try {
@@ -317,7 +371,8 @@ async function handleApiRequest(request) {
           const serverTodos = await freshResponse.json();
 
           // Get current local todos (may include unsynced offline todos)
-          const localTodos = await getTodos(authData.userId);
+          // Filter by space if space_id parameter is provided
+          const localTodos = await getTodos(authData.userId, spaceId);
           const offlineOnlyTodos = localTodos.filter(t => t._id.startsWith('offline_'));
 
           // Remove any non-offline todos that no longer exist on the server
@@ -327,19 +382,14 @@ async function handleApiRequest(request) {
               await delTodo(t._id, authData.userId);
             }
           }
-          // console.log('📊 Online GET /todos - Local todos IDs:', localTodos.map(t => t._id));
-          // console.log('📊 Online GET /todos - Server todos IDs:', serverTodos.map(t => t._id));
-          // console.log('📊 Online GET /todos - Offline-only todos IDs:', offlineOnlyTodos.map(t => t._id));
 
           // Save fresh server data to IndexedDB
           for (const todo of serverTodos) {
             await putTodo(todo, authData.userId);
           }
 
-          // Merge server todos with any remaining offline todos
+          // Merge server todos with any remaining offline todos (for the specific space)
           const mergedTodos = [...serverTodos, ...offlineOnlyTodos];
-
-          // console.log('📊 Online GET /todos - Final merged todos IDs:', mergedTodos.map(t => t._id));
 
           // Return the merged data
           return new Response(JSON.stringify(mergedTodos), {
@@ -354,7 +404,8 @@ async function handleApiRequest(request) {
 
           const serverCategories = await response.clone().json(); // Array of strings like ["Work", "Personal"]
 
-          const localCategories = await getCategories(authData.userId);
+          // Get local categories for the specific space
+          const localCategories = await getCategories(authData.userId, spaceId);
           const offlineOnlyCategories = localCategories.filter(c => c.name.startsWith('offline_'));
           const offlineOnlyNames = offlineOnlyCategories.map(c => c.name);
 
@@ -362,13 +413,13 @@ async function handleApiRequest(request) {
           const serverSet = new Set(serverCategories);
           for (const c of localCategories) {
             if (!c.name.startsWith('offline_') && !serverSet.has(c.name)) {
-              await delCategory(c.name, authData.userId);
+              await delCategory(c.name, authData.userId, spaceId);
             }
           }
 
-          // Save all server categories to IndexedDB for offline access (as objects)
+          // Save all server categories to IndexedDB for offline access (as objects with space_id)
           for (const categoryName of serverCategories) {
-            await putCategory({ name: categoryName }, authData.userId);
+            await putCategory({ name: categoryName, space_id: spaceId }, authData.userId);
           }
 
           // Merge server categories with offline-only categories (return as strings)
@@ -377,6 +428,21 @@ async function handleApiRequest(request) {
           return new Response(JSON.stringify(mergedCategories), {
             headers: { 'Content-Type': 'application/json' }
           });
+        }
+
+        // For GET /spaces, sync server data to IndexedDB
+        if (url.pathname === '/spaces') {
+          const authData = await getAuth();
+          if (!authData || !authData.userId) return response; // No user context
+
+          const serverSpaces = await response.clone().json();
+
+          // Save all server spaces to IndexedDB for offline access
+          for (const space of serverSpaces) {
+            await putSpace(space, authData.userId);
+          }
+
+          return response; // Return original response
         }
       }
 
@@ -431,16 +497,26 @@ async function handleStaticRequest(request) {
 
 async function offlineFallback(request, url) {
   const authData = await getAuth();
+  const spaceId = url.searchParams.get('space_id');
 
-  // Handle core todo operations offline
+  // Handle core operations offline
   if (request.method === 'GET') {
+    // Handle spaces
+    if (url.pathname === '/spaces' || url.pathname.endsWith('/spaces')) {
+      const spaces = await getSpaces(authData ? authData.userId : null);
+      return new Response(JSON.stringify(spaces), { headers: { 'Content-Type': 'application/json' } });
+    }
+
+    // Handle todos (space-aware)
     if (url.pathname === '/todos' || url.pathname.endsWith('/todos')) {
-      const todos = await getTodos(authData ? authData.userId : null);
+      const todos = await getTodos(authData ? authData.userId : null, spaceId);
       console.log('📱 Offline GET /todos - Todo IDs:', todos.map(t => t._id));
       return new Response(JSON.stringify(todos), { headers: { 'Content-Type': 'application/json' } });
     }
+
+    // Handle categories (space-aware)
     if (url.pathname === '/categories' || url.pathname.endsWith('/categories')) {
-      const offlineCategories = await getCategories(authData ? authData.userId : null);
+      const offlineCategories = await getCategories(authData ? authData.userId : null, spaceId);
 
       // If we have stored categories, return their names; otherwise use defaults
       if (offlineCategories && offlineCategories.length > 0) {
@@ -472,6 +548,7 @@ async function offlineFallback(request, url) {
         dueDate: null,
         completed: false,
         user_id: authData ? authData.userId : 'offline_user',
+        space_id: data.space_id || null, // Include space_id from request data
         created_offline: true,
       };
 
@@ -479,8 +556,6 @@ async function offlineFallback(request, url) {
       if (text.startsWith('http://') || text.startsWith('https://')) {
         todoData.link = text;
       }
-
-      // console.log('📱 Offline POST /todos - Created todo with ID:', todoData._id);
 
       await putTodo(todoData, authData ? authData.userId : null);
       await addQueue({ type: 'CREATE', data: todoData }, authData ? authData.userId : null);
@@ -589,7 +664,7 @@ async function offlineFallback(request, url) {
     // Create new category
     if ((url.pathname === '/categories' || url.pathname.endsWith('/categories')) && request.method === 'POST') {
       const categoryName = data.name || `offline_${Date.now()}`;
-      const newCategory = { name: categoryName };
+      const newCategory = { name: categoryName, space_id: data.space_id || null };
 
       await putCategory(newCategory, authData ? authData.userId : null);
       await addQueue({ type: 'CREATE_CATEGORY', data: newCategory }, authData ? authData.userId : null);
@@ -604,21 +679,21 @@ async function offlineFallback(request, url) {
         return new Response(JSON.stringify({ error: 'Invalid name' }), { status: 400 });
       }
 
-      // Update all todos referencing this category
-      const todos = await getTodos(authData ? authData.userId : null);
+      // Update all todos referencing this category in the specified space
+      const todos = await getTodos(authData ? authData.userId : null, spaceId);
       for (const t of todos) {
-        if (t.category === oldName) {
+        if (t.category === oldName && t.space_id === spaceId) {
           const updated = { ...t, category: newName };
           await putTodo(updated, authData ? authData.userId : null);
           await addQueue({ type: 'UPDATE', data: updated }, authData ? authData.userId : null);
         }
       }
 
-      await delCategory(oldName, authData ? authData.userId : null);
-      await putCategory({ name: newName }, authData ? authData.userId : null);
+      await delCategory(oldName, authData ? authData.userId : null, spaceId);
+      await putCategory({ name: newName, space_id: spaceId }, authData ? authData.userId : null);
 
       const queueEntries = await readQueue(authData ? authData.userId : null);
-      const createIdx = queueEntries.findIndex(q => q.type === 'CREATE_CATEGORY' && q.data.name === oldName);
+      const createIdx = queueEntries.findIndex(q => q.type === 'CREATE_CATEGORY' && q.data.name === oldName && q.data.space_id === spaceId);
       if (createIdx !== -1) {
         queueEntries[createIdx].data.name = newName;
         await clearQueue(authData ? authData.userId : null);
@@ -626,7 +701,7 @@ async function offlineFallback(request, url) {
           await addQueue({ type: entry.type, data: entry.data }, authData ? authData.userId : null);
         }
       } else {
-        await addQueue({ type: 'RENAME_CATEGORY', data: { old_name: oldName, new_name: newName } }, authData ? authData.userId : null);
+        await addQueue({ type: 'RENAME_CATEGORY', data: { old_name: oldName, new_name: newName, space_id: spaceId } }, authData ? authData.userId : null);
       }
 
       return new Response(JSON.stringify({ message: 'Category renamed' }), { headers: { 'Content-Type': 'application/json' } });
@@ -636,20 +711,20 @@ async function offlineFallback(request, url) {
     if (url.pathname.startsWith('/categories/') && request.method === 'DELETE') {
       const categoryName = decodeURIComponent(url.pathname.split('/')[2]); // Get name from /categories/{name}
 
-      // Update todos that use this category to "General"
-      const todos = await getTodos(authData ? authData.userId : null);
+      // Update todos that use this category to "General" in the specified space
+      const todos = await getTodos(authData ? authData.userId : null, spaceId);
       for (const t of todos) {
-        if (t.category === categoryName) {
+        if (t.category === categoryName && t.space_id === spaceId) {
           const updated = { ...t, category: 'General' };
           await putTodo(updated, authData ? authData.userId : null);
           await addQueue({ type: 'UPDATE', data: updated }, authData ? authData.userId : null);
         }
       }
 
-      await delCategory(categoryName, authData ? authData.userId : null);
+      await delCategory(categoryName, authData ? authData.userId : null, spaceId);
 
       const queueEntries = await readQueue(authData ? authData.userId : null);
-      const createIdx = queueEntries.findIndex(q => q.type === 'CREATE_CATEGORY' && q.data.name === categoryName);
+      const createIdx = queueEntries.findIndex(q => q.type === 'CREATE_CATEGORY' && q.data.name === categoryName && q.data.space_id === spaceId);
       if (createIdx !== -1) {
         queueEntries.splice(createIdx, 1); // Cancel pending create if never synced
         await clearQueue(authData ? authData.userId : null);
@@ -657,7 +732,7 @@ async function offlineFallback(request, url) {
           await addQueue({ type: entry.type, data: entry.data }, authData ? authData.userId : null);
         }
       } else {
-        await addQueue({ type: 'DELETE_CATEGORY', data: { name: categoryName } }, authData ? authData.userId : null);
+        await addQueue({ type: 'DELETE_CATEGORY', data: { name: categoryName, space_id: spaceId } }, authData ? authData.userId : null);
       }
 
       return new Response(null, { status: 204 });
@@ -813,27 +888,33 @@ async function syncQueue() {
           });
           if (res.ok) {
             const serverCategory = await res.json();
-            await putCategory(serverCategory, authData.userId);
+            await putCategory({ ...serverCategory, space_id: op.data.space_id }, authData.userId);
           }
           break;
         case 'DELETE_CATEGORY':
-          res = await fetch(`/categories/${encodeURIComponent(op.data.name)}`, {
+          const deleteUrl = op.data.space_id
+            ? `/categories/${encodeURIComponent(op.data.name)}?space_id=${op.data.space_id}`
+            : `/categories/${encodeURIComponent(op.data.name)}`;
+          res = await fetch(deleteUrl, {
             method: 'DELETE',
             headers
           });
           if (res.ok) {
-            await delCategory(op.data.name, authData.userId);
+            await delCategory(op.data.name, authData.userId, op.data.space_id);
           }
           break;
         case 'RENAME_CATEGORY':
-          res = await fetch(`/categories/${encodeURIComponent(op.data.old_name)}`, {
+          const renameUrl = op.data.space_id
+            ? `/categories/${encodeURIComponent(op.data.old_name)}?space_id=${op.data.space_id}`
+            : `/categories/${encodeURIComponent(op.data.old_name)}`;
+          res = await fetch(renameUrl, {
             method: 'PUT',
             headers,
             body: JSON.stringify({ new_name: op.data.new_name })
           });
           if (res.ok) {
-            await delCategory(op.data.old_name, authData.userId);
-            await putCategory({ name: op.data.new_name }, authData.userId);
+            await delCategory(op.data.old_name, authData.userId, op.data.space_id);
+            await putCategory({ name: op.data.new_name, space_id: op.data.space_id }, authData.userId);
           }
           break;
       }
@@ -876,6 +957,9 @@ if (typeof module !== 'undefined') {
     getTodos,
     putTodo,
     delTodo,
+    getSpaces,
+    putSpace,
+    delSpace,
     getCategories,
     putCategory,
     delCategory,
