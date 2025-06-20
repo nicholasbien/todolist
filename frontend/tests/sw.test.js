@@ -517,8 +517,9 @@ describe('Cache-First API Handling', () => {
     const response = await handleApiRequest(request);
     const responseData = await response.json();
 
-    // Should return cached category names immediately
-    expect(responseData).toEqual(['Work', 'Personal']);
+    // Should return cached category names immediately (order doesn't matter)
+    expect(responseData).toEqual(expect.arrayContaining(['Work', 'Personal']));
+    expect(responseData).toHaveLength(2);
 
     // Background sync should have been triggered
     expect(global.fetch).toHaveBeenCalled();
