@@ -1,9 +1,9 @@
-const STATIC_CACHE = 'todo-static-v36';
-const API_CACHE = 'todo-api-v36';
+const STATIC_CACHE = 'todo-static-v38';
+const API_CACHE = 'todo-api-v38';
 
 const GLOBAL_DB_NAME = 'TodoGlobalDB';
 const USER_DB_PREFIX = 'TodoUserDB_';
-const DB_VERSION = 3;
+const DB_VERSION = 4;
 const TODOS = 'todos';
 const CATEGORIES = 'categories';
 const SPACES = 'spaces';
