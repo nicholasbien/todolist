@@ -205,6 +205,33 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
     }
   }, [token, user, fetchSpaces, fetchTodos, fetchCategories, fetchMembers]);
 
+  // Listen for service worker messages about data updates
+  useEffect(() => {
+    if ('serviceWorker' in navigator) {
+      const handleMessage = (event) => {
+        if (event.data && event.data.type === 'DATA_UPDATED') {
+          console.log('🔄 Service worker notified of data update:', event.data);
+
+          // Refresh the appropriate data based on endpoint
+          if (event.data.endpoint === '/todos') {
+            fetchTodos();
+          } else if (event.data.endpoint === '/categories') {
+            fetchCategories();
+          } else if (event.data.endpoint === '/spaces') {
+            fetchSpaces();
+          }
+        }
+      };
+
+      navigator.serviceWorker.addEventListener('message', handleMessage);
+
+      // Cleanup listener on unmount
+      return () => {
+        navigator.serviceWorker.removeEventListener('message', handleMessage);
+      };
+    }
+  }, [fetchTodos, fetchCategories, fetchSpaces]);
+
   // Refetch categories and members when active space changes
   useEffect(() => {
     if (token && user && activeSpace) {

@@ -1,5 +1,5 @@
-const STATIC_CACHE = 'todo-static-v36';
-const API_CACHE = 'todo-api-v36';
+const STATIC_CACHE = 'todo-static-v37';
+const API_CACHE = 'todo-api-v37';
 
 const GLOBAL_DB_NAME = 'TodoGlobalDB';
 const USER_DB_PREFIX = 'TodoUserDB_';
@@ -428,6 +428,17 @@ async function backgroundSync(request, userId, spaceId) {
     }
 
     console.log(`🔄 Background sync completed for ${url.pathname}`);
+
+    // Notify all clients that data has been updated
+    self.clients.matchAll().then(clients => {
+      clients.forEach(client => {
+        client.postMessage({
+          type: 'DATA_UPDATED',
+          endpoint: url.pathname,
+          spaceId: spaceId
+        });
+      });
+    });
   } catch (error) {
     console.log(`❌ Background sync failed for ${request.url}:`, error);
   }
