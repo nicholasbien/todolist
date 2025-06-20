@@ -569,7 +569,7 @@ describe('Cache-First API Handling', () => {
     expect(global.fetch).toHaveBeenCalled();
   });
 
-  test('falls back to default categories when no cached categories exist', async () => {
+  test('lets request fall through to server when no cached categories exist', async () => {
     const testUserId = 'test-user-clean'; // Use different user to avoid contamination
     const testToken = 'test-token';
     const spaceId = 'test-space-clean';
@@ -587,6 +587,16 @@ describe('Cache-First API Handling', () => {
     const verifyEmpty = await getCategories(testUserId, spaceId);
     expect(verifyEmpty).toHaveLength(0);
 
+    // Mock server response
+    global.fetch.mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve(['Work', 'Personal']),
+      clone: () => ({
+        ok: true,
+        json: () => Promise.resolve(['Work', 'Personal'])
+      })
+    });
+
     // Create test request (no cached categories)
     const request = new Request(`http://localhost:3000/categories?space_id=${spaceId}`, {
       method: 'GET'
@@ -596,8 +606,9 @@ describe('Cache-First API Handling', () => {
     const response = await handleApiRequest(request);
     const responseData = await response.json();
 
-    // Should return default categories when no cache exists
-    expect(responseData).toEqual(['General']); // From DEFAULT_CATEGORIES in sw.js
+    // Should get data from server since no cache exists
+    expect(responseData).toEqual(['Work', 'Personal']);
+    expect(global.fetch).toHaveBeenCalled();
   });
 
   test('handles offline mode by returning cached data only', async () => {
@@ -865,5 +876,104 @@ describe('Background Sync', () => {
     const cache = await getTodos(testUserId, spaceId);
     expect(cache).toHaveLength(1);
     expect(cache[0].text).toBe('Original Todo');
+  });
+
+  test('all categories must be associated with a space_id', async () => {
+    const testUserId = 'test-user';
+    const spaceId = 'test-space';
+
+    // Mock console.warn to catch warnings
+    const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+    // Test 1: putCategory should require space_id
+    const categoryWithSpace = { name: 'Work', space_id: spaceId };
+    const categoryWithoutSpace = { name: 'General' }; // Missing space_id
+
+    // This should work fine
+    await putCategory(categoryWithSpace, testUserId);
+
+    // This should trigger a warning (but still work for backward compatibility)
+    await putCategory(categoryWithoutSpace, testUserId);
+
+    // Test 2: Verify categories are stored with proper space association
+    const allCategories = await getCategories(testUserId);
+
+    // Both categories should exist
+    expect(allCategories.length).toBeGreaterThanOrEqual(2);
+
+    // The category with space should have proper space_id
+    const workCategories = allCategories.filter(c => c.name === 'Work');
+    expect(workCategories.length).toBeGreaterThanOrEqual(1);
+    const workCategory = workCategories.find(c => c.space_id === spaceId);
+    expect(workCategory).toBeDefined();
+    expect(workCategory.space_id).toBe(spaceId);
+
+    // The category without space should have null space_id (backward compatibility)
+    const generalCategory = allCategories.find(c => c.name === 'General' && c.space_id === null);
+    expect(generalCategory).toBeDefined();
+    expect(generalCategory.space_id).toBe(null);
+
+    // Test 3: Verify the warning was triggered for category without space_id
+    expect(consoleWarnSpy).toHaveBeenCalledWith('Category created without space_id:', 'General');
+
+    // Test 4: Verify space-filtered queries work correctly
+    const spaceCategories = await getCategories(testUserId, spaceId);
+    const spaceWorkCategories = spaceCategories.filter(c => c.name === 'Work');
+    expect(spaceWorkCategories.length).toBeGreaterThanOrEqual(1);
+    expect(spaceWorkCategories[0].space_id).toBe(spaceId);
+
+    // Cleanup
+    consoleWarnSpy.mockRestore();
+  });
+
+  test('backgroundSync categories should always include space_id', async () => {
+    const testUserId = 'test-user-bg-sync'; // Use unique user to avoid contamination
+    const spaceId = 'test-space-bg-sync'; // Use unique space to avoid contamination
+
+    // Mock console.warn to catch any warnings
+    const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+    // Clean up any existing categories for this user/space combination
+    const existingCategories = await getCategories(testUserId, spaceId);
+    for (const category of existingCategories) {
+      await delCategory(category.name, testUserId, spaceId);
+    }
+
+    // Verify cleanup worked
+    const cleanupCheck = await getCategories(testUserId, spaceId);
+    expect(cleanupCheck).toHaveLength(0);
+
+    // Mock server response with categories
+    const serverCategories = ['Work', 'Personal', 'Finance'];
+
+    global.fetch.mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve(serverCategories)
+    });
+
+    // Create mock request for categories endpoint
+    const mockRequest = {
+      url: `http://localhost:3000/categories?space_id=${spaceId}`,
+      clone: function() { return this; }
+    };
+
+    // Call backgroundSync
+    await backgroundSync(mockRequest, testUserId, spaceId);
+
+    // Verify all stored categories have proper space_id
+    const storedCategories = await getCategories(testUserId, spaceId);
+    expect(storedCategories).toHaveLength(3);
+
+    for (const category of storedCategories) {
+      expect(category.space_id).toBe(spaceId);
+      expect(category.space_id).not.toBe(null);
+      expect(category.space_id).not.toBe(undefined);
+    }
+
+    // Verify no warnings were triggered
+    expect(consoleWarnSpy).not.toHaveBeenCalled();
+
+    // Cleanup
+    consoleWarnSpy.mockRestore();
   });
 });
