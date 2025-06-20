@@ -25,6 +25,21 @@ categories_collection = db.categories
 DEFAULT_CATEGORIES = ["Work", "Personal", "Shopping", "Finance", "Health", "General"]
 
 
+async def init_category_indexes() -> None:
+    """Create indexes used for category queries."""
+    try:
+        # Single field indexes
+        await categories_collection.create_index("space_id")
+        await categories_collection.create_index("name")
+
+        # Compound index for space-specific category queries
+        await categories_collection.create_index([("space_id", 1), ("name", 1)], unique=True)
+
+        logger.info("Category indexes created successfully")
+    except Exception as e:
+        logger.error(f"Error creating category indexes: {e}")
+
+
 # Pydantic model
 class Category(BaseModel):
     name: str

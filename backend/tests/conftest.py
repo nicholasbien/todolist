@@ -30,16 +30,15 @@ async def client():
     from mongomock_motor import AsyncMongoMockClient
 
     # Recreate database connections in the current event loop context
+    # This ensures each test gets a fresh database connection in the correct event loop
     db.client = AsyncMongoMockClient()
     db.db = db.client.todo_db
 
+    # Update all module collection references to use the new shared connection
     auth.users_collection = db.db.users
     auth.sessions_collection = db.db.sessions
-
     todos.todos_collection = db.db.todos
-
     categories.categories_collection = db.db.categories
-
     spaces.spaces_collection = db.db.spaces
 
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://testserver") as async_client:

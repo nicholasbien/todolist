@@ -22,12 +22,29 @@ todos_collection = db.todos
 
 
 async def init_todo_indexes() -> None:
-    """Create indexes used in frequent queries."""
+    """Create indexes used in frequent queries for optimal performance."""
     try:
+        # Single field indexes for basic queries
         await todos_collection.create_index("user_id")
         await todos_collection.create_index("space_id")
+        await todos_collection.create_index("completed")
+
+        # Compound indexes for common query patterns
+        # Most todos queries filter by user_id + space_id together
+        await todos_collection.create_index([("user_id", 1), ("space_id", 1)])
+
+        # Queries for completed/uncompleted todos within a space
+        await todos_collection.create_index([("user_id", 1), ("space_id", 1), ("completed", 1)])
+
+        # Queries sorted by date (most recent first)
+        await todos_collection.create_index([("user_id", 1), ("space_id", 1), ("dateAdded", -1)])
+
+        # Queries by category within a space
+        await todos_collection.create_index([("user_id", 1), ("space_id", 1), ("category", 1)])
+
+        logger.info("Todo indexes created successfully")
     except Exception as e:
-        logger.error(f"Error creating indexes: {e}")
+        logger.error(f"Error creating todo indexes: {e}")
 
 
 # Pydantic models

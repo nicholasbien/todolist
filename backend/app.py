@@ -290,6 +290,7 @@ async def startup_event():
         await migrate_legacy_categories()
         # Also migrate legacy todos
         from auth import init_auth_indexes
+        from categories import init_category_indexes
         from spaces import init_space_indexes
         from todos import init_todo_indexes, migrate_legacy_todos
 
@@ -297,6 +298,7 @@ async def startup_event():
         await init_todo_indexes()
         await init_auth_indexes()
         await init_space_indexes()
+        await init_category_indexes()
         # Initialize default categories for default space (no space_id)
         await init_default_categories()
         await cleanup_expired_sessions()

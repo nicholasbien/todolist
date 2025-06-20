@@ -27,11 +27,20 @@ sessions_collection = db.sessions
 
 
 async def init_auth_indexes() -> None:
-    """Create indexes used for auth queries."""
+    """Create indexes used for authentication and session management."""
     try:
-        await users_collection.create_index("email", unique=True)
-        await sessions_collection.create_index("token", unique=True)
-        await sessions_collection.create_index("user_id")
+        # User collection indexes
+        await users_collection.create_index("email", unique=True)  # Unique constraint for login
+
+        # Session collection indexes
+        await sessions_collection.create_index("token", unique=True)  # Fast token lookup
+        await sessions_collection.create_index("user_id")  # Find sessions by user
+        await sessions_collection.create_index("expires_at")  # Cleanup expired sessions efficiently
+
+        # Compound index for session validation (token + expiry check)
+        await sessions_collection.create_index([("token", 1), ("expires_at", 1)])
+
+        logger.info("Auth indexes created successfully")
     except Exception as e:
         logger.error(f"Error creating auth indexes: {e}")
 

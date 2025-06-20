@@ -1,15 +1,16 @@
-const STATIC_CACHE = 'todo-static-v35';
-const API_CACHE = 'todo-api-v35';
+const STATIC_CACHE = 'todo-static-v36';
+const API_CACHE = 'todo-api-v36';
 
 const GLOBAL_DB_NAME = 'TodoGlobalDB';
 const USER_DB_PREFIX = 'TodoUserDB_';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 const TODOS = 'todos';
 const CATEGORIES = 'categories';
+const SPACES = 'spaces';
 const QUEUE = 'queue';
 const AUTH = 'auth';
 
-const DEFAULT_CATEGORIES = ['General'];
+const DEFAULT_CATEGORIES = ['Work', 'Personal', 'Shopping', 'Finance', 'Health', 'General'];
 
 // Static files to cache for offline use
 const STATIC_FILES = [
@@ -258,10 +259,8 @@ self.addEventListener('fetch', (event) => {
     url.origin === self.location.origin &&
     (url.pathname.startsWith('/todos') ||
       url.pathname.startsWith('/categories') ||
-      url.pathname.startsWith('/spaces') ||
       url.pathname.startsWith('/email') ||
       url.pathname.startsWith('/contact') ||
-      url.pathname.startsWith('/chat') ||
       url.pathname.startsWith('/auth/'));
 
   if (isApi) {
@@ -279,21 +278,10 @@ async function handleApiRequest(request) {
   const online = self.navigator.onLine;
   const url = new URL(request.url);
 
-  // TEMPORARILY DISABLED: Offline functionality disabled until spaces support is implemented
-  // This prevents data integrity issues with the spaces collaboration system
-  if (!online) {
-    return new Response(JSON.stringify({
-      error: 'Offline functionality is temporarily disabled. Please check your internet connection.'
-    }), {
-      status: 503,
-      headers: { 'Content-Type': 'application/json' }
-    });
-  }
-
   // Check if this is an offline-generated ID that shouldn't go to server
   const isOfflineId = url.pathname.includes('offline_');
 
-  // console.log(`🌐 API Request: ${request.method} ${url.pathname} | Online: ${online} | Offline ID: ${isOfflineId}`);
+  console.log(`🌐 API Request: ${request.method} ${url.pathname} | Online: ${online} | Offline ID: ${isOfflineId}`);
 
   if (online && !isOfflineId) {
     try {
@@ -320,16 +308,9 @@ async function handleApiRequest(request) {
           const localTodos = await getTodos(authData.userId);
           const offlineOnlyTodos = localTodos.filter(t => t._id.startsWith('offline_'));
 
-          // Remove any non-offline todos that no longer exist on the server
-          const serverIds = new Set(serverTodos.map(t => t._id));
-          for (const t of localTodos) {
-            if (!t._id.startsWith('offline_') && !serverIds.has(t._id)) {
-              await delTodo(t._id, authData.userId);
-            }
-          }
-          // console.log('📊 Online GET /todos - Local todos IDs:', localTodos.map(t => t._id));
-          // console.log('📊 Online GET /todos - Server todos IDs:', serverTodos.map(t => t._id));
-          // console.log('📊 Online GET /todos - Offline-only todos IDs:', offlineOnlyTodos.map(t => t._id));
+          console.log('📊 Online GET /todos - Local todos IDs:', localTodos.map(t => t._id));
+          console.log('📊 Online GET /todos - Server todos IDs:', serverTodos.map(t => t._id));
+          console.log('📊 Online GET /todos - Offline-only todos IDs:', offlineOnlyTodos.map(t => t._id));
 
           // Save fresh server data to IndexedDB
           for (const todo of serverTodos) {
@@ -339,7 +320,7 @@ async function handleApiRequest(request) {
           // Merge server todos with any remaining offline todos
           const mergedTodos = [...serverTodos, ...offlineOnlyTodos];
 
-          // console.log('📊 Online GET /todos - Final merged todos IDs:', mergedTodos.map(t => t._id));
+          console.log('📊 Online GET /todos - Final merged todos IDs:', mergedTodos.map(t => t._id));
 
           // Return the merged data
           return new Response(JSON.stringify(mergedTodos), {
@@ -354,22 +335,15 @@ async function handleApiRequest(request) {
 
           const serverCategories = await response.clone().json(); // Array of strings like ["Work", "Personal"]
 
-          const localCategories = await getCategories(authData.userId);
-          const offlineOnlyCategories = localCategories.filter(c => c.name.startsWith('offline_'));
-          const offlineOnlyNames = offlineOnlyCategories.map(c => c.name);
-
-          // Remove any local categories that are not on the server and not offline entries
-          const serverSet = new Set(serverCategories);
-          for (const c of localCategories) {
-            if (!c.name.startsWith('offline_') && !serverSet.has(c.name)) {
-              await delCategory(c.name, authData.userId);
-            }
-          }
-
           // Save all server categories to IndexedDB for offline access (as objects)
           for (const categoryName of serverCategories) {
             await putCategory({ name: categoryName }, authData.userId);
           }
+
+          // Get offline-only categories (not yet synced)
+          const offlineCategories = await getCategories(authData.userId);
+          const offlineOnlyCategories = offlineCategories.filter(c => c.name.startsWith('offline_'));
+          const offlineOnlyNames = offlineOnlyCategories.map(c => c.name);
 
           // Merge server categories with offline-only categories (return as strings)
           const mergedCategories = [...serverCategories, ...offlineOnlyNames];
@@ -400,8 +374,8 @@ async function handleStaticRequest(request) {
     // Try network first for static files
     const response = await fetch(request);
 
-    // Cache successful responses (only for GET requests)
-    if (response.ok && request.method === 'GET') {
+    // Cache successful responses
+    if (response.ok) {
       const cache = await caches.open(STATIC_CACHE);
       cache.put(request, response.clone());
     }
@@ -480,7 +454,7 @@ async function offlineFallback(request, url) {
         todoData.link = text;
       }
 
-      // console.log('📱 Offline POST /todos - Created todo with ID:', todoData._id);
+      console.log('📱 Offline POST /todos - Created todo with ID:', todoData._id);
 
       await putTodo(todoData, authData ? authData.userId : null);
       await addQueue({ type: 'CREATE', data: todoData }, authData ? authData.userId : null);
@@ -504,13 +478,13 @@ async function offlineFallback(request, url) {
     // Complete/uncomplete todo
     if (url.pathname.endsWith('/complete') && request.method === 'PUT') {
       const id = url.pathname.split('/')[2]; // Get ID from /todos/{id}/complete
-      // console.log(`✅ Offline COMPLETE request for todo ID: ${id}`);
+      console.log(`✅ Offline COMPLETE request for todo ID: ${id}`);
 
       const existingTodos = await getTodos(authData ? authData.userId : null);
       const existingTodo = existingTodos.find(t => t._id === id);
 
       if (existingTodo) {
-        // console.log(`✅ Todo ${id} found in IndexedDB, updating completion status...`);
+        console.log(`✅ Todo ${id} found in IndexedDB, updating completion status...`);
         const updated = { ...existingTodo, completed: !existingTodo.completed };
         if (updated.completed) {
           updated.dateCompleted = new Date().toISOString();
@@ -519,28 +493,12 @@ async function offlineFallback(request, url) {
         }
         await putTodo(updated, authData ? authData.userId : null);
 
-        // Handle offline todo completion - update the queued CREATE operation
-        if (id.startsWith('offline_')) {
-          // Update the CREATE operation in queue with completion status
-          const queue = await readQueue(authData ? authData.userId : null);
-          const updatedQueue = queue.map(op => {
-            if (op.type === 'CREATE' && op.data._id === id) {
-              // console.log(`✅ Updating queued CREATE operation for ${id} with completion status`);
-              return { ...op, data: { ...op.data, completed: updated.completed, dateCompleted: updated.dateCompleted } };
-            }
-            return op;
-          });
-
-          if (JSON.stringify(queue) !== JSON.stringify(updatedQueue)) {
-            await clearQueue(authData ? authData.userId : null);
-            for (const op of updatedQueue) {
-              await addQueue(op, authData ? authData.userId : null);
-            }
-          }
-          // console.log(`✅ Offline todo ${id} completion status updated in CREATE queue`);
-        } else {
+        // Only queue for server completion if it's not an offline-only todo
+        if (!id.startsWith('offline_')) {
           await addQueue({ type: 'COMPLETE', data: { _id: id, completed: updated.completed } }, authData ? authData.userId : null);
-          // console.log(`✅ Added server COMPLETE to queue for ${id} (completed: ${updated.completed})`);
+          console.log(`✅ Added server COMPLETE to queue for ${id} (completed: ${updated.completed})`);
+        } else {
+          console.log(`✅ Skipping server queue for offline-only todo ${id} (completed: ${updated.completed})`);
         }
 
         return new Response(JSON.stringify({ message: 'Todo updated' }), { headers: { 'Content-Type': 'application/json' } });
@@ -562,22 +520,12 @@ async function offlineFallback(request, url) {
         console.log(`🗑️ Todo ${id} found in IndexedDB, deleting...`);
         await delTodo(id, authData ? authData.userId : null);
 
-        // Check if there's a pending CREATE for this offline todo
-        if (id.startsWith('offline_')) {
-          // Remove the CREATE operation from queue to prevent resurrection
-          const queue = await readQueue(authData ? authData.userId : null);
-          const filteredQueue = queue.filter(op => !(op.type === 'CREATE' && op.data._id === id));
-          if (filteredQueue.length !== queue.length) {
-            console.log(`🗑️ Removed pending CREATE operation for deleted offline todo ${id}`);
-            await clearQueue(authData ? authData.userId : null);
-            for (const op of filteredQueue) {
-              await addQueue(op, authData ? authData.userId : null);
-            }
-          }
-          console.log(`🗑️ Offline todo ${id} deleted and CREATE operation cancelled`);
-        } else {
+        // Only queue for server deletion if it's not an offline-only todo
+        if (!id.startsWith('offline_')) {
           await addQueue({ type: 'DELETE', data: { _id: id } }, authData ? authData.userId : null);
           console.log(`🗑️ Added server DELETE to queue for ${id}`);
+        } else {
+          console.log(`🗑️ Skipping server queue for offline-only todo ${id}`);
         }
       } else {
         console.log(`⚠️ Todo ${id} not found in IndexedDB`);
@@ -695,7 +643,7 @@ async function syncQueue() {
   }
 
   syncInProgress = true;
-  // console.log('Starting sync...');
+  console.log('Starting sync...');
 
   try {
     const queue = await readQueue(authData.userId);
@@ -703,7 +651,7 @@ async function syncQueue() {
 
     // Load persistent ID mapping
     let idMap = await getIdMap(authData.userId);
-    // console.log('📋 Loaded ID mapping:', idMap);
+    console.log('📋 Loaded ID mapping:', idMap);
 
   for (const op of queue) {
     try {
@@ -725,9 +673,6 @@ async function syncQueue() {
               // Update ID mapping
               idMap[offlineId] = serverTodo._id;
               console.log(`🗺️ Added ID mapping: ${offlineId} -> ${serverTodo._id}`);
-
-              // Persist mapping immediately in case sync is interrupted
-              await putIdMap(idMap, authData.userId);
 
               await delTodo(offlineId, authData.userId); // Remove offline version
               await putTodo(serverTodo, authData.userId); // Add server version
@@ -847,11 +792,11 @@ async function syncQueue() {
 
     // Persist the updated ID mapping
     await putIdMap(idMap, authData.userId);
-    // console.log('📋 Saved updated ID mapping:', idMap);
+    console.log('📋 Saved updated ID mapping:', idMap);
 
     // Always clear queue after processing (prevents infinite retry loops)
     await clearQueue(authData.userId);
-    // console.log('Sync completed');
+    console.log('Sync completed');
   } finally {
     syncInProgress = false;
   }

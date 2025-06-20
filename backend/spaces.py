@@ -19,10 +19,18 @@ spaces_collection = db.spaces
 
 
 async def init_space_indexes() -> None:
-    """Create indexes used for space queries."""
+    """Create indexes used for space queries and member lookups."""
     try:
+        # Single field indexes
         await spaces_collection.create_index("owner_id")
-        await spaces_collection.create_index("member_ids")
+        await spaces_collection.create_index("member_ids")  # Array index for membership queries
+        await spaces_collection.create_index("pending_emails")  # Array index for pending invites
+
+        # Compound indexes for common patterns
+        # Finding spaces owned by user OR where user is a member (union queries)
+        await spaces_collection.create_index([("owner_id", 1), ("member_ids", 1)])
+
+        logger.info("Space indexes created successfully")
     except Exception as e:
         logger.error(f"Error creating space indexes: {e}")
 
@@ -80,14 +88,29 @@ async def get_spaces_for_user(user_id: str) -> List[Space]:
         doc["_id"] = str(doc["_id"])
         spaces.append(Space(**doc))
 
-    # Add virtual "Default" space (space_id = None) at the beginning
-    default_space = Space(
-        id=None,  # This represents space_id = None
-        name="Default",
-        owner_id=user_id,
-        member_ids=[user_id],
-    )
-    spaces.insert(0, default_space)
+    # DEBUG: Log found spaces from database
+    logger.info(f"DEBUG: Found {len(spaces)} spaces in database for user {user_id}")
+    for space in spaces:
+        logger.info(f"DEBUG: Space from DB - ID: {space.id}, Name: {space.name}, Owner: {space.owner_id}")
+
+    # Check if there's already a "Default" space in the database
+    existing_default = next((s for s in spaces if s.name == "Default"), None)
+    if existing_default:
+        logger.warning(f"DEBUG: Found existing Default space in database with ID: {existing_default.id}")
+        # If there's already a Default space in database, don't add virtual one
+        # Just ensure it's at the beginning
+        spaces = [s for s in spaces if s.name != "Default"]  # Remove from current position
+        spaces.insert(0, existing_default)  # Add at beginning
+    else:
+        # Add virtual "Default" space (space_id = None) at the beginning
+        default_space = Space(
+            id=None,  # This represents space_id = None
+            name="Default",
+            owner_id=user_id,
+            member_ids=[user_id],
+        )
+        logger.info(f"DEBUG: Creating virtual Default space for user {user_id}")
+        spaces.insert(0, default_space)
 
     # Sort remaining spaces alphabetically (Default is already first)
     if len(spaces) > 1:
