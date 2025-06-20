@@ -209,15 +209,8 @@ async def test_space_member_can_complete_others_todos(client, test_email, test_e
 
 
 @pytest.mark.asyncio
-async def test_space_access_control(client, test_email, test_email2, test_email3, monkeypatch):
+async def test_space_access_control(client, test_email, test_email2, test_email3):
     """Test that only space members can access space todos."""
-
-    # Mock email sending to prevent actual emails
-    async def fake_send_email(to_email: str, subject: str, body: str) -> bool:
-        return True
-
-    monkeypatch.setattr("email_summary.send_email", fake_send_email)
-
     token1 = await get_token(client, test_email)
     token2 = await get_token(client, test_email2)
     token3 = await get_token(client, test_email3)

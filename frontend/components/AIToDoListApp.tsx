@@ -139,16 +139,8 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
   const fetchCategories = useCallback(async () => {
     const fetchId = ++categoriesFetchIdRef.current;
     try {
-      const spaceId = activeSpace?._id;
-      if (!spaceId) {
-        // Don't fetch categories until we have an active space
-        if (fetchId === categoriesFetchIdRef.current) {
-          setCategories([]);
-        }
-        return;
-      }
-
-      const url = `/categories?space_id=${spaceId}`;
+      const spaceId = activeSpace?._id || null;
+      const url = spaceId ? `/categories?space_id=${spaceId}` : '/categories';
       const response = await authenticatedFetch(url);
       if (!response?.ok) {
         throw new Error('Failed to fetch categories');
