@@ -1,9 +1,9 @@
-const STATIC_CACHE = 'todo-static-v37';
-const API_CACHE = 'todo-api-v37';
+const STATIC_CACHE = 'todo-static-v36';
+const API_CACHE = 'todo-api-v36';
 
 const GLOBAL_DB_NAME = 'TodoGlobalDB';
 const USER_DB_PREFIX = 'TodoUserDB_';
-const DB_VERSION = 5;
+const DB_VERSION = 4;
 const TODOS = 'todos';
 const CATEGORIES = 'categories';
 const SPACES = 'spaces';
@@ -33,17 +33,6 @@ function openGlobalDB() {
       }
     };
   });
-}
-
-// Check if a database exists
-async function checkDatabaseExists(dbName) {
-  try {
-    const databases = await indexedDB.databases();
-    return databases.some(db => db.name === dbName);
-  } catch (e) {
-    // Fallback for browsers that don't support indexedDB.databases()
-    return true; // Assume it exists to be safe
-  }
 }
 
 // Open user-specific database for todos, categories, and queue
@@ -428,17 +417,6 @@ async function backgroundSync(request, userId, spaceId) {
     }
 
     console.log(`🔄 Background sync completed for ${url.pathname}`);
-
-    // Notify all clients that data has been updated
-    self.clients.matchAll().then(clients => {
-      clients.forEach(client => {
-        client.postMessage({
-          type: 'DATA_UPDATED',
-          endpoint: url.pathname,
-          spaceId: spaceId
-        });
-      });
-    });
   } catch (error) {
     console.log(`❌ Background sync failed for ${request.url}:`, error);
   }
@@ -459,24 +437,6 @@ async function handleApiRequest(request) {
   if (request.method === 'GET' && (url.pathname === '/todos' || url.pathname === '/categories' || url.pathname === '/spaces')) {
     const authData = await getAuth();
     if (authData && authData.userId) {
-      // Check if we have a user-specific database for this user
-      const dbName = `${USER_DB_PREFIX}${authData.userId}`;
-      const dbExists = await checkDatabaseExists(dbName);
-
-      // If no user-specific DB exists, skip cache and go to server
-      if (!dbExists) {
-        // New user or first login - skip cache, go to server
-        if (online && !isOfflineId) {
-          try {
-            const response = await fetch(request.clone());
-            return response;
-          } catch (err) {
-            return offlineFallback(request, url);
-          }
-        }
-        return offlineFallback(request, url);
-      }
-
       let cachedData = null;
 
       // Return cached data immediately for instant UI
@@ -493,13 +453,7 @@ async function handleApiRequest(request) {
         }
       } else if (url.pathname === '/spaces') {
         const cachedSpaces = await getSpaces(authData.userId);
-        if (cachedSpaces.length > 0) {
-          cachedData = cachedSpaces;
-        } else {
-          // No cached spaces - let request fall through to server
-          // (every user should have at least a Default space)
-          cachedData = null;
-        }
+        cachedData = cachedSpaces;
       }
 
       // Only return cached data if we actually have some
