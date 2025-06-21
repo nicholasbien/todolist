@@ -49,6 +49,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
   const [spaceMembers, setSpaceMembers] = useState<any[]>([]);
   const [pendingInvites, setPendingInvites] = useState<string[]>([]);
 
+
   // Loading state when switching spaces
   const [spaceLoading, setSpaceLoading] = useState(false);
   const spaceFetchIdRef = useRef(0);
@@ -836,12 +837,15 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
             </button>
           )}
         </div>
-        <div className="flex flex-wrap gap-2 mb-4">
+        <div
+          className="flex gap-2 overflow-x-auto whitespace-nowrap scroll-smooth mb-4 pb-2"
+          style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+        >
           {spaces.map(space => (
             <button
               key={space._id}
               onClick={() => setActiveSpace(space)}
-              className={`px-4 py-2 rounded-xl text-base transition-colors ${
+              className={`px-4 py-2 rounded-xl text-base transition-colors flex-shrink-0 ${
                 activeSpace && space._id === activeSpace._id
                   ? 'bg-blue-600 text-white shadow-lg'
                   : 'bg-gray-900 text-gray-300 hover:bg-gray-800 border border-gray-800'
@@ -852,7 +856,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
           ))}
           <button
             onClick={() => { setShowAddSpaceModal(true); }}
-            className="px-4 py-2 rounded-xl text-base bg-gray-900 text-gray-300 hover:bg-gray-800 border border-gray-800 transition-colors"
+            className="px-4 py-2 rounded-xl text-base bg-gray-900 text-gray-300 hover:bg-gray-800 border border-gray-800 transition-colors flex-shrink-0"
           >
             +
           </button>
@@ -899,44 +903,47 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
             </button>
           )}
         </div>
-        <div className="flex flex-wrap gap-2 mb-4">
+        <div
+          className="flex gap-2 overflow-x-auto whitespace-nowrap scroll-smooth mb-4 pb-2"
+          style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+        >
           <button
-            onClick={() => setActiveCat("All")}
-            className={`px-4 py-2 rounded-xl text-base transition-colors ${
-              activeCat === "All"
-                ? "bg-blue-600 text-white shadow-lg"
-                : "bg-gray-900 text-gray-300 hover:bg-gray-800 border border-gray-800"
+            onClick={() => setActiveCat('All')}
+            className={`px-4 py-2 rounded-xl text-base transition-colors flex-shrink-0 ${
+              activeCat === 'All'
+                ? 'bg-blue-600 text-white shadow-lg'
+                : 'bg-gray-900 text-gray-300 hover:bg-gray-800 border border-gray-800'
             }`}
           >
             All
           </button>
           {categories
-            .sort((a, b) => {
-              const aName = typeof a === 'string' ? a : a.name;
-              const bName = typeof b === 'string' ? b : b.name;
-              if (aName === "General") return -1;
-              if (bName === "General") return 1;
-              return aName.localeCompare(bName);
-            })
-            .map(cat => {
-              const catName = typeof cat === 'string' ? cat : cat.name;
-              return (
+          .sort((a, b) => {
+            const aName = typeof a === 'string' ? a : a.name;
+            const bName = typeof b === 'string' ? b : b.name;
+            if (aName === "General") return -1;
+            if (bName === "General") return 1;
+            return aName.localeCompare(bName);
+          })
+          .map(cat => {
+            const catName = typeof cat === 'string' ? cat : cat.name;
+            return (
             <button
               key={catName}
               onClick={() => setActiveCat(catName)}
-              className={`px-4 py-2 rounded-xl text-base transition-colors ${
+              className={`px-4 py-2 rounded-xl text-base transition-colors flex-shrink-0 ${
                 catName === activeCat
-                  ? "bg-blue-600 text-white shadow-lg"
-                  : "bg-gray-900 text-gray-300 hover:bg-gray-800 border border-gray-800"
+                  ? 'bg-blue-600 text-white shadow-lg'
+                  : 'bg-gray-900 text-gray-300 hover:bg-gray-800 border border-gray-800'
               }`}
             >
               {catName}
             </button>
-              );
-            })}
+            );
+          })}
           <button
             onClick={() => setShowAddCategoryModal(true)}
-            className="px-4 py-2 rounded-xl text-base bg-gray-900 text-gray-300 hover:bg-gray-800 border border-gray-800 transition-colors"
+            className="px-4 py-2 rounded-xl text-base bg-gray-900 text-gray-300 hover:bg-gray-800 border border-gray-800 transition-colors flex-shrink-0"
           >
             +
           </button>
