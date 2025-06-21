@@ -49,6 +49,11 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
   const [spaceMembers, setSpaceMembers] = useState<any[]>([]);
   const [pendingInvites, setPendingInvites] = useState<string[]>([]);
 
+  // Loading state when switching spaces
+  const [spaceLoading, setSpaceLoading] = useState(false);
+  const spaceFetchIdRef = useRef(0);
+
+  // Edit todo modal state
   const [showEditTodoModal, setShowEditTodoModal] = useState(false);
   const [todoToEdit, setTodoToEdit] = useState<any>(null);
   const [editText, setEditText] = useState('');
@@ -196,14 +201,20 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
     }
   }, [authenticatedFetch, activeSpace]);
 
+  const fetchSpaceData = useCallback(async () => {
+    const fetchId = ++spaceFetchIdRef.current;
+    setSpaceLoading(true);
+    await Promise.all([fetchCategories(), fetchTodos(), fetchMembers()]);
+    if (fetchId === spaceFetchIdRef.current) {
+      setSpaceLoading(false);
+    }
+  }, [fetchCategories, fetchTodos, fetchMembers]);
 
-  // Load todos and categories when token is available
+
+  // Initial load when token becomes available
   useEffect(() => {
     if (token && user) {
       fetchSpaces();
-      fetchTodos();
-      fetchCategories();
-      fetchMembers();
 
       // Send auth info to service worker for offline sync
       if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
@@ -213,22 +224,21 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
           userId: user.id || user._id || user.email
         });
       }
-
     }
-  }, [token, user, fetchSpaces, fetchTodos, fetchCategories, fetchMembers]);
+  }, [token, user, fetchSpaces]);
 
   // Refetch data when active space changes
   useEffect(() => {
     if (token && user) {
-      setTodos([]); // hide current tasks immediately
-      setCategories([]); // hide current categories immediately
-      fetchCategories();
-      fetchMembers();
-      fetchTodos();
+      // Hide current data immediately to show loading state
+      setTodos([]);
+      setCategories([]);
+      // Fetch new data for the active space
+      fetchSpaceData();
     }
     // Reset category filter when switching spaces
     setActiveCat('All');
-  }, [activeSpace, fetchCategories, fetchMembers, fetchTodos, token, user]);
+  }, [activeSpace, fetchSpaceData, token, user]);
 
   // Update email time when user info loads
   useEffect(() => {
@@ -865,6 +875,10 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
 
 
       {/* Categories - Horizontal wrapping pills */}
+      {spaceLoading ? (
+        <div className="text-center text-gray-400 py-6">Loading...</div>
+      ) : (
+        <>
       <div className="mb-6">
         {loadingCategories && (
           <div className="text-gray-400 mb-2">Loading categories...</div>
@@ -929,6 +943,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
         </div>
 
       </div>
+
 
       {/* Add new todo */}
       <div className="mb-6">
@@ -1164,6 +1179,9 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
             />
           ))}
         </div>
+      )}
+
+      </>
       )}
 
       {showEditTodoModal && (
