@@ -55,7 +55,7 @@ async def test_email_space_filtering(client, test_email, monkeypatch):
     names = {s["space"] for s in captured["spaces"]}
     assert "A" in names
     assert "B" not in names
-    assert "Default" in names
+    assert "Personal" in names
 
 
 @pytest.mark.asyncio
@@ -81,4 +81,4 @@ async def test_chat_space_filtering(client, test_email, monkeypatch):
     names = {s["space"] for s in captured["spaces"]}
     assert "A" in names
     assert "B" not in names
-    assert "Default" in names
+    assert "Personal" in names

@@ -61,3 +61,16 @@ def test_email2():
 def test_email3():
     """Third test email for collaboration tests."""
     return "pytest3@example.com"
+
+
+async def get_token(client, email):
+    """Helper function to get authentication token for tests."""
+    from tests.test_auth import get_verification_code_from_db
+
+    await client.post("/auth/signup", json={"email": email})
+    code = await get_verification_code_from_db(email)
+    if not code:
+        pytest.skip("Could not retrieve verification code from database")
+    resp = await client.post("/auth/login", json={"email": email, "code": code})
+    assert resp.status_code == 200
+    return resp.json()["token"]

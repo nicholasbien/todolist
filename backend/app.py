@@ -256,7 +256,7 @@ async def api_complete_todo(todo_id: str, current_user: dict = Depends(get_curre
     return await complete_todo(todo_id, current_user["user_id"])
 
 
-@app.put("/todos/{todo_id}")
+@app.put("/todos/{todo_id}", response_model=Todo)
 async def api_update_todo(todo_id: str, request: Request, current_user: dict = Depends(get_current_user)):
     try:
         body = await request.json()

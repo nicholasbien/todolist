@@ -257,11 +257,23 @@ async def update_todo_fields(todo_id: str, updates: dict, user_id: str):
 
         result = await todos_collection.update_one(query, {"$set": updates})
         if result.matched_count == 1:
-            if result.modified_count == 1:
-                updated_fields = ", ".join(f"{k} to {v}" for k, v in updates.items())
-                return {"message": f"Todo updated: {updated_fields}"}
+            # Get the updated todo document
+            updated_todo = await todos_collection.find_one({"_id": object_id})
+            if updated_todo:
+                # Convert ObjectId to string
+                updated_todo["_id"] = str(updated_todo["_id"])
+
+                # Add user's first name for collaborative spaces
+                try:
+                    user = await auth.users_collection.find_one({"_id": ObjectId(updated_todo["user_id"])})
+                    if user:
+                        updated_todo["first_name"] = user.get("first_name", "")
+                except Exception:
+                    updated_todo["first_name"] = ""
+
+                return Todo(**updated_todo)
             else:
-                return {"message": "Todo unchanged (no modifications needed)"}
+                raise HTTPException(status_code=404, detail="Updated todo not found")
         raise HTTPException(status_code=404, detail="Todo not found")
     except HTTPException as he:
         raise he
