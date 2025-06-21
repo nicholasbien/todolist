@@ -285,6 +285,7 @@ export default function Home() {
   const [showEmailSettings, setShowEmailSettings] = useState(false);
   const [contactMessage, setContactMessage] = useState('');
   const [sendingContact, setSendingContact] = useState(false);
+  const [showOfflineTooltip, setShowOfflineTooltip] = useState(false);
   const settingsDropdownRef = useRef(null);
   const isOffline = useOffline();
 
@@ -308,6 +309,19 @@ export default function Home() {
     checkAuth();
     // OfflineProvider handles network status updates
   }, []);
+
+  useEffect(() => {
+    if (showOfflineTooltip) {
+      const timer = setTimeout(() => setShowOfflineTooltip(false), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [showOfflineTooltip]);
+
+  useEffect(() => {
+    if (!isOffline) {
+      setShowOfflineTooltip(false);
+    }
+  }, [isOffline]);
 
   // Handle click outside settings dropdown
   useEffect(() => {
@@ -398,7 +412,22 @@ export default function Home() {
             <h1 className="text-2xl font-bold">todolist.nyc</h1>
           <div className="flex items-center space-x-4">
             <div className="flex items-center">
-              {isOffline && <span className="mr-2" title="Offline">📴</span>}
+              {isOffline && (
+                <div className="relative mr-2">
+                  <button
+                    onClick={() => setShowOfflineTooltip(true)}
+                    title="Offline"
+                    className="focus:outline-none"
+                  >
+                    📴
+                  </button>
+                  {showOfflineTooltip && (
+                    <div className="absolute left-1/2 -translate-x-1/2 mt-2 w-64 bg-gray-800 text-gray-100 text-xs p-2 rounded-lg shadow-lg z-10">
+                      {"You're offline. Todos will be synced when you're back online."}
+                    </div>
+                  )}
+                </div>
+              )}
               <span className="text-sm text-gray-400">Hello, {user?.first_name || user?.email}</span>
             </div>
             <div className="relative" ref={settingsDropdownRef}>
