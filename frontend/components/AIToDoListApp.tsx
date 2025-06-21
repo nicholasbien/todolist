@@ -607,7 +607,23 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
     setEditNotes(todo.notes || '');
     setEditCategoryVal(todo.category);
     setEditPriorityVal(todo.priority);
-    setEditDueDate(todo.dueDate || '');
+
+    // Format date for HTML date input (YYYY-MM-DD)
+    let formattedDate = '';
+    if (todo.dueDate) {
+      try {
+        const date = new Date(todo.dueDate);
+        // Only format if it's a valid date
+        if (!isNaN(date.getTime())) {
+          formattedDate = date.toISOString().split('T')[0];
+        }
+      } catch (e) {
+        console.warn('Invalid date format:', todo.dueDate);
+        formattedDate = '';
+      }
+    }
+    setEditDueDate(formattedDate);
+
     setShowEditTodoModal(true);
   };
 
@@ -1165,12 +1181,28 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
               <option value="Medium">Medium</option>
               <option value="Low">Low</option>
             </select>
-            <input
-              type="date"
-              value={editDueDate}
-              onChange={(e) => setEditDueDate(e.target.value)}
-              className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 text-base focus:outline-none"
-            />
+            <div className="relative">
+              <input
+                type="date"
+                value={editDueDate}
+                onChange={(e) => setEditDueDate(e.target.value)}
+                placeholder="Select due date"
+                className="w-full p-3 pr-8 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 text-base focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                style={{
+                  colorScheme: 'dark',
+                  position: 'relative'
+                }}
+              />
+              {editDueDate && (
+                <button
+                  type="button"
+                  onClick={() => setEditDueDate('')}
+                  className="absolute right-1 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-200 z-10"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
             <div className="flex justify-center space-x-3">
               <button onClick={handleSaveTodoEdit} className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-2 rounded-lg transition-colors">Save</button>
               <button onClick={() => setShowEditTodoModal(false)} className="bg-gray-800 hover:bg-gray-700 text-gray-300 px-6 py-2 rounded-lg transition-colors">Cancel</button>

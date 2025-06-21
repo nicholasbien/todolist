@@ -278,10 +278,11 @@ async def api_update_todo(todo_id: str, request: Request, current_user: dict = D
             raise HTTPException(status_code=400, detail="No valid fields to update")
 
         logger.info(f"Updating todo {todo_id} with: {updates} for user: {current_user['email']}")
+        logger.info(f"CURRENT_USER DEBUG: {current_user}")
         return await update_todo_fields(todo_id, updates, current_user["user_id"])
     except Exception as e:
-        logger.error(f"Error updating todo: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error updating todo: {str(e)}")
+        logger.error(f"Error updating todo - Exception type: {type(e)}, Exception args: {e.args}, Exception: {repr(e)}")
+        raise HTTPException(status_code=500, detail=f"Error updating todo: {repr(e)}")
 
 
 @app.get("/health")
