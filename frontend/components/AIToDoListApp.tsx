@@ -47,6 +47,21 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
   const [spaceMembers, setSpaceMembers] = useState<any[]>([]);
   const [pendingInvites, setPendingInvites] = useState<string[]>([]);
 
+  const spacesRef = useRef<HTMLDivElement>(null);
+  const categoriesRef = useRef<HTMLDivElement>(null);
+
+  const scrollSpaces = (offset: number) => {
+    if (spacesRef.current) {
+      spacesRef.current.scrollBy({ left: offset, behavior: 'smooth' });
+    }
+  };
+
+  const scrollCategories = (offset: number) => {
+    if (categoriesRef.current) {
+      categoriesRef.current.scrollBy({ left: offset, behavior: 'smooth' });
+    }
+  };
+
   // Track latest fetch requests to avoid race conditions when switching spaces
   const todosFetchIdRef = useRef(0);
   const categoriesFetchIdRef = useRef(0);
@@ -751,25 +766,44 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
             </button>
           )}
         </div>
-        <div className="flex flex-wrap gap-2 mb-4">
-          {spaces.map(space => (
-            <button
-              key={space._id}
-              onClick={() => setActiveSpace(space)}
-              className={`px-4 py-2 rounded-xl text-base transition-colors ${
-                activeSpace && space._id === activeSpace._id
-                  ? 'bg-blue-600 text-white shadow-lg'
-                  : 'bg-gray-900 text-gray-300 hover:bg-gray-800 border border-gray-800'
-              }`}
-            >
-              {space.name}
-            </button>
-          ))}
+        <div className="relative mb-4">
           <button
-            onClick={() => { setShowAddSpaceModal(true); }}
-            className="px-4 py-2 rounded-xl text-base bg-gray-900 text-gray-300 hover:bg-gray-800 border border-gray-800 transition-colors"
+            type="button"
+            onClick={() => scrollSpaces(-150)}
+            className="absolute left-0 top-1/2 -translate-y-1/2 z-10 px-2 text-gray-300 bg-gray-800/70 rounded"
           >
-            +
+            ‹
+          </button>
+          <div
+            ref={spacesRef}
+            className="flex gap-2 overflow-x-auto whitespace-nowrap scroll-smooth px-6"
+          >
+            {spaces.map(space => (
+              <button
+                key={space._id}
+                onClick={() => setActiveSpace(space)}
+                className={`px-4 py-2 rounded-xl text-base transition-colors ${
+                  activeSpace && space._id === activeSpace._id
+                    ? 'bg-blue-600 text-white shadow-lg'
+                    : 'bg-gray-900 text-gray-300 hover:bg-gray-800 border border-gray-800'
+                }`}
+              >
+                {space.name}
+              </button>
+            ))}
+            <button
+              onClick={() => { setShowAddSpaceModal(true); }}
+              className="px-4 py-2 rounded-xl text-base bg-gray-900 text-gray-300 hover:bg-gray-800 border border-gray-800 transition-colors"
+            >
+              +
+            </button>
+          </div>
+          <button
+            type="button"
+            onClick={() => scrollSpaces(150)}
+            className="absolute right-0 top-1/2 -translate-y-1/2 z-10 px-2 text-gray-300 bg-gray-800/70 rounded"
+          >
+            ›
           </button>
         </div>
       </div>
@@ -807,18 +841,29 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
             </button>
           )}
         </div>
-        <div className="flex flex-wrap gap-2 mb-4">
+        <div className="relative mb-4">
           <button
-            onClick={() => setActiveCat("All")}
-            className={`px-4 py-2 rounded-xl text-base transition-colors ${
-              activeCat === "All"
-                ? "bg-blue-600 text-white shadow-lg"
-                : "bg-gray-900 text-gray-300 hover:bg-gray-800 border border-gray-800"
-            }`}
+            type="button"
+            onClick={() => scrollCategories(-150)}
+            className="absolute left-0 top-1/2 -translate-y-1/2 z-10 px-2 text-gray-300 bg-gray-800/70 rounded"
           >
-            All
+            ‹
           </button>
-          {categories
+          <div
+            ref={categoriesRef}
+            className="flex gap-2 overflow-x-auto whitespace-nowrap scroll-smooth px-6"
+          >
+            <button
+              onClick={() => setActiveCat('All')}
+              className={`px-4 py-2 rounded-xl text-base transition-colors ${
+                activeCat === 'All'
+                  ? 'bg-blue-600 text-white shadow-lg'
+                  : 'bg-gray-900 text-gray-300 hover:bg-gray-800 border border-gray-800'
+              }`}
+            >
+              All
+            </button>
+            {categories
             .sort((a, b) => {
               const aName = typeof a === 'string' ? a : a.name;
               const bName = typeof b === 'string' ? b : b.name;
@@ -829,24 +874,32 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
             .map(cat => {
               const catName = typeof cat === 'string' ? cat : cat.name;
               return (
-            <button
-              key={catName}
-              onClick={() => setActiveCat(catName)}
-              className={`px-4 py-2 rounded-xl text-base transition-colors ${
-                catName === activeCat
-                  ? "bg-blue-600 text-white shadow-lg"
-                  : "bg-gray-900 text-gray-300 hover:bg-gray-800 border border-gray-800"
-              }`}
-            >
-              {catName}
-            </button>
+              <button
+                key={catName}
+                onClick={() => setActiveCat(catName)}
+                className={`px-4 py-2 rounded-xl text-base transition-colors ${
+                  catName === activeCat
+                    ? 'bg-blue-600 text-white shadow-lg'
+                    : 'bg-gray-900 text-gray-300 hover:bg-gray-800 border border-gray-800'
+                }`}
+              >
+                {catName}
+              </button>
               );
             })}
+            <button
+              onClick={() => setShowAddCategoryModal(true)}
+              className="px-4 py-2 rounded-xl text-base bg-gray-900 text-gray-300 hover:bg-gray-800 border border-gray-800 transition-colors"
+            >
+              +
+            </button>
+          </div>
           <button
-            onClick={() => setShowAddCategoryModal(true)}
-            className="px-4 py-2 rounded-xl text-base bg-gray-900 text-gray-300 hover:bg-gray-800 border border-gray-800 transition-colors"
+            type="button"
+            onClick={() => scrollCategories(150)}
+            className="absolute right-0 top-1/2 -translate-y-1/2 z-10 px-2 text-gray-300 bg-gray-800/70 rounded"
           >
-            +
+            ›
           </button>
         </div>
 
