@@ -59,6 +59,7 @@ class Todo(BaseModel):
     priority: str = "Medium"
     dateAdded: str
     dueDate: Optional[str] = None
+    notes: Optional[str] = None
     completed: bool = False
     dateCompleted: Optional[str] = None
     user_id: str
@@ -236,6 +237,8 @@ async def complete_todo(todo_id: str, user_id: str):
 
 async def update_todo_fields(todo_id: str, updates: dict, user_id: str):
     try:
+        logger.info(f"UPDATE DEBUG - todo_id: {todo_id}, updates: {updates}, user_id: {user_id}")
+
         # Check if todo_id is valid
         if not todo_id or todo_id == "None" or todo_id == "undefined":
             raise HTTPException(status_code=400, detail="Invalid todo ID")
@@ -253,15 +256,30 @@ async def update_todo_fields(todo_id: str, updates: dict, user_id: str):
             raise HTTPException(status_code=403, detail="Not in space")
 
         result = await todos_collection.update_one(query, {"$set": updates})
-        if result.modified_count == 1:
-            updated_fields = ", ".join(f"{k} to {v}" for k, v in updates.items())
-            return {"message": f"Todo updated: {updated_fields}"}
+        if result.matched_count == 1:
+            # Get the updated todo document
+            updated_todo = await todos_collection.find_one({"_id": object_id})
+            if updated_todo:
+                # Convert ObjectId to string
+                updated_todo["_id"] = str(updated_todo["_id"])
+
+                # Add user's first name for collaborative spaces
+                try:
+                    user = await auth.users_collection.find_one({"_id": ObjectId(updated_todo["user_id"])})
+                    if user:
+                        updated_todo["first_name"] = user.get("first_name", "")
+                except Exception:
+                    updated_todo["first_name"] = ""
+
+                return Todo(**updated_todo)
+            else:
+                raise HTTPException(status_code=404, detail="Updated todo not found")
         raise HTTPException(status_code=404, detail="Todo not found")
     except HTTPException as he:
         raise he
     except Exception as e:
-        logger.error(f"Error updating todo: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error updating todo: {str(e)}")
+        logger.error(f"Error updating todo - Exception type: {type(e)}, Exception args: {e.args}, Exception: {repr(e)}")
+        raise HTTPException(status_code=500, detail=f"Error updating todo: {repr(e)}")
 
 
 # Migrate legacy todos to have space_id field

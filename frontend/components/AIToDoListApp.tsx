@@ -20,6 +20,8 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
   const [newTodo, setNewTodo] = useState("");
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [loadingTodos, setLoadingTodos] = useState(false);
+  const [loadingCategories, setLoadingCategories] = useState(false);
   const [error, setError] = useState("");
   const [newCat, setNewCat] = useState("");
   const [activeCat, setActiveCat] = useState("All");
@@ -47,20 +49,19 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
   const [spaceMembers, setSpaceMembers] = useState<any[]>([]);
   const [pendingInvites, setPendingInvites] = useState<string[]>([]);
 
-  const spacesRef = useRef<HTMLDivElement>(null);
-  const categoriesRef = useRef<HTMLDivElement>(null);
 
-  const scrollSpaces = (offset: number) => {
-    if (spacesRef.current) {
-      spacesRef.current.scrollBy({ left: offset, behavior: 'smooth' });
-    }
-  };
+  // Loading state when switching spaces
+  const [spaceLoading, setSpaceLoading] = useState(false);
+  const spaceFetchIdRef = useRef(0);
 
-  const scrollCategories = (offset: number) => {
-    if (categoriesRef.current) {
-      categoriesRef.current.scrollBy({ left: offset, behavior: 'smooth' });
-    }
-  };
+  // Edit todo modal state
+  const [showEditTodoModal, setShowEditTodoModal] = useState(false);
+  const [todoToEdit, setTodoToEdit] = useState<any>(null);
+  const [editText, setEditText] = useState('');
+  const [editNotes, setEditNotes] = useState('');
+  const [editCategoryVal, setEditCategoryVal] = useState('General');
+  const [editPriorityVal, setEditPriorityVal] = useState('Medium');
+  const [editDueDate, setEditDueDate] = useState<string>('');
 
   // Track latest fetch requests to avoid race conditions when switching spaces
   const todosFetchIdRef = useRef(0);
@@ -153,6 +154,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
   // Fetch categories from MongoDB
   const fetchCategories = useCallback(async () => {
     const fetchId = ++categoriesFetchIdRef.current;
+    setLoadingCategories(true);
     try {
       const spaceId = activeSpace?._id || null;
       const url = spaceId ? `/categories?space_id=${spaceId}` : '/categories';
@@ -168,12 +170,17 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
       if (fetchId === categoriesFetchIdRef.current) {
         setError('Error loading categories: ' + err.message);
       }
+    } finally {
+      if (fetchId === categoriesFetchIdRef.current) {
+        setLoadingCategories(false);
+      }
     }
   }, [authenticatedFetch, activeSpace]);
 
   // Fetch todos from MongoDB
   const fetchTodos = useCallback(async () => {
     const fetchId = ++todosFetchIdRef.current;
+    setLoadingTodos(true);
     try {
       const url = activeSpace && activeSpace._id ? `/todos?space_id=${activeSpace._id}` : '/todos';
       const response = await authenticatedFetch(url);
@@ -188,17 +195,27 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
       if (fetchId === todosFetchIdRef.current) {
         setError('Error loading todos: ' + err.message);
       }
+    } finally {
+      if (fetchId === todosFetchIdRef.current) {
+        setLoadingTodos(false);
+      }
     }
   }, [authenticatedFetch, activeSpace]);
 
+  const fetchSpaceData = useCallback(async () => {
+    const fetchId = ++spaceFetchIdRef.current;
+    setSpaceLoading(true);
+    await Promise.all([fetchCategories(), fetchTodos(), fetchMembers()]);
+    if (fetchId === spaceFetchIdRef.current) {
+      setSpaceLoading(false);
+    }
+  }, [fetchCategories, fetchTodos, fetchMembers]);
 
-  // Load todos and categories when token is available
+
+  // Initial load when token becomes available
   useEffect(() => {
     if (token && user) {
       fetchSpaces();
-      fetchTodos();
-      fetchCategories();
-      fetchMembers();
 
       // Send auth info to service worker for offline sync
       if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
@@ -208,20 +225,21 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
           userId: user.id || user._id || user.email
         });
       }
-
     }
-  }, [token, user, fetchSpaces, fetchTodos, fetchCategories, fetchMembers]);
+  }, [token, user, fetchSpaces]);
 
-  // Refetch categories and members when active space changes
+  // Refetch data when active space changes
   useEffect(() => {
-    if (token && user && activeSpace) {
-      fetchCategories();
-      fetchMembers();
-      fetchTodos();
+    if (token && user) {
+      // Hide current data immediately to show loading state
+      setTodos([]);
+      setCategories([]);
+      // Fetch new data for the active space
+      fetchSpaceData();
     }
     // Reset category filter when switching spaces
     setActiveCat('All');
-  }, [activeSpace, fetchCategories, fetchMembers, fetchTodos, token, user]);
+  }, [activeSpace, fetchSpaceData, token, user]);
 
   // Update email time when user info loads
   useEffect(() => {
@@ -608,6 +626,58 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
     }
   };
 
+  const handleEditTodo = (todo) => {
+    setTodoToEdit(todo);
+    setEditText(todo.text);
+    setEditNotes(todo.notes || '');
+    setEditCategoryVal(todo.category);
+    setEditPriorityVal(todo.priority);
+
+    // Format date for HTML date input (YYYY-MM-DD)
+    let formattedDate = '';
+    if (todo.dueDate) {
+      try {
+        const date = new Date(todo.dueDate);
+        // Only format if it's a valid date
+        if (!isNaN(date.getTime())) {
+          formattedDate = date.toISOString().split('T')[0];
+        }
+      } catch (e) {
+        console.warn('Invalid date format:', todo.dueDate);
+        formattedDate = '';
+      }
+    }
+    setEditDueDate(formattedDate);
+
+    setShowEditTodoModal(true);
+  };
+
+  const handleSaveTodoEdit = async () => {
+    if (!todoToEdit) return;
+    try {
+      const updates: any = {
+        text: editText,
+        notes: editNotes,
+        category: editCategoryVal,
+        priority: editPriorityVal,
+        dueDate: editDueDate || null,
+      };
+      const response = await authenticatedFetch(`/todos/${todoToEdit._id}`, {
+        method: 'PUT',
+        body: JSON.stringify(updates),
+      });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to update todo');
+      }
+      await fetchTodos();
+      setShowEditTodoModal(false);
+      setTodoToEdit(null);
+    } catch (err) {
+      setError('Error updating todo: ' + err.message);
+    }
+  };
+
 
   // Send email summary
   const handleSendEmailSummary = async () => {
@@ -747,9 +817,10 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
       <div className="mb-6">
         <div className="flex items-center mb-3">
           <h2 className="text-lg font-semibold text-gray-100">
-            Space: {activeSpace ? activeSpace.name : 'None'}
+            Space:{' '}
+            {activeSpace ? activeSpace.name : 'None'}
           </h2>
-          {activeSpace && activeSpace.name !== 'Default' && (
+          {activeSpace && !activeSpace.is_default && (
             <button
               onClick={() => {
                 setSpaceToEdit(activeSpace);
@@ -766,44 +837,28 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
             </button>
           )}
         </div>
-        <div className="relative mb-4">
-          <button
-            type="button"
-            onClick={() => scrollSpaces(-150)}
-            className="absolute left-0 top-1/2 -translate-y-1/2 z-10 px-2 text-gray-300 bg-gray-800/70 rounded"
-          >
-            ‹
-          </button>
-          <div
-            ref={spacesRef}
-            className="flex gap-2 overflow-x-auto whitespace-nowrap scroll-smooth px-6"
-          >
-            {spaces.map(space => (
-              <button
-                key={space._id}
-                onClick={() => setActiveSpace(space)}
-                className={`px-4 py-2 rounded-xl text-base transition-colors ${
-                  activeSpace && space._id === activeSpace._id
-                    ? 'bg-blue-600 text-white shadow-lg'
-                    : 'bg-gray-900 text-gray-300 hover:bg-gray-800 border border-gray-800'
-                }`}
-              >
-                {space.name}
-              </button>
-            ))}
+        <div
+          className="flex gap-2 overflow-x-auto whitespace-nowrap scroll-smooth mb-4 pb-2"
+          style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+        >
+          {spaces.map(space => (
             <button
-              onClick={() => { setShowAddSpaceModal(true); }}
-              className="px-4 py-2 rounded-xl text-base bg-gray-900 text-gray-300 hover:bg-gray-800 border border-gray-800 transition-colors"
+              key={space._id}
+              onClick={() => setActiveSpace(space)}
+              className={`px-4 py-2 rounded-xl text-base transition-colors flex-shrink-0 ${
+                activeSpace && space._id === activeSpace._id
+                  ? 'bg-blue-600 text-white shadow-lg'
+                  : 'bg-gray-900 text-gray-300 hover:bg-gray-800 border border-gray-800'
+              }`}
             >
-              +
+              {space.name}
             </button>
-          </div>
+          ))}
           <button
-            type="button"
-            onClick={() => scrollSpaces(150)}
-            className="absolute right-0 top-1/2 -translate-y-1/2 z-10 px-2 text-gray-300 bg-gray-800/70 rounded"
+            onClick={() => { setShowAddSpaceModal(true); }}
+            className="px-4 py-2 rounded-xl text-base bg-gray-900 text-gray-300 hover:bg-gray-800 border border-gray-800 transition-colors flex-shrink-0"
           >
-            ›
+            +
           </button>
         </div>
       </div>
@@ -824,7 +879,14 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
 
 
       {/* Categories - Horizontal wrapping pills */}
+      {spaceLoading ? (
+        <div className="text-center text-gray-400 py-6">Loading...</div>
+      ) : (
+        <>
       <div className="mb-6">
+        {loadingCategories && (
+          <div className="text-gray-400 mb-2">Loading categories...</div>
+        )}
         <div className="flex items-center mb-3">
           <h2 className="text-lg font-semibold text-gray-100">
             Category: {activeCat}
@@ -841,69 +903,54 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
             </button>
           )}
         </div>
-        <div className="relative mb-4">
+        <div
+          className="flex gap-2 overflow-x-auto whitespace-nowrap scroll-smooth mb-4 pb-2"
+          style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+        >
           <button
-            type="button"
-            onClick={() => scrollCategories(-150)}
-            className="absolute left-0 top-1/2 -translate-y-1/2 z-10 px-2 text-gray-300 bg-gray-800/70 rounded"
+            onClick={() => setActiveCat('All')}
+            className={`px-4 py-2 rounded-xl text-base transition-colors flex-shrink-0 ${
+              activeCat === 'All'
+                ? 'bg-blue-600 text-white shadow-lg'
+                : 'bg-gray-900 text-gray-300 hover:bg-gray-800 border border-gray-800'
+            }`}
           >
-            ‹
+            All
           </button>
-          <div
-            ref={categoriesRef}
-            className="flex gap-2 overflow-x-auto whitespace-nowrap scroll-smooth px-6"
-          >
+          {categories
+          .sort((a, b) => {
+            const aName = typeof a === 'string' ? a : a.name;
+            const bName = typeof b === 'string' ? b : b.name;
+            if (aName === "General") return -1;
+            if (bName === "General") return 1;
+            return aName.localeCompare(bName);
+          })
+          .map(cat => {
+            const catName = typeof cat === 'string' ? cat : cat.name;
+            return (
             <button
-              onClick={() => setActiveCat('All')}
-              className={`px-4 py-2 rounded-xl text-base transition-colors ${
-                activeCat === 'All'
+              key={catName}
+              onClick={() => setActiveCat(catName)}
+              className={`px-4 py-2 rounded-xl text-base transition-colors flex-shrink-0 ${
+                catName === activeCat
                   ? 'bg-blue-600 text-white shadow-lg'
                   : 'bg-gray-900 text-gray-300 hover:bg-gray-800 border border-gray-800'
               }`}
             >
-              All
+              {catName}
             </button>
-            {categories
-            .sort((a, b) => {
-              const aName = typeof a === 'string' ? a : a.name;
-              const bName = typeof b === 'string' ? b : b.name;
-              if (aName === "General") return -1;
-              if (bName === "General") return 1;
-              return aName.localeCompare(bName);
-            })
-            .map(cat => {
-              const catName = typeof cat === 'string' ? cat : cat.name;
-              return (
-              <button
-                key={catName}
-                onClick={() => setActiveCat(catName)}
-                className={`px-4 py-2 rounded-xl text-base transition-colors ${
-                  catName === activeCat
-                    ? 'bg-blue-600 text-white shadow-lg'
-                    : 'bg-gray-900 text-gray-300 hover:bg-gray-800 border border-gray-800'
-                }`}
-              >
-                {catName}
-              </button>
-              );
-            })}
-            <button
-              onClick={() => setShowAddCategoryModal(true)}
-              className="px-4 py-2 rounded-xl text-base bg-gray-900 text-gray-300 hover:bg-gray-800 border border-gray-800 transition-colors"
-            >
-              +
-            </button>
-          </div>
+            );
+          })}
           <button
-            type="button"
-            onClick={() => scrollCategories(150)}
-            className="absolute right-0 top-1/2 -translate-y-1/2 z-10 px-2 text-gray-300 bg-gray-800/70 rounded"
+            onClick={() => setShowAddCategoryModal(true)}
+            className="px-4 py-2 rounded-xl text-base bg-gray-900 text-gray-300 hover:bg-gray-800 border border-gray-800 transition-colors flex-shrink-0"
           >
-            ›
+            +
           </button>
         </div>
 
       </div>
+
 
       {/* Add new todo */}
       <div className="mb-6">
@@ -1088,6 +1135,9 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
       )}
 
       {/* Todo list */}
+      {loadingTodos && (
+        <div className="text-gray-400 mb-2">Loading tasks...</div>
+      )}
       <div className="space-y-3">
         {uncompletedTodos.map((todo) => (
           <TodoItem
@@ -1101,6 +1151,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
             handleCompleteTodo={handleCompleteTodo}
             handleDeleteTodo={handleDeleteTodo}
             isCollaborative={(activeSpace?.member_ids?.length ?? 0) > 1}
+            onEdit={handleEditTodo}
           />
         ))}
       </div>
@@ -1131,8 +1182,78 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
               handleCompleteTodo={handleCompleteTodo}
               handleDeleteTodo={handleDeleteTodo}
               isCollaborative={(activeSpace?.member_ids?.length ?? 0) > 1}
+              onEdit={handleEditTodo}
             />
           ))}
+        </div>
+      )}
+
+      </>
+      )}
+
+      {showEditTodoModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50">
+          <div className="bg-black border border-gray-800 p-6 rounded-xl w-80 space-y-4 shadow-2xl">
+            <h3 className="text-gray-100 text-lg font-bold mb-2">Edit Todo</h3>
+            <input
+              type="text"
+              value={editText}
+              onChange={(e) => setEditText(e.target.value)}
+              className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <textarea
+              value={editNotes}
+              onChange={(e) => setEditNotes(e.target.value)}
+              placeholder="Notes"
+              className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 text-base h-24 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <select
+              value={editCategoryVal}
+              onChange={(e) => setEditCategoryVal(e.target.value)}
+              className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 text-base focus:outline-none"
+            >
+              {categories.map((cat) => (
+                <option key={cat} value={cat}>
+                  {cat}
+                </option>
+              ))}
+            </select>
+            <select
+              value={editPriorityVal}
+              onChange={(e) => setEditPriorityVal(e.target.value)}
+              className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 text-base focus:outline-none"
+            >
+              <option value="High">High</option>
+              <option value="Medium">Medium</option>
+              <option value="Low">Low</option>
+            </select>
+            <div className="relative">
+              <input
+                type="date"
+                value={editDueDate}
+                onChange={(e) => setEditDueDate(e.target.value)}
+                placeholder="Select due date"
+                className="w-full p-3 pr-8 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 text-base focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                style={{
+                  colorScheme: 'dark',
+                  position: 'relative'
+                }}
+              />
+              {editDueDate && (
+                <button
+                  type="button"
+                  onClick={() => setEditDueDate('')}
+                  className="absolute right-1 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-200 z-10"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+            <div className="flex justify-center space-x-3">
+              <button onClick={handleSaveTodoEdit} className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-2 rounded-lg transition-colors">Save</button>
+              <button onClick={() => setShowEditTodoModal(false)} className="bg-gray-800 hover:bg-gray-700 text-gray-300 px-6 py-2 rounded-lg transition-colors">Cancel</button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -1186,8 +1307,8 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
                       <input
                         type="checkbox"
                         id={`space-${space._id || 'default'}`}
-                        disabled={!emailEnabled || space.name === 'Default'}
-                        checked={space.name === 'Default' || emailSpaceIds.includes(space._id)}
+                        disabled={!emailEnabled || space.is_default}
+                        checked={space.is_default || emailSpaceIds.includes(space._id)}
                         onChange={(e) => {
                           const id = space._id;
                           if (e.target.checked) {

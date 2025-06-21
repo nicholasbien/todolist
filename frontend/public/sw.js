@@ -546,6 +546,7 @@ async function offlineFallback(request, url) {
         priority: normalizePriority(data.priority),
         dateAdded: new Date().toISOString(),
         dueDate: null,
+        notes: data.notes || '',
         completed: false,
         user_id: authData ? authData.userId : 'offline_user',
         space_id: data.space_id || null, // Include space_id from request data

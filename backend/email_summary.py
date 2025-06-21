@@ -289,7 +289,7 @@ async def send_daily_summary(
         # Regroup limited todos by space
         limited_by_space: Dict[str, List[dict]] = {}
         for todo in limited:
-            space_name = todo.pop("_space", "Default")
+            space_name = todo.pop("_space", "Personal")
             limited_by_space.setdefault(space_name, []).append(todo)
         limited_spaces = [{"space": name, "todos": items} for name, items in limited_by_space.items()]
 
