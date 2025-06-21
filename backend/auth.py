@@ -396,7 +396,7 @@ async def ensure_user_has_default_space(user_id: str) -> None:
         if not existing_default:
             # Create default space
             default_space = {
-                "name": "Default",
+                "name": "Personal",
                 "owner_id": user_id,
                 "member_ids": [user_id],
                 "pending_emails": [],

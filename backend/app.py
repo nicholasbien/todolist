@@ -256,32 +256,56 @@ async def api_complete_todo(todo_id: str, current_user: dict = Depends(get_curre
     return await complete_todo(todo_id, current_user["user_id"])
 
 
-@app.put("/todos/{todo_id}")
+@app.put("/todos/{todo_id}", response_model=Todo)
 async def api_update_todo(todo_id: str, request: Request, current_user: dict = Depends(get_current_user)):
     try:
         body = await request.json()
 
         # Build updates dict from request body
         updates = {}
+        if "text" in body:
+            updates["text"] = body["text"]
+        if "notes" in body:
+            updates["notes"] = body["notes"]
         if "category" in body:
             updates["category"] = body["category"]
         if "priority" in body:
             updates["priority"] = body["priority"]
+        if "dueDate" in body:
+            updates["dueDate"] = body["dueDate"]
 
         if not updates:
             raise HTTPException(status_code=400, detail="No valid fields to update")
 
         logger.info(f"Updating todo {todo_id} with: {updates} for user: {current_user['email']}")
+        logger.info(f"CURRENT_USER DEBUG: {current_user}")
         return await update_todo_fields(todo_id, updates, current_user["user_id"])
     except Exception as e:
-        logger.error(f"Error updating todo: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error updating todo: {str(e)}")
+        logger.error(f"Error updating todo - Exception type: {type(e)}, Exception args: {e.args}, Exception: {repr(e)}")
+        raise HTTPException(status_code=500, detail=f"Error updating todo: {repr(e)}")
 
 
 @app.get("/health")
 async def api_health_check():
     logger.info("Health check requested")
     return await health_check()
+
+
+async def rename_default_spaces_to_personal():
+    """One-time migration to rename all 'Default' spaces to 'Personal'."""
+    try:
+        from spaces import spaces_collection
+
+        # Update all spaces with name "Default" to "Personal"
+        result = await spaces_collection.update_many({"name": "Default"}, {"$set": {"name": "Personal"}})
+
+        if result.modified_count > 0:
+            logger.info(f"Renamed {result.modified_count} 'Default' spaces to 'Personal'")
+        else:
+            logger.info("No 'Default' spaces found to rename")
+
+    except Exception as e:
+        logger.error(f"Error renaming Default spaces to Personal: {e}")
 
 
 @app.on_event("startup")
@@ -300,6 +324,8 @@ async def startup_event():
         await migrate_legacy_todos()
         # Migrate conceptual default spaces to actual space documents
         await migrate_default_spaces()
+        # Rename Default spaces to Personal (one-time migration)
+        await rename_default_spaces_to_personal()
         await init_todo_indexes()
         await init_auth_indexes()
         await init_space_indexes()
@@ -537,6 +563,9 @@ async def api_chat(
     """Answer user questions about their todos using OpenAI."""
     try:
         spaces = await get_spaces_for_user(current_user["user_id"])
+        if current_user.get("email_spaces"):
+            allowed = set(current_user["email_spaces"])
+            spaces = [s for s in spaces if s.is_default or s.id in allowed]
         spaces_data = []
         for space in spaces:
             todos = await get_todos(current_user["user_id"], space.id)

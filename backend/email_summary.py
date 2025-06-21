@@ -230,7 +230,7 @@ async def send_daily_summary(
         spaces = await get_spaces_for_user(user_id)
         if user and user.get("email_spaces"):
             allowed = set(user.get("email_spaces", []))
-            spaces = [s for s in spaces if s.id is None or s.id in allowed]
+            spaces = [s for s in spaces if s.is_default or s.id in allowed]
         spaces_data = []
         all_todos = []
         for space in spaces:
@@ -289,7 +289,7 @@ async def send_daily_summary(
         # Regroup limited todos by space
         limited_by_space: Dict[str, List[dict]] = {}
         for todo in limited:
-            space_name = todo.pop("_space", "Default")
+            space_name = todo.pop("_space", "Personal")
             limited_by_space.setdefault(space_name, []).append(todo)
         limited_spaces = [{"space": name, "todos": items} for name, items in limited_by_space.items()]
 
