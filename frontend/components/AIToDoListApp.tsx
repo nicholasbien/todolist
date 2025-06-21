@@ -49,6 +49,14 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
   const [spaceMembers, setSpaceMembers] = useState<any[]>([]);
   const [pendingInvites, setPendingInvites] = useState<string[]>([]);
 
+  const [showEditTodoModal, setShowEditTodoModal] = useState(false);
+  const [todoToEdit, setTodoToEdit] = useState<any>(null);
+  const [editText, setEditText] = useState('');
+  const [editNotes, setEditNotes] = useState('');
+  const [editCategoryVal, setEditCategoryVal] = useState('General');
+  const [editPriorityVal, setEditPriorityVal] = useState('Medium');
+  const [editDueDate, setEditDueDate] = useState<string>('');
+
   // Track latest fetch requests to avoid race conditions when switching spaces
   const todosFetchIdRef = useRef(0);
   const categoriesFetchIdRef = useRef(0);
@@ -607,6 +615,58 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
     }
   };
 
+  const handleEditTodo = (todo) => {
+    setTodoToEdit(todo);
+    setEditText(todo.text);
+    setEditNotes(todo.notes || '');
+    setEditCategoryVal(todo.category);
+    setEditPriorityVal(todo.priority);
+
+    // Format date for HTML date input (YYYY-MM-DD)
+    let formattedDate = '';
+    if (todo.dueDate) {
+      try {
+        const date = new Date(todo.dueDate);
+        // Only format if it's a valid date
+        if (!isNaN(date.getTime())) {
+          formattedDate = date.toISOString().split('T')[0];
+        }
+      } catch (e) {
+        console.warn('Invalid date format:', todo.dueDate);
+        formattedDate = '';
+      }
+    }
+    setEditDueDate(formattedDate);
+
+    setShowEditTodoModal(true);
+  };
+
+  const handleSaveTodoEdit = async () => {
+    if (!todoToEdit) return;
+    try {
+      const updates: any = {
+        text: editText,
+        notes: editNotes,
+        category: editCategoryVal,
+        priority: editPriorityVal,
+        dueDate: editDueDate || null,
+      };
+      const response = await authenticatedFetch(`/todos/${todoToEdit._id}`, {
+        method: 'PUT',
+        body: JSON.stringify(updates),
+      });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to update todo');
+      }
+      await fetchTodos();
+      setShowEditTodoModal(false);
+      setTodoToEdit(null);
+    } catch (err) {
+      setError('Error updating todo: ' + err.message);
+    }
+  };
+
 
   // Send email summary
   const handleSendEmailSummary = async () => {
@@ -1068,6 +1128,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
             handleCompleteTodo={handleCompleteTodo}
             handleDeleteTodo={handleDeleteTodo}
             isCollaborative={(activeSpace?.member_ids?.length ?? 0) > 1}
+            onEdit={handleEditTodo}
           />
         ))}
       </div>
@@ -1098,8 +1159,75 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
               handleCompleteTodo={handleCompleteTodo}
               handleDeleteTodo={handleDeleteTodo}
               isCollaborative={(activeSpace?.member_ids?.length ?? 0) > 1}
+              onEdit={handleEditTodo}
             />
           ))}
+        </div>
+      )}
+
+      {showEditTodoModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50">
+          <div className="bg-black border border-gray-800 p-6 rounded-xl w-80 space-y-4 shadow-2xl">
+            <h3 className="text-gray-100 text-lg font-bold mb-2">Edit Todo</h3>
+            <input
+              type="text"
+              value={editText}
+              onChange={(e) => setEditText(e.target.value)}
+              className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <textarea
+              value={editNotes}
+              onChange={(e) => setEditNotes(e.target.value)}
+              placeholder="Notes"
+              className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 text-base h-24 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <select
+              value={editCategoryVal}
+              onChange={(e) => setEditCategoryVal(e.target.value)}
+              className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 text-base focus:outline-none"
+            >
+              {categories.map((cat) => (
+                <option key={cat} value={cat}>
+                  {cat}
+                </option>
+              ))}
+            </select>
+            <select
+              value={editPriorityVal}
+              onChange={(e) => setEditPriorityVal(e.target.value)}
+              className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 text-base focus:outline-none"
+            >
+              <option value="High">High</option>
+              <option value="Medium">Medium</option>
+              <option value="Low">Low</option>
+            </select>
+            <div className="relative">
+              <input
+                type="date"
+                value={editDueDate}
+                onChange={(e) => setEditDueDate(e.target.value)}
+                placeholder="Select due date"
+                className="w-full p-3 pr-8 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 text-base focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                style={{
+                  colorScheme: 'dark',
+                  position: 'relative'
+                }}
+              />
+              {editDueDate && (
+                <button
+                  type="button"
+                  onClick={() => setEditDueDate('')}
+                  className="absolute right-1 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-200 z-10"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+            <div className="flex justify-center space-x-3">
+              <button onClick={handleSaveTodoEdit} className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-2 rounded-lg transition-colors">Save</button>
+              <button onClick={() => setShowEditTodoModal(false)} className="bg-gray-800 hover:bg-gray-700 text-gray-300 px-6 py-2 rounded-lg transition-colors">Cancel</button>
+            </div>
+          </div>
         </div>
       )}
 
