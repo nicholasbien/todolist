@@ -10,6 +10,7 @@ interface TodoItemProps {
   handleCompleteTodo: (id: string) => void;
   handleDeleteTodo: (id: string) => void;
   isCollaborative: boolean;
+  onEdit: (todo: any) => void;
 }
 
 export default function TodoItem({
@@ -22,6 +23,7 @@ export default function TodoItem({
   handleCompleteTodo,
   handleDeleteTodo,
   isCollaborative,
+  onEdit,
 }: TodoItemProps) {
   const [isCompleting, setIsCompleting] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -51,6 +53,7 @@ export default function TodoItem({
   return (
     <div
       key={todo._id}
+      onClick={() => onEdit(todo)}
       className={`p-4 border rounded-xl transition-all duration-300 ease-in-out ${
         shouldAnimate ? 'opacity-100 transform translate-y-0' : 'opacity-0 transform translate-y-2'
       } ${
@@ -86,7 +89,7 @@ export default function TodoItem({
         <div className="flex items-center space-x-2 ml-3">
           {!todo.completed ? (
             <button
-              onClick={handleCompleteClick}
+              onClick={(e) => { e.stopPropagation(); handleCompleteClick(); }}
               disabled={isCompleting}
               className={`text-lg w-8 h-8 flex items-center justify-center rounded-lg transition-all duration-200 ${
                 isCompleting
@@ -98,14 +101,14 @@ export default function TodoItem({
             </button>
           ) : (
             <button
-              onClick={handleCompleteClick}
+              onClick={(e) => { e.stopPropagation(); handleCompleteClick(); }}
               className="text-yellow-400 hover:text-yellow-300 hover:bg-yellow-900/20 text-lg w-8 h-8 flex items-center justify-center rounded-lg transition-colors"
             >
               ↻
             </button>
           )}
           <button
-            onClick={handleDeleteClick}
+            onClick={(e) => { e.stopPropagation(); handleDeleteClick(); }}
             disabled={isDeleting}
             className={`text-lg w-8 h-8 flex items-center justify-center rounded-lg transition-all duration-200 ${
               isDeleting
@@ -126,7 +129,7 @@ export default function TodoItem({
             onBlur={() => setEditingCategory(null)}
             className="px-3 py-1.5 rounded-lg bg-black text-white border border-gray-700 text-xs focus:border-blue-500 focus:outline-none"
             autoFocus
-            onClick={(e) => (e.target as HTMLSelectElement).focus()}
+            onClick={(e) => { (e.target as HTMLSelectElement).focus(); e.stopPropagation(); }}
           >
             {categories
               .sort((a, b) => {
@@ -144,6 +147,7 @@ export default function TodoItem({
           <select
             value={todo.category}
             onChange={(e) => handleUpdateCategory(todo._id, e.target.value)}
+            onClick={(e) => e.stopPropagation()}
             className={`px-3 py-1.5 rounded-lg cursor-pointer text-xs appearance-none transition-colors ${
               todo.completed ? "bg-black border border-gray-800 text-gray-500" : "bg-black border border-gray-700 text-gray-200 hover:border-gray-600"
             }`}
@@ -164,6 +168,7 @@ export default function TodoItem({
         <select
           value={todo.priority}
           onChange={(e) => handleUpdatePriority(todo._id, e.target.value)}
+          onClick={(e) => e.stopPropagation()}
           className={`px-3 py-1.5 rounded-lg cursor-pointer text-xs appearance-none min-w-16 transition-colors ${
             todo.completed ? "bg-black border border-gray-800 text-gray-500" : "bg-black border border-gray-700 text-gray-200 hover:border-gray-600"
           }`}
