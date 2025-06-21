@@ -234,6 +234,8 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
       // Hide current data immediately to show loading state
       setTodos([]);
       setCategories([]);
+      setSpaceMembers([]);
+      setPendingInvites([]);
       // Fetch new data for the active space
       fetchSpaceData();
     }
