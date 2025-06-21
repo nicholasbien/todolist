@@ -214,9 +214,9 @@ async def leave_space(space_id: str, user_id: str) -> dict:
 
 
 async def is_default_space(space_id: str, user_id: str) -> bool:
-    """Check if the given space is the user's Default space."""
+    """Check if the given space is the user's default space."""
     space = await spaces_collection.find_one({"_id": ObjectId(space_id), "owner_id": user_id})
-    return bool(space and space.get("name") == "Default")
+    return bool(space and space.get("is_default"))
 
 
 async def delete_space(space_id: str, user_id: str) -> dict:
@@ -226,8 +226,8 @@ async def delete_space(space_id: str, user_id: str) -> dict:
         raise HTTPException(status_code=404, detail="Space not found")
     if space.get("owner_id") != user_id:
         raise HTTPException(status_code=403, detail="Only the owner can delete the space")
-    if space.get("name") == "Default":
-        raise HTTPException(status_code=400, detail="Cannot delete the Default space")
+    if space.get("is_default"):
+        raise HTTPException(status_code=400, detail="Cannot delete the Personal space")
 
     # Import here to avoid circular imports
     from categories import categories_collection
@@ -313,7 +313,7 @@ async def migrate_default_spaces() -> None:
         # Create default space for each user and update their data
         for user_id in user_ids:
             # Check if user already has a default space
-            existing_default = await spaces_collection.find_one({"owner_id": user_id, "name": "Default"})
+            existing_default = await spaces_collection.find_one({"owner_id": user_id, "name": "Personal"})
 
             if existing_default:
                 default_space_id = str(existing_default["_id"])
@@ -323,7 +323,7 @@ async def migrate_default_spaces() -> None:
             else:
                 # Create new default space
                 default_space = {
-                    "name": "Default",
+                    "name": "Personal",
                     "owner_id": user_id,
                     "member_ids": [user_id],
                     "pending_emails": [],
@@ -351,7 +351,7 @@ async def migrate_default_spaces() -> None:
 
         # Create these categories for each user's default space
         for user_id in user_ids:
-            default_space = await spaces_collection.find_one({"owner_id": user_id, "name": "Default"})
+            default_space = await spaces_collection.find_one({"owner_id": user_id, "name": "Personal"})
 
             if default_space:
                 default_space_id = str(default_space["_id"])

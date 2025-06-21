@@ -233,7 +233,7 @@ class TestAuthenticationWithDatabase:
 
         # First space should be the default space
         default_space = spaces[0]
-        assert default_space["name"] == "Default"
+        assert default_space["name"] == "Personal"
         assert default_space["is_default"] is True
         assert default_space["owner_id"]  # Should have an owner_id
 

@@ -732,9 +732,10 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
       <div className="mb-6">
         <div className="flex items-center mb-3">
           <h2 className="text-lg font-semibold text-gray-100">
-            Space: {activeSpace ? activeSpace.name : 'None'}
+            Space:{' '}
+            {activeSpace ? activeSpace.name : 'None'}
           </h2>
-          {activeSpace && activeSpace.name !== 'Default' && (
+          {activeSpace && !activeSpace.is_default && (
             <button
               onClick={() => {
                 setSpaceToEdit(activeSpace);
@@ -1133,8 +1134,8 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
                       <input
                         type="checkbox"
                         id={`space-${space._id || 'default'}`}
-                        disabled={!emailEnabled || space.name === 'Default'}
-                        checked={space.name === 'Default' || emailSpaceIds.includes(space._id)}
+                        disabled={!emailEnabled || space.is_default}
+                        checked={space.is_default || emailSpaceIds.includes(space._id)}
                         onChange={(e) => {
                           const id = space._id;
                           if (e.target.checked) {
