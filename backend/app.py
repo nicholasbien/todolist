@@ -537,6 +537,9 @@ async def api_chat(
     """Answer user questions about their todos using OpenAI."""
     try:
         spaces = await get_spaces_for_user(current_user["user_id"])
+        if current_user.get("email_spaces"):
+            allowed = set(current_user["email_spaces"])
+            spaces = [s for s in spaces if s.is_default or s.id in allowed]
         spaces_data = []
         for space in spaces:
             todos = await get_todos(current_user["user_id"], space.id)
