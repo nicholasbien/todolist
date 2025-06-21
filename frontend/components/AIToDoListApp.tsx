@@ -20,6 +20,8 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
   const [newTodo, setNewTodo] = useState("");
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [loadingTodos, setLoadingTodos] = useState(false);
+  const [loadingCategories, setLoadingCategories] = useState(false);
   const [error, setError] = useState("");
   const [newCat, setNewCat] = useState("");
   const [activeCat, setActiveCat] = useState("All");
@@ -138,6 +140,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
   // Fetch categories from MongoDB
   const fetchCategories = useCallback(async () => {
     const fetchId = ++categoriesFetchIdRef.current;
+    setLoadingCategories(true);
     try {
       const spaceId = activeSpace?._id || null;
       const url = spaceId ? `/categories?space_id=${spaceId}` : '/categories';
@@ -153,12 +156,17 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
       if (fetchId === categoriesFetchIdRef.current) {
         setError('Error loading categories: ' + err.message);
       }
+    } finally {
+      if (fetchId === categoriesFetchIdRef.current) {
+        setLoadingCategories(false);
+      }
     }
   }, [authenticatedFetch, activeSpace]);
 
   // Fetch todos from MongoDB
   const fetchTodos = useCallback(async () => {
     const fetchId = ++todosFetchIdRef.current;
+    setLoadingTodos(true);
     try {
       const url = activeSpace && activeSpace._id ? `/todos?space_id=${activeSpace._id}` : '/todos';
       const response = await authenticatedFetch(url);
@@ -172,6 +180,10 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
     } catch (err) {
       if (fetchId === todosFetchIdRef.current) {
         setError('Error loading todos: ' + err.message);
+      }
+    } finally {
+      if (fetchId === todosFetchIdRef.current) {
+        setLoadingTodos(false);
       }
     }
   }, [authenticatedFetch, activeSpace]);
@@ -197,9 +209,11 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
     }
   }, [token, user, fetchSpaces, fetchTodos, fetchCategories, fetchMembers]);
 
-  // Refetch categories and members when active space changes
+  // Refetch data when active space changes
   useEffect(() => {
-    if (token && user && activeSpace) {
+    if (token && user) {
+      setTodos([]); // hide current tasks immediately
+      setCategories([]); // hide current categories immediately
       fetchCategories();
       fetchMembers();
       fetchTodos();
@@ -791,6 +805,9 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
 
       {/* Categories - Horizontal wrapping pills */}
       <div className="mb-6">
+        {loadingCategories && (
+          <div className="text-gray-400 mb-2">Loading categories...</div>
+        )}
         <div className="flex items-center mb-3">
           <h2 className="text-lg font-semibold text-gray-100">
             Category: {activeCat}
@@ -1035,6 +1052,9 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
       )}
 
       {/* Todo list */}
+      {loadingTodos && (
+        <div className="text-gray-400 mb-2">Loading tasks...</div>
+      )}
       <div className="space-y-3">
         {uncompletedTodos.map((todo) => (
           <TodoItem
