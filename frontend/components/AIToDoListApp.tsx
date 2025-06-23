@@ -1304,7 +1304,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
         <div className="text-center py-12">
           <div className="text-gray-400 mb-4 text-4xl">📊</div>
           <h3 className="text-lg font-semibold text-gray-100 mb-2">Insights Coming Soon</h3>
-          <p className="text-gray-400">We're working on analytics and insights for your tasks.</p>
+          <p className="text-gray-400">We&apos;re working on analytics and insights for your tasks.</p>
         </div>
       )}
 
