@@ -1,3 +1,4 @@
+const SW_VERSION = '39';
 const STATIC_CACHE = 'todo-static-v39';
 const API_CACHE = 'todo-api-v39';
 
@@ -314,6 +315,13 @@ self.addEventListener('activate', (event) => {
     ])
   );
   self.clients.claim();
+});
+
+// Handle messages from main thread
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
 });
 
 self.addEventListener('fetch', (event) => {
