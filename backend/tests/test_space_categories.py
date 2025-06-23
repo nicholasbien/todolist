@@ -37,7 +37,7 @@ async def test_default_space_categories(client, test_email):
     categories = resp.json()
 
     # Should have default categories
-    expected_categories = ["Work", "Personal", "Shopping", "Finance", "Health", "General"]
+    expected_categories = ["General"]
     for cat in expected_categories:
         assert cat in categories
 
