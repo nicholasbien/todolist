@@ -178,9 +178,11 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
   }, [authenticatedFetch, activeSpace]);
 
   // Fetch todos from MongoDB
-  const fetchTodos = useCallback(async () => {
+  const fetchTodos = useCallback(async (showLoading: boolean = true) => {
     const fetchId = ++todosFetchIdRef.current;
-    setLoadingTodos(true);
+    if (showLoading) {
+      setLoadingTodos(true);
+    }
     try {
       const url = activeSpace && activeSpace._id ? `/todos?space_id=${activeSpace._id}` : '/todos';
       const response = await authenticatedFetch(url);
@@ -196,7 +198,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
         setError('Error loading todos: ' + err.message);
       }
     } finally {
-      if (fetchId === todosFetchIdRef.current) {
+      if (fetchId === todosFetchIdRef.current && showLoading) {
         setLoadingTodos(false);
       }
     }
@@ -205,7 +207,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
   const fetchSpaceData = useCallback(async () => {
     const fetchId = ++spaceFetchIdRef.current;
     setSpaceLoading(true);
-    await Promise.all([fetchCategories(), fetchTodos(), fetchMembers()]);
+    await Promise.all([fetchCategories(), fetchTodos(true), fetchMembers()]);
     if (fetchId === spaceFetchIdRef.current) {
       setSpaceLoading(false);
     }
@@ -286,7 +288,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
       // The service worker handles sync automatically when GET /todos is called
       // Just trigger a single fetch which will handle sync + refresh internally
       if (token && user) {
-        fetchTodos();
+        fetchTodos(false);
       }
     };
 
@@ -459,7 +461,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
       }
 
       await fetchCategories();
-      await fetchTodos();
+      await fetchTodos(false);
       setActiveCat(trimmed);
       setShowEditCategoryModal(false);
       setEditCatName('');
@@ -520,7 +522,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
       }
 
       // Refresh todos list
-      await fetchTodos();
+      await fetchTodos(false);
       setNewTodo('');
     } catch (err) {
       if (err.name === 'AbortError') {
@@ -552,7 +554,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
       }
 
       // Refresh todos list
-      await fetchTodos();
+      await fetchTodos(false);
       setError(''); // Clear any existing errors on success
     } catch (err) {
       setError('Error deleting todo: ' + err.message);
@@ -578,7 +580,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
       }
 
       // Refresh todos list
-      await fetchTodos();
+      await fetchTodos(false);
       setError(''); // Clear any existing errors on success
     } catch (err) {
       setError('Error updating todo: ' + err.message);
@@ -599,7 +601,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
       }
 
       // Refresh todos list
-      await fetchTodos();
+      await fetchTodos(false);
       setEditingCategory(null);
       setError('');
     } catch (err) {
@@ -621,7 +623,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
       }
 
       // Refresh todos list
-      await fetchTodos();
+      await fetchTodos(false);
       setError('');
     } catch (err) {
       setError('Error updating priority: ' + err.message);
@@ -672,7 +674,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
         const errorData = await response.json();
         throw new Error(errorData.detail || 'Failed to update todo');
       }
-      await fetchTodos();
+      await fetchTodos(false);
       setShowEditTodoModal(false);
       setTodoToEdit(null);
     } catch (err) {
