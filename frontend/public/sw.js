@@ -1,9 +1,9 @@
-const STATIC_CACHE = 'todo-static-v39';
-const API_CACHE = 'todo-api-v39';
+const STATIC_CACHE = 'todo-static-v40';
+const API_CACHE = 'todo-api-v40';
 
 const GLOBAL_DB_NAME = 'TodoGlobalDB';
 const USER_DB_PREFIX = 'TodoUserDB_';
-const DB_VERSION = 7;
+const DB_VERSION = 8;
 const TODOS = 'todos';
 const CATEGORIES = 'categories';
 const SPACES = 'spaces';
@@ -734,6 +734,15 @@ async function offlineFallback(request, url) {
         }
       } else {
         await addQueue({ type: 'DELETE_CATEGORY', data: { name: categoryName, space_id: spaceId } }, authData ? authData.userId : null);
+      }
+
+      // Ensure a General category exists after deletion
+      const remainingCategories = await getCategories(authData ? authData.userId : null, spaceId);
+      const hasGeneral = remainingCategories.some(c => c.name === 'General' && c.space_id === spaceId);
+      if (!hasGeneral) {
+        const generalCategory = { name: 'General', space_id: spaceId };
+        await putCategory(generalCategory, authData ? authData.userId : null);
+        // Server will recreate General automatically; no need to queue
       }
 
       return new Response(null, { status: 204 });

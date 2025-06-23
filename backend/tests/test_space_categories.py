@@ -1,3 +1,5 @@
+from datetime import datetime
+
 import pytest
 from tests.test_auth import get_verification_code_from_db
 
@@ -251,6 +253,60 @@ async def test_category_todo_relationship_in_spaces(client, test_email):
     assert resp.status_code == 200
 
     # Verify todo was moved to General category
+    resp = await client.get(f"/todos?space_id={space_id}", headers=headers)
+    assert resp.status_code == 200
+    todos = resp.json()
+    assert len(todos) == 1
+    assert todos[0]["category"] == "General"
+
+
+@pytest.mark.asyncio
+async def test_general_category_recreated_on_delete(client, test_email):
+    """General category should exist after deleting categories."""
+    token = await get_token(client, test_email)
+    headers = {"Authorization": f"Bearer {token}"}
+
+    space_id = await create_test_space(client, token, "General Recreation")
+
+    # Add a custom category and todo
+    resp = await client.post(
+        "/categories",
+        json={"name": "Temp", "space_id": space_id},
+        headers=headers,
+    )
+    assert resp.status_code == 200
+
+    todo_data = {
+        "text": "Temp task",
+        "category": "Temp",
+        "priority": "Low",
+        "dateAdded": datetime.now().isoformat(),
+        "space_id": space_id,
+    }
+    resp = await client.post("/todos", json=todo_data, headers=headers)
+    assert resp.status_code == 200
+
+    # Delete the General category if present
+    resp = await client.delete(f"/categories/General?space_id={space_id}", headers=headers)
+    assert resp.status_code == 200
+
+    # General category should be recreated automatically
+    resp = await client.get(f"/categories?space_id={space_id}", headers=headers)
+    assert resp.status_code == 200
+    categories = resp.json()
+    assert "General" in categories
+
+    # Delete the custom category
+    resp = await client.delete(f"/categories/Temp?space_id={space_id}", headers=headers)
+    assert resp.status_code == 200
+
+    # Verify General still exists
+    resp = await client.get(f"/categories?space_id={space_id}", headers=headers)
+    assert resp.status_code == 200
+    categories = resp.json()
+    assert "General" in categories
+
+    # Todo should now be in General category
     resp = await client.get(f"/todos?space_id={space_id}", headers=headers)
     assert resp.status_code == 200
     todos = resp.json()

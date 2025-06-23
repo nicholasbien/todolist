@@ -107,6 +107,11 @@ async def delete_category(name: str, space_id: Optional[str] = None) -> dict:
         if delete_result.deleted_count == 0:
             raise HTTPException(status_code=404, detail="Category not found")
 
+        # Ensure a General category exists after deletion
+        general_query = {"name": "General", "space_id": space_id}
+        if not await categories_collection.find_one(general_query):
+            await categories_collection.insert_one(general_query)
+
         message = f"Category {name} deleted successfully"
         if update_result.modified_count > 0:
             message += f" and {update_result.modified_count} todos moved to General"
