@@ -154,7 +154,6 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
   // Fetch categories from MongoDB
   const fetchCategories = useCallback(async () => {
     const fetchId = ++categoriesFetchIdRef.current;
-    setLoadingCategories(true);
     try {
       const spaceId = activeSpace?._id || null;
       const url = spaceId ? `/categories?space_id=${spaceId}` : '/categories';
@@ -169,10 +168,6 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
     } catch (err) {
       if (fetchId === categoriesFetchIdRef.current) {
         setError('Error loading categories: ' + err.message);
-      }
-    } finally {
-      if (fetchId === categoriesFetchIdRef.current) {
-        setLoadingCategories(false);
       }
     }
   }, [authenticatedFetch, activeSpace]);
