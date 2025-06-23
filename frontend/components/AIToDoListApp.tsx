@@ -51,8 +51,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
 
 
   // Loading state when switching spaces
-  const [spaceLoading, setSpaceLoading] = useState(false);
-  const spaceFetchIdRef = useRef(0);
+  // Categories and todos load independently so we no longer gate the UI
 
   // Edit todo modal state
   const [showEditTodoModal, setShowEditTodoModal] = useState(false);
@@ -202,13 +201,11 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
     }
   }, [authenticatedFetch, activeSpace]);
 
-  const fetchSpaceData = useCallback(async () => {
-    const fetchId = ++spaceFetchIdRef.current;
-    setSpaceLoading(true);
-    await Promise.all([fetchCategories(), fetchTodos(), fetchMembers()]);
-    if (fetchId === spaceFetchIdRef.current) {
-      setSpaceLoading(false);
-    }
+  const fetchSpaceData = useCallback(() => {
+    // Trigger fetches without waiting for all to finish
+    fetchCategories();
+    fetchTodos();
+    fetchMembers();
   }, [fetchCategories, fetchTodos, fetchMembers]);
 
 
@@ -881,10 +878,6 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
 
 
       {/* Categories - Horizontal wrapping pills */}
-      {spaceLoading ? (
-        <div className="text-center text-gray-400 py-6">Loading...</div>
-      ) : (
-        <>
       <div className="mb-6">
         {loadingCategories && (
           <div className="text-gray-400 mb-2">Loading categories...</div>
@@ -1190,8 +1183,6 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
         </div>
       )}
 
-      </>
-      )}
 
       {showEditTodoModal && (
         <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50">
