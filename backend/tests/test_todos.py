@@ -130,5 +130,5 @@ async def test_add_todo_with_selected_category(client, test_email):
         assert create_resp.status_code == 200
         todo = create_resp.json()
         assert todo["category"] == "Work"
-        assert todo["priority"] == "Medium"
+        assert todo["priority"] == "High"
         mock_classify.assert_not_called()

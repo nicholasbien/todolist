@@ -165,6 +165,7 @@ async def api_create_todo(request: Request, current_user: dict = Depends(get_cur
         body = await request.json()
         logger.info(f"Received todo creation request: {json.dumps(body)}")
 
+        body["priority"] = "High"
         body["user_id"] = current_user["user_id"]
         if "space_id" not in body:
             body["space_id"] = None
@@ -212,7 +213,7 @@ async def api_create_todo(request: Request, current_user: dict = Depends(get_cur
                     body.get("dateAdded", ""),
                 )
                 body["category"] = classification.get("category", "General")
-                body["priority"] = classification.get("priority", "Medium")
+                body["priority"] = "High"
                 if classification.get("text"):
                     # TODO: AI is over-aggressively cleaning text, removing "by User X" as date keywords
                     # This causes "Todo by User 1" to become just "Todo". Need to fix AI prompt
@@ -223,10 +224,10 @@ async def api_create_todo(request: Request, current_user: dict = Depends(get_cur
             except Exception as e:
                 logger.error(f"Failed to classify text '{classify_text}': {e}")
                 body["category"] = "General"
-                body["priority"] = "Medium"
+                body["priority"] = "High"
         else:
-            # If category provided or created offline, ensure priority defaults
-            body.setdefault("priority", "Medium")
+            # If category provided or created offline, still overwrite priority
+            body["priority"] = "High"
 
         # Ensure dateAdded exists (frontend should provide this)
         body.setdefault("dateAdded", datetime.now().isoformat())
