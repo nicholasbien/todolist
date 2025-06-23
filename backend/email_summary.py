@@ -177,7 +177,12 @@ async def send_email(to_email: str, subject: str, body: str) -> bool:
     """
     try:
         # Block test emails from being sent
-        test_emails = ["pytest@example.com", "test@example.com", "pytest2@example.com"]
+        test_emails = [
+            "pytest@example.com",
+            "test@example.com",
+            "pytest2@example.com",
+            "pytest3@example.com",
+        ]
         if to_email.lower() in [email.lower() for email in test_emails]:
             logger.info(f"Blocked email send to test address: {to_email}")
             return True  # Return True to avoid breaking tests
