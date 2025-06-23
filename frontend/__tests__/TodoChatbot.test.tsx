@@ -15,7 +15,7 @@ describe('TodoChatbot', () => {
     render(<TodoChatbot token="abc" />);
 
     fireEvent.change(screen.getByPlaceholderText(/Ask a question/i), { target: { value: 'What is the meaning?' } });
-    fireEvent.click(screen.getByRole('button', { name: /Ask/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Send/i }));
 
     await waitFor(() => expect(screen.getByText('42')).toBeInTheDocument());
     expect(fetch).toHaveBeenCalledWith('/chat', expect.any(Object));
