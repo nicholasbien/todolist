@@ -428,8 +428,9 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
         setActiveCat("All");
       }
 
-      // Refresh categories
+      // Refresh categories and todos list
       await fetchCategories();
+      await fetchTodos();
       setError('');
     } catch (err) {
       setError('Error deleting category: ' + err.message);
