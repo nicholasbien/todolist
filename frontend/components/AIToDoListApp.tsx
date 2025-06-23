@@ -153,10 +153,14 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
   // Fetch categories from MongoDB
   const fetchCategories = useCallback(async () => {
     const fetchId = ++categoriesFetchIdRef.current;
+
+    // Don't fetch if no active space
+    if (!activeSpace?._id) {
+      return;
+    }
+
     try {
-      const spaceId = activeSpace?._id || null;
-      const url = spaceId ? `/categories?space_id=${spaceId}` : '/categories';
-      const response = await authenticatedFetch(url);
+      const response = await authenticatedFetch(`/categories?space_id=${activeSpace._id}`);
       if (!response?.ok) {
         throw new Error('Failed to fetch categories');
       }

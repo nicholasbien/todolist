@@ -22,7 +22,7 @@ load_dotenv()
 categories_collection = db.categories
 
 # Shared default categories
-DEFAULT_CATEGORIES = ["Work", "Personal", "Shopping", "Finance", "Health", "General"]
+DEFAULT_CATEGORIES = ["General"]
 
 
 async def init_category_indexes() -> None:

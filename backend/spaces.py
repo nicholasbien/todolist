@@ -52,11 +52,21 @@ class Space(BaseModel):
         allow_population_by_field_name = True
 
 
+async def get_default_space_id(user_id: str) -> str:
+    """Get the default space ID for a user."""
+    default_space = await spaces_collection.find_one({"owner_id": user_id, "is_default": True})
+    if not default_space:
+        raise HTTPException(status_code=404, detail="Default space not found for user")
+    return str(default_space["_id"])
+
+
 async def ensure_default_categories(user_id: str) -> None:
-    """Ensure the user has default categories (space_id = None)."""
-    # Initialize default categories for the default space if none exist
-    await init_default_categories(None)
-    logger.info("Ensured default categories for user %s", user_id)
+    """Ensure the user has default categories for their default space."""
+    # Get the user's default space ID
+    default_space_id = await get_default_space_id(user_id)
+    # Initialize default categories for the actual default space
+    await init_default_categories(default_space_id)
+    logger.info("Ensured default categories for user %s in default space %s", user_id, default_space_id)
 
 
 async def create_space(name: str, owner_id: str) -> Space:
