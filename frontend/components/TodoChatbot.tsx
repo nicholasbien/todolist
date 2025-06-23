@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
 interface ChatbotProps {
   token: string;
@@ -9,11 +9,29 @@ export default function TodoChatbot({ token }: ChatbotProps) {
   const [messages, setMessages] = useState<{ role: string; content: string }[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
 
   const handleAsk = async () => {
     if (!question.trim()) return;
+
+    // Add user message immediately
+    const userQuestion = question;
+    setMessages((prev) => [
+      ...prev,
+      { role: 'user', content: userQuestion },
+    ]);
+    setQuestion('');
     setLoading(true);
     setError('');
+
     try {
       const resp = await fetch('/chat', {
         method: 'POST',
@@ -21,19 +39,19 @@ export default function TodoChatbot({ token }: ChatbotProps) {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ question }),
+        body: JSON.stringify({ question: userQuestion }),
       });
       if (!resp.ok) {
         const data = await resp.json();
         throw new Error(data.detail || 'Failed to get response');
       }
       const data = await resp.json();
+
+      // Add assistant response
       setMessages((prev) => [
         ...prev,
-        { role: 'user', content: question },
         { role: 'assistant', content: data.answer },
       ]);
-      setQuestion('');
     } catch (err: any) {
       setError(err.message || 'Error');
     } finally {
@@ -41,32 +59,69 @@ export default function TodoChatbot({ token }: ChatbotProps) {
     }
   };
 
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleAsk();
+    }
+  };
+
   return (
-    <div className="mt-8 border-t border-gray-800 pt-4">
-      <h3 className="text-lg font-semibold mb-2 text-gray-100">Chatbot</h3>
-      <textarea
-        className="w-full bg-gray-900 border border-gray-700 text-gray-100 rounded-lg p-2 mb-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-        rows={3}
-        value={question}
-        onChange={(e) => setQuestion(e.target.value)}
-        placeholder="Ask a question about your todos"
-      />
-      <button
-        onClick={handleAsk}
-        disabled={loading}
-        className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-500 disabled:bg-blue-800"
-      >
-        {loading ? 'Thinking...' : 'Ask'}
-      </button>
-      {messages.map((msg, idx) => (
-        <p key={idx} className="mt-3 text-gray-300 whitespace-pre-wrap">
-          <strong>{msg.role === 'user' ? 'You: ' : 'Bot: '}</strong>
-          {msg.content}
-        </p>
-      ))}
+    <div className="flex flex-col">
+      <h3 className="text-lg font-semibold mb-4 text-gray-100">AI Assistant</h3>
+
+      {/* Messages container */}
+      <div className="mb-4 space-y-4">
+        {messages.map((msg, idx) => (
+          <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+            <div className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
+              msg.role === 'user'
+                ? 'bg-blue-600 text-white'
+                : 'bg-gray-800 text-gray-100 border border-gray-700'
+            }`}>
+              <div className="text-xs mb-1 opacity-75">
+                {msg.role === 'user' ? 'You' : 'Assistant'}
+              </div>
+              <div className="whitespace-pre-wrap text-sm">{msg.content}</div>
+            </div>
+          </div>
+        ))}
+        {loading && (
+          <div className="flex justify-start">
+            <div className="bg-gray-800 text-gray-100 border border-gray-700 max-w-xs lg:max-w-md px-4 py-2 rounded-lg">
+              <div className="text-xs mb-1 opacity-75">Assistant</div>
+              <div className="text-sm">Thinking...</div>
+            </div>
+          </div>
+        )}
+        <div ref={messagesEndRef} />
+      </div>
+
       {error && (
-        <p className="mt-3 text-red-400">{error}</p>
+        <div className="mb-2 p-2 bg-red-900/20 border border-red-800 rounded-lg">
+          <p className="text-red-300 text-sm">{error}</p>
+        </div>
       )}
+
+      {/* Input area */}
+      <div className="flex gap-2">
+        <textarea
+          className="flex-1 bg-gray-900 border border-gray-700 text-gray-100 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+          rows={2}
+          value={question}
+          onChange={(e) => setQuestion(e.target.value)}
+          onKeyPress={handleKeyPress}
+          placeholder="Ask a question about your todos... (Enter to send, Shift+Enter for new line)"
+          disabled={loading}
+        />
+        <button
+          onClick={handleAsk}
+          disabled={loading || !question.trim()}
+          className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-500 disabled:bg-blue-800 disabled:cursor-not-allowed transition-colors self-end"
+        >
+          Send
+        </button>
+      </div>
     </div>
   );
 }

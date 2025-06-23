@@ -67,6 +67,9 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
   const categoriesFetchIdRef = useRef(0);
   const membersFetchIdRef = useRef(0);
 
+  // Tab state
+  const [activeTab, setActiveTab] = useState<'tasks' | 'assistant' | 'insights'>('tasks');
+
   const handleOpenEmailSettings = async () => {
     try {
       const response = await authenticatedFetch('/auth/me');
@@ -793,6 +796,40 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
         </div>
       )}
 
+      {/* Tab Navigation */}
+      <div className="grid grid-cols-3 border-b border-gray-800 mb-6">
+        <button
+          onClick={() => setActiveTab('tasks')}
+          className={`py-3 font-medium text-sm transition-colors text-center ${
+            activeTab === 'tasks'
+              ? 'text-blue-400 border-b-2 border-blue-400'
+              : 'text-gray-400 hover:text-gray-300'
+          }`}
+        >
+          Tasks
+        </button>
+        <button
+          onClick={() => setActiveTab('assistant')}
+          className={`py-3 font-medium text-sm transition-colors text-center ${
+            activeTab === 'assistant'
+              ? 'text-blue-400 border-b-2 border-blue-400'
+              : 'text-gray-400 hover:text-gray-300'
+          }`}
+        >
+          Assistant
+        </button>
+        <button
+          onClick={() => setActiveTab('insights')}
+          className={`py-3 font-medium text-sm transition-colors text-center ${
+            activeTab === 'insights'
+              ? 'text-blue-400 border-b-2 border-blue-400'
+              : 'text-gray-400 hover:text-gray-300'
+          }`}
+        >
+          Insights
+        </button>
+      </div>
+
 
       {showUpdatePrompt && (
         <div className="bg-blue-900/20 border border-blue-800 text-blue-300 px-4 py-3 rounded-xl mb-4 flex justify-between items-center">
@@ -814,7 +851,10 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
         </div>
       )}
 
-      {/* Spaces */}
+      {/* Tab Content */}
+      {activeTab === 'tasks' && (
+        <div>
+          {/* Spaces */}
       <div className="mb-6">
         <div className="flex items-center mb-3">
           <h2 className="text-lg font-semibold text-gray-100">
@@ -1251,8 +1291,22 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
           </div>
         </div>
       )}
+        </div>
+      )}
 
-      <TodoChatbot token={token} />
+      {activeTab === 'assistant' && (
+        <div>
+          <TodoChatbot token={token} />
+        </div>
+      )}
+
+      {activeTab === 'insights' && (
+        <div className="text-center py-12">
+          <div className="text-gray-400 mb-4 text-4xl">📊</div>
+          <h3 className="text-lg font-semibold text-gray-100 mb-2">Insights Coming Soon</h3>
+          <p className="text-gray-400">We're working on analytics and insights for your tasks.</p>
+        </div>
+      )}
 
       {/* Email Settings Modal */}
       {showEmailSettings && (
