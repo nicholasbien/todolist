@@ -86,6 +86,7 @@ Instructions:
 8. Keep it concise but personal (2-3 paragraphs max)
 9. End with a motivational note for the day ahead
 10. If referring to tasks in a specific space, only mention todos from that space
+11. Close with a brief Buddhist koan to encourage reflection
 {custom_instructions}
 
 Format as plain text email content (no HTML, no subject line).
