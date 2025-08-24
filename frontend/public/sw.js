@@ -288,9 +288,12 @@ async function syncServerDataToLocal() {
 }
 
 self.addEventListener('install', (event) => {
+  const isDevelopment = self.location.hostname === 'localhost' || self.location.hostname === '127.0.0.1';
+
   event.waitUntil(
     Promise.all([
-      caches.open(STATIC_CACHE).then(cache => cache.addAll(STATIC_FILES)),
+      // Only pre-cache static files in production
+      isDevelopment ? Promise.resolve() : caches.open(STATIC_CACHE).then(cache => cache.addAll(STATIC_FILES)),
       caches.open(API_CACHE),
       openGlobalDB()
     ])
@@ -465,20 +468,26 @@ async function handleApiRequest(request) {
 
 async function handleStaticRequest(request) {
   const url = new URL(request.url);
+  const isDevelopment = url.hostname === 'localhost' || url.hostname === '127.0.0.1';
 
   try {
     // Try network first for static files
     const response = await fetch(request);
 
-    // Cache successful responses (only for GET requests)
-    if (response.ok && request.method === 'GET') {
+    // Only cache in production to avoid development reload issues
+    if (response.ok && request.method === 'GET' && !isDevelopment) {
       const cache = await caches.open(STATIC_CACHE);
       cache.put(request, response.clone());
     }
 
     return response;
   } catch (error) {
-    // Network failed, try cache
+    // In development, don't use cache fallbacks - let it fail naturally
+    if (isDevelopment) {
+      return new Response('Development server unavailable', { status: 503 });
+    }
+
+    // Production: Network failed, try cache
     const cache = await caches.open(STATIC_CACHE);
     const cachedResponse = await cache.match(request);
 

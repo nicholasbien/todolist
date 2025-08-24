@@ -124,21 +124,21 @@ export default function InsightsComponent({ token, activeSpace, authenticatedFet
     <div className="space-y-8">
       {/* Overview Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
+        <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 min-h-[80px] flex flex-col justify-between">
           <div className="text-2xl font-bold text-accent">{insights.overview.total_tasks}</div>
-          <div className="text-sm text-gray-400">Total Tasks</div>
+          <div className="text-xs text-gray-400 leading-tight">Total Tasks</div>
         </div>
-        <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
+        <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 min-h-[80px] flex flex-col justify-between">
           <div className="text-2xl font-bold text-green-400">{insights.overview.completed_tasks}</div>
-          <div className="text-sm text-gray-400">Completed</div>
+          <div className="text-xs text-gray-400 leading-tight">Completed</div>
         </div>
-        <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
+        <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 min-h-[80px] flex flex-col justify-between">
           <div className="text-2xl font-bold text-yellow-400">{insights.overview.pending_tasks}</div>
-          <div className="text-sm text-gray-400">Pending</div>
+          <div className="text-xs text-gray-400 leading-tight">Pending</div>
         </div>
-        <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
-          <div className="text-2xl font-bold text-purple-400">{insights.overview.completion_rate}%</div>
-          <div className="text-sm text-gray-400">Completion Rate</div>
+        <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 min-h-[80px] flex flex-col justify-between">
+          <div className="text-2xl font-bold text-purple-400">{Math.round(insights.overview.completion_rate)}%</div>
+          <div className="text-xs text-gray-400 leading-tight">Completion Rate</div>
         </div>
       </div>
 
