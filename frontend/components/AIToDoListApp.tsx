@@ -92,6 +92,15 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
     }
   };
 
+  // When the parent triggers the modal to open, load the latest email settings
+  useEffect(() => {
+    if (showEmailSettings) {
+      handleOpenEmailSettings();
+    }
+    // `handleOpenEmailSettings` does not need to be in deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showEmailSettings]);
+
   // Helper function for authenticated requests
   const authenticatedFetch = useCallback(async (url: string, options: RequestInit = {}) => {
     if (!token) return;
