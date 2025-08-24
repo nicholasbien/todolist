@@ -192,12 +192,12 @@ Instructions:
 11. Close with a brief Buddhist koan to encourage reflection
 {custom_instructions}
 
-12. At the very end, add this EXACT haiku from a classical Japanese master
-    (do NOT create your own haiku, use only this one):
+12. At the very end, add this EXACT haiku from a classical Japanese master.
+    CRITICAL: Use ONLY this haiku - do NOT write any other haiku or poetry:
 
 {haiku}
 
-13. Finally, choose ONE emoji that best matches the themes, mood, or imagery in the haiku and email content
+13. After the haiku above, add exactly ONE emoji that best matches the themes, mood, or imagery
     from this list:
    - Nature: 🌸🍃🌺🍂🌱🌼🌻🌷🌹🌿🌳🌲🌴🌾🌵
    - Sky/Weather: 🌙⭐🌅🌊🌄🌈☀️🌤️⛅🌥️❄️💧🌟✨
@@ -228,7 +228,10 @@ async def generate_todo_summary(
             messages=[
                 {
                     "role": "system",
-                    "content": "You are a helpful personal assistant creating daily todo summaries.",
+                    "content": (
+                        "You are a helpful personal assistant creating daily todo summaries. "
+                        "Use ONLY the exact haiku provided in the prompt - never create additional poetry or haiku."
+                    ),
                 },
                 {"role": "user", "content": prompt},
             ],

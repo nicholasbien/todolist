@@ -830,16 +830,6 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
           Assistant
         </button>
         <button
-          onClick={() => setActiveTab('insights')}
-          className={`py-3 font-medium text-sm transition-colors text-center ${
-            activeTab === 'insights'
-              ? 'text-accent border-b-2 border-accent'
-              : 'text-gray-400 hover:text-gray-300'
-          }`}
-        >
-          Insights
-        </button>
-        <button
           onClick={() => setActiveTab('journal')}
           className={`py-3 font-medium text-sm transition-colors text-center ${
             activeTab === 'journal'
@@ -848,6 +838,16 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
           }`}
         >
           Journal
+        </button>
+        <button
+          onClick={() => setActiveTab('insights')}
+          className={`py-3 font-medium text-sm transition-colors text-center ${
+            activeTab === 'insights'
+              ? 'text-accent border-b-2 border-accent'
+              : 'text-gray-400 hover:text-gray-300'
+          }`}
+        >
+          Insights
         </button>
       </div>
 

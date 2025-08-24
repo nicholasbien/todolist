@@ -153,7 +153,7 @@ app = FastAPI(title="AI Todo List API", lifespan=lifespan)
 
 # In-memory conversation history
 conversations: Dict[str, List[dict]] = defaultdict(list)
-MAX_HISTORY = 20
+MAX_HISTORY = 10
 
 
 # Enable CORS - specifically for the Next.js frontend

@@ -4,6 +4,9 @@ interface ChatbotProps {
   token: string;
 }
 
+// Maximum number of messages to retain (matches backend MAX_HISTORY)
+const MAX_MESSAGES = 10;
+
 export default function TodoChatbot({ token }: ChatbotProps) {
   const [question, setQuestion] = useState('');
   const [messages, setMessages] = useState<{ role: string; content: string }[]>(() => {
@@ -41,12 +44,12 @@ export default function TodoChatbot({ token }: ChatbotProps) {
   const handleAsk = async () => {
     if (!question.trim()) return;
 
-    // Add user message immediately
+    // Add user message immediately and limit to last 20 messages (matching backend context)
     const userQuestion = question;
-    setMessages((prev) => [
-      ...prev,
-      { role: 'user', content: userQuestion },
-    ]);
+    setMessages((prev) => {
+      const updated = [...prev, { role: 'user', content: userQuestion }];
+      return updated.length > MAX_MESSAGES ? updated.slice(-MAX_MESSAGES) : updated;
+    });
     setQuestion('');
     setLoading(true);
     setError('');
@@ -66,11 +69,11 @@ export default function TodoChatbot({ token }: ChatbotProps) {
       }
       const data = await resp.json();
 
-      // Add assistant response
-      setMessages((prev) => [
-        ...prev,
-        { role: 'assistant', content: data.answer },
-      ]);
+      // Add assistant response and limit to last 20 messages (matching backend context)
+      setMessages((prev) => {
+        const updated = [...prev, { role: 'assistant', content: data.answer }];
+        return updated.length > MAX_MESSAGES ? updated.slice(-MAX_MESSAGES) : updated;
+      });
     } catch (err: any) {
       setError(err.message || 'Error');
     } finally {
