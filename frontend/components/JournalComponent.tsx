@@ -245,10 +245,6 @@ export default function JournalComponent({ token, activeSpace, authenticatedFetc
           />
         </div>
 
-        <div className="text-sm text-gray-400">
-          {formatDateForDisplay(selectedDate)}
-        </div>
-
         <div className="flex-1"></div>
 
         <div className="text-sm text-gray-400">
