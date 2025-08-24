@@ -51,7 +51,7 @@ This is an AI-powered collaborative todo list application with a React/Next.js f
 ### Backend Architecture
 - **Framework**: FastAPI with async support
 - **Database**: MongoDB with Motor (async driver)
-- **AI Integration**: OpenAI GPT-4.1-nano for task classification and GPT-4.1-mini for the chatbot
+- **AI Integration**: OpenAI GPT-5-nano for task classification and GPT-5-mini for the chatbot
 - **Authentication**: JWT-based session management with email verification
 - **Key Modules**:
   - `app.py`: Main FastAPI application with CORS setup

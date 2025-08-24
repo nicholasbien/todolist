@@ -81,7 +81,7 @@ async def classify_task(text: str, categories: List[str], date_added: str) -> Di
 
         # Make synchronous call since OpenAI client handles async internally
         completion = client.chat.completions.create(
-            model="gpt-4.1-nano",
+            model="gpt-5-nano",
             messages=[
                 {
                     "role": "system",
