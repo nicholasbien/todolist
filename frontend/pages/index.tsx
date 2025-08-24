@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
+import { useRouter } from 'next/router';
 import { useOffline } from '../context/OfflineContext';
 import dynamic from 'next/dynamic';
 import Head from 'next/head';
@@ -17,6 +18,7 @@ interface LoginFormProps {
 }
 
 function LoginForm({ onLogin }: LoginFormProps) {
+  const router = useRouter();
   const [email, setEmail] = useState('');
   const [code, setCode] = useState('');
   const [firstName, setFirstName] = useState('');
@@ -25,6 +27,12 @@ function LoginForm({ onLogin }: LoginFormProps) {
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [needsName, setNeedsName] = useState(false);
+
+  useEffect(() => {
+    if (router.isReady && typeof router.query.email === 'string') {
+      setEmail(router.query.email);
+    }
+  }, [router.isReady, router.query.email]);
 
 
   const handleEmailSubmit = async (e) => {

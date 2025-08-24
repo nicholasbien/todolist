@@ -1,6 +1,7 @@
 import logging
 import os
 from typing import List, Optional
+from urllib.parse import quote
 
 import auth
 from bson import ObjectId
@@ -163,7 +164,8 @@ async def invite_members(space_id: str, inviter_email: str, emails: List[str]) -
             subject = "You've been invited to a todo space"
             body = f"{inviter_display} has invited you to collaborate on the space '{space['name']}'.\n"
             if WEBSITE_URL:
-                body += f"Sign up at {WEBSITE_URL} to access the shared todos."
+                signup_link = f"{WEBSITE_URL}?email={quote(email)}"
+                body += f"Sign up at {signup_link} to access the shared todos."
             else:
                 body += "Sign up to access the shared todos."
             await send_email(email, subject, body)
