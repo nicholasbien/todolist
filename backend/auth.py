@@ -50,7 +50,8 @@ JWT_SECRET = os.getenv("JWT_SECRET")
 if not JWT_SECRET:
     raise ValueError("JWT_SECRET environment variable is required")
 JWT_ALGORITHM = "HS256"
-JWT_EXPIRATION_HOURS = 24 * 7  # 7 days
+# Extend sessions for 30 days from last activity
+JWT_EXPIRATION_HOURS = 24 * 30  # 30 days
 
 # Email settings
 SMTP_SERVER = os.getenv("SMTP_SERVER", "smtp.gmail.com")
@@ -317,6 +318,13 @@ async def verify_session(token: str) -> dict:
         user = await users_collection.find_one({"_id": ObjectId(session["user_id"])})
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
+
+        # Extend expiration to one month from last activity
+        new_expiration = datetime.now() + timedelta(hours=JWT_EXPIRATION_HOURS)
+        await sessions_collection.update_one({"_id": session["_id"]}, {"$set": {"expires_at": new_expiration}})
+
+        # Record last active time
+        await users_collection.update_one({"_id": user["_id"]}, {"$set": {"last_login": datetime.now()}})
 
         return {
             "user_id": str(user["_id"]),

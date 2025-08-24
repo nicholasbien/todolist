@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import TodoItem from "./TodoItem";
 import TodoChatbot from "./TodoChatbot";
+import InsightsComponent from "./InsightsComponent";
 
 interface Props {
   user: any;
@@ -802,7 +803,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
           onClick={() => setActiveTab('tasks')}
           className={`py-3 font-medium text-sm transition-colors text-center ${
             activeTab === 'tasks'
-              ? 'text-blue-400 border-b-2 border-blue-400'
+              ? 'text-accent border-b-2 border-accent'
               : 'text-gray-400 hover:text-gray-300'
           }`}
         >
@@ -812,7 +813,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
           onClick={() => setActiveTab('assistant')}
           className={`py-3 font-medium text-sm transition-colors text-center ${
             activeTab === 'assistant'
-              ? 'text-blue-400 border-b-2 border-blue-400'
+              ? 'text-accent border-b-2 border-accent'
               : 'text-gray-400 hover:text-gray-300'
           }`}
         >
@@ -822,7 +823,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
           onClick={() => setActiveTab('insights')}
           className={`py-3 font-medium text-sm transition-colors text-center ${
             activeTab === 'insights'
-              ? 'text-blue-400 border-b-2 border-blue-400'
+              ? 'text-accent border-b-2 border-accent'
               : 'text-gray-400 hover:text-gray-300'
           }`}
         >
@@ -832,12 +833,12 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
 
 
       {showUpdatePrompt && (
-        <div className="bg-blue-900/20 border border-blue-800 text-blue-300 px-4 py-3 rounded-xl mb-4 flex justify-between items-center">
+        <div className="bg-accent/20 border border-accent-dark text-accent-light px-4 py-3 rounded-xl mb-4 flex justify-between items-center">
           <span>🔄 A new version is available!</span>
           <div className="space-x-2">
             <button
               onClick={handleUpdate}
-              className="bg-blue-600 text-white px-3 py-1 rounded-lg text-sm hover:bg-blue-500 transition-colors"
+              className="bg-accent text-foreground px-3 py-1 rounded-lg text-sm hover:bg-accent-light transition-colors"
             >
               Update Now
             </button>
@@ -888,7 +889,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
               onClick={() => setActiveSpace(space)}
               className={`px-4 py-2 rounded-xl text-base transition-colors flex-shrink-0 ${
                 activeSpace && space._id === activeSpace._id
-                  ? 'bg-blue-600 text-white shadow-lg'
+                  ? 'bg-accent text-foreground shadow-lg'
                   : 'bg-gray-900 text-gray-300 hover:bg-gray-800 border border-gray-800'
               }`}
             >
@@ -948,7 +949,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
             onClick={() => setActiveCat('All')}
             className={`px-4 py-2 rounded-xl text-base transition-colors flex-shrink-0 ${
               activeCat === 'All'
-                ? 'bg-blue-600 text-white shadow-lg'
+                ? 'bg-accent text-foreground shadow-lg'
                 : 'bg-gray-900 text-gray-300 hover:bg-gray-800 border border-gray-800'
             }`}
           >
@@ -970,7 +971,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
               onClick={() => setActiveCat(catName)}
               className={`px-4 py-2 rounded-xl text-base transition-colors flex-shrink-0 ${
                 catName === activeCat
-                  ? 'bg-blue-600 text-white shadow-lg'
+                  ? 'bg-accent text-foreground shadow-lg'
                   : 'bg-gray-900 text-gray-300 hover:bg-gray-800 border border-gray-800'
               }`}
             >
@@ -997,13 +998,13 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
             value={newTodo}
             onChange={(e) => setNewTodo(e.target.value)}
             placeholder="Add a new task..."
-            className="flex-1 p-3 border border-gray-800 rounded-xl bg-black text-gray-100 placeholder-gray-500 focus:border-blue-500 focus:outline-none transition-colors"
+            className="flex-1 p-3 border border-gray-800 rounded-xl bg-black text-gray-100 placeholder-gray-500 focus:border-accent focus:outline-none transition-colors"
             onKeyPress={(e) => e.key === 'Enter' && handleAddTodo()}
           />
           <button
             onClick={handleAddTodo}
             disabled={loading}
-            className="bg-blue-600 text-white w-12 h-12 rounded-xl hover:bg-blue-500 disabled:bg-blue-800 disabled:text-gray-400 flex items-center justify-center transition-colors shadow-lg"
+              className="bg-accent text-foreground w-12 h-12 rounded-xl hover:bg-accent-light disabled:bg-accent-dark disabled:text-gray-400 flex items-center justify-center transition-colors shadow-lg"
           >
             {loading ? '...' : '+'}
           </button>
@@ -1020,11 +1021,11 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
               value={newSpaceName}
               onChange={e => setNewSpaceName(e.target.value)}
               onKeyPress={e => e.key === 'Enter' && handleAddSpace()}
-              className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 placeholder-gray-500 text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 placeholder-gray-500 text-base focus:outline-none focus:ring-2 focus:ring-accent"
               autoFocus
             />
             <div className="flex justify-center space-x-3">
-              <button onClick={handleAddSpace} className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-2 rounded-lg transition-colors">Add</button>
+              <button onClick={handleAddSpace} className="bg-accent hover:bg-accent-light text-foreground px-6 py-2 rounded-lg transition-colors">Add</button>
               <button onClick={() => { setShowAddSpaceModal(false); setNewSpaceName(''); }} className="bg-gray-800 hover:bg-gray-700 text-gray-300 px-6 py-2 rounded-lg transition-colors">Cancel</button>
             </div>
           </div>
@@ -1041,7 +1042,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
                   type="text"
                   value={editSpaceName}
                   onChange={e => setEditSpaceName(e.target.value)}
-                  className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 text-base focus:outline-none focus:ring-2 focus:ring-accent"
                 />
                 <label className="flex items-center space-x-2 text-gray-300">
                   <input
@@ -1064,7 +1065,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
                           updated[idx] = e.target.value;
                           setInviteEmails(updated);
                         }}
-                        className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 placeholder-gray-500 text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 placeholder-gray-500 text-base focus:outline-none focus:ring-2 focus:ring-accent"
                       />
                     ))}
                     <button
@@ -1077,7 +1078,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
                   </div>
                 )}
                 <div className="flex justify-center space-x-3">
-                  <button onClick={handleUpdateSpace} className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-2 rounded-lg transition-colors">Save</button>
+                  <button onClick={handleUpdateSpace} className="bg-accent hover:bg-accent-light text-foreground px-6 py-2 rounded-lg transition-colors">Save</button>
                   {spaceToEdit && (
                     <button onClick={() => { handleDeleteSpace(spaceToEdit._id); setShowEditSpaceModal(false); }} className="bg-red-600 hover:bg-red-500 text-white px-6 py-2 rounded-lg transition-colors">Delete</button>
                   )}
@@ -1110,13 +1111,13 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
               value={newCat}
               onChange={e => setNewCat(e.target.value)}
               onKeyPress={e => e.key === 'Enter' && handleAddCategory()}
-              className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 placeholder-gray-500 text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 placeholder-gray-500 text-base focus:outline-none focus:ring-2 focus:ring-accent"
               autoFocus
             />
             <div className="flex justify-center space-x-3">
               <button
                 onClick={handleAddCategory}
-                className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-2 rounded-lg transition-colors"
+                className="bg-accent hover:bg-accent-light text-foreground px-6 py-2 rounded-lg transition-colors"
               >
                 Add
               </button>
@@ -1142,12 +1143,12 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
               type="text"
               value={editCatName}
               onChange={(e) => setEditCatName(e.target.value)}
-              className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 text-base focus:outline-none focus:ring-2 focus:ring-accent"
             />
             <div className="flex justify-center space-x-3">
               <button
                 onClick={handleRenameCategory}
-                className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+                className="bg-accent text-foreground px-6 py-2 rounded-lg hover:bg-accent-dark transition-colors"
               >
                 Rename
               </button>
@@ -1234,13 +1235,13 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
               type="text"
               value={editText}
               onChange={(e) => setEditText(e.target.value)}
-              className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 text-base focus:outline-none focus:ring-2 focus:ring-accent"
             />
             <textarea
               value={editNotes}
               onChange={(e) => setEditNotes(e.target.value)}
               placeholder="Notes"
-              className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 text-base h-24 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 text-base h-24 resize-none focus:outline-none focus:ring-2 focus:ring-accent"
             />
             <select
               value={editCategoryVal}
@@ -1268,7 +1269,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
                 value={editDueDate}
                 onChange={(e) => setEditDueDate(e.target.value)}
                 placeholder="Select due date"
-                className="w-full p-3 pr-8 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 text-base focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                className="w-full p-3 pr-8 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 text-base focus:outline-none focus:ring-2 focus:ring-accent cursor-pointer"
                 style={{
                   colorScheme: 'dark',
                   position: 'relative'
@@ -1285,7 +1286,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
               )}
             </div>
             <div className="flex justify-center space-x-3">
-              <button onClick={handleSaveTodoEdit} className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-2 rounded-lg transition-colors">Save</button>
+              <button onClick={handleSaveTodoEdit} className="bg-accent hover:bg-accent-light text-foreground px-6 py-2 rounded-lg transition-colors">Save</button>
               <button onClick={() => setShowEditTodoModal(false)} className="bg-gray-800 hover:bg-gray-700 text-gray-300 px-6 py-2 rounded-lg transition-colors">Cancel</button>
             </div>
           </div>
@@ -1301,11 +1302,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
       )}
 
       {activeTab === 'insights' && (
-        <div className="text-center py-12">
-          <div className="text-gray-400 mb-4 text-4xl">📊</div>
-          <h3 className="text-lg font-semibold text-gray-100 mb-2">Insights Coming Soon</h3>
-          <p className="text-gray-400">We&apos;re working on analytics and insights for your tasks.</p>
-        </div>
+        <InsightsComponent token={token} activeSpace={activeSpace} authenticatedFetch={authenticatedFetch} />
       )}
 
       {/* Email Settings Modal */}
@@ -1320,7 +1317,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
                   id="emailEnabled"
                   checked={emailEnabled}
                   onChange={(e) => setEmailEnabled(e.target.checked)}
-                  className="w-4 h-4 text-blue-600 bg-gray-900 border-gray-700 rounded focus:ring-blue-500 focus:ring-2"
+                  className="w-4 h-4 text-accent bg-gray-900 border-gray-700 rounded focus:ring-accent focus:ring-2"
                 />
                 <label htmlFor="emailEnabled" className="text-sm text-gray-300">
                   Enable daily email summaries
@@ -1333,7 +1330,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
                   type="time"
                   value={emailTime}
                   onChange={(e) => setEmailTime(e.target.value)}
-                  className="w-full bg-gray-900 border border-gray-700 text-gray-100 p-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full bg-gray-900 border border-gray-700 text-gray-100 p-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent"
                   disabled={!emailEnabled}
                 />
               </div>
@@ -1343,7 +1340,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
                 <textarea
                   value={emailInstructions}
                   onChange={(e) => setEmailInstructions(e.target.value)}
-                  className="w-full bg-gray-900 border border-gray-700 text-gray-100 placeholder-gray-500 p-2 rounded-lg h-24 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full bg-gray-900 border border-gray-700 text-gray-100 placeholder-gray-500 p-2 rounded-lg h-24 resize-none focus:outline-none focus:ring-2 focus:ring-accent"
                   placeholder="Write like a Buddhist monk. Include a haiku at the end."
                 />
               </div>
@@ -1366,7 +1363,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
                             setEmailSpaceIds(emailSpaceIds.filter((sid) => sid !== id));
                           }
                         }}
-                        className="w-4 h-4 text-blue-600 bg-gray-900 border-gray-700 rounded focus:ring-blue-500 focus:ring-2"
+                        className="w-4 h-4 text-accent bg-gray-900 border-gray-700 rounded focus:ring-accent focus:ring-2"
                       />
                       <label htmlFor={`space-${space._id || 'default'}`} className="text-sm text-gray-300">
                         {space.name}
@@ -1380,7 +1377,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
                 <button
                   onClick={handleUpdateSchedule}
                   disabled={savingSchedule}
-                  className="bg-blue-600 hover:bg-blue-500 disabled:bg-blue-800 disabled:text-gray-400 text-white px-6 py-2 rounded-lg transition-colors"
+                  className="bg-accent hover:bg-accent-light disabled:bg-accent-dark disabled:text-gray-400 text-foreground px-6 py-2 rounded-lg transition-colors"
                 >
                   {savingSchedule ? 'Saving...' : 'Save'}
                 </button>

@@ -5,6 +5,7 @@ Daily todo summary email functionality
 import json
 import logging
 import os
+import random
 import smtplib
 from datetime import datetime, timedelta
 from email.mime.multipart import MIMEMultipart
@@ -32,8 +33,65 @@ openai.api_key = os.getenv("OPENAI_API_KEY")
 logger = logging.getLogger(__name__)
 
 
+def load_haiku_collection() -> List[str]:
+    """Load the haiku collection from JSON file."""
+    try:
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        # Try large collection first, fall back to small one
+        large_haiku_file = os.path.join(current_dir, "haiku_collection_large.json")
+        small_haiku_file = os.path.join(current_dir, "haiku_collection.json")
+
+        haiku_file = large_haiku_file if os.path.exists(large_haiku_file) else small_haiku_file
+
+        with open(haiku_file, "r", encoding="utf-8") as f:
+            haikus = json.load(f)
+
+        logger.info(f"Loaded {len(haikus)} haikus from {os.path.basename(haiku_file)}")
+        return haikus
+    except Exception as e:
+        logger.error(f"Error loading haiku collection: {e}")
+        # Fallback classic haiku if file can't be loaded (from the collection we know works)
+        return [
+            "An old silent pond...\nA frog jumps into the pond,\nsplash! Silence again.",
+            "In the cicada's cry\nNo sign can foretell\nHow soon it must die.",
+            "No one travels\nAlong this way but I,\nThis autumn evening.",
+            "From time to time\nThe clouds give rest\nTo the moon-beholders.",
+            "Autumn moonlight-\na worm digs silently\ninto the chestnut.",
+            "Lightning flash-\nwhat I thought were faces\nare plumes of pampas grass.",
+            "First winter rain-\neven the monkey\nseems to want a raincoat.",
+            "The summer grasses\nAll that remains\nOf brave soldiers dreams",
+            "My life, -\nHow much more of it remains?\nThe night is brief.",
+            "Consider me\nAs one who loved poetry\nAnd persimmons.",
+            "Over the wintry\nforest, winds howl in rage\nwith no leaves to blow.",
+            "The lamp once out\nCool stars enter\nThe window frame.",
+            "The crow has flown away:\nswaying in the evening sun,\na leafless tree.",
+            "O snail\nClimb Mount Fuji,\nBut slowly, slowly!",
+            "What a strange thing!\nto be alive\nbeneath cherry blossoms.",
+        ]
+
+
+def get_random_haiku() -> str:
+    """Get a random haiku from the collection that doesn't contain 'tasks'."""
+    haikus = load_haiku_collection()
+    return random.choice(haikus)
+
+
+def get_default_buddhist_instructions() -> str:
+    """Return default Buddhist monk instructions for users who haven't set custom instructions."""
+    return """
+
+Write like a Buddhist monk. Include a life lesson and famous Buddhist quote or koan.
+
+At the end, highlight the top 5 items that need my attention as a numbered list.
+"""
+
+
 def create_summary_prompt(
-    spaces_json: str, user_name: str = "there", custom_instructions: str = "", user_timezone: str = "America/New_York"
+    spaces_json: str,
+    user_name: str = "there",
+    custom_instructions: str = "",
+    user_timezone: str = "America/New_York",
+    haiku: str = "",
 ) -> str:
     """Create a prompt for generating a daily todo summary with space context."""
     # Localize date to user's timezone
@@ -86,7 +144,19 @@ Instructions:
 8. Keep it concise but personal (2-3 paragraphs max)
 9. End with a motivational note for the day ahead
 10. If referring to tasks in a specific space, only mention todos from that space
+11. Close with a brief Buddhist koan to encourage reflection
 {custom_instructions}
+
+12. At the very end, add this exact haiku from a classical Japanese master:
+{haiku}
+
+13. Finally, choose ONE emoji that best matches the themes, mood, or imagery in the haiku and email content
+    from this list:
+   - Nature: 🌸🍃🌺🍂🌱🌼🌻🌷🌹🌿🌳🌲🌴🌾🌵
+   - Sky/Weather: 🌙⭐🌅🌊🌄🌈☀️🌤️⛅🌥️❄️💧🌟✨
+   - Zen/Spiritual: 🧘🕯️🪷🎍🎐🪶🪨🏔️🎋🍀
+
+Add the chosen emoji on a separate line after the haiku.
 
 Format as plain text email content (no HTML, no subject line).
 """
@@ -100,7 +170,9 @@ async def generate_todo_summary(
         # Convert spaces and their todos to JSON for the prompt
         spaces_json = json.dumps(spaces_data, indent=2, default=str)
 
-        prompt = create_summary_prompt(spaces_json, user_name, custom_instructions, user_timezone)
+        # Get a haiku to include in the prompt so AI can choose matching emoji
+        haiku = get_random_haiku()
+        prompt = create_summary_prompt(spaces_json, user_name, custom_instructions, user_timezone, haiku)
 
         # Use OpenAI to generate the summary
         client = openai.AsyncOpenAI(api_key=openai.api_key)
@@ -113,11 +185,13 @@ async def generate_todo_summary(
                 },
                 {"role": "user", "content": prompt},
             ],
-            max_tokens=500,
+            max_tokens=600,  # Increased slightly for haiku + emoji
             temperature=0.7,
         )
 
-        return response.choices[0].message.content.strip()
+        summary = response.choices[0].message.content.strip()
+
+        return summary
 
     except Exception as e:
         logger.error(f"Error generating summary with OpenAI: {e}")
@@ -249,6 +323,11 @@ async def send_daily_summary(
 
         if custom_instructions is None:
             custom_instructions = user.get("email_instructions", "") if user else ""
+
+            # If user has no custom instructions, use Buddhist monk defaults
+            if not custom_instructions.strip():
+                custom_instructions = get_default_buddhist_instructions()
+
             user_timezone = user.get("timezone", "America/New_York") if user else "America/New_York"
         else:
             user_timezone = user.get("timezone", "America/New_York") if user else "America/New_York"

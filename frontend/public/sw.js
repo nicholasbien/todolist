@@ -17,7 +17,8 @@ const STATIC_FILES = [
   '/',
   '/manifest.json',
   '/icon-192x192.png',
-  '/icon-512x512.png'
+  '/icon-512x512.png',
+  '/favicon.ico'
 ];
 
 // Open global database for auth data
@@ -319,7 +320,7 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
-  // Only handle API requests, let all other requests go through normally
+  // Only handle API requests
   const isApi =
     url.origin === self.location.origin &&
     (url.pathname.startsWith('/todos') ||
@@ -328,6 +329,7 @@ self.addEventListener('fetch', (event) => {
       url.pathname.startsWith('/email') ||
       url.pathname.startsWith('/contact') ||
       url.pathname.startsWith('/chat') ||
+      url.pathname.startsWith('/insights') ||
       url.pathname.startsWith('/auth/'));
 
   if (isApi) {
@@ -335,25 +337,9 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Cache static assets (HTML/JS/CSS) so app loads offline
-  if (event.request.method === 'GET') {
-    event.respondWith(
-      caches.match(event.request).then((cached) => {
-        if (cached) return cached;
-        return fetch(event.request)
-          .then((response) => {
-            const clone = response.clone();
-            caches.open(STATIC_CACHE).then((cache) => cache.put(event.request, clone));
-            return response;
-          })
-          .catch(() => {
-            if (event.request.mode === 'navigate') {
-              return caches.match('/');
-            }
-          });
-      })
-    );
-    return;
+  // Cache static assets so the app can load offline
+  if (url.origin === self.location.origin) {
+    event.respondWith(handleStaticRequest(event.request));
   }
 });
 

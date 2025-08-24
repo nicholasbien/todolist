@@ -6,7 +6,17 @@ interface ChatbotProps {
 
 export default function TodoChatbot({ token }: ChatbotProps) {
   const [question, setQuestion] = useState('');
-  const [messages, setMessages] = useState<{ role: string; content: string }[]>([]);
+  const [messages, setMessages] = useState<{ role: string; content: string }[]>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const stored = sessionStorage.getItem('todo_chat_messages');
+        return stored ? JSON.parse(stored) : [];
+      } catch {
+        return [];
+      }
+    }
+    return [];
+  });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -19,6 +29,13 @@ export default function TodoChatbot({ token }: ChatbotProps) {
 
   useEffect(() => {
     scrollToBottom();
+    if (typeof window !== 'undefined') {
+      try {
+        sessionStorage.setItem('todo_chat_messages', JSON.stringify(messages));
+      } catch {
+        // Ignore write errors
+      }
+    }
   }, [messages]);
 
   const handleAsk = async () => {
@@ -78,7 +95,7 @@ export default function TodoChatbot({ token }: ChatbotProps) {
           <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
             <div className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
               msg.role === 'user'
-                ? 'bg-blue-600 text-white'
+                ? 'bg-accent text-foreground'
                 : 'bg-gray-800 text-gray-100 border border-gray-700'
             }`}>
               <div className="text-xs mb-1 opacity-75">
@@ -108,18 +125,18 @@ export default function TodoChatbot({ token }: ChatbotProps) {
       {/* Input area */}
       <div className="flex gap-2">
         <textarea
-          className="flex-1 bg-gray-900 border border-gray-700 text-gray-100 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+          className="flex-1 bg-gray-900 border border-gray-700 text-gray-100 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-accent resize-none"
           rows={2}
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
           onKeyPress={handleKeyPress}
-          placeholder="Ask a question about your todos... (Enter to send, Shift+Enter for new line)"
+          placeholder="Ask a question about your todos...\n(Enter to send, Shift+Enter for new line)"
           disabled={loading}
         />
         <button
           onClick={handleAsk}
           disabled={loading || !question.trim()}
-          className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-500 disabled:bg-blue-800 disabled:cursor-not-allowed transition-colors self-end"
+          className="bg-accent text-foreground px-6 py-2 rounded-lg hover:bg-accent-light disabled:bg-accent-dark disabled:cursor-not-allowed transition-colors self-end"
         >
           Send
         </button>
