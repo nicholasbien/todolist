@@ -102,7 +102,11 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
       ...options.headers
     };
 
-    const response = await fetch(url, {
+    // Use environment variable for API base URL
+    const baseURL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+    const fullURL = url.startsWith('http') ? url : `${baseURL}${url}`;
+
+    const response = await fetch(fullURL, {
       ...options,
       headers
     });

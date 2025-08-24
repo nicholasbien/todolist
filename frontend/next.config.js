@@ -21,18 +21,7 @@ const nextConfig = {
       },
     ];
   },
-  async rewrites() {
-    return [
-      { source: '/auth/:path*', destination: `${API_URL}/auth/:path*` },
-      { source: '/todos/:path*', destination: `${API_URL}/todos/:path*` },
-      { source: '/categories/:path*', destination: `${API_URL}/categories/:path*` },
-      { source: '/spaces/:path*', destination: `${API_URL}/spaces/:path*` },
-      { source: '/email/:path*', destination: `${API_URL}/email/:path*` },
-      { source: '/contact', destination: `${API_URL}/contact` },
-      { source: '/chat', destination: `${API_URL}/chat` },
-      { source: '/insights', destination: `${API_URL}/insights` },
-    ];
-  },
+  // API rewrites removed - using direct environment-based URLs in frontend code instead
 };
 
 module.exports = nextConfig;

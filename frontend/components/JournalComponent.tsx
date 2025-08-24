@@ -136,7 +136,7 @@ export default function JournalComponent({ token, activeSpace, authenticatedFetc
         clearTimeout(saveTimeout);
       }
     };
-  }, [journalText, saveJournalEntry, lastSavedText, saveTimeout]);
+  }, [journalText, lastSavedText]); // Removed saveJournalEntry and saveTimeout to prevent infinite loop
 
   const handleManualSave = async () => {
     if (journalText.trim()) {
