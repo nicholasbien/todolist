@@ -58,6 +58,52 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI(title="AI Todo List API")
 
+
+@app.on_event("startup")
+async def startup_event():
+    """Initialize default categories, cleanup expired sessions, and start scheduler."""
+    try:
+        # Skip startup tasks in test environment
+        if not os.getenv("USE_MOCK_DB"):
+            logger.info("Starting initialization tasks...")
+
+            # Migrate legacy data to have space_id fields
+            await migrate_legacy_categories()
+
+            # Import initialization functions
+            from auth import init_auth_indexes
+            from categories import init_category_indexes
+            from spaces import init_space_indexes, migrate_default_spaces
+            from todos import init_todo_indexes, migrate_legacy_todos
+
+            await migrate_legacy_todos()
+            # Migrate conceptual default spaces to actual space documents
+            await migrate_default_spaces()
+            # Rename Default spaces to Personal (one-time migration)
+            await rename_default_spaces_to_personal()
+
+            # Initialize database indexes
+            await init_todo_indexes()
+            await init_auth_indexes()
+            await init_space_indexes()
+            await init_category_indexes()
+
+            # Initialize default categories for default space (no space_id)
+            await init_default_categories()
+            await cleanup_expired_sessions()
+
+            # Start the scheduler
+            start_scheduler()
+            logger.info("Initialization completed successfully")
+        else:
+            logger.info("Running in test mode - skipping initialization")
+
+    except Exception as e:
+        logger.error(f"Critical startup error: {e}")
+        # Don't re-raise to prevent crash loop
+        logger.error("App started with startup errors - some features may not work correctly")
+
+
 # In-memory conversation history
 conversations: Dict[str, List[dict]] = defaultdict(list)
 MAX_HISTORY = 20
@@ -306,34 +352,6 @@ async def rename_default_spaces_to_personal():
 
     except Exception as e:
         logger.error(f"Error renaming Default spaces to Personal: {e}")
-
-
-@app.on_event("startup")
-async def startup_event():
-    """Initialize default categories, cleanup expired sessions, and start scheduler."""
-    # Skip startup tasks in test environment
-    if not os.getenv("USE_MOCK_DB"):
-        # Migrate legacy data to have space_id fields
-        await migrate_legacy_categories()
-        # Also migrate legacy todos
-        from auth import init_auth_indexes
-        from categories import init_category_indexes
-        from spaces import init_space_indexes, migrate_default_spaces
-        from todos import init_todo_indexes, migrate_legacy_todos
-
-        await migrate_legacy_todos()
-        # Migrate conceptual default spaces to actual space documents
-        await migrate_default_spaces()
-        # Rename Default spaces to Personal (one-time migration)
-        await rename_default_spaces_to_personal()
-        await init_todo_indexes()
-        await init_auth_indexes()
-        await init_space_indexes()
-        await init_category_indexes()
-        # Initialize default categories for default space (no space_id)
-        await init_default_categories()
-        await cleanup_expired_sessions()
-        start_scheduler()
 
 
 # Category management endpoints
