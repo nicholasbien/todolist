@@ -198,7 +198,9 @@ export default function InsightsComponent({ token, activeSpace, authenticatedFet
         <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
           <h3 className="text-lg font-semibold text-gray-100 mb-4">Tasks by Category</h3>
           <div className="space-y-3">
-            {insights.category_breakdown.map((category) => (
+            {insights.category_breakdown
+              .sort((a, b) => b.total - a.total)
+              .map((category) => (
               <div key={category.category} className="flex items-center justify-between">
                 <div className="flex items-center space-x-3">
                   <div className="text-gray-100 font-medium">{category.category}</div>
