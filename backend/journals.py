@@ -167,7 +167,7 @@ async def generate_journal_summary(entry_text: str) -> str:
 Summary:"""
 
         response = await client.chat.completions.create(
-            model="gpt-4o-mini",
+            model="gpt-4.1-mini",
             messages=[
                 {
                     "role": "system",
@@ -179,7 +179,7 @@ Summary:"""
                 {"role": "user", "content": prompt},
             ],
             max_tokens=150,
-            temperature=0.7,
+            temperature=1,
         )
 
         summary = response.choices[0].message.content.strip()

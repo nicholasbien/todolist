@@ -24,7 +24,7 @@ if not api_key:
     raise ValueError("OPENAI_API_KEY not found in environment variables!")
 
 # Initialize OpenAI client with timeout
-client = OpenAI(api_key=api_key, timeout=5.0, max_retries=0)  # 10 second timeout
+client = OpenAI(api_key=api_key, timeout=10.0, max_retries=0)  # 10 second timeout
 
 
 async def classify_task(text: str, categories: List[str], date_added: str) -> Dict[str, Any]:
@@ -81,7 +81,7 @@ async def classify_task(text: str, categories: List[str], date_added: str) -> Di
 
         # Make synchronous call since OpenAI client handles async internally
         completion = client.chat.completions.create(
-            model="gpt-5-nano",
+            model="gpt-4.1-nano",
             messages=[
                 {
                     "role": "system",

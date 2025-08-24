@@ -192,7 +192,9 @@ Instructions:
 11. Close with a brief Buddhist koan to encourage reflection
 {custom_instructions}
 
-12. At the very end, add this exact haiku from a classical Japanese master:
+12. At the very end, add this EXACT haiku from a classical Japanese master
+    (do NOT create your own haiku, use only this one):
+
 {haiku}
 
 13. Finally, choose ONE emoji that best matches the themes, mood, or imagery in the haiku and email content
@@ -222,7 +224,7 @@ async def generate_todo_summary(
         # Use OpenAI to generate the summary
         client = openai.AsyncOpenAI(api_key=openai.api_key)
         response = await client.chat.completions.create(
-            model="gpt-5",
+            model="gpt-4.1",
             messages=[
                 {
                     "role": "system",
@@ -231,7 +233,7 @@ async def generate_todo_summary(
                 {"role": "user", "content": prompt},
             ],
             max_tokens=600,  # Increased slightly for haiku + emoji
-            temperature=0.7,
+            temperature=1,
         )
 
         summary = response.choices[0].message.content.strip()
@@ -377,13 +379,16 @@ async def send_daily_summary(
         if custom_instructions is None:
             custom_instructions = user.get("email_instructions", "") if user else ""
 
-            # If user has no custom instructions, use Buddhist monk defaults
-            if not custom_instructions.strip():
-                custom_instructions = get_default_buddhist_instructions()
-
-            user_timezone = user.get("timezone", "America/New_York") if user else "America/New_York"
+        # Always include Buddhist monk instructions in addition to any custom instructions
+        buddhist_instructions = get_default_buddhist_instructions()
+        if custom_instructions.strip():
+            # Combine Buddhist monk instructions with custom instructions after
+            custom_instructions = buddhist_instructions + "\n" + custom_instructions
         else:
-            user_timezone = user.get("timezone", "America/New_York") if user else "America/New_York"
+            # Use only Buddhist monk instructions if no custom ones
+            custom_instructions = buddhist_instructions
+
+        user_timezone = user.get("timezone", "America/New_York") if user else "America/New_York"
 
         # Filter out invalid todos (those without dateAdded)
         valid_todos_dict = [todo for todo in all_todos if todo.get("dateAdded")]

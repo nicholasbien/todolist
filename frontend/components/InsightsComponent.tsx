@@ -124,19 +124,19 @@ export default function InsightsComponent({ token, activeSpace, authenticatedFet
     <div className="space-y-8">
       {/* Overview Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 min-h-[80px] flex flex-col justify-between">
+        <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 min-h-[80px] flex flex-col text-center">
           <div className="text-2xl font-bold text-accent">{insights.overview.total_tasks}</div>
           <div className="text-xs text-gray-400 leading-tight">Total Tasks</div>
         </div>
-        <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 min-h-[80px] flex flex-col justify-between">
+        <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 min-h-[80px] flex flex-col text-center">
           <div className="text-2xl font-bold text-green-400">{insights.overview.completed_tasks}</div>
-          <div className="text-xs text-gray-400 leading-tight">Completed</div>
+          <div className="text-xs text-gray-400 leading-tight">Completed Tasks</div>
         </div>
-        <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 min-h-[80px] flex flex-col justify-between">
+        <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 min-h-[80px] flex flex-col text-center">
           <div className="text-2xl font-bold text-yellow-400">{insights.overview.pending_tasks}</div>
-          <div className="text-xs text-gray-400 leading-tight">Pending</div>
+          <div className="text-xs text-gray-400 leading-tight">Pending Tasks</div>
         </div>
-        <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 min-h-[80px] flex flex-col justify-between">
+        <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 min-h-[80px] flex flex-col text-center">
           <div className="text-2xl font-bold text-purple-400">{Math.round(insights.overview.completion_rate)}%</div>
           <div className="text-xs text-gray-400 leading-tight">Completion Rate</div>
         </div>
@@ -175,7 +175,7 @@ export default function InsightsComponent({ token, activeSpace, authenticatedFet
                   </div>
                 </div>
                 <div className="text-xs text-gray-400 w-12">
-                  {week.created}↗ {week.completed}✓
+                  {week.created}+ {week.completed}✓
                 </div>
               </div>
             ))}
@@ -214,7 +214,7 @@ export default function InsightsComponent({ token, activeSpace, authenticatedFet
                     />
                   </div>
                   <div className="text-sm text-gray-400 w-12">
-                    {category.completion_rate}%
+                    {Math.round(category.completion_rate)}%
                   </div>
                 </div>
               </div>
@@ -228,7 +228,13 @@ export default function InsightsComponent({ token, activeSpace, authenticatedFet
         <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
           <h3 className="text-lg font-semibold text-gray-100 mb-4">Tasks by Priority</h3>
           <div className="space-y-3">
-            {insights.priority_breakdown.map((priority) => (
+            {insights.priority_breakdown
+              .sort((a, b) => {
+                const priorityOrder = { 'High': 3, 'Medium': 2, 'Low': 1 };
+                return (priorityOrder[b.priority as keyof typeof priorityOrder] || 0) -
+                       (priorityOrder[a.priority as keyof typeof priorityOrder] || 0);
+              })
+              .map((priority) => (
               <div key={priority.priority} className="flex items-center justify-between">
                 <div className="flex items-center space-x-3">
                   <div className={`text-gray-100 font-medium ${
@@ -254,7 +260,7 @@ export default function InsightsComponent({ token, activeSpace, authenticatedFet
                     />
                   </div>
                   <div className="text-sm text-gray-400 w-12">
-                    {priority.completion_rate}%
+                    {Math.round(priority.completion_rate)}%
                   </div>
                 </div>
               </div>
