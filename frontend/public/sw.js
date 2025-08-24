@@ -17,7 +17,8 @@ const STATIC_FILES = [
   '/',
   '/manifest.json',
   '/icon-192x192.png',
-  '/icon-512x512.png'
+  '/icon-512x512.png',
+  '/favicon.ico'
 ];
 
 // Open global database for auth data
@@ -319,7 +320,7 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
-  // Only handle API requests, let all other requests go through normally
+  // Only handle API requests
   const isApi =
     url.origin === self.location.origin &&
     (url.pathname.startsWith('/todos') ||
@@ -335,8 +336,10 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Let all non-API requests pass through to the network normally
-  // This prevents the service worker from interfering with static files during development
+  // Cache static assets so the app can load offline
+  if (url.origin === self.location.origin) {
+    event.respondWith(handleStaticRequest(event.request));
+  }
 });
 
 async function handleApiRequest(request) {
