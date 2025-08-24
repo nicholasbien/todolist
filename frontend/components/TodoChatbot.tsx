@@ -6,7 +6,17 @@ interface ChatbotProps {
 
 export default function TodoChatbot({ token }: ChatbotProps) {
   const [question, setQuestion] = useState('');
-  const [messages, setMessages] = useState<{ role: string; content: string }[]>([]);
+  const [messages, setMessages] = useState<{ role: string; content: string }[]>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const stored = sessionStorage.getItem('todo_chat_messages');
+        return stored ? JSON.parse(stored) : [];
+      } catch {
+        return [];
+      }
+    }
+    return [];
+  });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -19,6 +29,13 @@ export default function TodoChatbot({ token }: ChatbotProps) {
 
   useEffect(() => {
     scrollToBottom();
+    if (typeof window !== 'undefined') {
+      try {
+        sessionStorage.setItem('todo_chat_messages', JSON.stringify(messages));
+      } catch {
+        // Ignore write errors
+      }
+    }
   }, [messages]);
 
   const handleAsk = async () => {
