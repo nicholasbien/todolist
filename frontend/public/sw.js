@@ -459,6 +459,12 @@ async function handleApiRequest(request) {
       }
       return response;
     } catch (err) {
+      if (err && err.name === 'AbortError') {
+        return new Response(JSON.stringify({ error: 'Request aborted' }), {
+          status: 408,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
       return offlineFallback(request, url);
     }
   }
