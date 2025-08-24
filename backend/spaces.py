@@ -50,7 +50,7 @@ class Space(BaseModel):
     class Config:
         arbitrary_types_allowed = True
         json_encoders = {ObjectId: str}
-        allow_population_by_field_name = True
+        populate_by_name = True
 
 
 async def get_default_space_id(user_id: str) -> str:

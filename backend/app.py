@@ -2,6 +2,7 @@ import json
 import logging
 import os
 from collections import defaultdict
+from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import Dict, List, Optional
 
@@ -37,6 +38,16 @@ from classify import classify_task
 from email_summary import send_daily_summary
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+
+# Import journal functions
+from journals import (
+    JournalEntry,
+    create_journal_entry,
+    delete_journal_entry,
+    generate_journal_summary,
+    get_journal_entries,
+    get_journal_entry_by_date,
+)
 from pydantic import BaseModel
 from scheduler import get_scheduler_status, start_scheduler, update_schedule_time
 from spaces import (
@@ -55,16 +66,17 @@ from todos import Todo, complete_todo, create_todo, delete_todo, get_todos, heal
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="AI Todo List API")
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Initialize application on startup and cleanup on shutdown."""
+    logger.info("🚀 FastAPI startup (lifespan) event triggered")
 
-@app.on_event("startup")
-async def startup_event():
-    """Initialize default categories, cleanup expired sessions, and start scheduler."""
     try:
         # Skip startup tasks in test environment
         if os.getenv("USE_MOCK_DB"):
             logger.info("Running in test mode - skipping initialization")
+            yield
             return
 
         logger.info("Starting initialization tasks...")
@@ -72,8 +84,15 @@ async def startup_event():
         # Import initialization functions
         from auth import cleanup_expired_sessions, init_auth_indexes
         from categories import init_category_indexes
+
+        # Test database connection first
+        from db import check_database_health
+        from journals import init_journal_indexes
         from spaces import init_space_indexes, migrate_default_spaces
         from todos import init_todo_indexes, migrate_legacy_todos
+
+        if not await check_database_health():
+            logger.error("Database health check failed - continuing anyway")
 
         # Run each initialization step with individual error handling
         initialization_steps = [
@@ -85,6 +104,7 @@ async def startup_event():
             ("init_auth_indexes", init_auth_indexes),
             ("init_space_indexes", init_space_indexes),
             ("init_category_indexes", init_category_indexes),
+            ("init_journal_indexes", init_journal_indexes),
             ("init_default_categories", init_default_categories),
             ("cleanup_expired_sessions", cleanup_expired_sessions),
         ]
@@ -92,14 +112,17 @@ async def startup_event():
         failed_steps = []
         for step_name, step_func in initialization_steps:
             try:
-                await step_func()
+                logger.info(f"⏳ Starting {step_name}...")
+                await step_func()  # type: ignore
                 logger.info(f"✓ {step_name} completed")
             except Exception as e:
                 logger.error(f"✗ {step_name} failed: {e}")
                 failed_steps.append(step_name)
+                # Don't let individual failures stop the entire startup
 
         # Start scheduler (non-critical, should not fail startup)
         try:
+            logger.info("⏳ Starting scheduler...")
             start_scheduler()
             logger.info("✓ Scheduler started")
         except Exception as e:
@@ -111,10 +134,21 @@ async def startup_event():
         else:
             logger.info("🚀 All initialization completed successfully")
 
+        logger.info("✅ Startup event completed")
+
     except Exception as e:
         logger.error(f"Critical startup error: {e}")
         # Don't re-raise to prevent crash loop
         logger.error("App started with startup errors - some features may not work correctly")
+
+    # Application is now running
+    yield
+
+    # Cleanup on shutdown
+    logger.info("🔄 FastAPI shutdown event triggered")
+
+
+app = FastAPI(title="AI Todo List API", lifespan=lifespan)
 
 
 # In-memory conversation history
@@ -753,9 +787,109 @@ async def get_insights(
         raise HTTPException(status_code=500, detail="Failed to get insights")
 
 
+class JournalCreateRequest(BaseModel):
+    date: str  # YYYY-MM-DD format
+    text: str
+    space_id: Optional[str] = None
+
+
+# Journal endpoints
+@app.get("/journals")
+async def api_get_journal_entries(
+    date: Optional[str] = None, space_id: Optional[str] = None, current_user: dict = Depends(get_current_user)
+):
+    """Get journal entries. If date is provided, get entry for that specific date. Otherwise get recent entries."""
+    try:
+        # Check space access if space_id provided
+        if space_id is not None and not await user_in_space(current_user["user_id"], space_id):
+            raise HTTPException(status_code=403, detail="Access denied to this space")
+
+        if date:
+            # Get specific date entry
+            entry = await get_journal_entry_by_date(current_user["user_id"], date, space_id)
+            return entry.dict() if entry else None
+        else:
+            # Get recent entries
+            entries = await get_journal_entries(current_user["user_id"], space_id)
+            return [entry.dict() for entry in entries]
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching journal entries: {e}")
+        raise HTTPException(status_code=500, detail="Failed to fetch journal entries")
+
+
+@app.post("/journals")
+async def api_create_journal_entry(request: JournalCreateRequest, current_user: dict = Depends(get_current_user)):
+    """Create or update a journal entry."""
+    try:
+        # Check space access if space_id provided
+        if request.space_id is not None and not await user_in_space(current_user["user_id"], request.space_id):
+            raise HTTPException(status_code=403, detail="Access denied to this space")
+
+        # Create journal entry
+        entry = JournalEntry(
+            user_id=current_user["user_id"], space_id=request.space_id, date=request.date, text=request.text
+        )
+
+        result = await create_journal_entry(entry)
+        logger.info(f"Journal entry created/updated for user {current_user['email']}, date {request.date}")
+        return result.dict()
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error creating journal entry: {e}")
+        raise HTTPException(status_code=500, detail="Failed to create journal entry")
+
+
+@app.delete("/journals/{entry_id}")
+async def api_delete_journal_entry(entry_id: str, current_user: dict = Depends(get_current_user)):
+    """Delete a journal entry."""
+    try:
+        success = await delete_journal_entry(entry_id, current_user["user_id"])
+        if success:
+            logger.info(f"Journal entry {entry_id} deleted by user {current_user['email']}")
+            return {"message": "Journal entry deleted successfully"}
+        else:
+            raise HTTPException(status_code=404, detail="Journal entry not found")
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting journal entry: {e}")
+        raise HTTPException(status_code=500, detail="Failed to delete journal entry")
+
+
+@app.get("/journals/{entry_id}/ai-summary")
+async def api_generate_journal_summary(entry_id: str, current_user: dict = Depends(get_current_user)):
+    """Generate AI summary for a journal entry."""
+    try:
+        # First, get the entry to ensure user owns it and extract text
+        from bson import ObjectId
+        from journals import journals_collection
+
+        entry = await journals_collection.find_one({"_id": ObjectId(entry_id), "user_id": current_user["user_id"]})
+
+        if not entry:
+            raise HTTPException(status_code=404, detail="Journal entry not found")
+
+        summary = await generate_journal_summary(entry["text"])
+        logger.info(f"AI summary generated for journal entry {entry_id}")
+        return {"summary": summary}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error generating journal summary: {e}")
+        raise HTTPException(status_code=500, detail="Failed to generate summary")
+
+
 if __name__ == "__main__":
     import uvicorn
 
     port = int(os.environ.get("PORT", 8000))
-    # Enable hot reload for development
-    uvicorn.run(app, host="0.0.0.0", port=port, reload=True)
+    # Only enable hot reload in development
+    is_dev = os.environ.get("ENV", "development") == "development"
+    uvicorn.run(app, host="0.0.0.0", port=port, reload=is_dev)

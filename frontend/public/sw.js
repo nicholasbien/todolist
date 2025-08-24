@@ -9,6 +9,7 @@ const CATEGORIES = 'categories';
 const SPACES = 'spaces';
 const QUEUE = 'queue';
 const AUTH = 'auth';
+const JOURNALS = 'journals';
 
 const DEFAULT_CATEGORIES = ['General'];
 
@@ -56,6 +57,9 @@ function openUserDB(userId) {
       }
       if (!db.objectStoreNames.contains(QUEUE)) {
         db.createObjectStore(QUEUE, { keyPath: 'id', autoIncrement: true });
+      }
+      if (!db.objectStoreNames.contains(JOURNALS)) {
+        db.createObjectStore(JOURNALS, { keyPath: '_id' });
       }
     };
   });
@@ -192,6 +196,37 @@ const clearQueue = async (userId) => {
   const authData = userId ? null : await getAuth();
   const effectiveUserId = userId || (authData ? authData.userId : null);
   return userDbTx(effectiveUserId, QUEUE, 'readwrite', (s) => s.clear());
+};
+
+// Journal operations
+const getJournals = async (userId, date = null, spaceId = null) => {
+  const authData = userId ? null : await getAuth();
+  const effectiveUserId = userId || (authData ? authData.userId : null);
+  const allJournals = await userDbTx(effectiveUserId, JOURNALS, 'readonly', (s) => s.getAll());
+
+  let filteredJournals = allJournals;
+
+  if (date) {
+    filteredJournals = allJournals.filter(j => j.date === date);
+  }
+
+  if (spaceId !== null) {
+    filteredJournals = filteredJournals.filter(j => j.space_id === spaceId);
+  }
+
+  return filteredJournals;
+};
+
+const putJournal = async (journal, userId) => {
+  const authData = userId ? null : await getAuth();
+  const effectiveUserId = userId || (authData ? authData.userId : null);
+  return userDbTx(effectiveUserId, JOURNALS, 'readwrite', (s) => s.put(journal));
+};
+
+const delJournal = async (id, userId) => {
+  const authData = userId ? null : await getAuth();
+  const effectiveUserId = userId || (authData ? authData.userId : null);
+  return userDbTx(effectiveUserId, JOURNALS, 'readwrite', (s) => s.delete(id));
 };
 
 // ID mapping functions for persisting offline → server ID mappings
@@ -333,6 +368,7 @@ self.addEventListener('fetch', (event) => {
       url.pathname.startsWith('/contact') ||
       url.pathname.startsWith('/chat') ||
       url.pathname.startsWith('/insights') ||
+      url.pathname.startsWith('/journals') ||
       url.pathname.startsWith('/auth/'));
 
   if (isApi) {
@@ -524,6 +560,24 @@ async function offlineFallback(request, url) {
     if (url.pathname === '/spaces' || url.pathname.endsWith('/spaces')) {
       const spaces = await getSpaces(authData ? authData.userId : null);
       return new Response(JSON.stringify(spaces), { headers: { 'Content-Type': 'application/json' } });
+    }
+
+    // Handle journals
+    if (url.pathname === '/journals' || url.pathname.endsWith('/journals')) {
+      const date = url.searchParams.get('date');
+      const spaceId = url.searchParams.get('space_id');
+      const journals = await getJournals(authData ? authData.userId : null, date, spaceId);
+
+      if (date && journals.length > 0) {
+        // Return single entry for specific date
+        return new Response(JSON.stringify(journals[0]), { headers: { 'Content-Type': 'application/json' } });
+      } else if (date) {
+        // No entry found for date
+        return new Response('null', { headers: { 'Content-Type': 'application/json' } });
+      } else {
+        // Return all journals
+        return new Response(JSON.stringify(journals), { headers: { 'Content-Type': 'application/json' } });
+      }
     }
 
     // Handle todos (space-aware)
@@ -766,6 +820,59 @@ async function offlineFallback(request, url) {
 
       return new Response(null, { status: 204 });
     }
+
+    // Create/update journal entry
+    if ((url.pathname === '/journals' || url.pathname.endsWith('/journals')) && request.method === 'POST') {
+      const journalData = {
+        _id: `offline_journal_${data.date}_${Date.now()}`,
+        user_id: authData ? authData.userId : 'offline_user',
+        space_id: data.space_id || null,
+        date: data.date,
+        text: data.text,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        created_offline: true,
+      };
+
+      await putJournal(journalData, authData ? authData.userId : null);
+      await addQueue({ type: 'CREATE_JOURNAL', data: journalData }, authData ? authData.userId : null);
+      return new Response(JSON.stringify(journalData), { headers: { 'Content-Type': 'application/json' } });
+    }
+
+    // Delete journal entry
+    if (url.pathname.startsWith('/journals/') && request.method === 'DELETE') {
+      const id = url.pathname.split('/')[2];
+      console.log(`🗑️ Offline DELETE journal request for ID: ${id}`);
+
+      const existingJournals = await getJournals(authData ? authData.userId : null);
+      const journalExists = existingJournals.find(j => j._id === id);
+
+      if (journalExists) {
+        console.log(`🗑️ Journal ${id} found in IndexedDB, deleting...`);
+        await delJournal(id, authData ? authData.userId : null);
+
+        if (id.startsWith('offline_journal_')) {
+          // Remove the CREATE operation from queue to prevent resurrection
+          const queue = await readQueue(authData ? authData.userId : null);
+          const filteredQueue = queue.filter(op => !(op.type === 'CREATE_JOURNAL' && op.data._id === id));
+          if (filteredQueue.length !== queue.length) {
+            console.log(`🗑️ Removed pending CREATE_JOURNAL operation for deleted offline journal ${id}`);
+            await clearQueue(authData ? authData.userId : null);
+            for (const op of filteredQueue) {
+              await addQueue(op, authData ? authData.userId : null);
+            }
+          }
+          console.log(`🗑️ Offline journal ${id} deleted and CREATE operation cancelled`);
+        } else {
+          await addQueue({ type: 'DELETE_JOURNAL', data: { _id: id } }, authData ? authData.userId : null);
+          console.log(`🗑️ Added server DELETE_JOURNAL to queue for ${id}`);
+        }
+      } else {
+        console.log(`⚠️ Journal ${id} not found in IndexedDB`);
+      }
+
+      return new Response(null, { status: 204 });
+    }
   }
 
   // Gracefully fail all other requests when offline
@@ -946,6 +1053,53 @@ async function syncQueue() {
             await putCategory({ name: op.data.new_name, space_id: op.data.space_id }, authData.userId);
           }
           break;
+        case 'CREATE_JOURNAL':
+          if (op.data._id.startsWith('offline_journal_')) {
+            const { _id: offlineId, ...payload } = op.data;
+            res = await fetch('/journals', {
+              method: 'POST',
+              headers,
+              body: JSON.stringify(payload),
+            });
+            if (res && res.ok) {
+              // Immediately replace offline journal with server version
+              const serverJournal = await res.json();
+              console.log(`🔄 Journal Sync SUCCESS: Replacing offline journal ${offlineId} with server journal ${serverJournal._id}`);
+
+              // Update ID mapping
+              idMap[offlineId] = serverJournal._id;
+              console.log(`🗺️ Added Journal ID mapping: ${offlineId} -> ${serverJournal._id}`);
+
+              // Persist mapping immediately
+              await putIdMap(idMap, authData.userId);
+
+              await delJournal(offlineId, authData.userId); // Remove offline version
+              await putJournal(serverJournal, authData.userId); // Add server version
+              console.log(`✅ Synced offline journal ${offlineId} -> ${serverJournal._id}`);
+            } else {
+              console.log(`❌ Journal Sync FAILED: Offline journal ${offlineId} will be preserved`);
+            }
+          }
+          break;
+        case 'DELETE_JOURNAL':
+          // Check if we need to translate offline ID to server ID
+          let deleteJournalId = op.data._id;
+          if (deleteJournalId.startsWith('offline_journal_') && idMap[deleteJournalId]) {
+            deleteJournalId = idMap[deleteJournalId];
+            console.log(`🗺️ Translating DELETE_JOURNAL ID: ${op.data._id} -> ${deleteJournalId}`);
+          }
+
+          if (!deleteJournalId.startsWith('offline_journal_')) {
+            res = await fetch(`/journals/${deleteJournalId}`, {
+              method: 'DELETE',
+              headers
+            });
+            if (res && res.ok) {
+              // Remove from local storage
+              await delJournal(deleteJournalId, authData.userId);
+            }
+          }
+          break;
       }
     } catch (err) {
       // Continue processing other operations on error
@@ -992,6 +1146,9 @@ if (typeof module !== 'undefined') {
     getCategories,
     putCategory,
     delCategory,
+    getJournals,
+    putJournal,
+    delJournal,
     addQueue,
     readQueue,
     clearQueue,

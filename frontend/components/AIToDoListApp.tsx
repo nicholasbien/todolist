@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import TodoItem from "./TodoItem";
 import TodoChatbot from "./TodoChatbot";
 import InsightsComponent from "./InsightsComponent";
+import JournalComponent from "./JournalComponent";
 
 interface Props {
   user: any;
@@ -68,7 +69,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
   const membersFetchIdRef = useRef(0);
 
   // Tab state
-  const [activeTab, setActiveTab] = useState<'tasks' | 'assistant' | 'insights'>('tasks');
+  const [activeTab, setActiveTab] = useState<'tasks' | 'assistant' | 'insights' | 'journal'>('tasks');
 
   const handleOpenEmailSettings = async () => {
     try {
@@ -794,7 +795,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
       )}
 
       {/* Tab Navigation */}
-      <div className="grid grid-cols-3 border-b border-gray-800 mb-6">
+      <div className="grid grid-cols-4 border-b border-gray-800 mb-6">
         <button
           onClick={() => setActiveTab('tasks')}
           className={`py-3 font-medium text-sm transition-colors text-center ${
@@ -824,6 +825,16 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
           }`}
         >
           Insights
+        </button>
+        <button
+          onClick={() => setActiveTab('journal')}
+          className={`py-3 font-medium text-sm transition-colors text-center ${
+            activeTab === 'journal'
+              ? 'text-accent border-b-2 border-accent'
+              : 'text-gray-400 hover:text-gray-300'
+          }`}
+        >
+          Journal
         </button>
       </div>
 
@@ -1296,6 +1307,10 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
 
       {activeTab === 'insights' && (
         <InsightsComponent token={token} activeSpace={activeSpace} authenticatedFetch={authenticatedFetch} />
+      )}
+
+      {activeTab === 'journal' && (
+        <JournalComponent token={token} activeSpace={activeSpace} authenticatedFetch={authenticatedFetch} />
       )}
 
       {/* Email Settings Modal */}
