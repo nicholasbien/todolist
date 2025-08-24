@@ -8,3 +8,4 @@ frontend/.env.local
 frontend/out/
 frontend/coverage/
 frontend/.DS_Store
+frontend/.claude/
