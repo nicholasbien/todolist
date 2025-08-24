@@ -130,7 +130,8 @@ export default function TodoChatbot({ token }: ChatbotProps) {
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
           onKeyPress={handleKeyPress}
-          placeholder="Ask a question about your todos...\n(Enter to send, Shift+Enter for new line)"
+          placeholder={`Ask a question about your todos...
+(Enter to send, Shift+Enter for new line)`}
           disabled={loading}
         />
         <button

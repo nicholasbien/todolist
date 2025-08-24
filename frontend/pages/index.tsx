@@ -196,7 +196,7 @@ function LoginForm({ onLogin }: LoginFormProps) {
                 id="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-gray-900 text-gray-100 placeholder-gray-500"
+                className="w-full px-4 py-2 border border-gray-700 rounded-lg focus:ring-2 focus:ring-accent focus:border-accent outline-none bg-gray-900 text-gray-100 placeholder-gray-500"
                 placeholder="Enter your email"
                 disabled={loading}
                 required
@@ -206,7 +206,7 @@ function LoginForm({ onLogin }: LoginFormProps) {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="w-full bg-accent text-white py-2 px-4 rounded-lg hover:bg-accent-dark focus:ring-2 focus:ring-accent focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {loading ? 'Sending Code...' : 'Send Verification Code'}
             </button>
@@ -222,7 +222,7 @@ function LoginForm({ onLogin }: LoginFormProps) {
                 id="code"
                 value={code}
                 onChange={(e) => setCode(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-center text-lg font-mono"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent focus:border-accent outline-none text-center text-lg font-mono"
                 placeholder="000000"
                 disabled={loading}
                 required
@@ -236,7 +236,7 @@ function LoginForm({ onLogin }: LoginFormProps) {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="w-full bg-accent text-white py-2 px-4 rounded-lg hover:bg-accent-dark focus:ring-2 focus:ring-accent focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {loading ? 'Verifying...' : 'Sign In'}
             </button>
@@ -260,7 +260,7 @@ function LoginForm({ onLogin }: LoginFormProps) {
                 id="firstName"
                 value={firstName}
                 onChange={(e) => setFirstName(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent focus:border-accent outline-none"
                 placeholder="Enter your first name"
                 disabled={loading}
                 required
@@ -270,7 +270,7 @@ function LoginForm({ onLogin }: LoginFormProps) {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="w-full bg-accent text-white py-2 px-4 rounded-lg hover:bg-accent-dark focus:ring-2 focus:ring-accent focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {loading ? 'Saving...' : 'Continue'}
             </button>
@@ -441,7 +441,7 @@ export default function Home() {
             <div className="relative" ref={settingsDropdownRef}>
               <button
                 onClick={() => setShowSettingsDropdown(!showSettingsDropdown)}
-                className="text-blue-400 hover:text-blue-300 text-lg w-8 h-8 flex items-center justify-center rounded-lg transition-colors"
+                className="text-accent hover:text-accent-light text-lg w-8 h-8 flex items-center justify-center rounded-lg transition-colors"
                 title="Settings"
               >
                 ⚙️
@@ -498,13 +498,13 @@ export default function Home() {
                 value={contactMessage}
                 onChange={(e) => setContactMessage(e.target.value)}
                 placeholder="Ask for a new feature... Report a bug... Say hi!"
-                className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 placeholder-gray-500 h-32 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 placeholder-gray-500 h-32 resize-none focus:outline-none focus:ring-2 focus:ring-accent"
               />
               <div className="flex justify-center space-x-3">
                 <button
                   onClick={handleSendContact}
                   disabled={sendingContact || !contactMessage.trim()}
-                  className="bg-blue-600 hover:bg-blue-500 disabled:bg-blue-800 disabled:text-gray-400 text-white px-6 py-2 rounded-lg transition-colors"
+                  className="bg-accent hover:bg-accent-light disabled:bg-accent-dark disabled:text-gray-400 text-white px-6 py-2 rounded-lg transition-colors"
                 >
                   {sendingContact ? 'Sending...' : 'Send'}
                 </button>
