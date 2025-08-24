@@ -32,6 +32,49 @@ openai.api_key = os.getenv("OPENAI_API_KEY")
 logger = logging.getLogger(__name__)
 
 
+def format_date_with_relative(date_str: str) -> str:
+    """Return absolute date with relative offset like "in 3 days" or "2 weeks ago"."""
+    try:
+        dt = datetime.fromisoformat(str(date_str).replace("Z", "+00:00"))
+    except Exception:
+        return str(date_str)
+
+    now = datetime.now(dt.tzinfo)
+    delta_days = (dt.date() - now.date()).days
+
+    def _future(days: int) -> str:
+        if days == 1:
+            return "in 1 day"
+        if days < 7:
+            return f"in {days} days"
+        if days < 30:
+            weeks = days // 7
+            return f"in {weeks} week" + ("s" if weeks > 1 else "")
+        months = days // 30
+        return f"in {months} month" + ("s" if months > 1 else "")
+
+    def _past(days: int) -> str:
+        if days == 1:
+            return "1 day ago"
+        if days < 7:
+            return f"{days} days ago"
+        if days < 30:
+            weeks = days // 7
+            return f"{weeks} week" + ("s" if weeks > 1 else "") + " ago"
+        months = days // 30
+        return f"{months} month" + ("s" if months > 1 else "") + " ago"
+
+    if delta_days > 0:
+        rel = _future(delta_days)
+    elif delta_days < 0:
+        rel = _past(-delta_days)
+    else:
+        rel = "today"
+
+    absolute = dt.strftime("%b %d, %Y")
+    return f"{absolute} ({rel})"
+
+
 def create_summary_prompt(
     spaces_json: str, user_name: str = "there", custom_instructions: str = "", user_timezone: str = "America/New_York"
 ) -> str:
@@ -71,6 +114,8 @@ Instructions:
    - Celebrate recently completed tasks (completed yesterday or today only)
    - Identify pending tasks that are getting old/stale
    - Highlight urgent items or those with approaching due dates
+   - When present, use the "dateAddedRelative", "dateCompletedRelative", and "dueDateRelative" fields
+     which combine absolute dates with relative phrases like "3 days ago" or "in 1 week"
 5. **PRIORITY ATTENTION**: Pay special attention to "High" priority tasks in the pending list.
    Always mention high priority tasks prominently and encourage action on them.
 6. Organize todos by:
@@ -162,7 +207,7 @@ Here's your daily todo summary:
     if due_soon:
         summary += "Tasks due soon:\n"
         for todo in due_soon[:3]:
-            due = datetime.fromisoformat(str(todo["dueDate"])).strftime("%b %d")
+            due = format_date_with_relative(todo["dueDate"])
             summary += f"  • {todo.get('text', 'Unknown task')} (due {due})\n"
         summary += "\n"
 
@@ -241,11 +286,19 @@ async def send_daily_summary(
         for space in spaces:
             space_todos = await get_todos(user_id, space.id)
             todos_dict = [t.dict() if hasattr(t, "dict") else t for t in space_todos]
-            spaces_data.append({"space": space.name, "todos": todos_dict})
+            humanized: List[dict] = []
             for t in todos_dict:
                 t_copy = dict(t)
+                if t_copy.get("dueDate"):
+                    t_copy["dueDateRelative"] = format_date_with_relative(t_copy["dueDate"])
+                if t_copy.get("dateAdded"):
+                    t_copy["dateAddedRelative"] = format_date_with_relative(t_copy["dateAdded"])
+                if t_copy.get("dateCompleted"):
+                    t_copy["dateCompletedRelative"] = format_date_with_relative(t_copy["dateCompleted"])
                 t_copy["_space"] = space.name
+                humanized.append(t_copy)
                 all_todos.append(t_copy)
+            spaces_data.append({"space": space.name, "todos": humanized})
 
         if custom_instructions is None:
             custom_instructions = user.get("email_instructions", "") if user else ""
