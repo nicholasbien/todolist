@@ -2,6 +2,7 @@ import React from 'react';
 import { render, screen, waitFor, act } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import AIToDoListApp from '../components/AIToDoListApp';
+import { AuthProvider } from '../context/AuthContext';
 
 // Mock the fetch function
 global.fetch = jest.fn();
@@ -52,7 +53,11 @@ describe('Online/Offline Event Handling', () => {
     const addEventListenerSpy = jest.spyOn(window, 'addEventListener');
 
     await act(async () => {
-      render(<AIToDoListApp {...mockProps} />);
+      render(
+        <AuthProvider>
+          <AIToDoListApp {...mockProps} />
+        </AuthProvider>
+      );
     });
 
     expect(addEventListenerSpy).toHaveBeenCalledWith('online', expect.any(Function));
@@ -65,7 +70,11 @@ describe('Online/Offline Event Handling', () => {
     const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
 
     await act(async () => {
-      render(<AIToDoListApp {...mockProps} />);
+      render(
+        <AuthProvider>
+          <AIToDoListApp {...mockProps} />
+        </AuthProvider>
+      );
     });
 
     // Simulate going online
@@ -90,7 +99,11 @@ describe('Online/Offline Event Handling', () => {
     const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
 
     await act(async () => {
-      render(<AIToDoListApp {...mockProps} />);
+      render(
+        <AuthProvider>
+          <AIToDoListApp {...mockProps} />
+        </AuthProvider>
+      );
     });
 
     // Clear initial fetch calls from component mount
@@ -120,7 +133,11 @@ describe('Online/Offline Event Handling', () => {
     };
 
     await act(async () => {
-      render(<AIToDoListApp {...propsWithoutAuth} />);
+      render(
+        <AuthProvider>
+          <AIToDoListApp {...propsWithoutAuth} />
+        </AuthProvider>
+      );
     });
 
     // Clear initial mount calls
@@ -142,7 +159,11 @@ describe('Online/Offline Event Handling', () => {
     const removeEventListenerSpy = jest.spyOn(window, 'removeEventListener');
 
     const { unmount } = await act(async () => {
-      return render(<AIToDoListApp {...mockProps} />);
+      return render(
+        <AuthProvider>
+          <AIToDoListApp {...mockProps} />
+        </AuthProvider>
+      );
     });
 
     await act(async () => {
@@ -157,7 +178,11 @@ describe('Online/Offline Event Handling', () => {
 
   test('multiple online events do not cause race conditions', async () => {
     await act(async () => {
-      render(<AIToDoListApp {...mockProps} />);
+      render(
+        <AuthProvider>
+          <AIToDoListApp {...mockProps} />
+        </AuthProvider>
+      );
     });
 
     // Clear initial mount calls
@@ -194,7 +219,11 @@ describe('Online/Offline Event Handling', () => {
     // triggered by the GET /todos call, not explicit sync messages
 
     await act(async () => {
-      render(<AIToDoListApp {...mockProps} />);
+      render(
+        <AuthProvider>
+          <AIToDoListApp {...mockProps} />
+        </AuthProvider>
+      );
     });
 
     // Clear any initial setup calls

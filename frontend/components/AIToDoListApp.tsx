@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import TodoItem from "./TodoItem";
 import TodoChatbot from "./TodoChatbot";
+import { useAuth } from "../context/AuthContext";
+import Link from "next/link";
 
 interface Props {
   user: any;
@@ -16,13 +18,14 @@ interface Props {
  * Backend classifies tasks automatically when creating todos
  */
 export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettings, showEmailSettings, onCloseEmailSettings }: Props) {
+  const { logout, clearAuthExpired } = useAuth();
   const [todos, setTodos] = useState([]);
   const [newTodo, setNewTodo] = useState("");
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(false);
   const [loadingTodos, setLoadingTodos] = useState(false);
   const [loadingCategories, setLoadingCategories] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<React.ReactNode>("");
   const [newCat, setNewCat] = useState("");
   const [activeCat, setActiveCat] = useState("All");
   const [showAddCategoryModal, setShowAddCategoryModal] = useState(false);
@@ -48,6 +51,24 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
   const [spaceToEdit, setSpaceToEdit] = useState<any>(null);
   const [spaceMembers, setSpaceMembers] = useState<any[]>([]);
   const [pendingInvites, setPendingInvites] = useState<string[]>([]);
+
+  const handleError = useCallback(
+    (err: any, prefix?: string) => {
+      if (err?.message === 'Authentication expired') {
+        setError(
+          <>
+            Session expired.{' '}
+            <Link href="/" onClick={clearAuthExpired} className="underline text-blue-400">
+              Sign in again
+            </Link>
+          </>
+        );
+        return;
+      }
+      setError(prefix ? `${prefix}: ${err.message || err}` : err.message || String(err));
+    },
+    [clearAuthExpired]
+  );
 
 
   // Loading state when switching spaces
@@ -87,7 +108,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
       onShowEmailSettings?.();
       setError('');
     } catch (err) {
-      setError('Error loading email settings: ' + (err.message || err));
+      handleError(err, 'Error loading email settings');
     }
   };
 
@@ -107,11 +128,12 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
     });
 
     if (response.status === 401) {
+      logout(true);
       throw new Error('Authentication expired');
     }
 
     return response;
-  }, [token]);
+  }, [token, logout]);
 
   const fetchSpaces = useCallback(async () => {
     try {
@@ -125,8 +147,9 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
       }
     } catch (err) {
       console.error('Error loading spaces', err);
+      handleError(err);
     }
-  }, [authenticatedFetch, activeSpace]);
+  }, [authenticatedFetch, activeSpace, handleError]);
 
   const fetchMembers = useCallback(async () => {
     const fetchId = ++membersFetchIdRef.current;
@@ -149,9 +172,10 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
     } catch (err) {
       if (fetchId === membersFetchIdRef.current) {
         console.error('Error loading members', err);
+        handleError(err);
       }
     }
-  }, [authenticatedFetch, activeSpace]);
+  }, [authenticatedFetch, activeSpace, handleError]);
 
   // Fetch categories from MongoDB
   const fetchCategories = useCallback(async () => {
@@ -173,10 +197,10 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
       }
     } catch (err) {
       if (fetchId === categoriesFetchIdRef.current) {
-        setError('Error loading categories: ' + err.message);
+        handleError(err, 'Error loading categories');
       }
     }
-  }, [authenticatedFetch, activeSpace]);
+  }, [authenticatedFetch, activeSpace, handleError]);
 
   // Fetch todos from MongoDB
   const fetchTodos = useCallback(async (showLoading: boolean = true) => {
@@ -196,14 +220,14 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
       }
     } catch (err) {
       if (fetchId === todosFetchIdRef.current) {
-        setError('Error loading todos: ' + err.message);
+        handleError(err, 'Error loading todos');
       }
     } finally {
       if (fetchId === todosFetchIdRef.current && showLoading) {
         setLoadingTodos(false);
       }
     }
-  }, [authenticatedFetch, activeSpace]);
+  }, [authenticatedFetch, activeSpace, handleError]);
 
   const fetchSpaceData = useCallback(() => {
     // Trigger fetches without waiting for all to finish
@@ -339,7 +363,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
       setShowAddCategoryModal(false);
       setError('');
     } catch (err) {
-      setError('Error adding category: ' + err.message);
+      handleError(err, 'Error adding category');
     }
   };
 
@@ -436,7 +460,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
       await fetchTodos();
       setError('');
     } catch (err) {
-      setError('Error deleting category: ' + err.message);
+      handleError(err, 'Error deleting category');
     }
   };
 
@@ -467,7 +491,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
       setEditCatName('');
       setError('');
     } catch (err) {
-      setError('Error renaming category: ' + err.message);
+      handleError(err, 'Error renaming category');
     }
   };
 
@@ -528,7 +552,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
       if (err.name === 'AbortError') {
         setError('Request timed out. Please try again.');
       } else {
-        setError('Error adding todo: ' + err.message);
+        handleError(err, 'Error adding todo');
       }
     } finally {
       setLoading(false);
@@ -557,7 +581,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
       await fetchTodos(false);
       setError(''); // Clear any existing errors on success
     } catch (err) {
-      setError('Error deleting todo: ' + err.message);
+      handleError(err, 'Error deleting todo');
     }
   };
 
@@ -583,7 +607,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
       await fetchTodos(false);
       setError(''); // Clear any existing errors on success
     } catch (err) {
-      setError('Error updating todo: ' + err.message);
+      handleError(err, 'Error updating todo');
     }
   };
 
@@ -605,7 +629,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
       setEditingCategory(null);
       setError('');
     } catch (err) {
-      setError('Error updating category: ' + err.message);
+      handleError(err, 'Error updating category');
     }
   };
 
@@ -626,7 +650,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
       await fetchTodos(false);
       setError('');
     } catch (err) {
-      setError('Error updating priority: ' + err.message);
+      handleError(err, 'Error updating priority');
     }
   };
 
@@ -678,7 +702,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
       setShowEditTodoModal(false);
       setTodoToEdit(null);
     } catch (err) {
-      setError('Error updating todo: ' + err.message);
+      handleError(err, 'Error updating todo');
     }
   };
 
@@ -703,7 +727,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
       // Could add a success message state if you want
       console.log('Email summary sent successfully:', result);
     } catch (err) {
-      setError('Error sending email summary: ' + err.message);
+      handleError(err, 'Error sending email summary');
     } finally {
       setSendingEmail(false);
     }
@@ -749,7 +773,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
       onCloseEmailSettings?.();
       setError('');
     } catch (err) {
-      setError('Error updating schedule: ' + err.message);
+      handleError(err, 'Error updating schedule');
     } finally {
       setSavingSchedule(false);
     }
