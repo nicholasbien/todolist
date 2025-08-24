@@ -18,8 +18,7 @@ const STATIC_FILES = [
   '/',
   '/manifest.json',
   '/icon-192x192.png',
-  '/icon-512x512.png',
-  '/favicon.ico'
+  '/icon-512x512.png'
 ];
 
 // Open global database for auth data
@@ -327,14 +326,36 @@ self.addEventListener('install', (event) => {
 
   event.waitUntil(
     Promise.all([
-      // Only pre-cache static files in production
-      isDevelopment ? Promise.resolve() : caches.open(STATIC_CACHE).then(cache => cache.addAll(STATIC_FILES)),
+      // Only pre-cache static files in production, with individual error handling
+      isDevelopment ? Promise.resolve() : cacheStaticFiles(),
       caches.open(API_CACHE),
       openGlobalDB()
     ])
   );
   self.skipWaiting();
 });
+
+// Helper function to cache static files with individual error handling
+async function cacheStaticFiles() {
+  const cache = await caches.open(STATIC_CACHE);
+
+  // Cache files individually to avoid failing if one file is missing
+  const cachePromises = STATIC_FILES.map(async (url) => {
+    try {
+      const response = await fetch(url);
+      if (response.ok) {
+        await cache.put(url, response);
+        console.log(`✅ Cached: ${url}`);
+      } else {
+        console.log(`⚠️ Failed to cache ${url}: ${response.status}`);
+      }
+    } catch (error) {
+      console.log(`⚠️ Error caching ${url}:`, error);
+    }
+  });
+
+  await Promise.allSettled(cachePromises);
+}
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
