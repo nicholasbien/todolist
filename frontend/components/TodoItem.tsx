@@ -33,7 +33,10 @@ export default function TodoItem({
     setShouldAnimate(true);
   }, []);
 
-  const handleCompleteClick = async () => {
+  const handleCompleteClick = async (
+    e: React.MouseEvent<HTMLButtonElement>
+  ) => {
+    e.currentTarget.blur();
     setIsCompleting(true);
     // Brief delay to show completion state
     setTimeout(() => {
@@ -41,7 +44,10 @@ export default function TodoItem({
     }, 300);
   };
 
-  const handleDeleteClick = async () => {
+  const handleDeleteClick = async (
+    e: React.MouseEvent<HTMLButtonElement>
+  ) => {
+    e.currentTarget.blur();
     setIsDeleting(true);
     // Brief delay for fade out animation
     setTimeout(() => {
@@ -89,7 +95,7 @@ export default function TodoItem({
         <div className="flex items-center space-x-2 ml-3">
           {!todo.completed ? (
             <button
-              onClick={(e) => { e.stopPropagation(); handleCompleteClick(); }}
+              onClick={(e) => { e.stopPropagation(); handleCompleteClick(e); }}
               disabled={isCompleting}
               className={`text-lg w-8 h-8 flex items-center justify-center rounded-lg transition-all duration-200 ${
                 isCompleting
@@ -101,14 +107,14 @@ export default function TodoItem({
             </button>
           ) : (
             <button
-              onClick={(e) => { e.stopPropagation(); handleCompleteClick(); }}
+              onClick={(e) => { e.stopPropagation(); handleCompleteClick(e); }}
               className="text-yellow-400 hover:text-yellow-300 hover:bg-yellow-900/20 text-lg w-8 h-8 flex items-center justify-center rounded-lg transition-colors"
             >
               ↻
             </button>
           )}
           <button
-            onClick={(e) => { e.stopPropagation(); handleDeleteClick(); }}
+            onClick={(e) => { e.stopPropagation(); handleDeleteClick(e); }}
             disabled={isDeleting}
             className={`text-lg w-8 h-8 flex items-center justify-center rounded-lg transition-all duration-200 ${
               isDeleting
