@@ -335,8 +335,26 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Let all non-API requests pass through to the network normally
-  // This prevents the service worker from interfering with static files during development
+  // Cache static assets (HTML/JS/CSS) so app loads offline
+  if (event.request.method === 'GET') {
+    event.respondWith(
+      caches.match(event.request).then((cached) => {
+        if (cached) return cached;
+        return fetch(event.request)
+          .then((response) => {
+            const clone = response.clone();
+            caches.open(STATIC_CACHE).then((cache) => cache.put(event.request, clone));
+            return response;
+          })
+          .catch(() => {
+            if (event.request.mode === 'navigate') {
+              return caches.match('/');
+            }
+          });
+      })
+    );
+    return;
+  }
 });
 
 async function handleApiRequest(request) {
