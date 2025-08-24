@@ -101,7 +101,7 @@ export default function InsightsComponent({ token, activeSpace, authenticatedFet
         <p className="text-red-400">{error}</p>
         <button
           onClick={fetchInsights}
-          className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-500 transition-colors"
+          className="mt-4 px-4 py-2 bg-accent text-foreground rounded-lg hover:bg-accent-light transition-colors"
         >
           Retry
         </button>
@@ -125,7 +125,7 @@ export default function InsightsComponent({ token, activeSpace, authenticatedFet
       {/* Overview Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
-          <div className="text-2xl font-bold text-blue-400">{insights.overview.total_tasks}</div>
+          <div className="text-2xl font-bold text-accent">{insights.overview.total_tasks}</div>
           <div className="text-sm text-gray-400">Total Tasks</div>
         </div>
         <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
@@ -156,7 +156,7 @@ export default function InsightsComponent({ token, activeSpace, authenticatedFet
                   {/* Created bar */}
                   <div className="flex-1">
                     <div
-                      className="bg-blue-600 h-4 rounded"
+                      className="bg-accent h-4 rounded"
                       style={{
                         width: `${(week.created / maxWeeklyValue) * 100}%`,
                         minWidth: week.created > 0 ? '8px' : '0'
@@ -182,7 +182,7 @@ export default function InsightsComponent({ token, activeSpace, authenticatedFet
           </div>
           <div className="flex justify-center space-x-6 mt-4 text-sm">
             <div className="flex items-center space-x-2">
-              <div className="w-3 h-3 bg-blue-600 rounded"></div>
+              <div className="w-3 h-3 bg-accent rounded"></div>
               <span className="text-gray-400">Created</span>
             </div>
             <div className="flex items-center space-x-2">
@@ -209,7 +209,7 @@ export default function InsightsComponent({ token, activeSpace, authenticatedFet
                 <div className="flex items-center space-x-3">
                   <div className="w-24 bg-gray-800 rounded-full h-2">
                     <div
-                      className="bg-blue-500 h-2 rounded-full"
+                      className="bg-accent h-2 rounded-full"
                       style={{ width: `${category.completion_rate}%` }}
                     />
                   </div>
