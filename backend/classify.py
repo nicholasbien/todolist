@@ -107,6 +107,11 @@ async def classify_task(text: str, categories: List[str], date_added: str) -> Di
                 category = "General"
 
             due_date, cleaned_text = result.get("dueDate"), result.get("text", text)
+            if not due_date:
+                fallback_due, fallback_text = manual_parse_due_date(text, date_added)
+                if fallback_due:
+                    due_date = fallback_due
+                    cleaned_text = fallback_text
 
             return {
                 "category": category,

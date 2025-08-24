@@ -48,6 +48,34 @@ def manual_parse_due_date(text: str, date_added: str) -> tuple[Optional[str], st
             pass
         return (reference.date() + timedelta(days=1)).isoformat(), cleaned_text
 
+    # Handle "in <number> days/weeks"
+    m = re.search(r"\bin\s+(\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+(day|days|week|weeks)\b", lowered)
+    if m:
+        try:
+            num_str, unit = m.group(1), m.group(2)
+            word_to_num = {
+                "one": 1,
+                "two": 2,
+                "three": 3,
+                "four": 4,
+                "five": 5,
+                "six": 6,
+                "seven": 7,
+                "eight": 8,
+                "nine": 9,
+                "ten": 10,
+            }
+            if num_str.isdigit():
+                num: Optional[int] = int(num_str)
+            else:
+                num = word_to_num.get(num_str)
+            if num is not None:
+                delta = timedelta(days=num) if "day" in unit else timedelta(weeks=num)
+                cleaned_text = remove_phrase(cleaned_text, m)
+                return (reference.date() + delta).isoformat(), cleaned_text
+        except Exception:
+            pass
+
     # Handle "next <weekday>"
     m = re.search(
         rf"\b({keyword_re})?\s*next\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b",
