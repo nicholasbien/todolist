@@ -7,7 +7,7 @@ export default function AppMain() {
 
   if (isLoading) {
     return (
-      <main className="min-h-screen bg-zinc-950 text-white flex items-center justify-center">
+      <main className="min-h-screen bg-background text-foreground flex items-center justify-center">
         <div className="container mx-auto p-4 max-w-md">
           <div className="animate-pulse">Loading...</div>
         </div>
@@ -16,7 +16,7 @@ export default function AppMain() {
   }
 
   return (
-    <main className="min-h-screen bg-zinc-950 text-white">
+    <main className="min-h-screen bg-background text-foreground">
       {isAuthenticated ? <AIToDoListApp user={user} token={token} /> : <AuthForm />}
     </main>
   );

@@ -127,7 +127,7 @@ export default function TodoItem({
             value={todo.category}
             onChange={(e) => handleUpdateCategory(todo._id, e.target.value)}
             onBlur={() => setEditingCategory(null)}
-            className="px-3 py-1.5 rounded-lg bg-black text-white border border-gray-700 text-xs focus:border-blue-500 focus:outline-none"
+            className="px-3 py-1.5 rounded-lg bg-black text-white border border-gray-700 text-xs focus:border-accent focus:outline-none"
             autoFocus
             onClick={(e) => { (e.target as HTMLSelectElement).focus(); e.stopPropagation(); }}
           >
