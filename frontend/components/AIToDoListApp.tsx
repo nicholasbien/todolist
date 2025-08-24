@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import TodoItem from "./TodoItem";
 import TodoChatbot from "./TodoChatbot";
+import InsightsComponent from "./InsightsComponent";
 
 interface Props {
   user: any;
@@ -1301,11 +1302,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
       )}
 
       {activeTab === 'insights' && (
-        <div className="text-center py-12">
-          <div className="text-gray-400 mb-4 text-4xl">📊</div>
-          <h3 className="text-lg font-semibold text-gray-100 mb-2">Insights Coming Soon</h3>
-          <p className="text-gray-400">We&apos;re working on analytics and insights for your tasks.</p>
-        </div>
+        <InsightsComponent token={token} activeSpace={activeSpace} authenticatedFetch={authenticatedFetch} />
       )}
 
       {/* Email Settings Modal */}

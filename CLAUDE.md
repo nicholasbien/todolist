@@ -133,3 +133,5 @@ Both frontend and backend require OpenAI API keys:
 - `POST /auth/signup` - Sign up with email
 - `POST /auth/login` - Login with email and verification code
 - `POST /auth/logout` - Logout and invalidate session
+
+- go into the virtual environment if you see environment issues and are not in it

@@ -30,6 +30,7 @@ const nextConfig = {
       { source: '/email/:path*', destination: `${API_URL}/email/:path*` },
       { source: '/contact', destination: `${API_URL}/contact` },
       { source: '/chat', destination: `${API_URL}/chat` },
+      { source: '/insights', destination: `${API_URL}/insights` },
     ];
   },
 };
