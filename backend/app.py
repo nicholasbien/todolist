@@ -10,7 +10,6 @@ from auth import (
     LoginRequest,
     SignupRequest,
     UpdateNameRequest,
-    cleanup_expired_sessions,
     login_user,
     logout_user,
     signup_user,
@@ -64,39 +63,53 @@ async def startup_event():
     """Initialize default categories, cleanup expired sessions, and start scheduler."""
     try:
         # Skip startup tasks in test environment
-        if not os.getenv("USE_MOCK_DB"):
-            logger.info("Starting initialization tasks...")
-
-            # Migrate legacy data to have space_id fields
-            await migrate_legacy_categories()
-
-            # Import initialization functions
-            from auth import init_auth_indexes
-            from categories import init_category_indexes
-            from spaces import init_space_indexes, migrate_default_spaces
-            from todos import init_todo_indexes, migrate_legacy_todos
-
-            await migrate_legacy_todos()
-            # Migrate conceptual default spaces to actual space documents
-            await migrate_default_spaces()
-            # Rename Default spaces to Personal (one-time migration)
-            await rename_default_spaces_to_personal()
-
-            # Initialize database indexes
-            await init_todo_indexes()
-            await init_auth_indexes()
-            await init_space_indexes()
-            await init_category_indexes()
-
-            # Initialize default categories for default space (no space_id)
-            await init_default_categories()
-            await cleanup_expired_sessions()
-
-            # Start the scheduler
-            start_scheduler()
-            logger.info("Initialization completed successfully")
-        else:
+        if os.getenv("USE_MOCK_DB"):
             logger.info("Running in test mode - skipping initialization")
+            return
+
+        logger.info("Starting initialization tasks...")
+
+        # Import initialization functions
+        from auth import cleanup_expired_sessions, init_auth_indexes
+        from categories import init_category_indexes
+        from spaces import init_space_indexes, migrate_default_spaces
+        from todos import init_todo_indexes, migrate_legacy_todos
+
+        # Run each initialization step with individual error handling
+        initialization_steps = [
+            ("migrate_legacy_categories", migrate_legacy_categories),
+            ("migrate_legacy_todos", migrate_legacy_todos),
+            ("migrate_default_spaces", migrate_default_spaces),
+            ("rename_default_spaces_to_personal", rename_default_spaces_to_personal),
+            ("init_todo_indexes", init_todo_indexes),
+            ("init_auth_indexes", init_auth_indexes),
+            ("init_space_indexes", init_space_indexes),
+            ("init_category_indexes", init_category_indexes),
+            ("init_default_categories", init_default_categories),
+            ("cleanup_expired_sessions", cleanup_expired_sessions),
+        ]
+
+        failed_steps = []
+        for step_name, step_func in initialization_steps:
+            try:
+                await step_func()
+                logger.info(f"✓ {step_name} completed")
+            except Exception as e:
+                logger.error(f"✗ {step_name} failed: {e}")
+                failed_steps.append(step_name)
+
+        # Start scheduler (non-critical, should not fail startup)
+        try:
+            start_scheduler()
+            logger.info("✓ Scheduler started")
+        except Exception as e:
+            logger.error(f"✗ Scheduler failed to start: {e}")
+            failed_steps.append("scheduler")
+
+        if failed_steps:
+            logger.warning(f"⚠️  Startup completed with {len(failed_steps)} failed steps: {', '.join(failed_steps)}")
+        else:
+            logger.info("🚀 All initialization completed successfully")
 
     except Exception as e:
         logger.error(f"Critical startup error: {e}")

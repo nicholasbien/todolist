@@ -32,7 +32,7 @@ function LoginForm({ onLogin }: LoginFormProps) {
     if (router.isReady && typeof router.query.email === 'string') {
       setEmail(router.query.email);
     }
-  }, [router.isReady, router.query.email]);
+  }, [router.isReady]);
 
 
   const handleEmailSubmit = async (e) => {
