@@ -47,7 +47,6 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
   const [inviteEmails, setInviteEmails] = useState<string[]>(['']);
   const [spaceToEdit, setSpaceToEdit] = useState<any>(null);
   const [spaceMembers, setSpaceMembers] = useState<any[]>([]);
-  const [pendingInvites, setPendingInvites] = useState<string[]>([]);
 
 
   // Loading state when switching spaces
@@ -133,7 +132,6 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
     if (!activeSpace || !activeSpace._id) {
       if (fetchId === membersFetchIdRef.current) {
         setSpaceMembers([]);
-        setPendingInvites([]);
       }
       return;
     }
@@ -143,7 +141,6 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
         const data = await resp.json();
         if (fetchId === membersFetchIdRef.current) {
           setSpaceMembers(data.members || []);
-          setPendingInvites(data.pending_invites || []);
         }
       }
     } catch (err) {
@@ -236,7 +233,6 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
       setTodos([]);
       setCategories([]);
       setSpaceMembers([]);
-      setPendingInvites([]);
       // Fetch new data for the active space
       fetchSpaceData();
     }
@@ -910,9 +906,6 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
           <ul className="text-gray-300 text-sm space-y-1">
             {spaceMembers.map((m) => (
               <li key={m.id}>{m.first_name || 'Unknown User'}</li>
-            ))}
-            {pendingInvites && pendingInvites.map((email) => (
-              <li key={email} className="italic">{email} (pending)</li>
             ))}
           </ul>
         </div>
