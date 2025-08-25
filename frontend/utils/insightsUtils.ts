@@ -65,7 +65,7 @@ export function getWeekKey(dateString: string | Date): string | null {
 
 export function generateInsights(todos: Todo[]): InsightsData {
   // Convert todos to consistent format
-  const todoArray = Array.isArray(todos) ? todos : Object.values(todos);
+  const todoArray = Array.isArray(todos) ? todos : Object.values(todos) as Todo[];
 
   // Calculate basic stats
   const totalTasks = todoArray.length;
