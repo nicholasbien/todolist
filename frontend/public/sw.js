@@ -267,6 +267,132 @@ async function getAuthHeaders() {
   return headers;
 }
 
+// Generate insights from todos data (shared logic with backend)
+function generateInsights(todos) {
+  // Convert todos to consistent format
+  const todoArray = Array.isArray(todos) ? todos : Object.values(todos);
+
+  // Calculate basic stats
+  const totalTasks = todoArray.length;
+  const completedTasks = todoArray.filter(todo => todo.completed).length;
+  const pendingTasks = totalTasks - completedTasks;
+  const completionRate = totalTasks > 0 ? (completedTasks / totalTasks * 100) : 0;
+
+  // Weekly stats tracking
+  const weeklyStats = {};
+
+  // Category stats tracking
+  const categoryStats = {};
+
+  // Priority stats tracking
+  const priorityStats = {};
+
+  // Process each todo
+  for (const todo of todoArray) {
+    // Parse dateAdded for weekly creation stats
+    try {
+      if (todo.dateAdded) {
+        const dateAdded = new Date(todo.dateAdded.replace('Z', '+00:00'));
+        if (!isNaN(dateAdded.getTime())) {
+          // Get Monday of the week (ISO week)
+          const weekStart = new Date(dateAdded);
+          weekStart.setDate(dateAdded.getDate() - dateAdded.getDay() + (dateAdded.getDay() === 0 ? -6 : 1));
+          const weekKey = weekStart.toISOString().split('T')[0];
+
+          if (!weeklyStats[weekKey]) {
+            weeklyStats[weekKey] = { created: 0, completed: 0 };
+          }
+          weeklyStats[weekKey].created += 1;
+        }
+      }
+    } catch (error) {
+      // Ignore invalid dates
+    }
+
+    // Parse dateCompleted for weekly completion stats
+    try {
+      if (todo.completed && todo.dateCompleted) {
+        const dateCompleted = new Date(todo.dateCompleted.replace('Z', '+00:00'));
+        if (!isNaN(dateCompleted.getTime())) {
+          const weekStart = new Date(dateCompleted);
+          weekStart.setDate(dateCompleted.getDate() - dateCompleted.getDay() + (dateCompleted.getDay() === 0 ? -6 : 1));
+          const weekKey = weekStart.toISOString().split('T')[0];
+
+          if (!weeklyStats[weekKey]) {
+            weeklyStats[weekKey] = { created: 0, completed: 0 };
+          }
+          weeklyStats[weekKey].completed += 1;
+        }
+      }
+    } catch (error) {
+      // Ignore invalid dates
+    }
+
+    // Category stats
+    const category = todo.category || 'General';
+    if (!categoryStats[category]) {
+      categoryStats[category] = { total: 0, completed: 0 };
+    }
+    categoryStats[category].total += 1;
+    if (todo.completed) {
+      categoryStats[category].completed += 1;
+    }
+
+    // Priority stats
+    const priority = todo.priority || 'Medium';
+    if (!priorityStats[priority]) {
+      priorityStats[priority] = { total: 0, completed: 0 };
+    }
+    priorityStats[priority].total += 1;
+    if (todo.completed) {
+      priorityStats[priority].completed += 1;
+    }
+  }
+
+  // Convert weekly stats to sorted array
+  const weeklyData = Object.keys(weeklyStats)
+    .sort()
+    .map(week => ({
+      week,
+      created: weeklyStats[week].created,
+      completed: weeklyStats[week].completed
+    }));
+
+  // Convert category stats to array
+  const categoryData = Object.entries(categoryStats).map(([category, stats]) => {
+    const completionRate = stats.total > 0 ? (stats.completed / stats.total * 100) : 0;
+    return {
+      category,
+      total: stats.total,
+      completed: stats.completed,
+      completion_rate: Math.round(completionRate * 10) / 10
+    };
+  });
+
+  // Convert priority stats to array
+  const priorityData = Object.entries(priorityStats).map(([priority, stats]) => {
+    const completionRate = stats.total > 0 ? (stats.completed / stats.total * 100) : 0;
+    return {
+      priority,
+      total: stats.total,
+      completed: stats.completed,
+      completion_rate: Math.round(completionRate * 10) / 10
+    };
+  });
+
+  return {
+    overview: {
+      total_tasks: totalTasks,
+      completed_tasks: completedTasks,
+      pending_tasks: pendingTasks,
+      completion_rate: Math.round(completionRate * 10) / 10
+    },
+    weekly_stats: weeklyData,
+    category_breakdown: categoryData,
+    priority_breakdown: priorityData
+  };
+}
+
 // Function to sync server data to local database on startup
 async function syncServerDataToLocal() {
   try {
@@ -620,6 +746,35 @@ async function offlineFallback(request, url) {
         return new Response(JSON.stringify(DEFAULT_CATEGORIES), { headers: { 'Content-Type': 'application/json' } });
       }
     }
+
+    // Handle insights by reusing the todos path so analytics logic is shared
+    if (url.pathname === '/insights' || url.pathname.endsWith('/insights')) {
+      try {
+        // Build a request for /todos with the same query params and headers
+        const headers = new Headers(request.headers);
+        const todosRequest = new Request(`/todos${url.search}`, { method: 'GET', headers });
+
+        // Use existing handler to get merged todo data (online or offline)
+        const todosResponse = await handleApiRequest(todosRequest);
+        if (!todosResponse || !todosResponse.ok) {
+          return todosResponse;
+        }
+
+        const todos = await todosResponse.clone().json();
+        const insights = generateInsights(todos);
+        return new Response(JSON.stringify(insights), {
+          headers: { 'Content-Type': 'application/json' }
+        });
+      } catch (err) {
+        // Fallback to locally stored todos if any step fails
+        const authData = await getAuth();
+        const todos = await getTodos(authData ? authData.userId : null, spaceId);
+        const insights = generateInsights(todos);
+        return new Response(JSON.stringify(insights), {
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+    }
   }
 
   // Handle core todo mutations offline
@@ -842,18 +997,35 @@ async function offlineFallback(request, url) {
       return new Response(null, { status: 204 });
     }
 
-    // Create/update journal entry
+    // Create or update journal entry (optimized for auto-save)
     if ((url.pathname === '/journals' || url.pathname.endsWith('/journals')) && request.method === 'POST') {
-      const journalData = {
-        _id: `offline_journal_${data.date}_${Date.now()}`,
-        user_id: authData ? authData.userId : 'offline_user',
-        space_id: data.space_id || null,
-        date: data.date,
-        text: data.text,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        created_offline: true,
-      };
+      const existing = await getJournals(
+        authData ? authData.userId : null,
+        data.date,
+        data.space_id || null
+      );
+
+      let journalData;
+      if (existing && existing.length > 0) {
+        // Update existing entry (perfect for auto-save!)
+        journalData = {
+          ...existing[0],
+          text: data.text,
+          updated_at: new Date().toISOString(),
+        };
+      } else {
+        // Create new offline entry only when needed
+        journalData = {
+          _id: `offline_journal_${data.date}_${Date.now()}`,
+          user_id: authData ? authData.userId : 'offline_user',
+          space_id: data.space_id || null,
+          date: data.date,
+          text: data.text,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          created_offline: true,
+        };
+      }
 
       await putJournal(journalData, authData ? authData.userId : null);
       await addQueue({ type: 'CREATE_JOURNAL', data: journalData }, authData ? authData.userId : null);
@@ -1099,6 +1271,17 @@ async function syncQueue() {
               console.log(`✅ Synced offline journal ${offlineId} -> ${serverJournal._id}`);
             } else {
               console.log(`❌ Journal Sync FAILED: Offline journal ${offlineId} will be preserved`);
+            }
+          } else {
+            // Handle both offline-generated and regular journal updates
+            res = await fetch('/journals', {
+              method: 'POST',
+              headers,
+              body: JSON.stringify(op.data),
+            });
+            if (res && res.ok) {
+              const serverJournal = await res.json();
+              await putJournal(serverJournal, authData.userId);
             }
           }
           break;

@@ -679,8 +679,7 @@ async def get_insights(
 ):
     """Get insights and analytics for user's todos."""
     try:
-        from collections import defaultdict
-        from datetime import datetime, timedelta
+        from insights_utils import generate_insights
 
         # Get todos for the specified space or all spaces
         if space_id:
@@ -707,99 +706,9 @@ async def get_insights(
             else:
                 todo_dicts.append(dict(todo))
 
-        # Calculate basic stats
-        total_tasks = len(todo_dicts)
-        completed_tasks = sum(1 for todo in todo_dicts if todo.get("completed", False))
-        pending_tasks = total_tasks - completed_tasks
-        completion_rate = (completed_tasks / total_tasks * 100) if total_tasks > 0 else 0
-
-        # Tasks per week over time
-        weekly_stats: Dict[str, Dict[str, int]] = defaultdict(lambda: {"created": 0, "completed": 0})
-
-        # Category breakdown
-        category_stats: Dict[str, Dict[str, int]] = defaultdict(lambda: {"total": 0, "completed": 0})
-
-        # Priority breakdown
-        priority_stats: Dict[str, Dict[str, int]] = defaultdict(lambda: {"total": 0, "completed": 0})
-
-        # Process each todo
-        for todo in todo_dicts:
-            # Parse dateAdded for weekly stats
-            try:
-                if todo.get("dateAdded"):
-                    date_added = datetime.fromisoformat(todo["dateAdded"].replace("Z", "+00:00"))
-                    # Get the Monday of the week (ISO week)
-                    week_start = date_added - timedelta(days=date_added.weekday())
-                    week_key = week_start.strftime("%Y-%m-%d")
-                    weekly_stats[week_key]["created"] += 1
-            except (ValueError, TypeError):
-                pass
-
-            # Parse dateCompleted for weekly completion stats
-            try:
-                if todo.get("completed") and todo.get("dateCompleted"):
-                    date_completed = datetime.fromisoformat(todo["dateCompleted"].replace("Z", "+00:00"))
-                    week_start = date_completed - timedelta(days=date_completed.weekday())
-                    week_key = week_start.strftime("%Y-%m-%d")
-                    weekly_stats[week_key]["completed"] += 1
-            except (ValueError, TypeError):
-                pass
-
-            # Category stats
-            category = todo.get("category", "General")
-            category_stats[category]["total"] += 1
-            if todo.get("completed"):
-                category_stats[category]["completed"] += 1
-
-            # Priority stats
-            priority = todo.get("priority", "Medium")
-            priority_stats[priority]["total"] += 1
-            if todo.get("completed"):
-                priority_stats[priority]["completed"] += 1
-
-        # Convert weekly stats to sorted list for charting
-        weekly_data = []
-        for week_key in sorted(weekly_stats.keys()):
-            stats = weekly_stats[week_key]
-            weekly_data.append({"week": week_key, "created": stats["created"], "completed": stats["completed"]})
-
-        # Convert category stats to list
-        category_data = []
-        for category, stats in category_stats.items():
-            completion_rate_cat = (stats["completed"] / stats["total"] * 100) if stats["total"] > 0 else 0
-            category_data.append(
-                {
-                    "category": category,
-                    "total": stats["total"],
-                    "completed": stats["completed"],
-                    "completion_rate": round(completion_rate_cat, 1),
-                }
-            )
-
-        # Convert priority stats to list
-        priority_data = []
-        for priority, stats in priority_stats.items():
-            completion_rate_pri = (stats["completed"] / stats["total"] * 100) if stats["total"] > 0 else 0
-            priority_data.append(
-                {
-                    "priority": priority,
-                    "total": stats["total"],
-                    "completed": stats["completed"],
-                    "completion_rate": round(completion_rate_pri, 1),
-                }
-            )
-
-        return {
-            "overview": {
-                "total_tasks": total_tasks,
-                "completed_tasks": completed_tasks,
-                "pending_tasks": pending_tasks,
-                "completion_rate": round(completion_rate, 1),
-            },
-            "weekly_stats": weekly_data,
-            "category_breakdown": category_data,
-            "priority_breakdown": priority_data,
-        }
+        # Use shared insights computation logic
+        insights = generate_insights(todo_dicts)
+        return insights
 
     except Exception as e:
         logger.error(f"Error getting insights: {e}")
