@@ -125,7 +125,7 @@ Write like a Buddhist monk. Include a life lesson and famous Buddhist quote or k
 """
 
 
-def create_summary_prompt(
+def create_summary_prompt(  # noqa: E501 (long lines OK for email templates)
     spaces_json: str,
     user_name: str = "there",
     custom_instructions: str = "",
@@ -150,12 +150,14 @@ def create_summary_prompt(
             # Final fallback to UTC
             current_date = datetime.now().strftime("%A, %B %d, %Y")
 
-    return f"""You are a helpful personal assistant creating a daily todo summary email.
+    # Email template with intentionally longer lines for readability
+    return f"""You are a helpful personal assistant creating a daily todo summary email with clear structure
+and visual hierarchy.
 
 Today's date: {current_date}
 
-Given the following JSON data of todos organized by collaboration space,
-and recent journal entries, create a warm, encouraging daily summary email.
+Given the following JSON data of todos organized by collaboration space and recent journal entries,
+create a well-structured, scannable daily summary email.
 
 Todo Data (grouped by space):
 {spaces_json}
@@ -163,48 +165,71 @@ Todo Data (grouped by space):
 Recent Journal Entries:
 {journal_entries_json}
 
-Instructions:
-1. Address the user as "{user_name}" if provided, otherwise use "there"
-2. Create a friendly, motivational tone
-3. **IMPORTANT**: Focus primarily on tasks completed in the last day (check "dateCompleted" field).
-   Ignore tasks completed before yesterday - they're included for context but shouldn't be highlighted.
-4. Pay attention to the "dateAdded" field in each todo to understand timing and
-   the "dueDate" field for upcoming deadlines:
-   - Celebrate recently completed tasks (completed yesterday or today only)
-   - Identify pending tasks that are getting old/stale
-   - Highlight urgent items or those with approaching due dates
-   - When present, use the "dateAddedRelative", "dateCompletedRelative", and "dueDateRelative" fields
-     which combine absolute dates with relative phrases like "3 days ago" or "in 1 week"
-5. **PRIORITY ATTENTION**: Pay special attention to "High" priority tasks in the pending list.
-   Always mention high priority tasks prominently and encourage action on them.
-6. Organize todos by:
-   - Recently completed tasks from last day (celebrate achievements!)
-   - Pending tasks by priority (High, Medium, Low) - emphasize High priority items
-   - Group by categories where relevant
-7. Provide insights like:
-   - Total tasks completed vs pending (focus on recent completions)
-   - Number of high priority tasks that need attention
-   - Most productive category
-   - Tasks that need attention due to age or priority
-   - Recent momentum and progress patterns
-8. Keep it concise but personal (2-3 paragraphs max)
-9. End with a motivational note for the day ahead
-10. If referring to tasks in a specific space, only mention todos from that space
-11. Close with a brief Buddhist koan to encourage reflection
-{custom_instructions}
+**EMAIL STRUCTURE (blend structured format with flowing prose):**
 
-12. At the very end, add this EXACT haiku from a classical Japanese master.
-    CRITICAL: Use ONLY this haiku - do NOT write any other haiku or poetry:
+Good morning {user_name},
+
+🎯 Today's Overview
+• [X completed tasks today/yesterday] ✅ | [Y pending tasks] 📋 | [Z high priority] 🔥
+
+✨ Recent Wins
+[Write 2-3 sentences celebrating recently completed tasks with personal context and encouragement.
+Connect completions to broader goals or themes. Be warm and specific about achievements.]
+
+🔥 Priority Focus (Top 3-5 most important)
+• 🚨 [Overdue task] - [due date with relative time]
+• ⚡ [High priority task] - [due date with relative time]
+• 📅 [Upcoming deadline] - [due date with relative time]
+
+[Write 1-2 sentences about these priority items - why they matter, how they connect to user's goals,
+gentle urgency without pressure. Personal and encouraging tone.]
+
+⚡ Quick Wins (Tasks that take <15 minutes)
+• [Quick task 1]
+• [Quick task 2]
+
+📊 Insights & Reflection
+[Write a flowing paragraph (3-4 sentences) that weaves together:
+- Productivity patterns and most active category
+- Deeper meaning behind the tasks and progress
+- Connection to personal growth or life themes
+- Thoughtful observations about momentum and direction
+Keep the philosophical, reflective tone from the original emails.]
+
+[Buddhist koan - keep meaningful and relevant to the user's current situation]
+
+---
 
 {haiku}
 
-13. After the haiku above, add exactly ONE emoji that best matches the themes, mood, or imagery
-    from this list:
+**FORMATTING REQUIREMENTS:**
+1. Address user as "{user_name}"
+2. **Use PLAIN TEXT formatting** - no HTML, no markdown bold/italics, just emojis and text
+3. **Blend structure with narrative** - use the emoji headers for scanning, but write in flowing prose
+   within each section
+4. **Focus on recent completions (last 24-48 hours only)** from dateCompleted field
+5. **Analyze task priorities yourself** - look at the "priority" field (High/Medium/Low) and due dates
+6. **Maintain the original's thoughtful tone** - be personal, encouraging, and philosophical
+7. Use bullet points for task lists but paragraphs for reflections and insights
+8. Add time context using dueDateRelative fields when available
+9. Group overdue items with 🚨, high priority with ⚡, upcoming with 📅
+10. Include accurate task counts in overview section
+11. **For Quick Wins section**: Identify tasks that appear simple/quick based on their text:
+    - Single action items (call, email, buy, pick up, clean, trim, etc.)
+    - Administrative tasks (pay bill, submit form, schedule appointment)
+    - Short maintenance tasks
+    - Avoid complex projects or multi-step tasks
+12. **Write with depth and meaning** - connect tasks to broader life themes, personal growth, and mindful living
+{custom_instructions}
+
+11. **Haiku placement**: Use ONLY the provided haiku exactly as written:
+
+{haiku}
+
+12. Add exactly ONE emoji at the end of the haiku's third line from:
    - Nature: 🌸🍃🌺🍂🌱🌼🌻🌷🌹🌿🌳🌲🌴🌾🌵
    - Sky/Weather: 🌙⭐🌅🌊🌄🌈☀️🌤️⛅🌥️❄️💧🌟✨
    - Zen/Spiritual: 🧘🕯️🪷🎍🎐🪶🪨🏔️🎋🍀
-
-Add the chosen emoji at the end of the third (final) line of the haiku, with a space before it.
 
 Format as plain text email content (no HTML, no subject line).
 """

@@ -28,6 +28,7 @@ A modern collaborative todo list application with AI-powered task classification
 ### Task Management
 - **Category and priority management** with space-specific categories
 - **Due date tracking** with upcoming deadlines highlighted in daily summaries
+- **Balanced daily email summaries** with structured sections and thoughtful prose, priority focus, and quick wins
 - **Day-of-week aware date parsing** for more accurate due dates
 - **Link support** - Add a URL as a task and its page title is fetched automatically
 - **Progressive Web App (PWA)** - Install on iPhone/Android like a native app
@@ -413,6 +414,44 @@ the manual endpoint if needed:
 - `GET /email/scheduler-status` - Check scheduler status
 - `POST /email/update-instructions` - Set custom instructions for summaries
 - `POST /email/update-spaces` - Choose which spaces are included in summaries
+
+#### Daily Email Format
+The daily summary emails blend structured scanning with thoughtful prose:
+
+```
+Good morning Nicholas,
+
+🎯 Today's Overview
+• 2 completed tasks today ✅ | 26 pending tasks 📋 | 5 high priority 🔥
+
+✨ Recent Wins
+Congratulations on another mindful step forward! Today, you wrapped up "Buy CRWV" and "Julbo sunglasses"—both essential pieces for your Kilimanjaro adventure. These completions reflect more than just crossing items off a list; they show your commitment to preparing thoughtfully for the challenges ahead.
+
+🔥 Priority Focus (Top 5 most important)
+• 🚨 Pick up contacts - Dec 1, 2024 (2 weeks ago)
+• ⚡ Carta exercise - Dec 16, 2024 (tomorrow)
+• ⚡ Trim toenails - Dec 14, 2024 (yesterday)
+• 📅 Clean retainer - high priority
+• 📅 Order contacts - high priority
+
+Among the 26 pending tasks, these five high-priority items call for your focus. Taking action on these will help clear your path for upcoming adventures and ensure nothing essential is forgotten as you ready yourself for both personal journeys and meaningful transitions.
+
+⚡ Quick Wins (Tasks that take <15 minutes)
+• Trim toenails
+• Clean retainer
+• Pick up contacts
+
+📊 Insights & Reflection
+Finance has been your most productive category over the past 24 hours, reflecting tangible progress in your preparation efforts. Yet don't let the older health-related tasks become burdens on your mind—each small action plants seeds for tomorrow's ease. The momentum you're building with gear and financial planning deserves the same attention to personal care and maintenance.
+
+A monk asked Baso, "What is Buddha?" Baso answered, "No mind, no Buddha."
+
+---
+
+The end of spring--
+the poet is brooding
+about editors. 🌸
+```
 
 ## Deployment
 

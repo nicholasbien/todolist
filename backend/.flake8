@@ -1,9 +1,10 @@
 [flake8]
 max-line-length = 120
-extend-ignore = E203,W503
-# Allow longer lines for strings and URLs
+extend-ignore = E203,W503,E501
+# Allow longer lines for strings and URLs globally
+# Especially useful for email templates and long string literals
 per-file-ignores =
-    *:E501
+    email_summary.py:E501
 exclude =
     .git,
     __pycache__,
