@@ -652,7 +652,7 @@ async def api_chat(
             raise HTTPException(status_code=404, detail="Space not found")
 
         todos = await get_todos(current_user["user_id"], req.space_id)
-        todos_dict = [todo.dict() if hasattr(todo, "dict") else todo for todo in todos]
+        todos_dict = [todo.dict(by_alias=True) if hasattr(todo, "dict") else todo for todo in todos]
         spaces_data = [{"space": requested_space.name, "todos": todos_dict}]
 
         history = conversations[current_user["user_id"]]
@@ -699,7 +699,7 @@ async def get_insights(
         todo_dicts = []
         for todo in todos:
             if hasattr(todo, "dict"):
-                todo_dicts.append(todo.dict())
+                todo_dicts.append(todo.dict(by_alias=True))
             elif hasattr(todo, "__dict__"):
                 todo_dicts.append(todo.__dict__)
             else:

@@ -431,7 +431,7 @@ async def send_daily_summary(
         all_todos = []
         for space in spaces:
             space_todos = await get_todos(user_id, space.id)
-            todos_dict = [t.dict() if hasattr(t, "dict") else t for t in space_todos]
+            todos_dict = [t.dict(by_alias=True) if hasattr(t, "dict") else t for t in space_todos]
             relative: List[dict] = []
             for t in todos_dict:
                 t_copy = dict(t)
@@ -451,7 +451,7 @@ async def send_daily_summary(
         one_week_ago = (datetime.utcnow() - timedelta(days=7)).date()
         journal_entries: List[dict] = []
         for j in recent_journals:
-            j_dict = j.dict() if hasattr(j, "dict") else j
+            j_dict = j.dict(by_alias=True) if hasattr(j, "dict") else j
             date_str = j_dict.get("date")
             try:
                 entry_date = datetime.fromisoformat(date_str).date()
