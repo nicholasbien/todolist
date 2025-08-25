@@ -76,7 +76,7 @@ async def test_chat_space_filtering(client, test_email, monkeypatch):
 
     monkeypatch.setattr("app.answer_question", AsyncMock(side_effect=fake_answer))
 
-    resp = await client.post("/chat", json={"question": "hello"}, headers=headers)
+    resp = await client.post("/chat", json={"question": "hello", "space_id": space_a}, headers=headers)
     assert resp.status_code == 200
     names = {s["space"] for s in captured["spaces"]}
     assert "A" in names

@@ -607,6 +607,7 @@ class ContactRequest(BaseModel):
 
 class ChatRequest(BaseModel):
     question: str
+    space_id: str
 
 
 @app.post("/contact")
@@ -640,15 +641,20 @@ async def api_chat(
 ):
     """Answer user questions about their todos using OpenAI."""
     try:
+        # Check if user has access to the requested space
+        if not await user_in_space(current_user["user_id"], req.space_id):
+            raise HTTPException(status_code=403, detail="Access denied to space")
+
+        # Get todos only from the requested space
+        todos = await get_todos(current_user["user_id"], req.space_id)
+        todos_dict = [todo.dict() if hasattr(todo, "dict") else todo for todo in todos]
+
+        # Get space info for context
         spaces = await get_spaces_for_user(current_user["user_id"])
-        if current_user.get("email_spaces"):
-            allowed = set(current_user["email_spaces"])
-            spaces = [s for s in spaces if s.is_default or s.id in allowed]
-        spaces_data = []
-        for space in spaces:
-            todos = await get_todos(current_user["user_id"], space.id)
-            todos_dict = [todo.dict() if hasattr(todo, "dict") else todo for todo in todos]
-            spaces_data.append({"space": space.name, "todos": todos_dict})
+        space = next((s for s in spaces if s.id == req.space_id), None)
+        space_name = space.name if space else "Unknown Space"
+
+        spaces_data = [{"space": space_name, "todos": todos_dict}]
 
         history = conversations[current_user["user_id"]]
         answer = await answer_question(req.question, spaces_data, history)

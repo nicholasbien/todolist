@@ -2,17 +2,19 @@ import React, { useState, useEffect, useRef } from 'react';
 
 interface ChatbotProps {
   token: string;
+  activeSpace: any;
 }
 
 // Maximum number of messages to retain (matches backend MAX_HISTORY)
 const MAX_MESSAGES = 10;
 
-export default function TodoChatbot({ token }: ChatbotProps) {
+export default function TodoChatbot({ token, activeSpace }: ChatbotProps) {
   const [question, setQuestion] = useState('');
   const [messages, setMessages] = useState<{ role: string; content: string }[]>(() => {
     if (typeof window !== 'undefined') {
       try {
-        const stored = sessionStorage.getItem('todo_chat_messages');
+        const spaceKey = `todo_chat_messages_${activeSpace?._id || 'default'}`;
+        const stored = sessionStorage.getItem(spaceKey);
         return stored ? JSON.parse(stored) : [];
       } catch {
         return [];
@@ -34,15 +36,34 @@ export default function TodoChatbot({ token }: ChatbotProps) {
     scrollToBottom();
     if (typeof window !== 'undefined') {
       try {
-        sessionStorage.setItem('todo_chat_messages', JSON.stringify(messages));
+        const spaceKey = `todo_chat_messages_${activeSpace?._id || 'default'}`;
+        sessionStorage.setItem(spaceKey, JSON.stringify(messages));
       } catch {
         // Ignore write errors
       }
     }
-  }, [messages]);
+  }, [messages, activeSpace]);
+
+  // Clear messages when space changes
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const spaceKey = `todo_chat_messages_${activeSpace?._id || 'default'}`;
+        const stored = sessionStorage.getItem(spaceKey);
+        setMessages(stored ? JSON.parse(stored) : []);
+      } catch {
+        setMessages([]);
+      }
+    }
+  }, [activeSpace]);
 
   const handleAsk = async () => {
     if (!question.trim()) return;
+
+    if (!activeSpace?._id) {
+      setError('No active space selected. Please select a space to use the assistant.');
+      return;
+    }
 
     // Add user message immediately and limit to last 20 messages (matching backend context)
     const userQuestion = question;
@@ -61,7 +82,10 @@ export default function TodoChatbot({ token }: ChatbotProps) {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ question: userQuestion }),
+        body: JSON.stringify({
+          question: userQuestion,
+          space_id: activeSpace._id
+        }),
       });
       if (!resp.ok) {
         const data = await resp.json();
@@ -136,7 +160,7 @@ export default function TodoChatbot({ token }: ChatbotProps) {
         />
         <button
           onClick={handleAsk}
-          disabled={loading || !question.trim()}
+          disabled={loading || !question.trim() || !activeSpace?._id}
           className="bg-accent text-foreground px-6 py-2 rounded-lg hover:bg-accent-light disabled:bg-accent-dark disabled:cursor-not-allowed transition-colors self-end"
         >
           Send

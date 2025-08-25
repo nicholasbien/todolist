@@ -1296,7 +1296,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
               }}
             />
           </div>
-          <TodoChatbot token={token} />
+          <TodoChatbot token={token} activeSpace={activeSpace} />
         </div>
       )}
 
