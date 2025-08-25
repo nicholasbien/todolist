@@ -111,9 +111,13 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
       ...options.headers
     };
 
-    // Use environment variable for API base URL
-    const baseURL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-    const fullURL = url.startsWith('http') ? url : `${baseURL}${url}`;
+    // Build the request URL.
+    // When no API base URL is provided we fall back to the relative path so the
+    // service worker can intercept the request for offline caching. Using an
+    // absolute URL here would bypass the service worker (different origin) and
+    // break offline functionality/tests.
+    const baseURL = process.env.NEXT_PUBLIC_API_URL;
+    const fullURL = url.startsWith('http') || !baseURL ? url : `${baseURL}${url}`;
 
     const response = await fetch(fullURL, {
       ...options,
