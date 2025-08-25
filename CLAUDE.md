@@ -191,3 +191,46 @@ Without version bumps, browsers will continue using the cached old service worke
 4. If offline: Serve from IndexedDB with offline ID generation
 5. Queue failed operations for sync when back online
 6. On successful sync: Immediately replace offline data with server data
+
+## Common Issues
+
+### Field Serialization Bug: `_id` vs `id`
+
+**Problem**: Service worker expects `_id` fields for IndexedDB storage, but inconsistent backend serialization can return `id` instead.
+
+**Symptoms**:
+- Journal/todo data cached successfully when online
+- "Found 0 items" when retrieving the same data offline
+- `ERR_INTERNET_DISCONNECTED` errors for cached requests
+
+**Root Cause**:
+- IndexedDB stores are configured with `keyPath: '_id'`
+- Pydantic models use `Field(alias="_id")` but serialize differently based on method:
+  - `model.dict()` → returns `{"id": "value"}` (Python field name)
+  - `model.dict(by_alias=True)` → returns `{"_id": "value"}` (alias name)
+  - FastAPI `response_model` → automatically uses aliases correctly
+
+**Solution**: Always use consistent serialization in FastAPI endpoints:
+```python
+# ❌ WRONG - Uses Python field name
+@app.get("/items")
+async def get_items():
+    items = await get_items_from_db()
+    return [item.dict() for item in items]  # Returns {"id": ...}
+
+# ✅ CORRECT - Use response_model for consistency
+@app.get("/items", response_model=List[Item])
+async def get_items():
+    return await get_items_from_db()  # FastAPI handles serialization
+
+# ✅ ALTERNATIVE - Explicit by_alias=True
+@app.get("/items")
+async def get_items():
+    items = await get_items_from_db()
+    return [item.dict(by_alias=True) for item in items]  # Returns {"_id": ...}
+```
+
+**Prevention**:
+- Always use `response_model` in FastAPI endpoints for consistency
+- Test offline functionality after adding new endpoints
+- Monitor service worker logs for "Found 0" vs expected counts
