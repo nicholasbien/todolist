@@ -45,6 +45,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
   const [emailSpaceIds, setEmailSpaceIds] = useState<string[]>([]);
   const [spaces, setSpaces] = useState([]);
   const [activeSpace, setActiveSpace] = useState(null);
+  const [loadingSpaces, setLoadingSpaces] = useState(true);
   const [showAddSpaceModal, setShowAddSpaceModal] = useState(false);
   const [newSpaceName, setNewSpaceName] = useState('');
   const [showEditSpaceModal, setShowEditSpaceModal] = useState(false);
@@ -126,6 +127,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
 
   const fetchSpaces = useCallback(async () => {
     try {
+      setLoadingSpaces(true);
       // For offline functionality, service worker doesn't need token
       // For online requests, authenticatedFetch handles token automatically
       const response = await authenticatedFetch('/api/spaces');
@@ -139,6 +141,8 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
     } catch (err) {
       console.error('Error loading spaces', err);
       handleError(err);
+    } finally {
+      setLoadingSpaces(false);
     }
   }, [authenticatedFetch, activeSpace, handleError]);
 
@@ -909,6 +913,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
                 setInviteEmails(['']);
                 setShowEditSpaceModal(true);
               }}
+              isLoading={loadingSpaces}
             />
           </div>
 
@@ -1290,6 +1295,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
                 setInviteEmails(['']);
                 setShowEditSpaceModal(true);
               }}
+              isLoading={loadingSpaces}
             />
           </div>
           <TodoChatbot token={token} activeSpace={activeSpace} />
@@ -1316,6 +1322,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
                 setInviteEmails(['']);
                 setShowEditSpaceModal(true);
               }}
+              isLoading={loadingSpaces}
             />
           </div>
           <InsightsComponent token={token} activeSpace={activeSpace} />
@@ -1342,6 +1349,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
                 setInviteEmails(['']);
                 setShowEditSpaceModal(true);
               }}
+              isLoading={loadingSpaces}
             />
           </div>
           <JournalComponent token={token} activeSpace={activeSpace} />

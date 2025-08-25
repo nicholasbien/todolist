@@ -16,6 +16,7 @@ interface SpaceDropdownProps {
   onSpaceSelect: (space: Space) => void;
   onCreateSpace: () => void;
   onEditSpace: (space: Space) => void;
+  isLoading?: boolean;
 }
 
 export default function SpaceDropdown({
@@ -24,7 +25,8 @@ export default function SpaceDropdown({
   user,
   onSpaceSelect,
   onCreateSpace,
-  onEditSpace
+  onEditSpace,
+  isLoading = false
 }: SpaceDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -76,7 +78,7 @@ export default function SpaceDropdown({
       >
         <span className="text-lg">🏠</span>
         <span className="font-medium">
-          {activeSpace?.name || 'No Space'}
+          {activeSpace?.name || (isLoading ? 'Loading…' : '')}
         </span>
         <svg
           className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`}
