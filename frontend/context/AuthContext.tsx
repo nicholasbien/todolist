@@ -5,9 +5,11 @@ interface AuthContextValue {
   token: string | null;
   isLoading: boolean;
   isAuthenticated: boolean;
+  authExpired: boolean;
   signup: (email: string) => Promise<{ success: boolean; message?: string; error?: string }>;
   login: (email: string, code: string) => Promise<{ success: boolean; error?: string }>;
-  logout: () => Promise<void> | void;
+  logout: (expired?: boolean) => Promise<void> | void;
+  clearAuthExpired: () => void;
   authenticatedFetch: (url: string, options?: RequestInit) => Promise<Response>;
 }
 
@@ -30,9 +32,10 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [token, setToken] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [mounted, setMounted] = useState(false);
+  const [authExpired, setAuthExpired] = useState(false);
 
 
-  const logout = async (): Promise<void> => {
+  const logout = async (expired: boolean = false): Promise<void> => {
     try {
       if (token) {
         // Call logout endpoint to invalidate token on server
@@ -53,6 +56,9 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       }
       setToken(null);
       setUser(null);
+      if (expired) {
+        setAuthExpired(true);
+      }
     }
   };
 
@@ -70,11 +76,11 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         setToken(tokenToVerify);
       } else {
         // Token is invalid, clear it
-        logout();
+        logout(true);
       }
     } catch (error) {
       console.error('Token verification failed:', error);
-      logout();
+      logout(true);
     } finally {
       setIsLoading(false);
     }
@@ -153,6 +159,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         // Update state
         setToken(newToken);
         setUser(userData);
+        setAuthExpired(false);
 
         return { success: true };
       } else {
@@ -182,7 +189,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
     // If token is invalid, logout
     if (response.status === 401) {
-      logout();
+      logout(true);
       throw new Error('Authentication expired');
     }
 
@@ -194,9 +201,11 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     token,
     isLoading: !mounted || isLoading,
     isAuthenticated: mounted && !!token && !!user,
+    authExpired,
     signup,
     login,
     logout,
+    clearAuthExpired: () => setAuthExpired(false),
     authenticatedFetch
   };
 
