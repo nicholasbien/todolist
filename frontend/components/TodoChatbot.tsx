@@ -90,7 +90,7 @@ export default function TodoChatbot({ token }: ChatbotProps) {
 
   return (
     <div className="flex flex-col">
-      <h3 className="text-lg font-semibold mb-4 text-gray-100">AI Assistant</h3>
+      <h3 className="text-lg font-semibold mb-4 text-gray-100">Assistant</h3>
 
       {/* Messages container */}
       <div className="mb-4 space-y-4">
@@ -133,8 +133,7 @@ export default function TodoChatbot({ token }: ChatbotProps) {
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
           onKeyPress={handleKeyPress}
-          placeholder={`Ask a question about your todos...
-(Enter to send, Shift+Enter for new line)`}
+          placeholder="Ask a question..."
           disabled={loading}
         />
         <button
