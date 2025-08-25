@@ -1,9 +1,11 @@
+import csv
 import json
 import logging
 import os
 from collections import defaultdict
 from contextlib import asynccontextmanager
 from datetime import datetime
+from io import StringIO
 from typing import Dict, List, Optional
 
 import httpx
@@ -38,6 +40,7 @@ from classify import classify_task
 from email_summary import send_daily_summary
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response
 
 # Import journal functions
 from journals import (
@@ -47,6 +50,7 @@ from journals import (
     generate_journal_summary,
     get_journal_entries,
     get_journal_entry_by_date,
+    journals_collection,
 )
 from pydantic import BaseModel
 from scheduler import get_scheduler_status, start_scheduler, update_schedule_time
@@ -60,7 +64,16 @@ from spaces import (
     update_space,
     user_in_space,
 )
-from todos import Todo, complete_todo, create_todo, delete_todo, get_todos, health_check, update_todo_fields
+from todos import (
+    Todo,
+    complete_todo,
+    create_todo,
+    delete_todo,
+    get_todos,
+    health_check,
+    todos_collection,
+    update_todo_fields,
+)
 
 # Set up logging with more detail
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -884,6 +897,64 @@ async def api_generate_journal_summary(entry_id: str, current_user: dict = Depen
     except Exception as e:
         logger.error(f"Error generating journal summary: {e}")
         raise HTTPException(status_code=500, detail="Failed to generate summary")
+
+
+@app.get("/export")
+async def export_data(
+    data: str,
+    format: str = "jsonl",
+    current_user: dict = Depends(get_current_user),
+):
+    """Export user's todos or journal entries in JSONL or CSV format."""
+    valid_types = {"todos": todos_collection, "journals": journals_collection}
+    if data not in valid_types:
+        raise HTTPException(status_code=400, detail="Invalid data type")
+
+    collection = valid_types[data]
+    cursor = collection.find({"user_id": current_user["user_id"]})
+    items = await cursor.to_list(length=None)
+    for item in items:
+        item.pop("_id", None)
+        item.pop("user_id", None)
+        item["first_name"] = current_user.get("first_name", "")
+
+    if format == "jsonl":
+        lines = [json.dumps(item) for item in items]
+        content = "\n".join(lines)
+        return Response(
+            content=content,
+            media_type="application/json",
+            headers={"Content-Disposition": f"attachment; filename={data}.jsonl"},
+        )
+
+    if format == "csv":
+        if data == "todos":
+            fields = [
+                "text",
+                "category",
+                "priority",
+                "dateAdded",
+                "dueDate",
+                "completed",
+                "notes",
+                "first_name",
+            ]
+        else:
+            fields = ["date", "text", "first_name"]
+
+        output = StringIO()
+        writer = csv.DictWriter(output, fieldnames=fields)
+        writer.writeheader()
+        for item in items:
+            writer.writerow({field: item.get(field, "") for field in fields})
+
+        return Response(
+            content=output.getvalue(),
+            media_type="text/csv",
+            headers={"Content-Disposition": f"attachment; filename={data}.csv"},
+        )
+
+    raise HTTPException(status_code=400, detail="Invalid format")
 
 
 if __name__ == "__main__":

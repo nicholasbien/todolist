@@ -291,6 +291,10 @@ export default function Home() {
   const [showSettingsDropdown, setShowSettingsDropdown] = useState(false);
   const [showContactModal, setShowContactModal] = useState(false);
   const [showEmailSettings, setShowEmailSettings] = useState(false);
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [exportType, setExportType] = useState<'todos' | 'journals'>('todos');
+  const [exportFormat, setExportFormat] = useState<'jsonl' | 'csv'>('jsonl');
+  const [exporting, setExporting] = useState(false);
   const [contactMessage, setContactMessage] = useState('');
   const [sendingContact, setSendingContact] = useState(false);
   const [showOfflineTooltip, setShowOfflineTooltip] = useState(false);
@@ -385,6 +389,33 @@ export default function Home() {
     }
   };
 
+  const handleExportData = async () => {
+    try {
+      setExporting(true);
+      const baseURL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+      const response = await fetch(`${baseURL}/export?data=${exportType}&format=${exportFormat}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (!response.ok) throw new Error('Export failed');
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${exportType}.${exportFormat}`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+      setShowExportModal(false);
+    } catch (err) {
+      console.error('Export error:', err);
+    } finally {
+      setExporting(false);
+    }
+  };
+
   if (!isClient || isChecking) {
     return (
       <>
@@ -461,6 +492,15 @@ export default function Home() {
                   <button
                     onClick={() => {
                       setShowSettingsDropdown(false);
+                      setShowExportModal(true);
+                    }}
+                    className="w-full text-left px-4 py-3 text-gray-300 hover:bg-gray-900 hover:text-gray-100 transition-colors"
+                  >
+                    Export Data
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowSettingsDropdown(false);
                       setShowContactModal(true);
                     }}
                     className="w-full text-left px-4 py-3 text-gray-300 hover:bg-gray-900 hover:text-gray-100 transition-colors"
@@ -488,6 +528,51 @@ export default function Home() {
           onShowEmailSettings={() => setShowEmailSettings(true)}
           onCloseEmailSettings={() => setShowEmailSettings(false)}
         />
+        {/* Export Modal */}
+        {showExportModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50">
+            <div className="bg-black border border-gray-800 p-6 rounded-xl w-80 space-y-4 shadow-2xl">
+              <h3 className="text-gray-100 text-lg font-bold mb-2">Export Data</h3>
+              <div>
+                <label className="block text-sm text-gray-300 mb-2">Data Type</label>
+                <select
+                  value={exportType}
+                  onChange={(e) => setExportType(e.target.value as 'todos' | 'journals')}
+                  className="w-full bg-gray-900 border border-gray-700 text-gray-100 p-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent"
+                >
+                  <option value="todos">Tasks</option>
+                  <option value="journals">Journal Entries</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm text-gray-300 mb-2">Format</label>
+                <select
+                  value={exportFormat}
+                  onChange={(e) => setExportFormat(e.target.value as 'jsonl' | 'csv')}
+                  className="w-full bg-gray-900 border border-gray-700 text-gray-100 p-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent"
+                >
+                  <option value="jsonl">JSONL</option>
+                  <option value="csv">CSV</option>
+                </select>
+              </div>
+              <div className="flex justify-center space-x-3">
+                <button
+                  onClick={handleExportData}
+                  disabled={exporting}
+                  className="bg-accent hover:bg-accent-light disabled:bg-accent-dark disabled:text-gray-400 text-white px-6 py-2 rounded-lg transition-colors"
+                >
+                  {exporting ? 'Exporting...' : 'Download'}
+                </button>
+                <button
+                  onClick={() => setShowExportModal(false)}
+                  className="bg-gray-800 hover:bg-gray-700 text-gray-300 px-6 py-2 rounded-lg transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Contact Modal */}
         {showContactModal && (
@@ -523,6 +608,6 @@ export default function Home() {
         )}
       </div>
     </main>
-    </>
+  </>
   );
 }
