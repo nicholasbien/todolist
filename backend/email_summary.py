@@ -424,7 +424,7 @@ async def send_daily_summary(
 
         # Get user's todos only for spaces the user has selected
         spaces = await get_spaces_for_user(user_id)
-        if user and user.get("email_spaces"):
+        if user is not None and user.get("email_spaces") is not None:
             allowed = set(user.get("email_spaces", []))
             spaces = [s for s in spaces if s.id in allowed]
         spaces_data = []
