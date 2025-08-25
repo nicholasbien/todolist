@@ -160,14 +160,14 @@ Recent Journal Entries:
 
 Good morning {user_name},
 
-🎯 Today's Overview
+**Today's Overview**
 • [X completed tasks today/yesterday] ✅ | [Y pending tasks] 📋 | [Z high priority] 🔥
 
-✨ Recent Wins
+**Recent Wins**
 [Write 2-3 sentences celebrating recently completed tasks with personal context and encouragement.
 Connect completions to broader goals or themes. Be warm and specific about achievements.]
 
-🔥 Priority Focus (Top 3-5 most important)
+**Priority Focus (Top 3-5 most important)**
 • 🚨 [Overdue task] - [due date with relative time]
 • ⚡ [High priority task] - [due date with relative time]
 • 📅 [Upcoming deadline] - [due date with relative time]
@@ -175,11 +175,11 @@ Connect completions to broader goals or themes. Be warm and specific about achie
 [Write 1-2 sentences about these priority items - why they matter, how they connect to user's goals,
 gentle urgency without pressure. Personal and encouraging tone.]
 
-⚡ Quick Wins (Tasks that take <15 minutes)
+**Quick Wins (Tasks that take <15 minutes)**
 • [Quick task 1]
 • [Quick task 2]
 
-📊 Insights & Reflection
+**Insights & Reflection**
 [Write a flowing paragraph (3-4 sentences) that weaves together:
 - Productivity patterns and most active category
 - Deeper meaning behind the tasks and progress
