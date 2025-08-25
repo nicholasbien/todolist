@@ -24,6 +24,21 @@ async def test_prompt_contains_date_context(monkeypatch):
     assert "Tuesday, 2025-06-10" in system_msg
 
 
+@pytest.mark.asyncio
+async def test_fallback_manual_parse(monkeypatch):
+    def fake_create(model, messages, temperature):
+        return FakeCompletion(
+            '{"category": "General", "priority": "Low", "text": "Bike to Bear Mountain", "dueDate": null}'
+        )
+
+    monkeypatch.setattr(classify.client.chat.completions, "create", fake_create)
+
+    result = await classify.classify_task("Bike to Bear Mountain in two weeks", [], "2025-06-10")
+
+    assert result["dueDate"] == "2025-06-24"
+    assert result["text"] == "Bike to Bear Mountain"
+
+
 def test_manual_parse_due_date():
     ref = "2025-06-10"  # Tuesday
     due_date, _ = manual_parse_due_date("finish tomorrow", ref)
@@ -46,6 +61,8 @@ def test_manual_parse_due_date_various():
     check("finish tomorrow", "2025-06-11", "finish")
     check("do it by today", "2025-06-10", "do it")
     check("due tomorrow", "2025-06-11", "")
+    check("Bike to Bear Mountain in two weeks", "2025-06-24", "Bike to Bear Mountain")
+    check("call mom in 3 days", "2025-06-13", "call mom")
     # Next weekday
     check("meet next Monday", "2025-06-16", "meet")
     check("by next tuesday", "2025-06-17", "")

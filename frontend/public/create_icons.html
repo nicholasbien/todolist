@@ -8,24 +8,20 @@
 // Create 192x192 icon
 const canvas192 = document.getElementById('canvas192');
 const ctx192 = canvas192.getContext('2d');
-ctx192.fillStyle = '#3b82f6';
+ctx192.fillStyle = '#ff7b4a';
 ctx192.fillRect(0, 0, 192, 192);
-ctx192.fillStyle = 'white';
-ctx192.font = 'bold 120px Arial';
-ctx192.textAlign = 'center';
-ctx192.textBaseline = 'middle';
-ctx192.fillText('✓', 96, 96);
+ctx192.strokeStyle = 'white';
+ctx192.lineWidth = 4;
+ctx192.strokeRect(48, 48, 96, 96);
 
 // Create 512x512 icon
 const canvas512 = document.getElementById('canvas512');
 const ctx512 = canvas512.getContext('2d');
-ctx512.fillStyle = '#3b82f6';
+ctx512.fillStyle = '#ff7b4a';
 ctx512.fillRect(0, 0, 512, 512);
-ctx512.fillStyle = 'white';
-ctx512.font = 'bold 320px Arial';
-ctx512.textAlign = 'center';
-ctx512.textBaseline = 'middle';
-ctx512.fillText('✓', 256, 256);
+ctx512.strokeStyle = 'white';
+ctx512.lineWidth = 10;
+ctx512.strokeRect(128, 128, 256, 256);
 
 // Convert to downloads
 setTimeout(() => {

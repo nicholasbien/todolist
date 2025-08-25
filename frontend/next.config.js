@@ -22,6 +22,9 @@ const nextConfig = {
     ];
   },
   async rewrites() {
+    // These rewrites proxy frontend API requests to the backend server
+    // Required for components that use direct fetch() calls with relative URLs
+    // Components using authenticatedFetch() get environment-based URLs and don't need these
     return [
       { source: '/auth/:path*', destination: `${API_URL}/auth/:path*` },
       { source: '/todos/:path*', destination: `${API_URL}/todos/:path*` },
@@ -30,6 +33,8 @@ const nextConfig = {
       { source: '/email/:path*', destination: `${API_URL}/email/:path*` },
       { source: '/contact', destination: `${API_URL}/contact` },
       { source: '/chat', destination: `${API_URL}/chat` },
+      { source: '/insights', destination: `${API_URL}/insights` },
+      { source: '/journals/:path*', destination: `${API_URL}/journals/:path*` },
     ];
   },
 };

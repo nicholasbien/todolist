@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+<head><title>Favicon Generator - Orange Theme</title></head>
+<body>
+<h2>Generating new favicon images...</h2>
+<p>The files will download automatically in 2 seconds.</p>
+<canvas id="canvas192" width="192" height="192" style="border:1px solid #000; margin: 10px;"></canvas>
+<canvas id="canvas512" width="512" height="512" style="border:1px solid #000; margin: 10px;"></canvas>
+<script>
+// Create 192x192 icon
+const canvas192 = document.getElementById('canvas192');
+const ctx192 = canvas192.getContext('2d');
+ctx192.fillStyle = '#ff7b4a';  // Orange background
+ctx192.fillRect(0, 0, 192, 192);
+ctx192.strokeStyle = 'white';   // White outline
+ctx192.lineWidth = 4;
+ctx192.strokeRect(48, 48, 96, 96);
+
+// Create 512x512 icon
+const canvas512 = document.getElementById('canvas512');
+const ctx512 = canvas512.getContext('2d');
+ctx512.fillStyle = '#ff7b4a';  // Orange background
+ctx512.fillRect(0, 0, 512, 512);
+ctx512.strokeStyle = 'white';   // White outline
+ctx512.lineWidth = 10;
+ctx512.strokeRect(128, 128, 256, 256);
+
+// Auto-download after 2 seconds
+setTimeout(() => {
+  const link192 = document.createElement('a');
+  link192.download = 'icon-192x192.png';
+  link192.href = canvas192.toDataURL('image/png');
+  link192.click();
+
+  setTimeout(() => {
+    const link512 = document.createElement('a');
+    link512.download = 'icon-512x512.png';
+    link512.href = canvas512.toDataURL('image/png');
+    link512.click();
+
+    document.body.innerHTML += '<p style="color: green; font-weight: bold;">✓ Files downloaded! Replace the old PNG files in your public folder with the new ones.</p>';
+  }, 500);
+}, 2000);
+</script>
+</body>
+</html>

@@ -24,7 +24,7 @@ if not api_key:
     raise ValueError("OPENAI_API_KEY not found in environment variables!")
 
 # Initialize OpenAI client with timeout
-client = OpenAI(api_key=api_key, timeout=5.0, max_retries=0)  # 10 second timeout
+client = OpenAI(api_key=api_key, timeout=10.0, max_retries=0)  # 10 second timeout
 
 
 async def classify_task(text: str, categories: List[str], date_added: str) -> Dict[str, Any]:
@@ -107,6 +107,11 @@ async def classify_task(text: str, categories: List[str], date_added: str) -> Di
                 category = "General"
 
             due_date, cleaned_text = result.get("dueDate"), result.get("text", text)
+            if not due_date:
+                fallback_due, fallback_text = manual_parse_due_date(text, date_added)
+                if fallback_due:
+                    due_date = fallback_due
+                    cleaned_text = fallback_text
 
             return {
                 "category": category,

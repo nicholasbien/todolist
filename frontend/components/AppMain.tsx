@@ -8,7 +8,7 @@ export default function AppMain() {
 
   if (isLoading) {
     return (
-      <main className="min-h-screen bg-zinc-950 text-white flex items-center justify-center">
+      <main className="min-h-screen bg-background text-foreground flex items-center justify-center">
         <div className="container mx-auto p-4 max-w-md">
           <div className="animate-pulse">Loading...</div>
         </div>
@@ -17,12 +17,12 @@ export default function AppMain() {
   }
 
   return (
-    <main className="min-h-screen bg-zinc-950 text-white">
+    <main className="min-h-screen bg-background text-foreground">
       {!isAuthenticated && authExpired && (
         <div className="max-w-md mx-auto p-4">
           <div className="bg-red-900/20 border border-red-800 text-red-300 px-4 py-3 rounded-xl mb-4">
             Session expired.{' '}
-            <Link href="/" onClick={clearAuthExpired} className="underline text-blue-400">
+            <Link href="/" onClick={clearAuthExpired} className="underline text-accent">
               Sign in again
             </Link>
           </div>

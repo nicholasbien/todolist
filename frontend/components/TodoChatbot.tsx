@@ -2,11 +2,26 @@ import React, { useState, useEffect, useRef } from 'react';
 
 interface ChatbotProps {
   token: string;
+  activeSpace: any;
 }
 
-export default function TodoChatbot({ token }: ChatbotProps) {
+// Maximum number of messages to retain (matches backend MAX_HISTORY)
+const MAX_MESSAGES = 10;
+
+export default function TodoChatbot({ token, activeSpace }: ChatbotProps) {
   const [question, setQuestion] = useState('');
-  const [messages, setMessages] = useState<{ role: string; content: string }[]>([]);
+  const [messages, setMessages] = useState<{ role: string; content: string }[]>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const spaceKey = `todo_chat_messages_${activeSpace?._id || 'default'}`;
+        const stored = sessionStorage.getItem(spaceKey);
+        return stored ? JSON.parse(stored) : [];
+      } catch {
+        return [];
+      }
+    }
+    return [];
+  });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -19,17 +34,43 @@ export default function TodoChatbot({ token }: ChatbotProps) {
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages]);
+    if (typeof window !== 'undefined') {
+      try {
+        const spaceKey = `todo_chat_messages_${activeSpace?._id || 'default'}`;
+        sessionStorage.setItem(spaceKey, JSON.stringify(messages));
+      } catch {
+        // Ignore write errors
+      }
+    }
+  }, [messages, activeSpace]);
+
+  // Clear messages when space changes
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const spaceKey = `todo_chat_messages_${activeSpace?._id || 'default'}`;
+        const stored = sessionStorage.getItem(spaceKey);
+        setMessages(stored ? JSON.parse(stored) : []);
+      } catch {
+        setMessages([]);
+      }
+    }
+  }, [activeSpace]);
 
   const handleAsk = async () => {
     if (!question.trim()) return;
 
-    // Add user message immediately
+    if (!activeSpace?._id) {
+      setError('No active space selected. Please select a space to use the assistant.');
+      return;
+    }
+
+    // Add user message immediately and limit to last 20 messages (matching backend context)
     const userQuestion = question;
-    setMessages((prev) => [
-      ...prev,
-      { role: 'user', content: userQuestion },
-    ]);
+    setMessages((prev) => {
+      const updated = [...prev, { role: 'user', content: userQuestion }];
+      return updated.length > MAX_MESSAGES ? updated.slice(-MAX_MESSAGES) : updated;
+    });
     setQuestion('');
     setLoading(true);
     setError('');
@@ -41,7 +82,10 @@ export default function TodoChatbot({ token }: ChatbotProps) {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ question: userQuestion }),
+        body: JSON.stringify({
+          question: userQuestion,
+          space_id: activeSpace._id
+        }),
       });
       if (!resp.ok) {
         const data = await resp.json();
@@ -49,11 +93,11 @@ export default function TodoChatbot({ token }: ChatbotProps) {
       }
       const data = await resp.json();
 
-      // Add assistant response
-      setMessages((prev) => [
-        ...prev,
-        { role: 'assistant', content: data.answer },
-      ]);
+      // Add assistant response and limit to last 20 messages (matching backend context)
+      setMessages((prev) => {
+        const updated = [...prev, { role: 'assistant', content: data.answer }];
+        return updated.length > MAX_MESSAGES ? updated.slice(-MAX_MESSAGES) : updated;
+      });
     } catch (err: any) {
       setError(err.message || 'Error');
     } finally {
@@ -70,15 +114,13 @@ export default function TodoChatbot({ token }: ChatbotProps) {
 
   return (
     <div className="flex flex-col">
-      <h3 className="text-lg font-semibold mb-4 text-gray-100">AI Assistant</h3>
-
       {/* Messages container */}
       <div className="mb-4 space-y-4">
         {messages.map((msg, idx) => (
           <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
             <div className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
               msg.role === 'user'
-                ? 'bg-blue-600 text-white'
+                ? 'bg-accent text-foreground'
                 : 'bg-gray-800 text-gray-100 border border-gray-700'
             }`}>
               <div className="text-xs mb-1 opacity-75">
@@ -108,18 +150,18 @@ export default function TodoChatbot({ token }: ChatbotProps) {
       {/* Input area */}
       <div className="flex gap-2">
         <textarea
-          className="flex-1 bg-gray-900 border border-gray-700 text-gray-100 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+          className="flex-1 bg-gray-900 border border-gray-700 text-gray-100 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-accent resize-none"
           rows={2}
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
           onKeyPress={handleKeyPress}
-          placeholder="Ask a question about your todos... (Enter to send, Shift+Enter for new line)"
+          placeholder="Ask a question..."
           disabled={loading}
         />
         <button
           onClick={handleAsk}
-          disabled={loading || !question.trim()}
-          className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-500 disabled:bg-blue-800 disabled:cursor-not-allowed transition-colors self-end"
+          disabled={loading || !question.trim() || !activeSpace?._id}
+          className="bg-accent text-foreground px-6 py-2 rounded-lg hover:bg-accent-light disabled:bg-accent-dark disabled:cursor-not-allowed transition-colors self-end"
         >
           Send
         </button>
