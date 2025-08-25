@@ -1,11 +1,11 @@
 // IMPORTANT: Always increment these versions when modifying this service worker file
 // This forces browsers to download and use the updated service worker
-const STATIC_CACHE = 'todo-static-v57';
-const API_CACHE = 'todo-api-v57';
+const STATIC_CACHE = 'todo-static-v61';
+const API_CACHE = 'todo-api-v61';
 
 const GLOBAL_DB_NAME = 'TodoGlobalDB';
 const USER_DB_PREFIX = 'TodoUserDB_';
-const DB_VERSION = 10;
+const DB_VERSION = 11;
 const TODOS = 'todos';
 const CATEGORIES = 'categories';
 const SPACES = 'spaces';
@@ -213,14 +213,24 @@ const clearQueue = async (userId) => {
 
 // Journal operations
 const getJournals = async (userId, date = null, spaceId = null) => {
-  const authData = userId ? null : await getAuth();
-  const effectiveUserId = userId || (authData ? authData.userId : null);
+  // For IndexedDB operations, we need to determine which user database to access
+  let effectiveUserId = userId;
+  if (!effectiveUserId) {
+    const authData = await getAuth();
+    effectiveUserId = authData ? authData.userId : null;
+  }
+
+  if (!effectiveUserId) {
+    console.log('🚫 getJournals: No user ID available');
+    return [];
+  }
+
   const allJournals = await userDbTx(effectiveUserId, JOURNALS, 'readonly', (s) => s.getAll());
 
   let filteredJournals = allJournals;
 
   if (date) {
-    filteredJournals = allJournals.filter(j => j.date === date);
+    filteredJournals = filteredJournals.filter(j => j.date === date);
   }
 
   if (spaceId !== null) {

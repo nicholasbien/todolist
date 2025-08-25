@@ -6,7 +6,7 @@ from collections import defaultdict
 from contextlib import asynccontextmanager
 from datetime import datetime
 from io import StringIO
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Union
 
 import httpx
 from auth import (
@@ -721,7 +721,7 @@ class JournalCreateRequest(BaseModel):
 
 
 # Journal endpoints
-@app.get("/journals")
+@app.get("/journals", response_model=Union[JournalEntry, List[JournalEntry], None])
 async def api_get_journal_entries(
     date: Optional[str] = None, space_id: Optional[str] = None, current_user: dict = Depends(get_current_user)
 ):
@@ -734,11 +734,11 @@ async def api_get_journal_entries(
         if date:
             # Get specific date entry
             entry = await get_journal_entry_by_date(current_user["user_id"], date, space_id)
-            return entry.dict() if entry else None
+            return entry
         else:
             # Get recent entries
             entries = await get_journal_entries(current_user["user_id"], space_id)
-            return [entry.dict() for entry in entries]
+            return entries
 
     except HTTPException:
         raise
@@ -747,7 +747,7 @@ async def api_get_journal_entries(
         raise HTTPException(status_code=500, detail="Failed to fetch journal entries")
 
 
-@app.post("/journals")
+@app.post("/journals", response_model=JournalEntry)
 async def api_create_journal_entry(request: JournalCreateRequest, current_user: dict = Depends(get_current_user)):
     """Create or update a journal entry."""
     try:
@@ -762,7 +762,7 @@ async def api_create_journal_entry(request: JournalCreateRequest, current_user: 
 
         result = await create_journal_entry(entry, current_user.get("timezone", "UTC"))
         logger.info(f"Journal entry created/updated for user {current_user['email']}, date {request.date}")
-        return result.dict()
+        return result
 
     except HTTPException:
         raise
