@@ -286,7 +286,7 @@ async def send_daily_summary(
         for space in spaces:
             space_todos = await get_todos(user_id, space.id)
             todos_dict = [t.dict() if hasattr(t, "dict") else t for t in space_todos]
-            humanized: List[dict] = []
+            relative: List[dict] = []
             for t in todos_dict:
                 t_copy = dict(t)
                 if t_copy.get("dueDate"):
@@ -296,9 +296,9 @@ async def send_daily_summary(
                 if t_copy.get("dateCompleted"):
                     t_copy["dateCompletedRelative"] = format_date_with_relative(t_copy["dateCompleted"])
                 t_copy["_space"] = space.name
-                humanized.append(t_copy)
+                relative.append(t_copy)
                 all_todos.append(t_copy)
-            spaces_data.append({"space": space.name, "todos": humanized})
+            spaces_data.append({"space": space.name, "todos": relative})
 
         if custom_instructions is None:
             custom_instructions = user.get("email_instructions", "") if user else ""
