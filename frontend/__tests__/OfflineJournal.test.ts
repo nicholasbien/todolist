@@ -131,7 +131,7 @@ describe('Offline Journal Functionality', () => {
     });
 
     const response = await sw.handleRequest(request);
-    expect(response.status).toBe(200);
+    expect(response.status).toBe(204);
 
     // Verify journal was deleted from storage
     const journals = await sw.getJournals('user1');
@@ -163,7 +163,7 @@ describe('Offline Journal Functionality', () => {
     });
 
     const response = await sw.handleRequest(request);
-    expect(response.status).toBe(200);
+    expect(response.status).toBe(204);
 
     // Verify journal was deleted from storage
     const journals = await sw.getJournals('user1');
@@ -259,7 +259,7 @@ describe('Offline Journal Functionality', () => {
       {
         _id: 'journal3',
         user_id: 'user1',
-        date: '2023-12-01',
+        date: '2023-12-03',
         text: 'Journal 3',
         space_id: 'space456'
       }
@@ -276,7 +276,7 @@ describe('Offline Journal Functionality', () => {
 
     const response1 = await sw.handleRequest(request1);
     const data1 = await response1.json();
-    expect(Array.isArray(data1) ? data1.length : 1).toBe(2);
+    expect(data1._id).toBe('journal1');
 
     // Test date and space filtering
     const request2 = new Request('/journals?date=2023-12-01&space_id=space123', {

@@ -12,7 +12,8 @@ describe('TodoChatbot', () => {
       json: async () => ({ answer: '42' })
     });
 
-    render(<TodoChatbot token="abc" />);
+    const mockActiveSpace = { _id: 'test-space-123' };
+    render(<TodoChatbot token="abc" activeSpace={mockActiveSpace} />);
 
     fireEvent.change(screen.getByPlaceholderText(/Ask a question/i), { target: { value: 'What is the meaning?' } });
     fireEvent.click(screen.getByRole('button', { name: /Send/i }));

@@ -505,18 +505,22 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
-  // Only handle API requests
+  // Only handle API requests (both same-origin and backend API)
+  const isApiPath =
+    url.pathname.startsWith('/todos') ||
+    url.pathname.startsWith('/categories') ||
+    url.pathname.startsWith('/spaces') ||
+    url.pathname.startsWith('/email') ||
+    url.pathname.startsWith('/contact') ||
+    url.pathname.startsWith('/chat') ||
+    url.pathname.startsWith('/insights') ||
+    url.pathname.startsWith('/journals') ||
+    url.pathname.startsWith('/auth/');
+
   const isApi =
-    url.origin === self.location.origin &&
-    (url.pathname.startsWith('/todos') ||
-      url.pathname.startsWith('/categories') ||
-      url.pathname.startsWith('/spaces') ||
-      url.pathname.startsWith('/email') ||
-      url.pathname.startsWith('/contact') ||
-      url.pathname.startsWith('/chat') ||
-      url.pathname.startsWith('/insights') ||
-      url.pathname.startsWith('/journals') ||
-      url.pathname.startsWith('/auth/'));
+    (url.origin === self.location.origin && isApiPath) ||
+    (url.hostname.includes('railway.app') && isApiPath) ||
+    (url.hostname === 'localhost' && url.port === '8000' && isApiPath);
 
   if (isApi) {
     event.respondWith(handleApiRequest(event.request));
@@ -716,13 +720,13 @@ async function offlineFallback(request, url) {
       const journals = await getJournals(authData ? authData.userId : null, date, spaceId);
 
       if (date && journals.length > 0) {
-        // Return single entry for specific date
+        // Return single entry for specific date (one journal per day)
         return new Response(JSON.stringify(journals[0]), { headers: { 'Content-Type': 'application/json' } });
       } else if (date) {
         // No entry found for date
         return new Response('null', { headers: { 'Content-Type': 'application/json' } });
       } else {
-        // Return all journals
+        // Return all journals as array
         return new Response(JSON.stringify(journals), { headers: { 'Content-Type': 'application/json' } });
       }
     }
@@ -1028,7 +1032,34 @@ async function offlineFallback(request, url) {
       }
 
       await putJournal(journalData, authData ? authData.userId : null);
-      await addQueue({ type: 'CREATE_JOURNAL', data: journalData }, authData ? authData.userId : null);
+
+      // For auto-save optimization: only add to queue if this is a new journal
+      // For updates to existing journals, replace the existing queue entry
+      if (existing && existing.length > 0) {
+        // Update existing queue entry for auto-save efficiency
+        const queue = await readQueue(authData ? authData.userId : null);
+        const existingQueueIndex = queue.findIndex(op =>
+          op.type === 'CREATE_JOURNAL' &&
+          op.data.date === data.date &&
+          op.data.space_id === (data.space_id || null)
+        );
+
+        if (existingQueueIndex !== -1) {
+          // Replace existing queue entry
+          queue[existingQueueIndex].data = journalData;
+          await clearQueue(authData ? authData.userId : null);
+          for (const op of queue) {
+            await addQueue(op, authData ? authData.userId : null);
+          }
+        } else {
+          // No existing queue entry, add new one
+          await addQueue({ type: 'CREATE_JOURNAL', data: journalData }, authData ? authData.userId : null);
+        }
+      } else {
+        // New journal, add to queue
+        await addQueue({ type: 'CREATE_JOURNAL', data: journalData }, authData ? authData.userId : null);
+      }
+
       return new Response(JSON.stringify(journalData), { headers: { 'Content-Type': 'application/json' } });
     }
 
@@ -1358,5 +1389,7 @@ if (typeof module !== 'undefined') {
     clearQueue,
     getAuthHeaders,
     syncQueue,
+    handleRequest: handleApiRequest,
+    generateInsights,
   };
 }
