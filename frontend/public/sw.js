@@ -1,7 +1,7 @@
 // IMPORTANT: Always increment these versions when modifying this service worker file
 // This forces browsers to download and use the updated service worker
-const STATIC_CACHE = 'todo-static-v61';
-const API_CACHE = 'todo-api-v61';
+const STATIC_CACHE = 'todo-static-v62';
+const API_CACHE = 'todo-api-v62';
 
 const GLOBAL_DB_NAME = 'TodoGlobalDB';
 const USER_DB_PREFIX = 'TodoUserDB_';
@@ -618,7 +618,6 @@ async function handleApiRequest(request) {
           }
 
           const serverResponse = await response.clone().json();
-          console.log('📝 Caching journal response:', serverResponse);
 
           // Only process non-null responses
           if (serverResponse !== null) {
@@ -626,14 +625,18 @@ async function handleApiRequest(request) {
             const serverJournals = Array.isArray(serverResponse) ? serverResponse : [serverResponse];
 
             // Save all server journals to IndexedDB for offline access
+            let cachedCount = 0;
             for (const journal of serverJournals) {
               if (journal && journal._id) {
-                console.log('💾 Storing journal in IndexedDB:', journal._id);
                 await putJournal(journal, authData.userId);
+                cachedCount++;
               }
             }
+            if (cachedCount > 0) {
+              console.log(`📝 Cached ${cachedCount} journal(s) to IndexedDB`);
+            }
           } else {
-            console.log('📝 Server returned null for journal - no data to cache');
+            console.log('📝 No journal data to cache');
           }
 
           return response; // Return original response
@@ -681,7 +684,7 @@ async function handleOfflineRequest(request, url) {
       // Filter by space if specified
       const filteredTodos = spaceId ? todos.filter(t => t.space_id === spaceId) : todos;
 
-      console.log(`📱 Offline GET /todos - Todo IDs: [${filteredTodos.map(t => t._id).join(', ')}]`);
+      console.log(`📱 Offline GET /todos - Found ${filteredTodos.length} todos`);
       return new Response(JSON.stringify(filteredTodos), {
         headers: { 'Content-Type': 'application/json' }
       });
