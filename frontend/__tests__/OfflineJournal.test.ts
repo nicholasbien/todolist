@@ -176,6 +176,43 @@ describe('Offline Journal Functionality', () => {
     expect(queue[0].data._id).toBe('server_journal_456');
   });
 
+  test('deletes synced journal with pending update and cancels it', async () => {
+    const sw = require('../public/sw.js');
+    await sw.putAuth('token123', 'user1');
+
+    const syncedJournal = {
+      _id: 'server_journal_789',
+      user_id: 'user1',
+      date: '2023-12-02',
+      text: 'Synced journal to update then delete',
+      space_id: 'space123'
+    };
+
+    await sw.putJournal(syncedJournal, 'user1');
+
+    // Queue an update to the synced journal
+    await sw.addQueue({ type: 'CREATE_JOURNAL', data: { ...syncedJournal, text: 'Updated text' } }, 'user1');
+
+    // Mock DELETE request
+    const request = new Request('/api/journals/server_journal_789', {
+      method: 'DELETE',
+      headers: { 'Authorization': 'Bearer token123' }
+    });
+
+    const response = await sw.handleRequest(request);
+    expect(response.status).toBe(204);
+
+    // Verify journal was deleted from storage
+    const journals = await sw.getJournals('user1');
+    expect(journals.length).toBe(0);
+
+    // Verify only delete operation remains in queue
+    const queue = await sw.readQueue('user1');
+    expect(queue.length).toBe(1);
+    expect(queue[0].type).toBe('DELETE_JOURNAL');
+    expect(queue[0].data._id).toBe('server_journal_789');
+  });
+
   test('syncs journal delete operation to server', async () => {
     const sw = require('../public/sw.js');
     await sw.putAuth('token123', 'user1');

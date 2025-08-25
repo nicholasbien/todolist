@@ -1,7 +1,7 @@
 // IMPORTANT: Always increment these versions when modifying this service worker file
 // This forces browsers to download and use the updated service worker
-const STATIC_CACHE = 'todo-static-v62';
-const API_CACHE = 'todo-api-v62';
+const STATIC_CACHE = 'todo-static-v63';
+const API_CACHE = 'todo-api-v63';
 
 const GLOBAL_DB_NAME = 'TodoGlobalDB';
 const USER_DB_PREFIX = 'TodoUserDB_';
@@ -838,6 +838,20 @@ async function handleOfflineRequest(request, url) {
         }
         console.log(`🗑️ Offline journal ${id} deleted and CREATE operation cancelled`);
       } else {
+        // Remove any pending CREATE_JOURNAL operations for this journal to prevent re-sync
+        const queue = await readQueue(authData ? authData.userId : null);
+        const filteredQueue = queue.filter(op => !(
+          op.type === 'CREATE_JOURNAL' &&
+          (op.data._id === id ||
+           (op.data.date === journalExists.date && op.data.space_id === journalExists.space_id))
+        ));
+        if (filteredQueue.length !== queue.length) {
+          console.log(`🗑️ Removed pending CREATE_JOURNAL operation for deleted journal ${id}`);
+          await clearQueue(authData ? authData.userId : null);
+          for (const op of filteredQueue) {
+            await addQueue(op, authData ? authData.userId : null);
+          }
+        }
         await addQueue({ type: 'DELETE_JOURNAL', data: { _id: id } }, authData ? authData.userId : null);
         console.log(`🗑️ Added server DELETE_JOURNAL to queue for ${id}`);
       }
