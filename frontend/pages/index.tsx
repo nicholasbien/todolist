@@ -17,6 +17,11 @@ interface LoginFormProps {
   onLogin: (user: any, token: string) => void;
 }
 
+interface Space {
+  _id: string;
+  name: string;
+}
+
 function LoginForm({ onLogin }: LoginFormProps) {
   const router = useRouter();
   const [email, setEmail] = useState('');
@@ -294,6 +299,8 @@ export default function Home() {
   const [showExportModal, setShowExportModal] = useState(false);
   const [exportType, setExportType] = useState<'todos' | 'journals'>('todos');
   const [exportFormat, setExportFormat] = useState<'jsonl' | 'csv'>('jsonl');
+  const [exportSpaces, setExportSpaces] = useState<Space[]>([]);
+  const [exportSpaceId, setExportSpaceId] = useState('');
   const [exporting, setExporting] = useState(false);
   const [contactMessage, setContactMessage] = useState('');
   const [sendingContact, setSendingContact] = useState(false);
@@ -334,6 +341,27 @@ export default function Home() {
       setShowOfflineTooltip(false);
     }
   }, [isOffline]);
+
+  useEffect(() => {
+    if (showExportModal && token) {
+      const loadSpaces = async () => {
+        try {
+          const baseURL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+          const resp = await fetch(`${baseURL}/spaces`, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          if (resp.ok) {
+            const data = await resp.json();
+            setExportSpaces(data);
+            setExportSpaceId(data[0]?._id || '');
+          }
+        } catch (err) {
+          console.error('Error loading spaces', err);
+        }
+      };
+      loadSpaces();
+    }
+  }, [showExportModal, token]);
 
   // Handle click outside settings dropdown
   useEffect(() => {
@@ -390,14 +418,18 @@ export default function Home() {
   };
 
   const handleExportData = async () => {
+    if (!exportSpaceId) return;
     try {
       setExporting(true);
       const baseURL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-      const response = await fetch(`${baseURL}/export?data=${exportType}&format=${exportFormat}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
+      const response = await fetch(
+        `${baseURL}/export?data=${exportType}&format=${exportFormat}&space_id=${exportSpaceId}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
         }
-      });
+      );
       if (!response.ok) throw new Error('Export failed');
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
@@ -555,10 +587,24 @@ export default function Home() {
                   <option value="csv">CSV</option>
                 </select>
               </div>
+              <div>
+                <label className="block text-sm text-gray-300 mb-2">Space</label>
+                <select
+                  value={exportSpaceId}
+                  onChange={(e) => setExportSpaceId(e.target.value)}
+                  className="w-full bg-gray-900 border border-gray-700 text-gray-100 p-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent"
+                >
+                  {exportSpaces.map((space) => (
+                    <option key={space._id} value={space._id}>
+                      {space.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
               <div className="flex justify-center space-x-3">
                 <button
                   onClick={handleExportData}
-                  disabled={exporting}
+                  disabled={exporting || !exportSpaceId}
                   className="bg-accent hover:bg-accent-light disabled:bg-accent-dark disabled:text-gray-400 text-white px-6 py-2 rounded-lg transition-colors"
                 >
                   {exporting ? 'Exporting...' : 'Download'}

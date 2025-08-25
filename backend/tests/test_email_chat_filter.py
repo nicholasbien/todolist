@@ -53,9 +53,7 @@ async def test_email_space_filtering(client, test_email, monkeypatch):
 
     await send_daily_summary(user_id, test_email, "")
     names = {s["space"] for s in captured["spaces"]}
-    assert "A" in names
-    assert "B" not in names
-    assert "Personal" in names
+    assert names == {"A"}
 
 
 @pytest.mark.asyncio
@@ -79,6 +77,4 @@ async def test_chat_space_filtering(client, test_email, monkeypatch):
     resp = await client.post("/chat", json={"question": "hello", "space_id": space_a}, headers=headers)
     assert resp.status_code == 200
     names = {s["space"] for s in captured["spaces"]}
-    assert "A" in names
-    assert "B" not in names
-    assert "Personal" in names
+    assert names == {"A"}

@@ -645,16 +645,15 @@ async def api_chat(
         if not await user_in_space(current_user["user_id"], req.space_id):
             raise HTTPException(status_code=403, detail="Access denied to space")
 
-        # Get todos only from the requested space
+        # Only include todos from the requested space
+        spaces = await get_spaces_for_user(current_user["user_id"])
+        requested_space = next((s for s in spaces if s.id == req.space_id), None)
+        if not requested_space:
+            raise HTTPException(status_code=404, detail="Space not found")
+
         todos = await get_todos(current_user["user_id"], req.space_id)
         todos_dict = [todo.dict() if hasattr(todo, "dict") else todo for todo in todos]
-
-        # Get space info for context
-        spaces = await get_spaces_for_user(current_user["user_id"])
-        space = next((s for s in spaces if s.id == req.space_id), None)
-        space_name = space.name if space else "Unknown Space"
-
-        spaces_data = [{"space": space_name, "todos": todos_dict}]
+        spaces_data = [{"space": requested_space.name, "todos": todos_dict}]
 
         history = conversations[current_user["user_id"]]
         answer = await answer_question(req.question, spaces_data, history)
@@ -817,6 +816,7 @@ async def api_generate_journal_summary(entry_id: str, current_user: dict = Depen
 @app.get("/export")
 async def export_data(
     data: str,
+    space_id: str,
     format: str = "jsonl",
     current_user: dict = Depends(get_current_user),
 ):
@@ -825,12 +825,18 @@ async def export_data(
     if data not in valid_types:
         raise HTTPException(status_code=400, detail="Invalid data type")
 
+    if not await user_in_space(current_user["user_id"], space_id):
+        raise HTTPException(status_code=403, detail="Not a member of the specified space")
+
     collection = valid_types[data]
-    cursor = collection.find({"user_id": current_user["user_id"]})
+    query = {"user_id": current_user["user_id"], "space_id": space_id}
+    cursor = collection.find(query)
     items = await cursor.to_list(length=None)
     for item in items:
         item.pop("_id", None)
         item.pop("user_id", None)
+        item.pop("space_id", None)
+        item.pop("created_offline", None)
         item["first_name"] = current_user.get("first_name", "")
 
     if format == "jsonl":
