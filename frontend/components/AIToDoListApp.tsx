@@ -3,6 +3,7 @@ import TodoItem from "./TodoItem";
 import TodoChatbot from "./TodoChatbot";
 import InsightsComponent from "./InsightsComponent";
 import JournalComponent from "./JournalComponent";
+import SpaceDropdown from "./SpaceDropdown";
 
 interface Props {
   user: any;
@@ -811,11 +812,11 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
         </div>
       )}
 
-      {/* Tab Navigation */}
-      <div className="grid grid-cols-4 border-b border-gray-800 mb-6">
+      {/* Tab Navigation - Full Width */}
+      <div className="flex border-b border-gray-800 mb-4">
         <button
           onClick={() => setActiveTab('tasks')}
-          className={`py-3 font-medium text-sm transition-colors text-center ${
+          className={`py-3 px-6 font-medium text-sm transition-colors ${
             activeTab === 'tasks'
               ? 'text-accent border-b-2 border-accent'
               : 'text-gray-400 hover:text-gray-300'
@@ -825,7 +826,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
         </button>
         <button
           onClick={() => setActiveTab('assistant')}
-          className={`py-3 font-medium text-sm transition-colors text-center ${
+          className={`py-3 px-6 font-medium text-sm transition-colors ${
             activeTab === 'assistant'
               ? 'text-accent border-b-2 border-accent'
               : 'text-gray-400 hover:text-gray-300'
@@ -835,7 +836,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
         </button>
         <button
           onClick={() => setActiveTab('insights')}
-          className={`py-3 font-medium text-sm transition-colors text-center ${
+          className={`py-3 px-6 font-medium text-sm transition-colors ${
             activeTab === 'insights'
               ? 'text-accent border-b-2 border-accent'
               : 'text-gray-400 hover:text-gray-300'
@@ -845,7 +846,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
         </button>
         <button
           onClick={() => setActiveTab('journal')}
-          className={`py-3 font-medium text-sm transition-colors text-center ${
+          className={`py-3 px-6 font-medium text-sm transition-colors ${
             activeTab === 'journal'
               ? 'text-accent border-b-2 border-accent'
               : 'text-gray-400 hover:text-gray-300'
@@ -879,136 +880,93 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
       {/* Tab Content */}
       {activeTab === 'tasks' && (
         <div>
-          {/* Spaces */}
-      <div className="mb-6">
-        <div className="flex items-center mb-3">
-          <h2 className="text-lg font-semibold text-gray-100">
-            Space:{' '}
-            {activeSpace ? activeSpace.name : 'None'}
-          </h2>
-          {activeSpace && !activeSpace.is_default && (
-            <button
-              onClick={() => {
-                setSpaceToEdit(activeSpace);
-                setEditSpaceName(activeSpace.name);
-                const isCollab = (activeSpace.member_ids?.length ?? 0) > 1 ||
-                  (activeSpace.pending_emails?.length ?? 0) > 0;
+          {/* Header Row with Page Title and Space Dropdown */}
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-2">
+              <h2 className="text-xl font-semibold text-gray-100">
+                {activeCat === 'All' ? 'Tasks' : `Tasks: ${activeCat}`}
+              </h2>
+              {activeCat !== "All" && (
+                <button
+                  onClick={() => {
+                    setEditCatName(activeCat);
+                    setShowEditCategoryModal(true);
+                  }}
+                  className="text-gray-400 hover:text-gray-200 text-sm border border-gray-700 px-2 py-1 rounded-lg hover:border-gray-600 transition-colors"
+                >
+                  Edit
+                </button>
+              )}
+            </div>
+            <SpaceDropdown
+              spaces={spaces}
+              activeSpace={activeSpace}
+              user={user}
+              onSpaceSelect={setActiveSpace}
+              onCreateSpace={() => setShowAddSpaceModal(true)}
+              onEditSpace={(space) => {
+                setSpaceToEdit(space);
+                setEditSpaceName(space.name);
+                const isCollab = (space.member_ids?.length ?? 0) > 1 ||
+                  (space.pending_emails?.length ?? 0) > 0;
                 setEditSpaceCollaborative(isCollab);
                 setInviteEmails(['']);
                 setShowEditSpaceModal(true);
               }}
-              className="ml-2 text-gray-400 hover:text-gray-200 text-sm border border-gray-700 px-2 py-1 rounded-lg hover:border-gray-600 transition-colors"
-            >
-              Edit
-            </button>
-          )}
-        </div>
-        <div
-          className="flex gap-2 overflow-x-auto whitespace-nowrap scroll-smooth mb-4 pb-2"
-          style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-        >
-          {spaces.map(space => (
-            <button
-              key={space._id}
-              onClick={() => setActiveSpace(space)}
-              className={`px-4 py-2 rounded-xl text-base transition-colors flex-shrink-0 ${
-                activeSpace && space._id === activeSpace._id
-                  ? 'bg-accent text-foreground shadow-lg'
-                  : 'bg-gray-900 text-gray-300 hover:bg-gray-800 border border-gray-800'
-              }`}
-            >
-              {space.name}
-            </button>
-          ))}
-          <button
-            onClick={() => { setShowAddSpaceModal(true); }}
-            className="px-4 py-2 rounded-xl text-base bg-gray-900 text-gray-300 hover:bg-gray-800 border border-gray-800 transition-colors flex-shrink-0"
-          >
-            +
-          </button>
-        </div>
-      </div>
+            />
+          </div>
 
-      {activeSpace && activeSpace._id && spaceMembers.length > 1 && (
-        <div className="mb-6 ml-4">
-          <h3 className="text-sm font-semibold text-gray-400 mb-1">Members:</h3>
-          <ul className="text-gray-300 text-sm space-y-1">
-            {spaceMembers.map((m) => (
-              <li key={m.id}>{m.first_name || 'Unknown User'}</li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-
-      {/* Categories - Horizontal wrapping pills */}
-      <div className="mb-6">
-        {loadingCategories && (
-          <div className="text-gray-400 mb-2">Loading categories...</div>
-        )}
-        <div className="flex items-center mb-3">
-          <h2 className="text-lg font-semibold text-gray-100">
-            Category: {activeCat}
-          </h2>
-          {activeCat !== "All" && (
-            <button
-              onClick={() => {
-                setEditCatName(activeCat);
-                setShowEditCategoryModal(true);
-              }}
-              className="ml-2 text-gray-400 hover:text-gray-200 text-sm border border-gray-700 px-2 py-1 rounded-lg hover:border-gray-600 transition-colors"
+          {/* Categories - Horizontal wrapping pills */}
+          <div className="mb-6">
+            {loadingCategories && (
+              <div className="text-gray-400 mb-2">Loading categories...</div>
+            )}
+            <div
+              className="flex gap-2 overflow-x-auto whitespace-nowrap scroll-smooth pb-2"
+              style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
             >
-              Edit
-            </button>
-          )}
-        </div>
-        <div
-          className="flex gap-2 overflow-x-auto whitespace-nowrap scroll-smooth mb-4 pb-2"
-          style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-        >
-          <button
-            onClick={() => setActiveCat('All')}
-            className={`px-4 py-2 rounded-xl text-base transition-colors flex-shrink-0 ${
-              activeCat === 'All'
-                ? 'bg-accent text-foreground shadow-lg'
-                : 'bg-gray-900 text-gray-300 hover:bg-gray-800 border border-gray-800'
-            }`}
-          >
-            All
-          </button>
-          {categories
-          .sort((a, b) => {
-            const aName = typeof a === 'string' ? a : a.name;
-            const bName = typeof b === 'string' ? b : b.name;
-            if (aName === "General") return -1;
-            if (bName === "General") return 1;
-            return aName.localeCompare(bName);
-          })
-          .map(cat => {
-            const catName = typeof cat === 'string' ? cat : cat.name;
-            return (
-            <button
-              key={catName}
-              onClick={() => setActiveCat(catName)}
-              className={`px-4 py-2 rounded-xl text-base transition-colors flex-shrink-0 ${
-                catName === activeCat
-                  ? 'bg-accent text-foreground shadow-lg'
-                  : 'bg-gray-900 text-gray-300 hover:bg-gray-800 border border-gray-800'
-              }`}
-            >
-              {catName}
-            </button>
-            );
-          })}
-          <button
-            onClick={() => setShowAddCategoryModal(true)}
-            className="px-4 py-2 rounded-xl text-base bg-gray-900 text-gray-300 hover:bg-gray-800 border border-gray-800 transition-colors flex-shrink-0"
-          >
-            +
-          </button>
-        </div>
-
-      </div>
+              <button
+                onClick={() => setActiveCat('All')}
+                className={`px-4 py-2 rounded-xl text-base transition-colors flex-shrink-0 ${
+                  activeCat === 'All'
+                    ? 'bg-accent text-foreground shadow-lg'
+                    : 'bg-gray-900 text-gray-300 hover:bg-gray-800 border border-gray-800'
+                }`}
+              >
+                All
+              </button>
+              {categories
+              .sort((a, b) => {
+                const aName = typeof a === 'string' ? a : a.name;
+                const bName = typeof b === 'string' ? b : b.name;
+                if (aName === "General") return -1;
+                if (bName === "General") return 1;
+                return aName.localeCompare(bName);
+              })
+              .map(cat => {
+                const catName = typeof cat === 'string' ? cat : cat.name;
+                return (
+                <button
+                  key={catName}
+                  onClick={() => setActiveCat(catName)}
+                  className={`px-4 py-2 rounded-xl text-base transition-colors flex-shrink-0 ${
+                    catName === activeCat
+                      ? 'bg-accent text-foreground shadow-lg'
+                      : 'bg-gray-900 text-gray-300 hover:bg-gray-800 border border-gray-800'
+                  }`}
+                >
+                  {catName}
+                </button>
+                );
+              })}
+              <button
+                onClick={() => setShowAddCategoryModal(true)}
+                className="px-4 py-2 rounded-xl text-base bg-gray-900 text-gray-300 hover:bg-gray-800 border border-gray-800 transition-colors flex-shrink-0"
+              >
+                +
+              </button>
+            </div>
+          </div>
 
 
       {/* Add new todo */}
@@ -1318,16 +1276,80 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
 
       {activeTab === 'assistant' && (
         <div>
+          {/* Header Row with Page Title and Space Dropdown */}
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-xl font-semibold text-gray-100">Assistant</h2>
+            <SpaceDropdown
+              spaces={spaces}
+              activeSpace={activeSpace}
+              user={user}
+              onSpaceSelect={setActiveSpace}
+              onCreateSpace={() => setShowAddSpaceModal(true)}
+              onEditSpace={(space) => {
+                setSpaceToEdit(space);
+                setEditSpaceName(space.name);
+                const isCollab = (space.member_ids?.length ?? 0) > 1 ||
+                  (space.pending_emails?.length ?? 0) > 0;
+                setEditSpaceCollaborative(isCollab);
+                setInviteEmails(['']);
+                setShowEditSpaceModal(true);
+              }}
+            />
+          </div>
           <TodoChatbot token={token} />
         </div>
       )}
 
       {activeTab === 'insights' && (
-        <InsightsComponent token={token} activeSpace={activeSpace} authenticatedFetch={authenticatedFetch} />
+        <div>
+          {/* Header Row with Page Title and Space Dropdown */}
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-xl font-semibold text-gray-100">Insights</h2>
+            <SpaceDropdown
+              spaces={spaces}
+              activeSpace={activeSpace}
+              user={user}
+              onSpaceSelect={setActiveSpace}
+              onCreateSpace={() => setShowAddSpaceModal(true)}
+              onEditSpace={(space) => {
+                setSpaceToEdit(space);
+                setEditSpaceName(space.name);
+                const isCollab = (space.member_ids?.length ?? 0) > 1 ||
+                  (space.pending_emails?.length ?? 0) > 0;
+                setEditSpaceCollaborative(isCollab);
+                setInviteEmails(['']);
+                setShowEditSpaceModal(true);
+              }}
+            />
+          </div>
+          <InsightsComponent token={token} activeSpace={activeSpace} authenticatedFetch={authenticatedFetch} />
+        </div>
       )}
 
       {activeTab === 'journal' && (
-        <JournalComponent token={token} activeSpace={activeSpace} authenticatedFetch={authenticatedFetch} />
+        <div>
+          {/* Header Row with Page Title and Space Dropdown */}
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-xl font-semibold text-gray-100">Journal</h2>
+            <SpaceDropdown
+              spaces={spaces}
+              activeSpace={activeSpace}
+              user={user}
+              onSpaceSelect={setActiveSpace}
+              onCreateSpace={() => setShowAddSpaceModal(true)}
+              onEditSpace={(space) => {
+                setSpaceToEdit(space);
+                setEditSpaceName(space.name);
+                const isCollab = (space.member_ids?.length ?? 0) > 1 ||
+                  (space.pending_emails?.length ?? 0) > 0;
+                setEditSpaceCollaborative(isCollab);
+                setInviteEmails(['']);
+                setShowEditSpaceModal(true);
+              }}
+            />
+          </div>
+          <JournalComponent token={token} activeSpace={activeSpace} authenticatedFetch={authenticatedFetch} />
+        </div>
       )}
 
       {/* Email Settings Modal */}

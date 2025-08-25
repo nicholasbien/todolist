@@ -90,8 +90,6 @@ export default function TodoChatbot({ token }: ChatbotProps) {
 
   return (
     <div className="flex flex-col">
-      <h3 className="text-lg font-semibold mb-4 text-gray-100">Assistant</h3>
-
       {/* Messages container */}
       <div className="mb-4 space-y-4">
         {messages.map((msg, idx) => (

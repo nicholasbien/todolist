@@ -31,8 +31,6 @@ export default function JournalComponent({ token, activeSpace, authenticatedFetc
   const [loading, setLoading] = useState<boolean>(false);
   const [saving, setSaving] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
-  const [aiSummary, setAiSummary] = useState<string>('');
-  const [generatingSummary, setGeneratingSummary] = useState<boolean>(false);
   const [lastSavedText, setLastSavedText] = useState<string>('');
 
   // Auto-save timeout
@@ -68,8 +66,6 @@ export default function JournalComponent({ token, activeSpace, authenticatedFetc
         setLastSavedText('');
       }
 
-      // Clear any previous AI summary when switching dates
-      setAiSummary('');
     } catch (err: any) {
       setError(err.message || 'Error loading journal entry');
       setCurrentEntry(null);
@@ -168,36 +164,12 @@ export default function JournalComponent({ token, activeSpace, authenticatedFetc
       setCurrentEntry(null);
       setJournalText('');
       setLastSavedText('');
-      setAiSummary('');
 
     } catch (err: any) {
       setError(err.message || 'Error deleting journal entry');
     }
   };
 
-  const handleGenerateAISummary = async () => {
-    if (!currentEntry?._id || !authenticatedFetch) return;
-
-    try {
-      setGeneratingSummary(true);
-      setError('');
-
-      const response = await authenticatedFetch(`/journals/${currentEntry._id}/ai-summary`);
-
-      if (!response?.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || 'Failed to generate summary');
-      }
-
-      const data = await response.json();
-      setAiSummary(data.summary);
-
-    } catch (err: any) {
-      setError(err.message || 'Error generating AI summary');
-    } finally {
-      setGeneratingSummary(false);
-    }
-  };
 
   const formatDateForDisplay = (dateString: string) => {
     // Parse the date string as YYYY-MM-DD and create date in local timezone
@@ -220,14 +192,6 @@ export default function JournalComponent({ token, activeSpace, authenticatedFetc
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-gray-100">Journal</h2>
-        {activeSpace && (
-          <div className="text-sm text-gray-400">
-            Space: <span className="text-gray-300">{activeSpace.name}</span>
-          </div>
-        )}
-      </div>
 
       {error && (
         <div className="bg-red-900/20 border border-red-800 text-red-300 px-4 py-3 rounded-xl">
@@ -284,32 +248,15 @@ export default function JournalComponent({ token, activeSpace, authenticatedFetc
             </button>
 
             {currentEntry && (
-              <>
-                <button
-                  onClick={handleGenerateAISummary}
-                  disabled={generatingSummary || !currentEntry._id}
-                  className="bg-purple-600 text-white px-6 py-2 rounded-lg hover:bg-purple-500 disabled:bg-purple-800 disabled:text-gray-400 transition-colors"
-                >
-                  {generatingSummary ? 'Generating...' : '✨ AI Summary'}
-                </button>
-
-                <button
-                  onClick={handleDeleteEntry}
-                  className="bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-red-500 transition-colors"
-                >
-                  🗑️ Delete
-                </button>
-              </>
+              <button
+                onClick={handleDeleteEntry}
+                className="bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-red-500 transition-colors"
+              >
+                🗑️ Delete
+              </button>
             )}
           </div>
 
-          {/* AI Summary Display */}
-          {aiSummary && (
-            <div className="bg-purple-900/20 border border-purple-800 rounded-xl p-4">
-              <h3 className="text-lg font-semibold text-purple-300 mb-2">✨ AI Summary</h3>
-              <p className="text-gray-300 leading-relaxed">{aiSummary}</p>
-            </div>
-          )}
 
           {/* Entry Meta Info */}
           {currentEntry && (
