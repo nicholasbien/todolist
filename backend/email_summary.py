@@ -81,11 +81,8 @@ def load_haiku_collection() -> List[str]:
     """Load the haiku collection from JSON file."""
     try:
         current_dir = os.path.dirname(os.path.abspath(__file__))
-        # Try large collection first, fall back to small one
-        large_haiku_file = os.path.join(current_dir, "haiku_collection_large.json")
-        small_haiku_file = os.path.join(current_dir, "haiku_collection.json")
-
-        haiku_file = large_haiku_file if os.path.exists(large_haiku_file) else small_haiku_file
+        # Use only the high-quality small collection
+        haiku_file = os.path.join(current_dir, "haiku_collection.json")
 
         with open(haiku_file, "r", encoding="utf-8") as f:
             haikus = json.load(f)
@@ -207,7 +204,7 @@ Instructions:
    - Sky/Weather: 🌙⭐🌅🌊🌄🌈☀️🌤️⛅🌥️❄️💧🌟✨
    - Zen/Spiritual: 🧘🕯️🪷🎍🎐🪶🪨🏔️🎋🍀
 
-Add the chosen emoji on a separate line after the haiku.
+Add the chosen emoji at the end of the third (final) line of the haiku, with a space before it.
 
 Format as plain text email content (no HTML, no subject line).
 """
