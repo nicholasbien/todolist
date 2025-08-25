@@ -139,36 +139,10 @@ export default function JournalComponent({ token, activeSpace, authenticatedFetc
   }, [journalText, lastSavedText]); // Removed saveJournalEntry and saveTimeout to prevent infinite loop
 
   const handleManualSave = async () => {
-    if (journalText.trim()) {
-      await saveJournalEntry(journalText, true);
-    }
+    // Allow saving even if empty
+    await saveJournalEntry(journalText, true);
   };
 
-  const handleDeleteEntry = async () => {
-    if (!currentEntry?._id || !authenticatedFetch) return;
-
-    if (!window.confirm('Are you sure you want to delete this journal entry?')) return;
-
-    try {
-      setError('');
-      const response = await authenticatedFetch(`/journals/${currentEntry._id}`, {
-        method: 'DELETE'
-      });
-
-      if (!response?.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || 'Failed to delete journal entry');
-      }
-
-      // Clear the entry
-      setCurrentEntry(null);
-      setJournalText('');
-      setLastSavedText('');
-
-    } catch (err: any) {
-      setError(err.message || 'Error deleting journal entry');
-    }
-  };
 
 
   const formatDateForDisplay = (dateString: string) => {
@@ -247,14 +221,6 @@ export default function JournalComponent({ token, activeSpace, authenticatedFetc
               {saving ? 'Saving...' : 'Save Entry'}
             </button>
 
-            {currentEntry && (
-              <button
-                onClick={handleDeleteEntry}
-                className="bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-red-500 transition-colors"
-              >
-                🗑️ Delete
-              </button>
-            )}
           </div>
 
 
