@@ -235,6 +235,8 @@ The app's service worker provides comprehensive offline support:
 - **Background sync** - Changes made offline sync automatically when connection returns
 - **Offline-first design** - App works fully without internet connection
 
+**⚠️ IndexedDB Schema Management**: When adding new offline stores (todos, journals, etc.), always increment `DB_VERSION` in `sw.js` to trigger database upgrades for existing users. Failure to do this causes "object store not found" errors.
+
 **⚠️ Critical for Offline**: The app uses an intelligent environment-aware URL strategy:
 
 - **Development** (`NEXT_PUBLIC_API_URL` unset): Uses relative URLs (`/todos`, `/chat`) → Service worker intercepts and caches → Full offline functionality

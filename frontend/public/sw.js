@@ -3,7 +3,7 @@ const API_CACHE = 'todo-api-v40';
 
 const GLOBAL_DB_NAME = 'TodoGlobalDB';
 const USER_DB_PREFIX = 'TodoUserDB_';
-const DB_VERSION = 8;
+const DB_VERSION = 9;
 const TODOS = 'todos';
 const CATEGORIES = 'categories';
 const SPACES = 'spaces';
