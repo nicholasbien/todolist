@@ -10,7 +10,7 @@ import smtplib
 from datetime import datetime, timedelta
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 import openai
 from bson import ObjectId
@@ -125,11 +125,6 @@ def get_default_buddhist_instructions() -> str:
     return """
 
 Write like a Buddhist monk. Include a life lesson and famous Buddhist quote or koan.
-
-At the end, highlight the top 5 items that need my attention as a numbered list. For each item, put
-the todo text on the same numbered line and place any details (like priority or due date) on the
-line below without bullet points or hyphens. Indent two spaces and begin directly with the detail
-label (e.g., "Priority: High"). This avoids Gmail formatting issues.
 """
 
 
@@ -314,7 +309,40 @@ Here's your daily todo summary:
     return summary
 
 
-async def send_email(to_email: str, subject: str, body: str) -> bool:
+def generate_top_items_section(todos: List[dict]) -> Tuple[str, str]:
+    """Generate a top 5 items section in both plain text and HTML."""
+    top = todos[:5]
+    if not top:
+        return "", ""
+
+    text_section = "Top 5 Items That Need Your Attention:\n"
+    html_section = "<h3>Top 5 Items That Need Your Attention:</h3><ol>"
+
+    for idx, todo in enumerate(top, 1):
+        text_section += f"{idx}. {todo.get('text', 'Unknown task')}\n"
+        if todo.get("priority"):
+            text_section += f"  Priority: {todo['priority']}\n"
+        if todo.get("dueDateRelative"):
+            text_section += f"  Due: {todo['dueDateRelative']}\n"
+        elif todo.get("dateAddedRelative"):
+            text_section += f"  Added: {todo['dateAddedRelative']}\n"
+        text_section += "\n"
+
+        html_section += "<li>"
+        html_section += f"{todo.get('text', 'Unknown task')}"
+        if todo.get("priority"):
+            html_section += f"<br><span style='margin-left:1em;'>Priority: {todo['priority']}</span>"
+        if todo.get("dueDateRelative"):
+            html_section += f"<br><span style='margin-left:1em;'>Due: {todo['dueDateRelative']}</span>"
+        elif todo.get("dateAddedRelative"):
+            html_section += f"<br><span style='margin-left:1em;'>Added: {todo['dateAddedRelative']}</span>"
+        html_section += "</li>"
+
+    html_section += "</ol>"
+    return text_section.strip(), html_section
+
+
+async def send_email(to_email: str, subject: str, body_text: str, body_html: str | None = None) -> bool:
     """
     Send an email using SMTP.
     """
@@ -334,12 +362,14 @@ async def send_email(to_email: str, subject: str, body: str) -> bool:
             logger.error("Email credentials not configured")
             return False
 
-        msg = MIMEMultipart()
+        msg = MIMEMultipart("alternative")
         msg["From"] = FROM_EMAIL
         msg["To"] = to_email
         msg["Subject"] = subject
 
-        msg.attach(MIMEText(body, "plain"))
+        msg.attach(MIMEText(body_text, "plain"))
+        if body_html:
+            msg.attach(MIMEText(body_html, "html"))
 
         server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
         server.starttls()
@@ -484,6 +514,13 @@ async def send_daily_summary(
             limited_spaces, journal_entries, display_name, custom_instructions or "", user_timezone
         )
 
+        top_text, top_html = generate_top_items_section(uncompleted_todos)
+        summary_text = summary
+        summary_html = "<p>" + "<br>".join(summary.splitlines()) + "</p>"
+        if top_text:
+            summary_text += "\n\n" + top_text
+            summary_html += top_html
+
         # Create subject with date in user's timezone
         import pytz  # type: ignore
 
@@ -501,7 +538,7 @@ async def send_daily_summary(
         subject = f"📋 Your Daily Todo Summary - {today}"
 
         # Send email
-        return await send_email(user_email, subject, summary)
+        return await send_email(user_email, subject, summary_text, summary_html)
 
     except Exception as e:
         logger.error(f"Failed to send daily summary to {user_email}: {e}")
