@@ -852,7 +852,7 @@ async def api_create_journal_entry(request: JournalCreateRequest, current_user: 
             user_id=current_user["user_id"], space_id=request.space_id, date=request.date, text=request.text
         )
 
-        result = await create_journal_entry(entry)
+        result = await create_journal_entry(entry, current_user.get("timezone", "UTC"))
         logger.info(f"Journal entry created/updated for user {current_user['email']}, date {request.date}")
         return result.dict()
 
