@@ -1,7 +1,7 @@
 // IMPORTANT: Always increment these versions when modifying this service worker file
 // This forces browsers to download and use the updated service worker
-const STATIC_CACHE = 'todo-static-v44';
-const API_CACHE = 'todo-api-v44';
+const STATIC_CACHE = 'todo-static-v45';
+const API_CACHE = 'todo-api-v45';
 
 const GLOBAL_DB_NAME = 'TodoGlobalDB';
 const USER_DB_PREFIX = 'TodoUserDB_';
@@ -513,6 +513,7 @@ self.addEventListener('fetch', (event) => {
   }
 
   // Only handle API requests (both same-origin and backend API)
+  // Exclude auth requests - they must go to server
   const isApiPath =
     url.pathname.startsWith('/todos') ||
     url.pathname.startsWith('/categories') ||
@@ -521,8 +522,8 @@ self.addEventListener('fetch', (event) => {
     url.pathname.startsWith('/contact') ||
     url.pathname.startsWith('/chat') ||
     url.pathname.startsWith('/insights') ||
-    url.pathname.startsWith('/journals') ||
-    url.pathname.startsWith('/auth/');
+    url.pathname.startsWith('/journals');
+    // Note: /auth/ paths excluded - they bypass service worker
 
   const isApi =
     (url.origin === self.location.origin && isApiPath) ||
