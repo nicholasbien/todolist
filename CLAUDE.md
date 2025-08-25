@@ -135,3 +135,12 @@ Both frontend and backend require OpenAI API keys:
 - `POST /auth/logout` - Logout and invalidate session
 
 - go into the virtual environment if you see environment issues and are not in it
+
+## Service Worker Updates
+
+**CRITICAL**: Always bump service worker cache versions when modifying `public/sw.js`:
+- Increment `STATIC_CACHE` version: `todo-static-v41` → `todo-static-v42`
+- Increment `API_CACHE` version: `todo-api-v41` → `todo-api-v42`
+- Increment `DB_VERSION` if changing IndexedDB schema: `10` → `11`
+
+Without version bumps, browsers will continue using the cached old service worker, and changes won't take effect in production.

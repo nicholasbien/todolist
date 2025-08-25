@@ -81,14 +81,13 @@ def load_haiku_collection() -> List[str]:
     """Load the haiku collection from JSON file."""
     try:
         current_dir = os.path.dirname(os.path.abspath(__file__))
-        # Use only the high-quality small collection
         haiku_file = os.path.join(current_dir, "haiku_collection.json")
 
         with open(haiku_file, "r", encoding="utf-8") as f:
-            haikus = json.load(f)
+            haiku_collection = json.load(f)
 
-        logger.info(f"Loaded {len(haikus)} haikus from {os.path.basename(haiku_file)}")
-        return haikus
+        logger.info(f"Loaded {len(haiku_collection)} haikus from {os.path.basename(haiku_file)}")
+        return haiku_collection
     except Exception as e:
         logger.error(f"Error loading haiku collection: {e}")
         # Fallback classic haiku if file can't be loaded (from the collection we know works)
@@ -99,15 +98,7 @@ def load_haiku_collection() -> List[str]:
             "From time to time\nThe clouds give rest\nTo the moon-beholders.",
             "Autumn moonlight-\na worm digs silently\ninto the chestnut.",
             "Lightning flash-\nwhat I thought were faces\nare plumes of pampas grass.",
-            "First winter rain-\neven the monkey\nseems to want a raincoat.",
-            "The summer grasses\nAll that remains\nOf brave soldiers dreams",
-            "My life, -\nHow much more of it remains?\nThe night is brief.",
-            "Consider me\nAs one who loved poetry\nAnd persimmons.",
-            "Over the wintry\nforest, winds howl in rage\nwith no leaves to blow.",
-            "The lamp once out\nCool stars enter\nThe window frame.",
-            "The crow has flown away:\nswaying in the evening sun,\na leafless tree.",
             "O snail\nClimb Mount Fuji,\nBut slowly, slowly!",
-            "What a strange thing!\nto be alive\nbeneath cherry blossoms.",
         ]
 
 
@@ -230,6 +221,11 @@ Keep the philosophical, reflective tone from the original emails.]
    - Nature: 🌸🍃🌺🍂🌱🌼🌻🌷🌹🌿🌳🌲🌴🌾🌵
    - Sky/Weather: 🌙⭐🌅🌊🌄🌈☀️🌤️⛅🌥️❄️💧🌟✨
    - Zen/Spiritual: 🧘🕯️🪷🎍🎐🪶🪨🏔️🎋🍀
+
+13. The format should be:
+[haiku line 1]
+[haiku line 2]
+[haiku line 3] [emoji]
 
 Format as plain text email content (no HTML, no subject line).
 """

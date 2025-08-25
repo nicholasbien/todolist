@@ -1,3 +1,5 @@
+// IMPORTANT: Always increment these versions when modifying this service worker file
+// This forces browsers to download and use the updated service worker
 const STATIC_CACHE = 'todo-static-v41';
 const API_CACHE = 'todo-api-v41';
 

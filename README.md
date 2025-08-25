@@ -247,6 +247,12 @@ The app's service worker provides comprehensive offline support:
 
 This ensures journals work identically to todos in offline mode - you can create, edit, and view journal entries without internet connection.
 
+**⚠️ Service Worker Updates**: ALWAYS bump cache versions when modifying `sw.js`:
+- Increment `STATIC_CACHE` version (e.g., `todo-static-v41` → `todo-static-v42`)
+- Increment `API_CACHE` version (e.g., `todo-api-v41` → `todo-api-v42`)
+- Increment `DB_VERSION` if changing IndexedDB schema (e.g., `10` → `11`)
+- This forces browsers to download and use the updated service worker
+
 **🔄 Adding New Offline Features**: When implementing offline functionality for new data types, follow this established pattern:
 1. Add the new store to `openUserDB()` in `sw.js` with `{ keyPath: '_id' }`
 2. Create get/put/del functions following the existing naming convention
@@ -451,6 +457,7 @@ A monk asked Baso, "What is Buddha?" Baso answered, "No mind, no Buddha."
 The end of spring--
 the poet is brooding
 about editors. 🌸
+—Anonymous
 ```
 
 ## Deployment
