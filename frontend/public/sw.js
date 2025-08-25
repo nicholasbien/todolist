@@ -1,7 +1,7 @@
 // IMPORTANT: Always increment these versions when modifying this service worker file
 // This forces browsers to download and use the updated service worker
-const STATIC_CACHE = 'todo-static-v62';
-const API_CACHE = 'todo-api-v62';
+const STATIC_CACHE = 'todo-static-v63';
+const API_CACHE = 'todo-api-v63';
 
 const GLOBAL_DB_NAME = 'TodoGlobalDB';
 const USER_DB_PREFIX = 'TodoUserDB_';
@@ -624,10 +624,22 @@ async function handleApiRequest(request) {
             // Handle both single journal and array responses
             const serverJournals = Array.isArray(serverResponse) ? serverResponse : [serverResponse];
 
+            // Check queue for pending journal updates to avoid overwriting offline changes
+            const queue = await readQueue(authData.userId);
+            const pendingIds = new Set(
+              queue
+                .filter(op => op.type === 'CREATE_JOURNAL' && op.data._id && !op.data._id.startsWith('offline_journal_'))
+                .map(op => op.data._id)
+            );
+
             // Save all server journals to IndexedDB for offline access
             let cachedCount = 0;
             for (const journal of serverJournals) {
               if (journal && journal._id) {
+                if (pendingIds.has(journal._id)) {
+                  console.log(`⏭️ Skipping cache for journal ${journal._id} due to pending offline update`);
+                  continue;
+                }
                 await putJournal(journal, authData.userId);
                 cachedCount++;
               }
