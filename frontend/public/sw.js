@@ -1,7 +1,7 @@
 // IMPORTANT: Always increment these versions when modifying this service worker file
 // This forces browsers to download and use the updated service worker
-const STATIC_CACHE = 'todo-static-v41';
-const API_CACHE = 'todo-api-v41';
+const STATIC_CACHE = 'todo-static-v44';
+const API_CACHE = 'todo-api-v44';
 
 const GLOBAL_DB_NAME = 'TodoGlobalDB';
 const USER_DB_PREFIX = 'TodoUserDB_';
@@ -507,6 +507,11 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
+  // Debug: Log all requests to see what the service worker is seeing
+  if (url.hostname.includes('railway.app')) {
+    console.log(`🔍 SW sees Railway request: ${event.request.method} ${url.href}`);
+  }
+
   // Only handle API requests (both same-origin and backend API)
   const isApiPath =
     url.pathname.startsWith('/todos') ||
@@ -525,6 +530,7 @@ self.addEventListener('fetch', (event) => {
     (url.hostname === 'localhost' && url.port === '8000' && isApiPath);
 
   if (isApi) {
+    console.log(`🔄 Service worker intercepting API request: ${event.request.method} ${url.href}`);
     event.respondWith(handleApiRequest(event.request));
     return;
   }
@@ -747,7 +753,7 @@ async function offlineFallback(request, url) {
         return new Response(JSON.stringify(journals[0]), { headers: { 'Content-Type': 'application/json' } });
       } else if (date) {
         // No entry found for date
-        return new Response('null', { headers: { 'Content-Type': 'application/json' } });
+        return new Response(JSON.stringify(null), { headers: { 'Content-Type': 'application/json' } });
       } else {
         // Return all journals as array
         return new Response(JSON.stringify(journals), { headers: { 'Content-Type': 'application/json' } });
