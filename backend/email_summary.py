@@ -10,11 +10,12 @@ import smtplib
 from datetime import datetime, timedelta
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 import openai
 from bson import ObjectId
 from dotenv import load_dotenv
+from journals import get_journal_entries
 from todos import get_todos
 
 # Load environment variables
@@ -137,6 +138,7 @@ def create_summary_prompt(
     custom_instructions: str = "",
     user_timezone: str = "America/New_York",
     haiku: str = "",
+    journal_entries_json: str = "",
 ) -> str:
     """Create a prompt for generating a daily todo summary with space context."""
     # Localize date to user's timezone
@@ -159,10 +161,14 @@ def create_summary_prompt(
 
 Today's date: {current_date}
 
-Given the following JSON data of todos organized by collaboration space, create a warm, encouraging daily summary email.
+Given the following JSON data of todos organized by collaboration space,
+and recent journal entries, create a warm, encouraging daily summary email.
 
 Todo Data (grouped by space):
 {spaces_json}
+
+Recent Journal Entries:
+{journal_entries_json}
 
 Instructions:
 1. Address the user as "{user_name}" if provided, otherwise use "there"
@@ -212,16 +218,26 @@ Format as plain text email content (no HTML, no subject line).
 
 
 async def generate_todo_summary(
-    spaces_data: list, user_name: str = "there", custom_instructions: str = "", user_timezone: str = "America/New_York"
+    spaces_data: list,
+    journal_entries_data: Optional[List[dict]] = None,
+    user_name: str = "there",
+    custom_instructions: str = "",
+    user_timezone: str = "America/New_York",
 ) -> str:
     """Use OpenAI to generate a personalized todo summary."""
     try:
         # Convert spaces and their todos to JSON for the prompt
         spaces_json = json.dumps(spaces_data, indent=2, default=str)
 
+        journal_entries_json = (
+            json.dumps(journal_entries_data, indent=2, default=str) if journal_entries_data is not None else "[]"
+        )
+
         # Get a haiku to include in the prompt so AI can choose matching emoji
         haiku = get_random_haiku()
-        prompt = create_summary_prompt(spaces_json, user_name, custom_instructions, user_timezone, haiku)
+        prompt = create_summary_prompt(
+            spaces_json, user_name, custom_instructions, user_timezone, haiku, journal_entries_json
+        )
 
         # Use OpenAI to generate the summary
         client = openai.AsyncOpenAI(api_key=openai.api_key)
@@ -381,6 +397,27 @@ async def send_daily_summary(
                 all_todos.append(t_copy)
             spaces_data.append({"space": space.name, "todos": humanized})
 
+        # Get recent journal entries from the past week (max 7)
+        recent_journals = await get_journal_entries(user_id, limit=7)
+        one_week_ago = (datetime.utcnow() - timedelta(days=7)).date()
+        journal_entries: List[dict] = []
+        for j in recent_journals:
+            j_dict = j.dict() if hasattr(j, "dict") else j
+            date_str = j_dict.get("date")
+            try:
+                entry_date = datetime.fromisoformat(date_str).date()
+            except Exception:
+                continue
+            if entry_date < one_week_ago:
+                continue
+            entry = {
+                "date": date_str,
+                "dateRelative": format_date_with_relative(date_str),
+                "text": j_dict.get("text", ""),
+                "space_id": j_dict.get("space_id"),
+            }
+            journal_entries.append(entry)
+
         if custom_instructions is None:
             custom_instructions = user.get("email_instructions", "") if user else ""
 
@@ -442,7 +479,9 @@ async def send_daily_summary(
 
         # Generate summary
         display_name = user_name or user_email.split("@")[0]
-        summary = await generate_todo_summary(limited_spaces, display_name, custom_instructions or "", user_timezone)
+        summary = await generate_todo_summary(
+            limited_spaces, journal_entries, display_name, custom_instructions or "", user_timezone
+        )
 
         # Create subject with date in user's timezone
         import pytz  # type: ignore
