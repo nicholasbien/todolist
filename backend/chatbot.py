@@ -16,7 +16,8 @@ api_key = os.getenv("OPENAI_API_KEY")
 if not api_key:
     raise ValueError("OPENAI_API_KEY not found in environment variables!")
 
-client = OpenAI(api_key=api_key, timeout=10.0, max_retries=0)
+# Allow a bit more time for responses from the assistant
+client = OpenAI(api_key=api_key, timeout=15.0, max_retries=0)
 
 
 async def answer_question(question: str, spaces_data: List[dict], history: List[dict]) -> str:
