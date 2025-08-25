@@ -932,6 +932,64 @@ describe('Journal Operations', () => {
     expect(dec1Journals[0].text).toBe('Server journal 1');
   });
 
+  test('offline journal updates are preserved after reconnect', async () => {
+    const sw = require('../public/sw.js');
+    await sw.putAuth('token123', 'user1');
+
+    // Existing journal cached locally
+    const serverJournal = {
+      _id: 'journal1',
+      user_id: 'user1',
+      date: '2023-12-01',
+      space_id: 'space1',
+      text: 'Server version'
+    };
+    await sw.putJournal(serverJournal, 'user1');
+
+    // User edits journal while offline
+    const updatedJournal = { ...serverJournal, text: 'Offline edit' };
+    await sw.putJournal(updatedJournal, 'user1');
+    await sw.addQueue({ type: 'CREATE_JOURNAL', data: updatedJournal }, 'user1');
+
+    // On reconnect, a GET request returns outdated server version before sync
+    global.fetch = jest
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => [serverJournal],
+        clone: () => ({ json: async () => [serverJournal] })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => updatedJournal
+      });
+
+    Object.defineProperty(global.navigator, 'onLine', { writable: true, value: true });
+    global.self = global.self || {};
+    global.self.location = { hostname: 'localhost' };
+
+    await sw.handleApiRequest(new Request('/api/journals?space_id=space1', { method: 'GET' }));
+
+    // Local journal should still contain offline edit
+    let journals = await sw.getJournals('user1', '2023-12-01', 'space1');
+    expect(journals[0].text).toBe('Offline edit');
+
+    // Sync queued update
+    await sw.syncQueue();
+
+    expect(fetch).toHaveBeenLastCalledWith(
+      '/api/journals',
+      expect.objectContaining({ method: 'POST', body: JSON.stringify(updatedJournal) })
+    );
+
+    journals = await sw.getJournals('user1', '2023-12-01', 'space1');
+    expect(journals[0].text).toBe('Offline edit');
+    expect(journals[0]._id).toBe('journal1');
+
+    const queue = await sw.readQueue('user1');
+    expect(queue).toHaveLength(0);
+  });
+
   test('GET /todos caching works correctly', async () => {
     const sw = require('../public/sw.js');
     await sw.putAuth('token123', 'user1');
