@@ -582,6 +582,7 @@ async function handleApiRequest(request) {
             await putTodo(todo, authData.userId);
           }
 
+
           // Merge server todos with any remaining offline todos (for the specific space)
           const mergedTodos = [...serverTodos, ...offlineOnlyTodos];
 
@@ -634,6 +635,26 @@ async function handleApiRequest(request) {
           // Save all server spaces to IndexedDB for offline access
           for (const space of serverSpaces) {
             await putSpace(space, authData.userId);
+          }
+
+          return response; // Return original response
+        }
+
+        // For GET /journals, sync server data to IndexedDB (same pattern as todos)
+        if (url.pathname === '/journals') {
+          const authData = await getAuth();
+          if (!authData || !authData.userId) return response; // No user context
+
+          const serverResponse = await response.clone().json();
+
+          // Handle both single journal and array responses
+          const serverJournals = Array.isArray(serverResponse) ? serverResponse : [serverResponse];
+
+          // Save all server journals to IndexedDB for offline access
+          for (const journal of serverJournals) {
+            if (journal && journal._id) {
+              await putJournal(journal, authData.userId);
+            }
           }
 
           return response; // Return original response
