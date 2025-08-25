@@ -127,8 +127,9 @@ def get_default_buddhist_instructions() -> str:
 Write like a Buddhist monk. Include a life lesson and famous Buddhist quote or koan.
 
 At the end, highlight the top 5 items that need my attention as a numbered list. For each item, put
-the todo text on the same numbered line and list any details (like priority or due date) as bullet
-points on the lines below.
+the todo text on the same numbered line and place any details (like priority or due date) on the
+line below without bullet points or hyphens. Indent two spaces and begin directly with the detail
+label (e.g., "Priority: High"). This avoids Gmail formatting issues.
 """
 
 
