@@ -426,11 +426,11 @@ async def send_daily_summary(
 
         user = await users_collection.find_one({"_id": ObjectId(user_id)})
 
-        # Get user's todos for all spaces
+        # Get user's todos only for spaces the user has selected
         spaces = await get_spaces_for_user(user_id)
         if user and user.get("email_spaces"):
             allowed = set(user.get("email_spaces", []))
-            spaces = [s for s in spaces if s.is_default or s.id in allowed]
+            spaces = [s for s in spaces if s.id in allowed]
         spaces_data = []
         all_todos = []
         for space in spaces:
