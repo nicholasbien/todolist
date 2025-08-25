@@ -1,6 +1,7 @@
 import '../styles/globals.css';
 import { useEffect } from 'react';
 import { OfflineProvider } from '../context/OfflineContext';
+import { AuthProvider } from '../context/AuthContext';
 import type { AppProps } from 'next/app';
 
 function MyApp({ Component, pageProps }: AppProps) {
@@ -21,9 +22,11 @@ function MyApp({ Component, pageProps }: AppProps) {
   }, []);
 
   return (
-    <OfflineProvider>
-      <Component {...pageProps} />
-    </OfflineProvider>
+    <AuthProvider>
+      <OfflineProvider>
+        <Component {...pageProps} />
+      </OfflineProvider>
+    </AuthProvider>
   );
 }
 

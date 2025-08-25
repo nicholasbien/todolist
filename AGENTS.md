@@ -347,3 +347,47 @@ The script deploys both backend and frontend services to Railway. Manual deploym
 - SMTP credentials needed for email functionality
 - Daily email scheduler runs automatically at 9 AM Eastern
 - Backend has restart policy ON_FAILURE for automatic recovery
+
+## Agent Definitions
+
+### pwa-app-store-converter
+
+**Purpose**: Converts existing Next.js/React PWA applications to native app store packages for iOS and Android distribution.
+
+**Description**: This agent specializes in transforming Progressive Web Apps (PWAs) into native app store packages without requiring code rewrites. It uses TWA (Trusted Web Activity) for Android Play Store deployment and Capacitor wrapper for iOS App Store deployment, providing a fast path to native app distribution.
+
+**Key Capabilities**:
+- **PWA Assessment**: Audits existing PWAs for app store readiness using Lighthouse and PWA quality criteria
+- **Android TWA Packaging**: Implements Trusted Web Activity wrapper for Google Play Store deployment
+- **iOS Capacitor Wrapping**: Creates Capacitor-based iOS app bundles for App Store submission
+- **Store Asset Generation**: Creates required icons, screenshots, and metadata for both app stores
+- **Performance Optimization**: Enhances PWAs for mobile app experience with caching strategies and mobile-specific optimizations
+- **App Store Submission**: Guides through Google Play Console and App Store Connect submission processes
+
+**Technical Stack**:
+- **Android**: Trusted Web Activity (TWA) with Bubblewrap CLI
+- **iOS**: Capacitor framework for native wrapper
+- **PWA Tools**: Lighthouse auditing, Workbox for service workers
+- **Build Tools**: Android Studio/Gradle for APK/AAB, Xcode for iOS archives
+
+**Advantages Over Native Development**:
+- **Zero Code Rewrite**: 100% code reuse from existing PWA
+- **Fast Implementation**: 3-4 weeks vs 10-16 weeks for React Native conversion
+- **Single Codebase Maintenance**: Web updates automatically reflect in mobile apps
+- **Lower Development Cost**: Minimal resources required for native presence
+- **Instant Updates**: No app store approval needed for web functionality updates
+
+**Use Cases**:
+- Converting existing PWAs to native app store presence
+- Rapid mobile app deployment for web-first applications
+- Maintaining web development velocity while gaining native distribution
+- Teams wanting app store presence without native development complexity
+
+**Deliverables**:
+- App store-ready Android APK/AAB packages
+- iOS app archives ready for App Store Connect
+- Store listing assets (icons, screenshots, descriptions)
+- PWA optimization recommendations and implementations
+- Submission guidance and app store compliance verification
+
+**Timeline**: Typically 3-4 weeks from PWA assessment to app store submission, significantly faster than traditional native development approaches.
