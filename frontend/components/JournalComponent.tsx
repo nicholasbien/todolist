@@ -45,8 +45,8 @@ export default function JournalComponent({ token, activeSpace }: JournalProps) {
       setError('');
 
       const url = activeSpace?._id
-        ? `/journals?date=${date}&space_id=${activeSpace._id}`
-        : `/journals?date=${date}`;
+        ? `/api/journals?date=${date}&space_id=${activeSpace._id}`
+        : `/api/journals?date=${date}`;
 
       const response = await authenticatedFetch(url);
 
@@ -97,7 +97,7 @@ export default function JournalComponent({ token, activeSpace }: JournalProps) {
         space_id: activeSpace?._id || null
       };
 
-      const response = await authenticatedFetch('/journals', {
+      const response = await authenticatedFetch('/api/journals', {
         method: 'POST',
         body: JSON.stringify(requestBody)
       });

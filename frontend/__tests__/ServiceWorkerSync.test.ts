@@ -170,7 +170,7 @@ describe('Category Operations', () => {
     await sw.addQueue({ type: 'DELETE_CATEGORY', data: deleteData }, 'user1');
     await sw.syncQueue();
 
-    expect(fetch).toHaveBeenCalledWith('/categories/Old%20Category', {
+    expect(fetch).toHaveBeenCalledWith('/api/categories/Old%20Category', {
       method: 'DELETE',
       headers: {
         'Content-Type': 'application/json',
@@ -189,7 +189,7 @@ describe('Category Operations', () => {
     await sw.addQueue({ type: 'RENAME_CATEGORY', data: renameData }, 'user1');
     await sw.syncQueue();
 
-    expect(fetch).toHaveBeenCalledWith('/categories/Old', {
+    expect(fetch).toHaveBeenCalledWith('/api/categories/Old', {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -738,7 +738,7 @@ describe('Journal Operations', () => {
 
     // Service worker should strip offline _id before sending to server
     const { _id: offlineId, ...expectedPayload } = journalData;
-    expect(fetch).toHaveBeenCalledWith('/journals', expect.objectContaining({
+    expect(fetch).toHaveBeenCalledWith('/api/journals', expect.objectContaining({
       method: 'POST',
       body: JSON.stringify(expectedPayload),
     }));
@@ -760,7 +760,7 @@ describe('Journal Operations', () => {
 
     await sw.syncQueue();
 
-    expect(fetch).toHaveBeenCalledWith(`/journals/${journalId}`, expect.objectContaining({
+    expect(fetch).toHaveBeenCalledWith(`/api/journals/${journalId}`, expect.objectContaining({
       method: 'DELETE',
     }));
   });
@@ -897,18 +897,22 @@ describe('Journal Operations', () => {
       value: true
     });
 
-    // Test GET /journals request through handleApiRequest
-    const request = new Request('/journals?space_id=space1', {
+    // Mock self.location for development environment detection
+    global.self = global.self || {};
+    global.self.location = {
+      hostname: 'localhost'
+    };
+
+    // Test GET /api/journals request through handleApiRequest
+    const request = new Request('/api/journals?space_id=space1', {
       method: 'GET'
     });
     const response = await sw.handleApiRequest(request);
 
-    // Verify fetch was called correctly
-    expect(fetch).toHaveBeenCalledWith('/journals?space_id=space1', expect.objectContaining({
+    // Verify fetch was called correctly (service worker forwards the /api/* request)
+    expect(fetch).toHaveBeenCalledWith(expect.objectContaining({
       method: 'GET',
-      headers: expect.objectContaining({
-        'Authorization': 'Bearer token123'
-      })
+      url: expect.stringContaining('/api/journals?space_id=space1')
     }));
 
     // Verify response is correct
@@ -963,18 +967,28 @@ describe('Journal Operations', () => {
       }
     });
 
-    // Test GET /todos request through handleApiRequest
-    const request = new Request('/todos?space_id=space1', {
+    // Mock navigator.onLine to be true to force online behavior
+    Object.defineProperty(global.navigator, 'onLine', {
+      writable: true,
+      value: true
+    });
+
+    // Mock self.location for development environment detection
+    global.self = global.self || {};
+    global.self.location = {
+      hostname: 'localhost'
+    };
+
+    // Test GET /api/todos request through handleApiRequest
+    const request = new Request('/api/todos?space_id=space1', {
       method: 'GET'
     });
     const response = await sw.handleApiRequest(request);
 
-    // Verify fetch was called correctly
-    expect(fetch).toHaveBeenCalledWith('/todos?space_id=space1', expect.objectContaining({
+    // Verify fetch was called correctly (service worker forwards the /api/* request)
+    expect(fetch).toHaveBeenCalledWith(expect.objectContaining({
       method: 'GET',
-      headers: expect.objectContaining({
-        'Authorization': 'Bearer token123'
-      })
+      url: expect.stringContaining('/api/todos?space_id=space1')
     }));
 
     // Verify response is correct
@@ -1011,8 +1025,8 @@ describe('Journal Operations', () => {
     // Mock network failure
     global.fetch = jest.fn().mockRejectedValue(new Error('Network error'));
 
-    // Test GET /todos request when offline
-    const request = new Request('/todos?space_id=space1', {
+    // Test GET /api/todos request when offline
+    const request = new Request('/api/todos?space_id=space1', {
       method: 'GET'
     });
     const response = await sw.handleApiRequest(request);

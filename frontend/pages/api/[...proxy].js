@@ -1,7 +1,7 @@
 // API proxy to forward all requests to the backend
 // This allows the service worker to intercept same-origin requests in production
 
-const BACKEND_URL = process.env.BACKEND_URL || 'https://backend-production-e920.up.railway.app';
+const BACKEND_URL = process.env.BACKEND_URL || (process.env.NODE_ENV === 'development' ? 'http://localhost:8000' : 'https://backend-production-e920.up.railway.app');
 
 export default async function handler(req, res) {
   const { proxy } = req.query;
@@ -27,8 +27,12 @@ export default async function handler(req, res) {
       if (req.body && typeof req.body === 'object') {
         body = JSON.stringify(req.body);
         headers['content-type'] = 'application/json';
-      } else {
+        headers['content-length'] = Buffer.byteLength(body).toString();
+      } else if (req.body) {
         body = req.body;
+        if (typeof body === 'string') {
+          headers['content-length'] = Buffer.byteLength(body).toString();
+        }
       }
     }
 

@@ -85,7 +85,7 @@ describe('Online/Offline Event Handling', () => {
 
     await waitFor(() => {
       expect(consoleSpy).toHaveBeenCalledWith('Browser came back online');
-      expect(fetch).toHaveBeenCalledWith('/todos', expect.objectContaining({
+      expect(fetch).toHaveBeenCalledWith('/api/todos', expect.objectContaining({
         headers: expect.objectContaining({
           'Authorization': 'Bearer mock-token-123'
         })
@@ -198,7 +198,7 @@ describe('Online/Offline Event Handling', () => {
 
     await waitFor(() => {
       // Should handle multiple events gracefully
-      expect(fetch).toHaveBeenCalledWith('/todos', expect.any(Object));
+      expect(fetch).toHaveBeenCalledWith('/api/todos', expect.any(Object));
     });
 
     // All calls should be identical - no corruption

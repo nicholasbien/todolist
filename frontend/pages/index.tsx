@@ -346,8 +346,7 @@ export default function Home() {
     if (showExportModal && token) {
       const loadSpaces = async () => {
         try {
-          const baseURL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-          const resp = await fetch(`${baseURL}/spaces`, {
+          const resp = await fetch('/api/spaces', {
             headers: { Authorization: `Bearer ${token}` }
           });
           if (resp.ok) {
@@ -397,7 +396,7 @@ export default function Home() {
     try {
       setSendingContact(true);
 
-      const response = await fetch('/contact', {
+      const response = await fetch('/api/contact', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

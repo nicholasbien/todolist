@@ -29,7 +29,7 @@ describe('Offline Journal Functionality', () => {
     global.fetch = mockFetch;
 
     // Create offline journal request
-    const request = new Request('/journals', {
+    const request = new Request('/api/journals', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer token123' },
       body: JSON.stringify(journalData)
@@ -89,7 +89,7 @@ describe('Offline Journal Functionality', () => {
     await sw.syncQueue();
 
     // Verify correct API call was made
-    expect(fetch).toHaveBeenCalledWith('/journals', expect.objectContaining({
+    expect(fetch).toHaveBeenCalledWith('/api/journals', expect.objectContaining({
       method: 'POST',
       headers: expect.objectContaining({
         'Authorization': 'Bearer token123',
@@ -125,7 +125,7 @@ describe('Offline Journal Functionality', () => {
     await sw.addQueue({ type: 'CREATE_JOURNAL', data: offlineJournal }, 'user1');
 
     // Mock DELETE request
-    const request = new Request('/journals/offline_journal_2023-12-01_12345', {
+    const request = new Request('/api/journals/offline_journal_2023-12-01_12345', {
       method: 'DELETE',
       headers: { 'Authorization': 'Bearer token123' }
     });
@@ -157,7 +157,7 @@ describe('Offline Journal Functionality', () => {
     await sw.putJournal(syncedJournal, 'user1');
 
     // Mock DELETE request
-    const request = new Request('/journals/server_journal_456', {
+    const request = new Request('/api/journals/server_journal_456', {
       method: 'DELETE',
       headers: { 'Authorization': 'Bearer token123' }
     });
@@ -339,7 +339,7 @@ describe('Journal Auto-save Integration', () => {
 
     // Simulate rapid auto-save updates
     for (let i = 1; i <= 5; i++) {
-      const request = new Request('/journals', {
+      const request = new Request('/api/journals', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer token123' },
         body: JSON.stringify({ ...baseJournal, text: `Update ${i}` })

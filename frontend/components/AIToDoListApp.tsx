@@ -95,7 +95,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
 
   const handleOpenEmailSettings = async () => {
     try {
-      const response = await authenticatedFetch('/auth/me');
+      const response = await authenticatedFetch('/api/auth/me');
       if (!response?.ok) throw new Error('Failed to fetch user info');
       const userData = await response.json();
       const h = String(userData?.summary_hour ?? 9).padStart(2, '0');
@@ -128,7 +128,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
     try {
       // For offline functionality, service worker doesn't need token
       // For online requests, authenticatedFetch handles token automatically
-      const response = await authenticatedFetch('/spaces');
+      const response = await authenticatedFetch('/api/spaces');
       if (response.ok) {
         const data = await response.json();
         setSpaces(data);
@@ -151,7 +151,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
       return;
     }
     try {
-      const resp = await authenticatedFetch(`/spaces/${activeSpace._id}/members`);
+      const resp = await authenticatedFetch(`/api/spaces/${activeSpace._id}/members`);
       if (resp?.ok) {
         const data = await resp.json();
         if (fetchId === membersFetchIdRef.current) {
@@ -176,7 +176,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
     }
 
     try {
-      const response = await authenticatedFetch(`/categories?space_id=${activeSpace._id}`);
+      const response = await authenticatedFetch(`/api/categories?space_id=${activeSpace._id}`);
       if (!response?.ok) {
         throw new Error('Failed to fetch categories');
       }
@@ -198,7 +198,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
       setLoadingTodos(true);
     }
     try {
-      const url = activeSpace && activeSpace._id ? `/todos?space_id=${activeSpace._id}` : '/todos';
+      const url = activeSpace && activeSpace._id ? `/api/todos?space_id=${activeSpace._id}` : '/api/todos';
       const response = await authenticatedFetch(url);
       if (!response.ok) {
         throw new Error('Failed to fetch todos');
@@ -332,7 +332,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
     if (!name) return;
 
     try {
-      const response = await authenticatedFetch('/categories', {
+      const response = await authenticatedFetch('/api/categories', {
         method: 'POST',
         body: JSON.stringify({
           name,
@@ -359,7 +359,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
     const spaceName = newSpaceName.trim();
     if (!spaceName) return;
     try {
-      const response = await authenticatedFetch('/spaces', {
+      const response = await authenticatedFetch('/api/spaces', {
         method: 'POST',
         body: JSON.stringify({ name: spaceName })
       });
@@ -377,13 +377,13 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
     if (!spaceToEdit) return;
     const trimmedName = editSpaceName.trim();
     try {
-      await authenticatedFetch(`/spaces/${spaceToEdit._id}`, {
+      await authenticatedFetch(`/api/spaces/${spaceToEdit._id}`, {
         method: 'PUT',
         body: JSON.stringify({ name: trimmedName || spaceToEdit.name, collaborative: editSpaceCollaborative })
       });
       const emails = inviteEmails.map(e => e.trim()).filter(e => e);
       if (emails.length) {
-        await authenticatedFetch(`/spaces/${spaceToEdit._id}/invite`, {
+        await authenticatedFetch(`/api/spaces/${spaceToEdit._id}/invite`, {
           method: 'POST',
           body: JSON.stringify({ emails })
         });
@@ -400,7 +400,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
 
   const handleDeleteSpace = async (id) => {
     try {
-      await authenticatedFetch(`/spaces/${id}`, { method: 'DELETE' });
+      await authenticatedFetch(`/api/spaces/${id}`, { method: 'DELETE' });
       await fetchSpaces();
       if (activeSpace && activeSpace._id === id) {
         const updated = spaces.filter(s => s._id !== id);
@@ -413,7 +413,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
 
   const handleLeaveSpace = async (id) => {
     try {
-      await authenticatedFetch(`/spaces/${id}/leave`, { method: 'POST' });
+      await authenticatedFetch(`/api/spaces/${id}/leave`, { method: 'POST' });
       await fetchSpaces();
       if (activeSpace && activeSpace._id === id) {
         const updated = spaces.filter(s => s._id !== id);
@@ -428,7 +428,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
   const handleDeleteCategory = async (name) => {
     try {
       const spaceId = activeSpace?._id || null;
-      const url = spaceId ? `/categories/${encodeURIComponent(name)}?space_id=${spaceId}` : `/categories/${encodeURIComponent(name)}`;
+      const url = spaceId ? `/api/categories/${encodeURIComponent(name)}?space_id=${spaceId}` : `/api/categories/${encodeURIComponent(name)}`;
       const response = await authenticatedFetch(url, {
         method: 'DELETE',
       });
@@ -461,7 +461,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
 
     try {
       const spaceId = activeSpace?._id || null;
-      const url = spaceId ? `/categories/${encodeURIComponent(activeCat)}?space_id=${spaceId}` : `/categories/${encodeURIComponent(activeCat)}`;
+      const url = spaceId ? `/api/categories/${encodeURIComponent(activeCat)}?space_id=${spaceId}` : `/api/categories/${encodeURIComponent(activeCat)}`;
       const response = await authenticatedFetch(url, {
         method: 'PUT',
         body: JSON.stringify({ new_name: trimmed }),
@@ -520,7 +520,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
 
-      const response = await authenticatedFetch('/todos', {
+      const response = await authenticatedFetch('/api/todos', {
         method: 'POST',
         body: JSON.stringify(todo),
         signal: controller.signal
@@ -556,7 +556,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
         return;
       }
 
-      const response = await authenticatedFetch(`/todos/${id}`, {
+      const response = await authenticatedFetch(`/api/todos/${id}`, {
         method: 'DELETE',
       });
 
@@ -582,7 +582,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
         return;
       }
 
-      const response = await authenticatedFetch(`/todos/${id}/complete`, {
+      const response = await authenticatedFetch(`/api/todos/${id}/complete`, {
         method: 'PUT',
       });
 
@@ -602,7 +602,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
   // Update todo category
   const handleUpdateCategory = async (todoId, newCategory) => {
     try {
-      const response = await authenticatedFetch(`/todos/${todoId}`, {
+      const response = await authenticatedFetch(`/api/todos/${todoId}`, {
         method: 'PUT',
         body: JSON.stringify({ category: newCategory }),
       });
@@ -624,7 +624,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
   // Update todo priority
   const handleUpdatePriority = async (todoId, newPriority) => {
     try {
-      const response = await authenticatedFetch(`/todos/${todoId}`, {
+      const response = await authenticatedFetch(`/api/todos/${todoId}`, {
         method: 'PUT',
         body: JSON.stringify({ priority: newPriority }),
       });
@@ -678,7 +678,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
         priority: editPriorityVal,
         dueDate: editDueDate || null,
       };
-      const response = await authenticatedFetch(`/todos/${todoToEdit._id}`, {
+      const response = await authenticatedFetch(`/api/todos/${todoToEdit._id}`, {
         method: 'PUT',
         body: JSON.stringify(updates),
       });
@@ -701,7 +701,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
       setSendingEmail(true);
       setError('');
 
-      const response = await authenticatedFetch('/email/send-summary', {
+      const response = await authenticatedFetch('/api/email/send-summary', {
         method: 'POST',
       });
 
@@ -727,7 +727,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
       const [hour, minute] = emailTime.split(':').map((v) => parseInt(v, 10));
       // Detect user's current timezone
       const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-      const response = await authenticatedFetch('/email/update-schedule', {
+      const response = await authenticatedFetch('/api/email/update-schedule', {
         method: 'POST',
         body: JSON.stringify({ hour, minute, timezone: userTimezone, email_enabled: emailEnabled }),
       });
@@ -737,7 +737,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
         throw new Error(errorData.detail || 'Failed to update schedule');
       }
 
-      const resp2 = await authenticatedFetch('/email/update-instructions', {
+      const resp2 = await authenticatedFetch('/api/email/update-instructions', {
         method: 'POST',
         body: JSON.stringify({ instructions: emailInstructions }),
       });
@@ -747,7 +747,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
         throw new Error(errorData.detail || 'Failed to update instructions');
       }
 
-      const resp3 = await authenticatedFetch('/email/update-spaces', {
+      const resp3 = await authenticatedFetch('/api/email/update-spaces', {
         method: 'POST',
         body: JSON.stringify({ space_ids: emailSpaceIds }),
       });
@@ -1428,7 +1428,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
                   onClick={async () => {
                     // Reset form to original values without saving
                     try {
-                      const response = await authenticatedFetch('/auth/me');
+                      const response = await authenticatedFetch('/api/auth/me');
                       if (response?.ok) {
                         const userData = await response.json();
                         const h = String(userData?.summary_hour ?? 9).padStart(2, '0');

@@ -39,7 +39,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     try {
       if (token) {
         // Call logout endpoint to invalidate token on server
-        await fetch('/auth/logout', {
+        await fetch('/api/auth/logout', {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${token}`
@@ -64,7 +64,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
   const verifyToken = async (tokenToVerify: string) => {
     try {
-      const response = await fetch('/auth/me', {
+      const response = await fetch('/api/auth/me', {
         headers: {
           'Authorization': `Bearer ${tokenToVerify}`
         }
@@ -115,7 +115,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
   const signup = async (email: string): Promise<{ success: boolean; message?: string; error?: string }> => {
     try {
-      const response = await fetch('/auth/signup', {
+      const response = await fetch('/api/auth/signup', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -137,7 +137,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
   const login = async (email: string, code: string): Promise<{ success: boolean; error?: string }> => {
     try {
-      const response = await fetch('/auth/login', {
+      const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'

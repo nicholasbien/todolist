@@ -51,7 +51,7 @@ export default function InsightsComponent({ token, activeSpace }: InsightsProps)
       setLoading(true);
       setError('');
 
-      const url = activeSpace?._id ? `/insights?space_id=${activeSpace._id}` : '/insights';
+      const url = activeSpace?._id ? `/api/insights?space_id=${activeSpace._id}` : '/api/insights';
       const response = await authenticatedFetch(url);
 
       if (!response?.ok) {

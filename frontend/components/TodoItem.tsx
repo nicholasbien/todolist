@@ -139,9 +139,11 @@ export default function TodoItem({
           >
             {categories
               .sort((a, b) => {
-                if (a === "General") return -1;
-                if (b === "General") return 1;
-                return a.localeCompare(b);
+                const aStr = String(a);
+                const bStr = String(b);
+                if (aStr === "General") return -1;
+                if (bStr === "General") return 1;
+                return aStr.localeCompare(bStr);
               })
               .map((cat) => (
                 <option key={cat} value={cat}>
@@ -160,9 +162,11 @@ export default function TodoItem({
           >
             {categories
               .sort((a, b) => {
-                if (a === "General") return -1;
-                if (b === "General") return 1;
-                return a.localeCompare(b);
+                const aStr = String(a);
+                const bStr = String(b);
+                if (aStr === "General") return -1;
+                if (bStr === "General") return 1;
+                return aStr.localeCompare(bStr);
               })
               .map((cat) => (
                 <option key={cat} value={cat}>

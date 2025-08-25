@@ -18,6 +18,9 @@ describe('Offline Insights Functionality', () => {
     const sw = require('../public/sw.js');
     await sw.putAuth('token123', 'user1');
 
+    // Clear any existing todos to ensure clean test state
+    await sw.clearTodos('user1');
+
     const todos = [
       {
         _id: 'todo1',
@@ -102,7 +105,10 @@ describe('Offline Insights Functionality', () => {
     const sw = require('../public/sw.js');
     await sw.putAuth('token123', 'user1');
 
-    const request = new Request('/insights', {
+    // Clear any existing todos to ensure clean test state
+    await sw.clearTodos('user1');
+
+    const request = new Request('/api/insights', {
       headers: { 'Authorization': 'Bearer token123' }
     });
 
@@ -126,6 +132,9 @@ describe('Offline Insights Functionality', () => {
   test('filters insights by space_id', async () => {
     const sw = require('../public/sw.js');
     await sw.putAuth('token123', 'user1');
+
+    // Clear any existing todos to ensure clean test state
+    await sw.clearTodos('user1');
 
     const todos = [
       {
@@ -171,6 +180,10 @@ describe('Offline Insights Functionality', () => {
   test('maintains user isolation for insights', async () => {
     const sw = require('../public/sw.js');
 
+    // Clear any existing todos to ensure clean test state
+    await sw.clearTodos('user1');
+    await sw.clearTodos('user2');
+
     const user1Todo = {
       _id: 'todo_user1',
       text: 'User 1 task',
@@ -198,7 +211,7 @@ describe('Offline Insights Functionality', () => {
 
     // Test user1 insights
     await sw.putAuth('token123', 'user1');
-    const request1 = new Request('/insights', {
+    const request1 = new Request('/api/insights', {
       headers: { 'Authorization': 'Bearer token123' }
     });
 
@@ -210,7 +223,7 @@ describe('Offline Insights Functionality', () => {
 
     // Test user2 insights
     await sw.putAuth('token456', 'user2');
-    const request2 = new Request('/insights', {
+    const request2 = new Request('/api/insights', {
       headers: { 'Authorization': 'Bearer token456' }
     });
 
@@ -227,6 +240,9 @@ describe('Offline Insights Functionality', () => {
   test('calculates weekly stats correctly', async () => {
     const sw = require('../public/sw.js');
     await sw.putAuth('token123', 'user1');
+
+    // Clear any existing todos to ensure clean test state
+    await sw.clearTodos('user1');
 
     // Create todos across different weeks
     const todos = [
@@ -265,7 +281,7 @@ describe('Offline Insights Functionality', () => {
       await sw.putTodo(todo, 'user1');
     }
 
-    const request = new Request('/insights', {
+    const request = new Request('/api/insights', {
       headers: { 'Authorization': 'Bearer token123' }
     });
 

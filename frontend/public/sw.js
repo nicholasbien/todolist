@@ -1,7 +1,7 @@
 // IMPORTANT: Always increment these versions when modifying this service worker file
 // This forces browsers to download and use the updated service worker
-const STATIC_CACHE = 'todo-static-v54';
-const API_CACHE = 'todo-api-v54';
+const STATIC_CACHE = 'todo-static-v57';
+const API_CACHE = 'todo-api-v57';
 
 const GLOBAL_DB_NAME = 'TodoGlobalDB';
 const USER_DB_PREFIX = 'TodoUserDB_';
@@ -408,7 +408,7 @@ async function syncServerDataToLocal() {
 
     // Fetch and store spaces first
     try {
-      const spacesResponse = await fetch('/spaces', { headers });
+      const spacesResponse = await fetch('/api/spaces', { headers });
       if (spacesResponse.ok) {
         const serverSpaces = await spacesResponse.json();
         for (const space of serverSpaces) {
@@ -421,7 +421,7 @@ async function syncServerDataToLocal() {
 
     // Fetch and store categories (now space-aware)
     try {
-      const categoriesResponse = await fetch('/categories', { headers });
+      const categoriesResponse = await fetch('/api/categories', { headers });
       if (categoriesResponse.ok) {
         const serverCategories = await categoriesResponse.json();
         for (const categoryName of serverCategories) {
@@ -450,12 +450,10 @@ async function syncServerDataToLocal() {
 }
 
 self.addEventListener('install', (event) => {
-  const isDevelopment = self.location.hostname === 'localhost' || self.location.hostname === '127.0.0.1';
-
   event.waitUntil(
     Promise.all([
-      // Only pre-cache static files in production, with individual error handling
-      isDevelopment ? Promise.resolve() : cacheStaticFiles(),
+      // Pre-cache static files with individual error handling
+      cacheStaticFiles(),
       caches.open(API_CACHE),
       openGlobalDB()
     ])
@@ -508,20 +506,11 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
 
-  // Only handle API requests (both same-origin and backend API)
+  // Only handle API requests through /api/* paths
   // Exclude auth requests - they must go to server
-  const isApiPath =
-    url.pathname.startsWith('/todos') ||
-    url.pathname.startsWith('/categories') ||
-    url.pathname.startsWith('/spaces') ||
-    url.pathname.startsWith('/email') ||
-    url.pathname.startsWith('/contact') ||
-    url.pathname.startsWith('/chat') ||
-    url.pathname.startsWith('/insights') ||
-    url.pathname.startsWith('/journals');
-    // Note: /auth/ paths excluded - they bypass service worker
-
-  const isApi = url.origin === self.location.origin && isApiPath;
+  const isApi = url.origin === self.location.origin &&
+                url.pathname.startsWith('/api/') &&
+                !url.pathname.startsWith('/api/auth');
 
   if (isApi) {
     event.respondWith(handleApiRequest(event.request));
@@ -546,15 +535,23 @@ async function handleApiRequest(request) {
 
   if (online && !isOfflineId) {
     try {
-      // Pass request through normally - auth headers should be preserved with same-origin requests
-      const response = await fetch(request.clone());
+      // All requests go through Next.js API proxy (already at /api/* path)
+      // Just forward the request with auth headers
+      const authHeaders = await getAuthHeaders();
+      const proxyRequest = new Request(request.url, {
+        method: request.method,
+        headers: authHeaders,
+        body: request.method !== 'GET' && request.method !== 'HEAD' ? await request.blob() : null
+      });
+
+      const response = await fetch(proxyRequest);
 
       if (request.method === 'GET' && response.ok) {
         const cache = await caches.open(API_CACHE);
         cache.put(request, response.clone());
 
-        // For GET /todos, sync pending operations then merge with fresh server data
-        if (url.pathname === '/todos') {
+        // For GET /api/todos, sync pending operations then merge with fresh server data
+        if (url.pathname === '/api/todos') {
           const authData = await getAuth();
           if (!authData || !authData.userId) return response; // No user context
 
@@ -570,8 +567,8 @@ async function handleApiRequest(request) {
           return response; // Return original response
         }
 
-        // For GET /journals, sync server data to IndexedDB
-        if (url.pathname === '/journals') {
+        // For GET /api/journals, sync server data to IndexedDB
+        if (url.pathname === '/api/journals') {
           const authData = await getAuth();
           if (!authData || !authData.userId) return response; // No user context
 
@@ -603,35 +600,111 @@ async function handleApiRequest(request) {
           headers: { 'Content-Type': 'application/json' }
         });
       }
-      return offlineFallback(request, url);
+      return handleOfflineRequest(request, url);
     }
   }
   console.log(`📱 Falling back to offline handler for: ${request.method} ${url.pathname}`);
-  return offlineFallback(request, url);
+  return handleOfflineRequest(request, url);
+}
+
+// Handle offline API requests
+async function handleOfflineRequest(request, url) {
+  const authData = await getAuth();
+  if (!authData || !authData.userId) {
+    return new Response(JSON.stringify({ error: 'Not authenticated' }), {
+      status: 401,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+
+  // Handle GET requests from cache/IndexedDB
+  if (request.method === 'GET') {
+    // Extract the actual API path (remove /api prefix)
+    const apiPath = url.pathname.replace('/api', '');
+
+    if (apiPath === '/todos') {
+      const spaceId = url.searchParams.get('space_id');
+      const todos = await getTodos(authData.userId);
+
+      // Filter by space if specified
+      const filteredTodos = spaceId ? todos.filter(t => t.space_id === spaceId) : todos;
+
+      console.log(`📱 Offline GET /todos - Todo IDs: [${filteredTodos.map(t => t._id).join(', ')}]`);
+      return new Response(JSON.stringify(filteredTodos), {
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
+    if (apiPath === '/journals') {
+      const spaceId = url.searchParams.get('space_id');
+      const date = url.searchParams.get('date');
+      const journals = await getJournals(authData.userId, date, spaceId);
+
+      console.log(`📱 Offline GET /journals - Found ${journals.length} journals`);
+
+      if (date && journals.length > 0) {
+        // Return single entry for specific date (one journal per day)
+        return new Response(JSON.stringify(journals[0]), { headers: { 'Content-Type': 'application/json' } });
+      } else if (date) {
+        // No entry found for date
+        return new Response(JSON.stringify(null), { headers: { 'Content-Type': 'application/json' } });
+      } else {
+        // Return all journals as array
+        return new Response(JSON.stringify(journals), { headers: { 'Content-Type': 'application/json' } });
+      }
+    }
+
+    if (apiPath === '/categories') {
+      const spaceId = url.searchParams.get('space_id');
+      const categories = await getCategories(authData.userId, spaceId);
+
+      return new Response(JSON.stringify(categories), {
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
+    if (apiPath === '/spaces') {
+      const spaces = await getSpaces(authData.userId);
+
+      return new Response(JSON.stringify(spaces), {
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
+    if (apiPath === '/insights') {
+      const spaceId = url.searchParams.get('space_id');
+      const insights = await generateInsights(authData.userId, spaceId);
+
+      return new Response(JSON.stringify(insights), {
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+  }
+
+  // Handle non-GET requests (POST, PUT, DELETE)
+
+
+  // For other write operations, return service unavailable
+  return new Response(JSON.stringify({ error: 'Write operation not available offline' }), {
+    status: 503,
+    headers: { 'Content-Type': 'application/json' }
+  });
 }
 
 async function handleStaticRequest(request) {
-  const url = new URL(request.url);
-  const isDevelopment = url.hostname === 'localhost' || url.hostname === '127.0.0.1';
-
   try {
     // Try network first for static files
     const response = await fetch(request);
 
-    // Only cache in production to avoid development reload issues
-    if (response.ok && request.method === 'GET' && !isDevelopment) {
+    // Cache successful GET requests
+    if (response.ok && request.method === 'GET') {
       const cache = await caches.open(STATIC_CACHE);
       cache.put(request, response.clone());
     }
 
     return response;
   } catch (error) {
-    // In development, don't use cache fallbacks - let it fail naturally
-    if (isDevelopment) {
-      return new Response('Development server unavailable', { status: 503 });
-    }
-
-    // Production: Network failed, try cache
+    // Network failed, try cache
     const cache = await caches.open(STATIC_CACHE);
     const cachedResponse = await cache.match(request);
 
@@ -659,28 +732,11 @@ async function offlineFallback(request, url) {
   // Handle core operations offline
   if (request.method === 'GET') {
     // Handle spaces
-    if (url.pathname === '/spaces' || url.pathname.endsWith('/spaces')) {
+    if (url.pathname === '/api/spaces' || url.pathname.endsWith('/api/spaces')) {
       const spaces = await getSpaces(authData ? authData.userId : null);
       return new Response(JSON.stringify(spaces), { headers: { 'Content-Type': 'application/json' } });
     }
 
-    // Handle journals
-    if (url.pathname === '/journals' || url.pathname.endsWith('/journals')) {
-      const date = url.searchParams.get('date');
-      const spaceId = url.searchParams.get('space_id');
-      const journals = await getJournals(authData ? authData.userId : null, date, spaceId);
-
-      if (date && journals.length > 0) {
-        // Return single entry for specific date (one journal per day)
-        return new Response(JSON.stringify(journals[0]), { headers: { 'Content-Type': 'application/json' } });
-      } else if (date) {
-        // No entry found for date
-        return new Response(JSON.stringify(null), { headers: { 'Content-Type': 'application/json' } });
-      } else {
-        // Return all journals as array
-        return new Response(JSON.stringify(journals), { headers: { 'Content-Type': 'application/json' } });
-      }
-    }
 
     // Handle todos (space-aware)
     if (url.pathname === '/todos' || url.pathname.endsWith('/todos')) {
@@ -690,7 +746,7 @@ async function offlineFallback(request, url) {
     }
 
     // Handle categories (space-aware)
-    if (url.pathname === '/categories' || url.pathname.endsWith('/categories')) {
+    if (url.pathname === '/api/categories' || url.pathname.endsWith('/api/categories')) {
       const offlineCategories = await getCategories(authData ? authData.userId : null, spaceId);
 
       // If we have stored categories, return their names; otherwise use defaults
@@ -867,7 +923,7 @@ async function offlineFallback(request, url) {
     }
 
     // Create new category
-    if ((url.pathname === '/categories' || url.pathname.endsWith('/categories')) && request.method === 'POST') {
+    if ((url.pathname === '/api/categories' || url.pathname.endsWith('/api/categories')) && request.method === 'POST') {
       const categoryName = data.name || `offline_${Date.now()}`;
       const newCategory = { name: categoryName, space_id: data.space_id || null };
 
@@ -877,7 +933,7 @@ async function offlineFallback(request, url) {
     }
 
     // Rename category
-    if (url.pathname.startsWith('/categories/') && request.method === 'PUT') {
+    if (url.pathname.startsWith('/api/categories/') && request.method === 'PUT') {
       const oldName = decodeURIComponent(url.pathname.split('/')[2]);
       const newName = (data.new_name || '').trim();
       if (!newName) {
@@ -913,8 +969,8 @@ async function offlineFallback(request, url) {
     }
 
     // Delete category
-    if (url.pathname.startsWith('/categories/') && request.method === 'DELETE') {
-      const categoryName = decodeURIComponent(url.pathname.split('/')[2]); // Get name from /categories/{name}
+    if (url.pathname.startsWith('/api/categories/') && request.method === 'DELETE') {
+      const categoryName = decodeURIComponent(url.pathname.split('/')[3]); // Get name from /api/categories/{name}
 
       // Update todos that use this category to "General" in the specified space
       const todos = await getTodos(authData ? authData.userId : null, spaceId);
@@ -953,7 +1009,7 @@ async function offlineFallback(request, url) {
     }
 
     // Create or update journal entry (optimized for auto-save)
-    if ((url.pathname === '/journals' || url.pathname.endsWith('/journals')) && request.method === 'POST') {
+    if ((url.pathname === '/api/journals' || url.pathname.endsWith('/api/journals')) && request.method === 'POST') {
       const existing = await getJournals(
         authData ? authData.userId : null,
         data.date,
@@ -1015,8 +1071,8 @@ async function offlineFallback(request, url) {
     }
 
     // Delete journal entry
-    if (url.pathname.startsWith('/journals/') && request.method === 'DELETE') {
-      const id = url.pathname.split('/')[2];
+    if (url.pathname.startsWith('/api/journals/') && request.method === 'DELETE') {
+      const id = url.pathname.split('/')[3]; // Get ID from /api/journals/{id}
       console.log(`🗑️ Offline DELETE journal request for ID: ${id}`);
 
       const existingJournals = await getJournals(authData ? authData.userId : null);
@@ -1204,8 +1260,8 @@ async function syncQueue() {
           break;
         case 'DELETE_CATEGORY':
           const deleteUrl = op.data.space_id
-            ? `/categories/${encodeURIComponent(op.data.name)}?space_id=${op.data.space_id}`
-            : `/categories/${encodeURIComponent(op.data.name)}`;
+            ? `/api/categories/${encodeURIComponent(op.data.name)}?space_id=${op.data.space_id}`
+            : `/api/categories/${encodeURIComponent(op.data.name)}`;
           res = await fetch(deleteUrl, {
             method: 'DELETE',
             headers
@@ -1216,8 +1272,8 @@ async function syncQueue() {
           break;
         case 'RENAME_CATEGORY':
           const renameUrl = op.data.space_id
-            ? `/categories/${encodeURIComponent(op.data.old_name)}?space_id=${op.data.space_id}`
-            : `/categories/${encodeURIComponent(op.data.old_name)}`;
+            ? `/api/categories/${encodeURIComponent(op.data.old_name)}?space_id=${op.data.space_id}`
+            : `/api/categories/${encodeURIComponent(op.data.old_name)}`;
           res = await fetch(renameUrl, {
             method: 'PUT',
             headers,
@@ -1231,7 +1287,7 @@ async function syncQueue() {
         case 'CREATE_JOURNAL':
           if (op.data._id.startsWith('offline_journal_')) {
             const { _id: offlineId, ...payload } = op.data;
-            res = await fetch('/journals', {
+            res = await fetch('/api/journals', {
               method: 'POST',
               headers,
               body: JSON.stringify(payload),
@@ -1256,7 +1312,7 @@ async function syncQueue() {
             }
           } else {
             // Handle both offline-generated and regular journal updates
-            res = await fetch('/journals', {
+            res = await fetch('/api/journals', {
               method: 'POST',
               headers,
               body: JSON.stringify(op.data),
@@ -1276,7 +1332,7 @@ async function syncQueue() {
           }
 
           if (!deleteJournalId.startsWith('offline_journal_')) {
-            res = await fetch(`/journals/${deleteJournalId}`, {
+            res = await fetch(`/api/journals/${deleteJournalId}`, {
               method: 'DELETE',
               headers
             });

@@ -263,12 +263,13 @@ This ensures journals work identically to todos in offline mode - you can create
 
 Following this pattern ensures consistent offline behavior across all app features.
 
-**⚠️ Critical for Offline**: The app uses relative URLs in both development and production to ensure service worker compatibility:
+**⚠️ Critical for Offline**: The app uses a clean `/api/*` URL pattern with Next.js proxy for optimal PWA architecture:
 
-- **Development**: Uses relative URLs (`/todos`, `/chat`) → Service worker intercepts → Full offline functionality
-- **Production**: Uses relative URLs with Next.js API proxy → Service worker intercepts → Full offline functionality
+- **All Environments**: Frontend calls `/api/todos`, `/api/journals`, etc. → Service worker intercepts `/api/*` → Full offline functionality
+- **Online**: Service worker forwards `/api/*` requests → Next.js API proxy → Backend
+- **Offline**: Service worker serves cached data from IndexedDB
 
-The Next.js API proxy (`pages/api/[...proxy].js`) forwards all API requests to the Railway backend while maintaining same-origin requests for the service worker. This ensures consistent offline behavior across all environments.
+The Next.js API proxy (`pages/api/[...proxy].js`) forwards all API requests to the backend while maintaining same-origin requests for the service worker. This clean architecture eliminates environment-specific logic in the service worker.
 
 ## Production Deployment with Railway
 
@@ -381,32 +382,32 @@ python3 -c "import secrets; print(secrets.token_urlsafe(32))"
 ## API Endpoints
 
 ### Authentication
-- `POST /auth/signup` - Send verification code to email
-- `POST /auth/login` - Verify code and login
-- `POST /auth/logout` - Logout user
-- `GET /auth/me` - Get current user info
-- `POST /auth/update-name` - Update user's first name
+- `POST /api/auth/signup` - Send verification code to email
+- `POST /api/auth/login` - Verify code and login
+- `POST /api/auth/logout` - Logout user
+- `GET /api/auth/me` - Get current user info
+- `POST /api/auth/update-name` - Update user's first name
 
 ### Spaces (Collaboration)
-- `GET /spaces` - List user's accessible spaces
-- `POST /spaces` - Create new shared space
-- `PUT /spaces/{id}` - Rename space (owner only)
-- `DELETE /spaces/{id}` - Delete space (owner only)
-- `POST /spaces/{id}/invite` - Invite users to space by email
-- `GET /spaces/{id}/members` - List member names and emails
+- `GET /api/spaces` - List user's accessible spaces
+- `POST /api/spaces` - Create new shared space
+- `PUT /api/spaces/{id}` - Rename space (owner only)
+- `DELETE /api/spaces/{id}` - Delete space (owner only)
+- `POST /api/spaces/{id}/invite` - Invite users to space by email
+- `GET /api/spaces/{id}/members` - List member names and emails
 
 ### Todos (Space-Aware)
-- `GET /todos?space_id={id}` - Get todos for specific space
-- `POST /todos` - Create new todo with space context
-- `PUT /todos/{id}` - Update todo
-- `PUT /todos/{id}/complete` - Toggle completion
-- `DELETE /todos/{id}` - Delete todo
+- `GET /api/todos?space_id={id}` - Get todos for specific space
+- `POST /api/todos` - Create new todo with space context
+- `PUT /api/todos/{id}` - Update todo
+- `PUT /api/todos/{id}/complete` - Toggle completion
+- `DELETE /api/todos/{id}` - Delete todo
 
 ### Categories (Space-Specific)
-- `GET /categories?space_id={id}` - Get categories for a space
-- `POST /categories` - Add new category to a space (`{ "name": "Work", "space_id": "..." }`)
-- `PUT /categories/{name}?space_id={id}` - Rename category within a space
-- `DELETE /categories/{name}?space_id={id}` - Delete category from a space
+- `GET /api/categories?space_id={id}` - Get categories for a space
+- `POST /api/categories` - Add new category to a space (`{ "name": "Work", "space_id": "..." }`)
+- `PUT /api/categories/{name}?space_id={id}` - Rename category within a space
+- `DELETE /api/categories/{name}?space_id={id}` - Delete category from a space
 
 ### AI Classification - now handled fully on the backend as part of adding task
 Todos are automatically classified when created. You can also use
