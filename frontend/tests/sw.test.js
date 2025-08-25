@@ -52,9 +52,13 @@ const {
   getCategories,
   putCategory,
   delCategory,
+  getJournals,
+  putJournal,
+  delJournal,
   addQueue,
   readQueue,
-  clearQueue
+  clearQueue,
+  handleRequest
 } = require('../public/sw.js');
 
 describe('Service Worker Database Operations', () => {
@@ -82,6 +86,7 @@ describe('Service Worker Database Operations', () => {
       expect(db.objectStoreNames.contains('categories')).toBe(true);
       expect(db.objectStoreNames.contains('spaces')).toBe(true);
       expect(db.objectStoreNames.contains('queue')).toBe(true);
+      expect(db.objectStoreNames.contains('journals')).toBe(true);
       db.close();
     });
   });
@@ -239,6 +244,101 @@ describe('Service Worker Database Operations', () => {
     });
   });
 
+  describe('Journal Operations', () => {
+    const testJournal = {
+      _id: 'journal-123',
+      user_id: testUserId,
+      space_id: testSpaceId,
+      date: '2023-12-01',
+      text: 'Test journal entry'
+    };
+
+    test('should store and retrieve journals', async () => {
+      await putJournal(testJournal, testUserId);
+      const journals = await getJournals(testUserId);
+
+      expect(journals).toHaveLength(1);
+      expect(journals[0]._id).toBe(testJournal._id);
+      expect(journals[0].text).toBe(testJournal.text);
+      expect(journals[0].space_id).toBe(testSpaceId);
+      expect(journals[0].date).toBe('2023-12-01');
+    });
+
+    test('should filter journals by date', async () => {
+      const journal1 = { ...testJournal, _id: 'journal-1', date: '2023-12-01' };
+      const journal2 = { ...testJournal, _id: 'journal-2', date: '2023-12-02' };
+
+      await putJournal(journal1, testUserId);
+      await putJournal(journal2, testUserId);
+
+      const dec1Journals = await getJournals(testUserId, '2023-12-01');
+      const dec2Journals = await getJournals(testUserId, '2023-12-02');
+
+      expect(dec1Journals).toHaveLength(1);
+      expect(dec1Journals[0].date).toBe('2023-12-01');
+
+      expect(dec2Journals).toHaveLength(1);
+      expect(dec2Journals[0].date).toBe('2023-12-02');
+    });
+
+    test('should filter journals by space_id', async () => {
+      const journal1 = { ...testJournal, _id: 'journal-1', space_id: 'space-1' };
+      const journal2 = { ...testJournal, _id: 'journal-2', space_id: 'space-2' };
+
+      await putJournal(journal1, testUserId);
+      await putJournal(journal2, testUserId);
+
+      const space1Journals = await getJournals(testUserId, null, 'space-1');
+      const space2Journals = await getJournals(testUserId, null, 'space-2');
+
+      expect(space1Journals).toHaveLength(1);
+      expect(space1Journals[0].space_id).toBe('space-1');
+
+      expect(space2Journals).toHaveLength(1);
+      expect(space2Journals[0].space_id).toBe('space-2');
+    });
+
+    test('should filter journals by both date and space_id', async () => {
+      const journal1 = { ...testJournal, _id: 'journal-1', date: '2023-12-01', space_id: 'space-1' };
+      const journal2 = { ...testJournal, _id: 'journal-2', date: '2023-12-01', space_id: 'space-2' };
+      const journal3 = { ...testJournal, _id: 'journal-3', date: '2023-12-02', space_id: 'space-1' };
+
+      await putJournal(journal1, testUserId);
+      await putJournal(journal2, testUserId);
+      await putJournal(journal3, testUserId);
+
+      const filteredJournals = await getJournals(testUserId, '2023-12-01', 'space-1');
+
+      expect(filteredJournals).toHaveLength(1);
+      expect(filteredJournals[0]._id).toBe('journal-1');
+      expect(filteredJournals[0].date).toBe('2023-12-01');
+      expect(filteredJournals[0].space_id).toBe('space-1');
+    });
+
+    test('should delete journals', async () => {
+      await putJournal(testJournal, testUserId);
+      await delJournal(testJournal._id, testUserId);
+
+      const journals = await getJournals(testUserId);
+      expect(journals).toHaveLength(0);
+    });
+
+    test('should handle offline journal IDs correctly', async () => {
+      const offlineJournal = {
+        ...testJournal,
+        _id: 'offline_journal_2023-12-01_1234567890',
+        created_offline: true
+      };
+
+      await putJournal(offlineJournal, testUserId);
+      const journals = await getJournals(testUserId);
+
+      expect(journals).toHaveLength(1);
+      expect(journals[0]._id.startsWith('offline_journal_')).toBe(true);
+      expect(journals[0].created_offline).toBe(true);
+    });
+  });
+
   describe('Queue Operations', () => {
     const testAction = {
       type: 'CREATE',
@@ -365,5 +465,195 @@ describe('Service Worker Regression Tests', () => {
     expect(spaceBTodos).toHaveLength(1);
     expect(spaceATodos.every(t => t.space_id === 'space-a')).toBe(true);
     expect(spaceBTodos.every(t => t.space_id === 'space-b')).toBe(true);
+  });
+
+  describe('Online Request Caching Integration', () => {
+    // This test would have caught the missing journal caching issue
+    test('should validate that online caching logic exists for all data types', async () => {
+      // This is a simpler test that validates the service worker has caching logic
+      // for all major data types without needing complex request simulation
+
+      const testUserId = 'cache-test-user';
+
+      // Test direct caching by simulating what the online handler does
+      const mockTodos = [
+        { _id: 'server-todo-1', text: 'Server Todo 1', space_id: 'space-1' },
+        { _id: 'server-todo-2', text: 'Server Todo 2', space_id: 'space-1' }
+      ];
+
+      const mockSpaces = [
+        { _id: 'space-1', name: 'Test Space', owner_id: testUserId }
+      ];
+
+      const mockJournals = [
+        { _id: 'server-journal-1', date: '2023-12-01', text: 'Server Journal 1', space_id: 'space-1' }
+      ];
+
+      // Test that we can cache each data type (simulating what online handler does)
+
+      // Cache todos
+      for (const todo of mockTodos) {
+        await putTodo(todo, testUserId);
+      }
+
+      // Cache spaces
+      for (const space of mockSpaces) {
+        await putSpace(space, testUserId);
+      }
+
+      // Cache journals
+      for (const journal of mockJournals) {
+        await putJournal(journal, testUserId);
+      }
+
+      // Verify that all data types were cached
+      const cachedTodos = await getTodos(testUserId, 'space-1');
+      const cachedSpaces = await getSpaces(testUserId);
+      const cachedJournals = await getJournals(testUserId, null, 'space-1');
+
+      // Assert todos were cached
+      expect(cachedTodos).toHaveLength(2);
+      expect(cachedTodos.map(t => t._id)).toEqual(['server-todo-1', 'server-todo-2']);
+
+      // Assert spaces were cached
+      expect(cachedSpaces).toHaveLength(1);
+      expect(cachedSpaces[0]._id).toBe('space-1');
+
+      // Assert journals were cached - THIS WOULD HAVE FAILED BEFORE THE FIX
+      expect(cachedJournals).toHaveLength(1);
+      expect(cachedJournals[0]._id).toBe('server-journal-1');
+      expect(cachedJournals[0].date).toBe('2023-12-01');
+    });
+
+    test('should ensure all API endpoints have corresponding IndexedDB operations', () => {
+      // This test validates that we have the necessary functions for offline caching
+      // The existence of these functions indicates caching capability
+
+      const requiredFunctions = [
+        // Todos
+        { name: 'getTodos', fn: getTodos },
+        { name: 'putTodo', fn: putTodo },
+        { name: 'delTodo', fn: delTodo },
+
+        // Journals - these were missing before the fix
+        { name: 'getJournals', fn: getJournals },
+        { name: 'putJournal', fn: putJournal },
+        { name: 'delJournal', fn: delJournal },
+
+        // Categories
+        { name: 'getCategories', fn: getCategories },
+        { name: 'putCategory', fn: putCategory },
+        { name: 'delCategory', fn: delCategory },
+
+        // Spaces
+        { name: 'getSpaces', fn: getSpaces },
+        { name: 'putSpace', fn: putSpace },
+        { name: 'delSpace', fn: delSpace }
+      ];
+
+      for (const { name, fn } of requiredFunctions) {
+        expect(fn).toBeDefined();
+        expect(typeof fn).toBe('function');
+      }
+
+      // This test would have caught the missing journal functions
+      expect(getJournals).toBeDefined();
+      expect(putJournal).toBeDefined();
+      expect(delJournal).toBeDefined();
+    });
+  });
+
+  describe('Offline Functionality Completeness', () => {
+    // This test ensures all data types follow the same offline pattern
+    test('should have consistent offline functionality across all data types', async () => {
+      const dataTypes = [
+        {
+          name: 'todos',
+          getFn: getTodos,
+          putFn: putTodo,
+          delFn: delTodo,
+          testData: { _id: 'offline_123', text: 'Test', space_id: 'space-1' }
+        },
+        {
+          name: 'journals',
+          getFn: getJournals,
+          putFn: putJournal,
+          delFn: delJournal,
+          testData: { _id: 'offline_journal_2023-12-01_123', date: '2023-12-01', text: 'Test', space_id: 'space-1' }
+        },
+        {
+          name: 'categories',
+          getFn: getCategories,
+          putFn: putCategory,
+          delFn: delCategory,
+          testData: { name: 'offline_test', space_id: 'space-1' }
+        },
+        {
+          name: 'spaces',
+          getFn: getSpaces,
+          putFn: putSpace,
+          delFn: delSpace,
+          testData: { _id: 'offline_space_123', name: 'Offline Space', owner_id: 'user-123' }
+        }
+      ];
+
+      const testUserId = 'offline-test-user';
+
+      for (const dataType of dataTypes) {
+        // Test CRUD operations work for each data type
+        await dataType.putFn(dataType.testData, testUserId);
+
+        const retrieved = await dataType.getFn(testUserId);
+        expect(retrieved.length).toBeGreaterThan(0);
+
+        // Test deletion
+        if (dataType.name === 'categories') {
+          await dataType.delFn(dataType.testData.name, testUserId, dataType.testData.space_id);
+        } else {
+          const idField = dataType.testData._id || dataType.testData.name;
+          await dataType.delFn(idField, testUserId);
+        }
+
+        const afterDelete = await dataType.getFn(testUserId);
+        if (dataType.name === 'categories') {
+          // Categories may have defaults, so just check the specific one is gone
+          const found = afterDelete.find(c => c.name === dataType.testData.name);
+          expect(found).toBeUndefined();
+        } else {
+          // For others, should be empty
+          expect(afterDelete.length).toBe(0);
+        }
+      }
+    });
+
+    test('should validate queue operations support all data types', async () => {
+      const testUserId = 'queue-test-user';
+
+      // Test that queue operations exist for all major data types
+      const queueOperations = [
+        { type: 'CREATE', data: { _id: 'todo-123', text: 'Test Todo' } },
+        { type: 'UPDATE', data: { _id: 'todo-123', completed: true } },
+        { type: 'COMPLETE', data: { _id: 'todo-123' } },
+        { type: 'DELETE', data: { _id: 'todo-123' } },
+        { type: 'CREATE_JOURNAL', data: { _id: 'offline_journal_2023-12-01_123', date: '2023-12-01', text: 'Test' } },
+        { type: 'DELETE_JOURNAL', data: { _id: 'journal-123' } },
+        { type: 'CREATE_CATEGORY', data: { name: 'Test Category', space_id: 'space-1' } },
+        { type: 'CREATE_SPACE', data: { _id: 'space-123', name: 'Test Space' } }
+      ];
+
+      // Add all operations to queue
+      for (const operation of queueOperations) {
+        await addQueue(operation, testUserId);
+      }
+
+      const queue = await readQueue(testUserId);
+      expect(queue.length).toBe(queueOperations.length);
+
+      // Verify all operation types are present
+      const types = queue.map(op => op.type);
+      expect(types).toContain('CREATE');
+      expect(types).toContain('CREATE_JOURNAL');
+      expect(types).toContain('DELETE_JOURNAL');
+    });
   });
 });

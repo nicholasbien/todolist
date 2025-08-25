@@ -237,6 +237,25 @@ The app's service worker provides comprehensive offline support:
 
 **⚠️ IndexedDB Schema Management**: When adding new offline stores (todos, journals, etc.), always increment `DB_VERSION` in `sw.js` to trigger database upgrades for existing users. Failure to do this causes "object store not found" errors.
 
+**📚 Journal Offline System**: Journals follow the same offline-first pattern as todos:
+1. **Online caching**: GET /journals requests automatically cache journal data in IndexedDB
+2. **Offline creation**: New offline journals get `offline_journal_` prefixed IDs and are stored locally
+3. **Sync queue**: All offline operations (create, update, delete) are queued for background sync
+4. **ID mapping**: Service worker maintains `offline_journal_id → server_id` mappings
+5. **Automatic sync**: When connection returns, offline journals sync to server and get replaced with real server versions
+
+This ensures journals work identically to todos in offline mode - you can create, edit, and view journal entries without internet connection.
+
+**🔄 Adding New Offline Features**: When implementing offline functionality for new data types, follow this established pattern:
+1. Add the new store to `openUserDB()` in `sw.js` with `{ keyPath: '_id' }`
+2. Create get/put/del functions following the existing naming convention
+3. Add offline request handlers with `offline_` prefixed IDs for new items
+4. Add sync queue operations (CREATE_X, UPDATE_X, DELETE_X) in `syncQueue()`
+5. Add online GET request caching in `handleApiRequest()` to store server data in IndexedDB
+6. Increment `DB_VERSION` to trigger database upgrades for existing users
+
+Following this pattern ensures consistent offline behavior across all app features.
+
 **⚠️ Critical for Offline**: The app uses an intelligent environment-aware URL strategy:
 
 - **Development** (`NEXT_PUBLIC_API_URL` unset): Uses relative URLs (`/todos`, `/chat`) → Service worker intercepts and caches → Full offline functionality

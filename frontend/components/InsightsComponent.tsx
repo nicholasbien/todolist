@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useAuth } from '../context/AuthContext';
 
 interface InsightsProps {
   token: string;
   activeSpace: any;
-  authenticatedFetch: (url: string, options?: RequestInit) => Promise<Response | undefined>;
 }
 
 interface WeeklyData {
@@ -40,7 +40,8 @@ interface InsightsData {
   priority_breakdown: PriorityData[];
 }
 
-export default function InsightsComponent({ token, activeSpace, authenticatedFetch }: InsightsProps) {
+export default function InsightsComponent({ token, activeSpace }: InsightsProps) {
+  const { authenticatedFetch } = useAuth();
   const [insights, setInsights] = useState<InsightsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');

@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useAuth } from '../context/AuthContext';
 
 interface JournalProps {
   token: string;
   activeSpace: any;
-  authenticatedFetch: (url: string, options?: RequestInit) => Promise<Response | undefined>;
 }
 
 interface JournalEntry {
@@ -16,7 +16,8 @@ interface JournalEntry {
   updated_at: string;
 }
 
-export default function JournalComponent({ token, activeSpace, authenticatedFetch }: JournalProps) {
+export default function JournalComponent({ token, activeSpace }: JournalProps) {
+  const { authenticatedFetch } = useAuth();
   const [selectedDate, setSelectedDate] = useState<string>(() => {
     // Default to today's date in user's local timezone in YYYY-MM-DD format
     const today = new Date();

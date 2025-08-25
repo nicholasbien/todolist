@@ -21,7 +21,7 @@ interface Props {
  * Backend classifies tasks automatically when creating todos
  */
 export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettings, showEmailSettings, onCloseEmailSettings }: Props) {
-  const { logout, clearAuthExpired } = useAuth();
+  const { logout, clearAuthExpired, authenticatedFetch } = useAuth();
   const [todos, setTodos] = useState([]);
   const [newTodo, setNewTodo] = useState("");
   const [categories, setCategories] = useState([]);
@@ -123,41 +123,13 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showEmailSettings]);
 
-  // Helper function for authenticated requests
-  const authenticatedFetch = useCallback(async (url: string, options: RequestInit = {}) => {
-    if (!token) return;
-
-    const headers = {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`,
-      ...options.headers
-    };
-
-    // Build the request URL.
-    // When no API base URL is provided we fall back to the relative path so the
-    // service worker can intercept the request for offline caching. Using an
-    // absolute URL here would bypass the service worker (different origin) and
-    // break offline functionality/tests.
-    const baseURL = process.env.NEXT_PUBLIC_API_URL;
-    const fullURL = url.startsWith('http') || !baseURL ? url : `${baseURL}${url}`;
-
-    const response = await fetch(fullURL, {
-      ...options,
-      headers
-    });
-
-    if (response.status === 401) {
-      logout(true);
-      throw new Error('Authentication expired');
-    }
-
-    return response;
-  }, [token, logout]);
 
   const fetchSpaces = useCallback(async () => {
     try {
+      // For offline functionality, service worker doesn't need token
+      // For online requests, authenticatedFetch handles token automatically
       const response = await authenticatedFetch('/spaces');
-      if (response?.ok) {
+      if (response.ok) {
         const data = await response.json();
         setSpaces(data);
         if (!activeSpace && data.length > 0) {
@@ -228,7 +200,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
     try {
       const url = activeSpace && activeSpace._id ? `/todos?space_id=${activeSpace._id}` : '/todos';
       const response = await authenticatedFetch(url);
-      if (!response?.ok) {
+      if (!response.ok) {
         throw new Error('Failed to fetch todos');
       }
       const data = await response.json();
@@ -1346,7 +1318,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
               }}
             />
           </div>
-          <InsightsComponent token={token} activeSpace={activeSpace} authenticatedFetch={authenticatedFetch} />
+          <InsightsComponent token={token} activeSpace={activeSpace} />
         </div>
       )}
 
@@ -1372,7 +1344,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
               }}
             />
           </div>
-          <JournalComponent token={token} activeSpace={activeSpace} authenticatedFetch={authenticatedFetch} />
+          <JournalComponent token={token} activeSpace={activeSpace} />
         </div>
       )}
 
