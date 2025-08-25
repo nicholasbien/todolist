@@ -172,11 +172,8 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
   // Helper function to make authenticated API calls
   const authenticatedFetch = useCallback(async (url: string, options: RequestInit = {}): Promise<Response> => {
-    // Environment-aware URL handling
-    // Development: Use relative URLs for service worker interception
-    // Production: Use absolute URLs for direct API calls
-    const baseURL = process.env.NEXT_PUBLIC_API_URL;
-    const fullURL = url.startsWith('http') || !baseURL ? url : `${baseURL}${url}`;
+    // Always use relative URLs to go through Next.js proxy and service worker
+    const fullURL = url;
 
     if (!token) {
       // No token available - this will go to service worker for offline functionality

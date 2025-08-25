@@ -420,9 +420,8 @@ export default function Home() {
     if (!exportSpaceId) return;
     try {
       setExporting(true);
-      const baseURL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
       const response = await fetch(
-        `${baseURL}/export?data=${exportType}&format=${exportFormat}&space_id=${exportSpaceId}`,
+        `/api/export?data=${exportType}&format=${exportFormat}&space_id=${exportSpaceId}`,
         {
           headers: {
             'Authorization': `Bearer ${token}`

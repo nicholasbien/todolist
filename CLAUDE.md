@@ -44,7 +44,8 @@ This is an AI-powered collaborative todo list application with a React/Next.js f
 - **Framework**: Next.js 14 with React 18
 - **Styling**: Tailwind CSS
 - **Main Component**: `AIToDoListApp.tsx` - handles todo management, categories, and spaces
-- **API Communication**: Direct fetch calls to backend endpoints with JWT authentication
+- **API Communication**: `/api/*` proxy pattern through Next.js for unified same-origin requests
+- **Service Worker**: Offline-first PWA with IndexedDB storage and intelligent sync
 - **State Management**: React useState hooks for local state
 - **Collaboration**: Real-time space switching and member management
 
@@ -68,12 +69,14 @@ This is an AI-powered collaborative todo list application with a React/Next.js f
 - **Isolation**: Todos and categories are completely isolated between spaces
 - **Email Invitations**: Support for inviting both existing and new users
 
-### Data Flow
+### Data Flow (With Service Worker Architecture)
 1. User selects or creates a space in the frontend
 2. User adds a task within the active space context
-3. Frontend sends task with space_id to `/todos`
-4. Backend classifies the task using space-specific categories and stores in MongoDB
-5. Frontend refreshes todo list filtered by active space
+3. Frontend sends task with space_id to `/api/todos` (proxied to backend)
+4. Service Worker intercepts same-origin `/api/*` requests for offline capability
+5. Backend classifies the task using space-specific categories and stores in MongoDB
+6. Service Worker provides offline storage and sync when back online
+7. Frontend refreshes todo list filtered by active space
 
 ### Database Schema
 - **Spaces Collection**: `{_id, name, owner_id, member_ids, pending_emails}`
@@ -98,6 +101,8 @@ Both frontend and backend require OpenAI API keys:
 
 ## Key Implementation Details
 
+- **Next.js API Proxy**: All frontend requests use `/api/*` pattern routed through `pages/api/[...proxy].js`
+- **Service Worker Offline-First**: PWA with IndexedDB storage, request interception, and intelligent sync
 - **Space-Aware Operations**: All todo and category operations include space context
 - **Legacy Data Migration**: Automatic migration of data without space_id to default space on startup
 - **Optional Space Parameters**: Backend APIs support optional space_id for backward compatibility
@@ -107,36 +112,70 @@ Both frontend and backend require OpenAI API keys:
 - **Email Invitations**: Handles both existing users and pending signups
 - **Error Handling**: Comprehensive error handling for network requests and space operations
 - **Data Isolation**: Complete separation of todos and categories between spaces
+- **Auto-save Optimization**: Journal entries use queue optimization to prevent duplicate operations
+- **Immediate Replacement**: Offline todos are immediately replaced with server versions upon successful sync
 
 ## API Endpoints
 
+**Note**: All frontend requests use `/api/*` pattern (e.g., `/api/todos`) which are proxied to the backend at the corresponding path (e.g., `/todos`).
+
 ### Spaces
-- `GET /spaces` - List user's accessible spaces
-- `POST /spaces` - Create new space
-- `PUT /spaces/{id}` - Rename space (owner only)
-- `DELETE /spaces/{id}` - Delete space (owner only)
-- `POST /spaces/{id}/invite` - Invite users to space
+- `GET /api/spaces` - List user's accessible spaces
+- `POST /api/spaces` - Create new space
+- `PUT /api/spaces/{id}` - Rename space (owner only)
+- `DELETE /api/spaces/{id}` - Delete space (owner only)
+- `POST /api/spaces/{id}/invite` - Invite users to space
 
 ### Todos (Space-Aware)
-- `GET /todos?space_id={id}` - Get todos for specific space
-- `POST /todos` - Create todo with space_id
-- `PUT /todos/{id}` - Update todo
-- `DELETE /todos/{id}` - Delete todo
+- `GET /api/todos?space_id={id}` - Get todos for specific space
+- `POST /api/todos` - Create todo with space_id
+- `PUT /api/todos/{id}` - Update todo
+- `DELETE /api/todos/{id}` - Delete todo
 
 ### Categories (Space-Aware)
-- `GET /categories?space_id={id}` - Get categories for space
-- `POST /categories` - Add category to space
-- `PUT /categories/{name}?space_id={id}` - Rename category
-- `DELETE /categories/{name}?space_id={id}` - Delete category
+- `GET /api/categories?space_id={id}` - Get categories for space
+- `POST /api/categories` - Add category to space
+- `PUT /api/categories/{name}?space_id={id}` - Rename category
+- `DELETE /api/categories/{name}?space_id={id}` - Delete category
 
 ### Authentication
-- `POST /auth/signup` - Sign up with email
-- `POST /auth/login` - Login with email and verification code
-- `POST /auth/logout` - Logout and invalidate session
+- `POST /api/auth/signup` - Sign up with email
+- `POST /api/auth/login` - Login with email and verification code
+- `POST /api/auth/logout` - Logout and invalidate session
+
+### Journals
+- `GET /api/journals?date={date}&space_id={id}` - Get journal entry for specific date and space
+- `POST /api/journals` - Create/update journal entry with space_id
+- `DELETE /api/journals/{id}` - Delete journal entry
+
+### Insights
+- `GET /api/insights?space_id={id}` - Get analytics/insights for specific space
+
+### Chat
+- `POST /api/chat` - AI chatbot for todo assistance
 
 - go into the virtual environment if you see environment issues and are not in it
 
-## Service Worker Updates
+## Service Worker Architecture
+
+### Overview
+The app uses an offline-first PWA architecture with a sophisticated service worker that:
+- **Intercepts `/api/*` requests** for offline capability
+- **Stores data in IndexedDB** for offline access
+- **Syncs queued operations** when back online
+- **Immediately replaces offline IDs** with server IDs upon successful sync
+- **Provides intelligent fallback** to cached data when offline
+
+### Key Features
+- **Request Interception**: All `/api/*` same-origin requests are intercepted
+- **Offline Storage**: Todos, journals, categories stored in user-isolated IndexedDB stores
+- **Sync Queue**: Failed operations queued for retry when online
+- **Auto-save Optimization**: Journal entries update existing queue entries to prevent duplicates
+- **ID Mapping**: Offline IDs (`offline_*`) are immediately replaced with server IDs after sync
+- **User Isolation**: All data strictly isolated by `user_id` in separate IndexedDB stores
+- **Concurrency Protection**: Sync operations use flags to prevent race conditions
+
+### Service Worker Updates
 
 **CRITICAL**: Always bump service worker cache versions when modifying `public/sw.js`:
 - Increment `STATIC_CACHE` version: `todo-static-v41` → `todo-static-v42`
@@ -144,3 +183,11 @@ Both frontend and backend require OpenAI API keys:
 - Increment `DB_VERSION` if changing IndexedDB schema: `10` → `11`
 
 Without version bumps, browsers will continue using the cached old service worker, and changes won't take effect in production.
+
+### Request Flow
+1. Frontend makes request to `/api/todos`
+2. Service Worker intercepts same-origin request
+3. If online: Forward to Next.js proxy → Backend
+4. If offline: Serve from IndexedDB with offline ID generation
+5. Queue failed operations for sync when back online
+6. On successful sync: Immediately replace offline data with server data
