@@ -812,7 +812,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
       <div className="flex border-b border-gray-800 mb-4">
         <button
           onClick={() => setActiveTab('tasks')}
-          className={`py-3 px-6 font-medium text-sm transition-colors ${
+          className={`flex-1 py-3 px-2 sm:px-6 font-medium text-sm transition-colors ${
             activeTab === 'tasks'
               ? 'text-accent border-b-2 border-accent'
               : 'text-gray-400 hover:text-gray-300'
@@ -822,7 +822,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
         </button>
         <button
           onClick={() => setActiveTab('assistant')}
-          className={`py-3 px-6 font-medium text-sm transition-colors ${
+          className={`flex-1 py-3 px-2 sm:px-6 font-medium text-sm transition-colors ${
             activeTab === 'assistant'
               ? 'text-accent border-b-2 border-accent'
               : 'text-gray-400 hover:text-gray-300'
@@ -832,7 +832,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
         </button>
         <button
           onClick={() => setActiveTab('insights')}
-          className={`py-3 px-6 font-medium text-sm transition-colors ${
+          className={`flex-1 py-3 px-2 sm:px-6 font-medium text-sm transition-colors ${
             activeTab === 'insights'
               ? 'text-accent border-b-2 border-accent'
               : 'text-gray-400 hover:text-gray-300'
@@ -842,7 +842,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
         </button>
         <button
           onClick={() => setActiveTab('journal')}
-          className={`py-3 px-6 font-medium text-sm transition-colors ${
+          className={`flex-1 py-3 px-2 sm:px-6 font-medium text-sm transition-colors ${
             activeTab === 'journal'
               ? 'text-accent border-b-2 border-accent'
               : 'text-gray-400 hover:text-gray-300'
