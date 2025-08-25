@@ -838,6 +838,230 @@ async function handleOfflineRequest(request, url) {
     });
   }
 
+  // ========= TODO OPERATIONS =========
+
+  // Create new todo
+  if (request.method === 'POST' && apiPath === '/todos') {
+    const text = data.text || '';
+
+    let todoData = {
+      _id: 'offline_' + Date.now(),
+      text: text,
+      category: data.category || 'General',
+      priority: normalizePriority(data.priority),
+      dateAdded: new Date().toISOString(),
+      dueDate: null,
+      notes: data.notes || '',
+      completed: false,
+      user_id: authData.userId,
+      space_id: data.space_id || null,
+      created_offline: true,
+    };
+
+    // If it's a URL, store it as a link (title fetching will happen when synced)
+    if (text.startsWith('http://') || text.startsWith('https://')) {
+      todoData.link = text;
+    }
+
+    await putTodo(todoData, authData.userId);
+    await addQueue({ type: 'CREATE', data: todoData }, authData.userId);
+    return new Response(JSON.stringify(todoData), { headers: { 'Content-Type': 'application/json' } });
+  }
+
+  // Update todo (category, priority changes)
+  if (request.method === 'PUT' && apiPath.startsWith('/todos/') && !apiPath.endsWith('/complete')) {
+    const id = apiPath.split('/')[2];
+    const existingTodos = await getTodos(authData.userId);
+    const existingTodo = existingTodos.find(t => t._id === id);
+
+    if (existingTodo) {
+      const updated = { ...existingTodo, ...data };
+      await putTodo(updated, authData.userId);
+      await addQueue({ type: 'UPDATE', data: updated }, authData.userId);
+      return new Response(JSON.stringify(updated), { headers: { 'Content-Type': 'application/json' } });
+    }
+  }
+
+  // Complete/uncomplete todo
+  if (request.method === 'PUT' && apiPath.endsWith('/complete')) {
+    const id = apiPath.split('/')[2];
+    const existingTodos = await getTodos(authData.userId);
+    const existingTodo = existingTodos.find(t => t._id === id);
+
+    if (existingTodo) {
+      const updated = { ...existingTodo, completed: !existingTodo.completed };
+      if (updated.completed) {
+        updated.dateCompleted = new Date().toISOString();
+      } else {
+        delete updated.dateCompleted;
+      }
+      await putTodo(updated, authData.userId);
+
+      // Handle offline todo completion - update the queued CREATE operation
+      if (id.startsWith('offline_')) {
+        const queue = await readQueue(authData.userId);
+        const updatedQueue = queue.map(op => {
+          if (op.type === 'CREATE' && op.data._id === id) {
+            return { ...op, data: { ...op.data, completed: updated.completed, dateCompleted: updated.dateCompleted } };
+          }
+          return op;
+        });
+
+        if (JSON.stringify(queue) !== JSON.stringify(updatedQueue)) {
+          await clearQueue(authData.userId);
+          for (const op of updatedQueue) {
+            await addQueue(op, authData.userId);
+          }
+        }
+      } else {
+        await addQueue({ type: 'COMPLETE', data: { _id: id, completed: updated.completed } }, authData.userId);
+      }
+
+      return new Response(JSON.stringify({ message: 'Todo updated' }), { headers: { 'Content-Type': 'application/json' } });
+    }
+  }
+
+  // Delete todo
+  if (request.method === 'DELETE' && apiPath.startsWith('/todos/')) {
+    const id = apiPath.split('/')[2];
+    const existingTodos = await getTodos(authData.userId);
+    const todoExists = existingTodos.find(t => t._id === id);
+
+    if (todoExists) {
+      await delTodo(id, authData.userId);
+
+      if (id.startsWith('offline_')) {
+        // Remove the CREATE operation from queue to prevent resurrection
+        const queue = await readQueue(authData.userId);
+        const filteredQueue = queue.filter(op => !(op.type === 'CREATE' && op.data._id === id));
+        if (filteredQueue.length !== queue.length) {
+          await clearQueue(authData.userId);
+          for (const op of filteredQueue) {
+            await addQueue(op, authData.userId);
+          }
+        }
+      } else {
+        await addQueue({ type: 'DELETE', data: { _id: id } }, authData.userId);
+      }
+    }
+
+    return new Response(null, { status: 204 });
+  }
+
+  // ========= CATEGORY OPERATIONS =========
+
+  // Create new category
+  if (request.method === 'POST' && apiPath === '/categories') {
+    const categoryName = data.name || `offline_${Date.now()}`;
+    const newCategory = { name: categoryName, space_id: data.space_id || null };
+
+    await putCategory(newCategory, authData.userId);
+    await addQueue({ type: 'CREATE_CATEGORY', data: newCategory }, authData.userId);
+    return new Response(JSON.stringify(newCategory), { headers: { 'Content-Type': 'application/json' } });
+  }
+
+  // Update/rename category
+  if (request.method === 'PUT' && apiPath.startsWith('/categories/')) {
+    const oldName = decodeURIComponent(apiPath.split('/')[2]);
+    const newName = (data.new_name || '').trim();
+    const spaceId = url.searchParams.get('space_id');
+
+    if (!newName) {
+      return new Response(JSON.stringify({ error: 'Invalid name' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+    }
+
+    // Update all todos referencing this category in the specified space
+    const todos = await getTodos(authData.userId, spaceId);
+    for (const t of todos) {
+      if (t.category === oldName && t.space_id === spaceId) {
+        const updated = { ...t, category: newName };
+        await putTodo(updated, authData.userId);
+        await addQueue({ type: 'UPDATE', data: updated }, authData.userId);
+      }
+    }
+
+    await delCategory(oldName, authData.userId, spaceId);
+    await putCategory({ name: newName, space_id: spaceId }, authData.userId);
+    await addQueue({ type: 'RENAME_CATEGORY', data: { old_name: oldName, new_name: newName, space_id: spaceId } }, authData.userId);
+
+    return new Response(JSON.stringify({ message: 'Category renamed' }), { headers: { 'Content-Type': 'application/json' } });
+  }
+
+  // Delete category
+  if (request.method === 'DELETE' && apiPath.startsWith('/categories/')) {
+    const categoryName = decodeURIComponent(apiPath.split('/')[2]);
+    const spaceId = url.searchParams.get('space_id');
+
+    // Update todos that use this category to "General" in the specified space
+    const todos = await getTodos(authData.userId, spaceId);
+    for (const t of todos) {
+      if (t.category === categoryName && t.space_id === spaceId) {
+        const updated = { ...t, category: 'General' };
+        await putTodo(updated, authData.userId);
+        await addQueue({ type: 'UPDATE', data: updated }, authData.userId);
+      }
+    }
+
+    await delCategory(categoryName, authData.userId, spaceId);
+    await addQueue({ type: 'DELETE_CATEGORY', data: { name: categoryName, space_id: spaceId } }, authData.userId);
+
+    // Ensure a General category exists after deletion
+    const remainingCategories = await getCategories(authData.userId, spaceId);
+    const hasGeneral = remainingCategories.some(c => c.name === 'General' && c.space_id === spaceId);
+    if (!hasGeneral) {
+      const generalCategory = { name: 'General', space_id: spaceId };
+      await putCategory(generalCategory, authData.userId);
+    }
+
+    return new Response(null, { status: 204 });
+  }
+
+  // ========= SPACE OPERATIONS =========
+
+  // Create new space
+  if (request.method === 'POST' && apiPath === '/spaces') {
+    const spaceData = {
+      _id: 'offline_space_' + Date.now(),
+      name: data.name || 'New Space',
+      owner_id: authData.userId,
+      member_ids: [authData.userId],
+      pending_emails: [],
+      created_offline: true,
+    };
+
+    await putSpace(spaceData, authData.userId);
+    await addQueue({ type: 'CREATE_SPACE', data: spaceData }, authData.userId);
+    return new Response(JSON.stringify(spaceData), { headers: { 'Content-Type': 'application/json' } });
+  }
+
+  // Update space
+  if (request.method === 'PUT' && apiPath.startsWith('/spaces/')) {
+    const spaceId = apiPath.split('/')[2];
+    const spaces = await getSpaces(authData.userId);
+    const currentSpace = spaces.find(s => s._id === spaceId);
+
+    if (currentSpace) {
+      const updatedSpace = { ...currentSpace, ...data, _id: spaceId };
+      await putSpace(updatedSpace, authData.userId);
+      await addQueue({ type: 'UPDATE_SPACE', id: spaceId, data: updatedSpace }, authData.userId);
+      return new Response(JSON.stringify(updatedSpace), { headers: { 'Content-Type': 'application/json' } });
+    }
+  }
+
+  // Delete space
+  if (request.method === 'DELETE' && apiPath.startsWith('/spaces/')) {
+    const spaceId = apiPath.split('/')[2];
+    const spaces = await getSpaces(authData.userId);
+    const spaceToDelete = spaces.find(s => s._id === spaceId);
+
+    if (spaceToDelete) {
+      await delSpace(spaceId, authData.userId);
+      await addQueue({ type: 'DELETE_SPACE', id: spaceId, data: spaceToDelete }, authData.userId);
+    }
+
+    return new Response(JSON.stringify({ success: true }), { headers: { 'Content-Type': 'application/json' } });
+  }
+
   // For other write operations, return service unavailable
   return new Response(JSON.stringify({ error: 'Write operation not available offline' }), {
     status: 503,
