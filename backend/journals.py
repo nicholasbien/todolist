@@ -2,6 +2,7 @@ import logging
 from datetime import datetime
 from typing import List, Optional
 
+import pytz  # type: ignore
 from bson import ObjectId
 from db import db
 from dotenv import load_dotenv
@@ -59,16 +60,24 @@ class JournalEntry(BaseModel):
         populate_by_name = True
 
 
-async def create_journal_entry(entry: JournalEntry) -> JournalEntry:
+async def create_journal_entry(entry: JournalEntry, user_timezone: str) -> JournalEntry:
     """Create or update a journal entry for a specific date and space."""
     try:
+        # Determine the user's timezone, defaulting to UTC if invalid
+        try:
+            tz = pytz.timezone(user_timezone)
+        except Exception:
+            tz = pytz.timezone("UTC")
+
+        now = datetime.now(tz)
+
         # Check if entry already exists for this user, date, and space
         existing_entry = await journals_collection.find_one(
             {"user_id": entry.user_id, "date": entry.date, "space_id": entry.space_id}
         )
 
         entry_dict = entry.dict(by_alias=True, exclude_unset=True)
-        entry_dict["updated_at"] = datetime.now()
+        entry_dict["updated_at"] = now
 
         if existing_entry:
             # Update existing entry
@@ -80,7 +89,7 @@ async def create_journal_entry(entry: JournalEntry) -> JournalEntry:
         else:
             # Create new entry
             entry_dict.pop("_id", None)  # Let MongoDB generate _id
-            entry_dict["created_at"] = datetime.now()
+            entry_dict["created_at"] = now
             result = await journals_collection.insert_one(entry_dict)
             entry_dict["_id"] = str(result.inserted_id)
 
