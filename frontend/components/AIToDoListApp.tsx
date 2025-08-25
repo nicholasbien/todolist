@@ -1,6 +1,9 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import TodoItem from "./TodoItem";
 import TodoChatbot from "./TodoChatbot";
+import InsightsComponent from "./InsightsComponent";
+import JournalComponent from "./JournalComponent";
+import SpaceDropdown from "./SpaceDropdown";
 
 interface Props {
   user: any;
@@ -47,7 +50,6 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
   const [inviteEmails, setInviteEmails] = useState<string[]>(['']);
   const [spaceToEdit, setSpaceToEdit] = useState<any>(null);
   const [spaceMembers, setSpaceMembers] = useState<any[]>([]);
-  const [pendingInvites, setPendingInvites] = useState<string[]>([]);
 
 
   // Loading state when switching spaces
@@ -68,7 +70,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
   const membersFetchIdRef = useRef(0);
 
   // Tab state
-  const [activeTab, setActiveTab] = useState<'tasks' | 'assistant' | 'insights'>('tasks');
+  const [activeTab, setActiveTab] = useState<'tasks' | 'assistant' | 'insights' | 'journal'>('tasks');
 
   const handleOpenEmailSettings = async () => {
     try {
@@ -91,6 +93,15 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
     }
   };
 
+  // When the parent triggers the modal to open, load the latest email settings
+  useEffect(() => {
+    if (showEmailSettings) {
+      handleOpenEmailSettings();
+    }
+    // `handleOpenEmailSettings` does not need to be in deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showEmailSettings]);
+
   // Helper function for authenticated requests
   const authenticatedFetch = useCallback(async (url: string, options: RequestInit = {}) => {
     if (!token) return;
@@ -101,7 +112,15 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
       ...options.headers
     };
 
-    const response = await fetch(url, {
+    // Build the request URL.
+    // When no API base URL is provided we fall back to the relative path so the
+    // service worker can intercept the request for offline caching. Using an
+    // absolute URL here would bypass the service worker (different origin) and
+    // break offline functionality/tests.
+    const baseURL = process.env.NEXT_PUBLIC_API_URL;
+    const fullURL = url.startsWith('http') || !baseURL ? url : `${baseURL}${url}`;
+
+    const response = await fetch(fullURL, {
       ...options,
       headers
     });
@@ -133,7 +152,6 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
     if (!activeSpace || !activeSpace._id) {
       if (fetchId === membersFetchIdRef.current) {
         setSpaceMembers([]);
-        setPendingInvites([]);
       }
       return;
     }
@@ -143,7 +161,6 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
         const data = await resp.json();
         if (fetchId === membersFetchIdRef.current) {
           setSpaceMembers(data.members || []);
-          setPendingInvites(data.pending_invites || []);
         }
       }
     } catch (err) {
@@ -236,7 +253,6 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
       setTodos([]);
       setCategories([]);
       setSpaceMembers([]);
-      setPendingInvites([]);
       // Fetch new data for the active space
       fetchSpaceData();
     }
@@ -796,13 +812,13 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
         </div>
       )}
 
-      {/* Tab Navigation */}
-      <div className="grid grid-cols-3 border-b border-gray-800 mb-6">
+      {/* Tab Navigation - Full Width */}
+      <div className="flex border-b border-gray-800 mb-4">
         <button
           onClick={() => setActiveTab('tasks')}
-          className={`py-3 font-medium text-sm transition-colors text-center ${
+          className={`py-3 px-6 font-medium text-sm transition-colors ${
             activeTab === 'tasks'
-              ? 'text-blue-400 border-b-2 border-blue-400'
+              ? 'text-accent border-b-2 border-accent'
               : 'text-gray-400 hover:text-gray-300'
           }`}
         >
@@ -810,9 +826,9 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
         </button>
         <button
           onClick={() => setActiveTab('assistant')}
-          className={`py-3 font-medium text-sm transition-colors text-center ${
+          className={`py-3 px-6 font-medium text-sm transition-colors ${
             activeTab === 'assistant'
-              ? 'text-blue-400 border-b-2 border-blue-400'
+              ? 'text-accent border-b-2 border-accent'
               : 'text-gray-400 hover:text-gray-300'
           }`}
         >
@@ -820,24 +836,34 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
         </button>
         <button
           onClick={() => setActiveTab('insights')}
-          className={`py-3 font-medium text-sm transition-colors text-center ${
+          className={`py-3 px-6 font-medium text-sm transition-colors ${
             activeTab === 'insights'
-              ? 'text-blue-400 border-b-2 border-blue-400'
+              ? 'text-accent border-b-2 border-accent'
               : 'text-gray-400 hover:text-gray-300'
           }`}
         >
           Insights
         </button>
+        <button
+          onClick={() => setActiveTab('journal')}
+          className={`py-3 px-6 font-medium text-sm transition-colors ${
+            activeTab === 'journal'
+              ? 'text-accent border-b-2 border-accent'
+              : 'text-gray-400 hover:text-gray-300'
+          }`}
+        >
+          Journal
+        </button>
       </div>
 
 
       {showUpdatePrompt && (
-        <div className="bg-blue-900/20 border border-blue-800 text-blue-300 px-4 py-3 rounded-xl mb-4 flex justify-between items-center">
+        <div className="bg-accent/20 border border-accent-dark text-accent-light px-4 py-3 rounded-xl mb-4 flex justify-between items-center">
           <span>🔄 A new version is available!</span>
           <div className="space-x-2">
             <button
               onClick={handleUpdate}
-              className="bg-blue-600 text-white px-3 py-1 rounded-lg text-sm hover:bg-blue-500 transition-colors"
+              className="bg-accent text-foreground px-3 py-1 rounded-lg text-sm hover:bg-accent-light transition-colors"
             >
               Update Now
             </button>
@@ -854,139 +880,93 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
       {/* Tab Content */}
       {activeTab === 'tasks' && (
         <div>
-          {/* Spaces */}
-      <div className="mb-6">
-        <div className="flex items-center mb-3">
-          <h2 className="text-lg font-semibold text-gray-100">
-            Space:{' '}
-            {activeSpace ? activeSpace.name : 'None'}
-          </h2>
-          {activeSpace && !activeSpace.is_default && (
-            <button
-              onClick={() => {
-                setSpaceToEdit(activeSpace);
-                setEditSpaceName(activeSpace.name);
-                const isCollab = (activeSpace.member_ids?.length ?? 0) > 1 ||
-                  (activeSpace.pending_emails?.length ?? 0) > 0;
+          {/* Header Row with Page Title and Space Dropdown */}
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-2">
+              <h2 className="text-xl font-semibold text-gray-100">
+                {activeCat === 'All' ? 'Tasks' : `Tasks: ${activeCat}`}
+              </h2>
+              {activeCat !== "All" && (
+                <button
+                  onClick={() => {
+                    setEditCatName(activeCat);
+                    setShowEditCategoryModal(true);
+                  }}
+                  className="text-gray-400 hover:text-gray-200 text-sm border border-gray-700 px-2 py-1 rounded-lg hover:border-gray-600 transition-colors"
+                >
+                  Edit
+                </button>
+              )}
+            </div>
+            <SpaceDropdown
+              spaces={spaces}
+              activeSpace={activeSpace}
+              user={user}
+              onSpaceSelect={setActiveSpace}
+              onCreateSpace={() => setShowAddSpaceModal(true)}
+              onEditSpace={(space) => {
+                setSpaceToEdit(space);
+                setEditSpaceName(space.name);
+                const isCollab = (space.member_ids?.length ?? 0) > 1 ||
+                  (space.pending_emails?.length ?? 0) > 0;
                 setEditSpaceCollaborative(isCollab);
                 setInviteEmails(['']);
                 setShowEditSpaceModal(true);
               }}
-              className="ml-2 text-gray-400 hover:text-gray-200 text-sm border border-gray-700 px-2 py-1 rounded-lg hover:border-gray-600 transition-colors"
-            >
-              Edit
-            </button>
-          )}
-        </div>
-        <div
-          className="flex gap-2 overflow-x-auto whitespace-nowrap scroll-smooth mb-4 pb-2"
-          style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-        >
-          {spaces.map(space => (
-            <button
-              key={space._id}
-              onClick={() => setActiveSpace(space)}
-              className={`px-4 py-2 rounded-xl text-base transition-colors flex-shrink-0 ${
-                activeSpace && space._id === activeSpace._id
-                  ? 'bg-blue-600 text-white shadow-lg'
-                  : 'bg-gray-900 text-gray-300 hover:bg-gray-800 border border-gray-800'
-              }`}
-            >
-              {space.name}
-            </button>
-          ))}
-          <button
-            onClick={() => { setShowAddSpaceModal(true); }}
-            className="px-4 py-2 rounded-xl text-base bg-gray-900 text-gray-300 hover:bg-gray-800 border border-gray-800 transition-colors flex-shrink-0"
-          >
-            +
-          </button>
-        </div>
-      </div>
+            />
+          </div>
 
-      {activeSpace && activeSpace._id && spaceMembers.length > 1 && (
-        <div className="mb-6 ml-4">
-          <h3 className="text-sm font-semibold text-gray-400 mb-1">Members:</h3>
-          <ul className="text-gray-300 text-sm space-y-1">
-            {spaceMembers.map((m) => (
-              <li key={m.id}>{m.first_name || 'Unknown User'}</li>
-            ))}
-            {pendingInvites && pendingInvites.map((email) => (
-              <li key={email} className="italic">{email} (pending)</li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-
-      {/* Categories - Horizontal wrapping pills */}
-      <div className="mb-6">
-        {loadingCategories && (
-          <div className="text-gray-400 mb-2">Loading categories...</div>
-        )}
-        <div className="flex items-center mb-3">
-          <h2 className="text-lg font-semibold text-gray-100">
-            Category: {activeCat}
-          </h2>
-          {activeCat !== "All" && (
-            <button
-              onClick={() => {
-                setEditCatName(activeCat);
-                setShowEditCategoryModal(true);
-              }}
-              className="ml-2 text-gray-400 hover:text-gray-200 text-sm border border-gray-700 px-2 py-1 rounded-lg hover:border-gray-600 transition-colors"
+          {/* Categories - Horizontal wrapping pills */}
+          <div className="mb-6">
+            {loadingCategories && (
+              <div className="text-gray-400 mb-2">Loading categories...</div>
+            )}
+            <div
+              className="flex gap-2 overflow-x-auto whitespace-nowrap scroll-smooth pb-2"
+              style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
             >
-              Edit
-            </button>
-          )}
-        </div>
-        <div
-          className="flex gap-2 overflow-x-auto whitespace-nowrap scroll-smooth mb-4 pb-2"
-          style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-        >
-          <button
-            onClick={() => setActiveCat('All')}
-            className={`px-4 py-2 rounded-xl text-base transition-colors flex-shrink-0 ${
-              activeCat === 'All'
-                ? 'bg-blue-600 text-white shadow-lg'
-                : 'bg-gray-900 text-gray-300 hover:bg-gray-800 border border-gray-800'
-            }`}
-          >
-            All
-          </button>
-          {categories
-          .sort((a, b) => {
-            const aName = typeof a === 'string' ? a : a.name;
-            const bName = typeof b === 'string' ? b : b.name;
-            if (aName === "General") return -1;
-            if (bName === "General") return 1;
-            return aName.localeCompare(bName);
-          })
-          .map(cat => {
-            const catName = typeof cat === 'string' ? cat : cat.name;
-            return (
-            <button
-              key={catName}
-              onClick={() => setActiveCat(catName)}
-              className={`px-4 py-2 rounded-xl text-base transition-colors flex-shrink-0 ${
-                catName === activeCat
-                  ? 'bg-blue-600 text-white shadow-lg'
-                  : 'bg-gray-900 text-gray-300 hover:bg-gray-800 border border-gray-800'
-              }`}
-            >
-              {catName}
-            </button>
-            );
-          })}
-          <button
-            onClick={() => setShowAddCategoryModal(true)}
-            className="px-4 py-2 rounded-xl text-base bg-gray-900 text-gray-300 hover:bg-gray-800 border border-gray-800 transition-colors flex-shrink-0"
-          >
-            +
-          </button>
-        </div>
-
-      </div>
+              <button
+                onClick={() => setActiveCat('All')}
+                className={`px-4 py-2 rounded-xl text-base transition-colors flex-shrink-0 ${
+                  activeCat === 'All'
+                    ? 'bg-accent text-foreground shadow-lg'
+                    : 'bg-gray-900 text-gray-300 hover:bg-gray-800 border border-gray-800'
+                }`}
+              >
+                All
+              </button>
+              {categories
+              .sort((a, b) => {
+                const aName = typeof a === 'string' ? a : a.name;
+                const bName = typeof b === 'string' ? b : b.name;
+                if (aName === "General") return -1;
+                if (bName === "General") return 1;
+                return aName.localeCompare(bName);
+              })
+              .map(cat => {
+                const catName = typeof cat === 'string' ? cat : cat.name;
+                return (
+                <button
+                  key={catName}
+                  onClick={() => setActiveCat(catName)}
+                  className={`px-4 py-2 rounded-xl text-base transition-colors flex-shrink-0 ${
+                    catName === activeCat
+                      ? 'bg-accent text-foreground shadow-lg'
+                      : 'bg-gray-900 text-gray-300 hover:bg-gray-800 border border-gray-800'
+                  }`}
+                >
+                  {catName}
+                </button>
+                );
+              })}
+              <button
+                onClick={() => setShowAddCategoryModal(true)}
+                className="px-4 py-2 rounded-xl text-base bg-gray-900 text-gray-300 hover:bg-gray-800 border border-gray-800 transition-colors flex-shrink-0"
+              >
+                +
+              </button>
+            </div>
+          </div>
 
 
       {/* Add new todo */}
@@ -997,13 +977,13 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
             value={newTodo}
             onChange={(e) => setNewTodo(e.target.value)}
             placeholder="Add a new task..."
-            className="flex-1 p-3 border border-gray-800 rounded-xl bg-black text-gray-100 placeholder-gray-500 focus:border-blue-500 focus:outline-none transition-colors"
+            className="flex-1 p-3 border border-gray-800 rounded-xl bg-black text-gray-100 placeholder-gray-500 focus:border-accent focus:outline-none transition-colors"
             onKeyPress={(e) => e.key === 'Enter' && handleAddTodo()}
           />
           <button
             onClick={handleAddTodo}
             disabled={loading}
-            className="bg-blue-600 text-white w-12 h-12 rounded-xl hover:bg-blue-500 disabled:bg-blue-800 disabled:text-gray-400 flex items-center justify-center transition-colors shadow-lg"
+              className="bg-accent text-foreground w-12 h-12 rounded-xl hover:bg-accent-light disabled:bg-accent-dark disabled:text-gray-400 flex items-center justify-center transition-colors shadow-lg"
           >
             {loading ? '...' : '+'}
           </button>
@@ -1020,11 +1000,11 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
               value={newSpaceName}
               onChange={e => setNewSpaceName(e.target.value)}
               onKeyPress={e => e.key === 'Enter' && handleAddSpace()}
-              className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 placeholder-gray-500 text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 placeholder-gray-500 text-base focus:outline-none focus:ring-2 focus:ring-accent"
               autoFocus
             />
             <div className="flex justify-center space-x-3">
-              <button onClick={handleAddSpace} className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-2 rounded-lg transition-colors">Add</button>
+              <button onClick={handleAddSpace} className="bg-accent hover:bg-accent-light text-foreground px-6 py-2 rounded-lg transition-colors">Add</button>
               <button onClick={() => { setShowAddSpaceModal(false); setNewSpaceName(''); }} className="bg-gray-800 hover:bg-gray-700 text-gray-300 px-6 py-2 rounded-lg transition-colors">Cancel</button>
             </div>
           </div>
@@ -1041,7 +1021,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
                   type="text"
                   value={editSpaceName}
                   onChange={e => setEditSpaceName(e.target.value)}
-                  className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 text-base focus:outline-none focus:ring-2 focus:ring-accent"
                 />
                 <label className="flex items-center space-x-2 text-gray-300">
                   <input
@@ -1064,7 +1044,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
                           updated[idx] = e.target.value;
                           setInviteEmails(updated);
                         }}
-                        className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 placeholder-gray-500 text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 placeholder-gray-500 text-base focus:outline-none focus:ring-2 focus:ring-accent"
                       />
                     ))}
                     <button
@@ -1077,7 +1057,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
                   </div>
                 )}
                 <div className="flex justify-center space-x-3">
-                  <button onClick={handleUpdateSpace} className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-2 rounded-lg transition-colors">Save</button>
+                  <button onClick={handleUpdateSpace} className="bg-accent hover:bg-accent-light text-foreground px-6 py-2 rounded-lg transition-colors">Save</button>
                   {spaceToEdit && (
                     <button onClick={() => { handleDeleteSpace(spaceToEdit._id); setShowEditSpaceModal(false); }} className="bg-red-600 hover:bg-red-500 text-white px-6 py-2 rounded-lg transition-colors">Delete</button>
                   )}
@@ -1110,13 +1090,13 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
               value={newCat}
               onChange={e => setNewCat(e.target.value)}
               onKeyPress={e => e.key === 'Enter' && handleAddCategory()}
-              className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 placeholder-gray-500 text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 placeholder-gray-500 text-base focus:outline-none focus:ring-2 focus:ring-accent"
               autoFocus
             />
             <div className="flex justify-center space-x-3">
               <button
                 onClick={handleAddCategory}
-                className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-2 rounded-lg transition-colors"
+                className="bg-accent hover:bg-accent-light text-foreground px-6 py-2 rounded-lg transition-colors"
               >
                 Add
               </button>
@@ -1142,12 +1122,12 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
               type="text"
               value={editCatName}
               onChange={(e) => setEditCatName(e.target.value)}
-              className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 text-base focus:outline-none focus:ring-2 focus:ring-accent"
             />
             <div className="flex justify-center space-x-3">
               <button
                 onClick={handleRenameCategory}
-                className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+                className="bg-accent text-foreground px-6 py-2 rounded-lg hover:bg-accent-dark transition-colors"
               >
                 Rename
               </button>
@@ -1234,13 +1214,13 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
               type="text"
               value={editText}
               onChange={(e) => setEditText(e.target.value)}
-              className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 text-base focus:outline-none focus:ring-2 focus:ring-accent"
             />
             <textarea
               value={editNotes}
               onChange={(e) => setEditNotes(e.target.value)}
               placeholder="Notes"
-              className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 text-base h-24 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 text-base h-24 resize-none focus:outline-none focus:ring-2 focus:ring-accent"
             />
             <select
               value={editCategoryVal}
@@ -1268,7 +1248,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
                 value={editDueDate}
                 onChange={(e) => setEditDueDate(e.target.value)}
                 placeholder="Select due date"
-                className="w-full p-3 pr-8 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 text-base focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                className="w-full p-3 pr-8 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 text-base focus:outline-none focus:ring-2 focus:ring-accent cursor-pointer"
                 style={{
                   colorScheme: 'dark',
                   position: 'relative'
@@ -1285,7 +1265,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
               )}
             </div>
             <div className="flex justify-center space-x-3">
-              <button onClick={handleSaveTodoEdit} className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-2 rounded-lg transition-colors">Save</button>
+              <button onClick={handleSaveTodoEdit} className="bg-accent hover:bg-accent-light text-foreground px-6 py-2 rounded-lg transition-colors">Save</button>
               <button onClick={() => setShowEditTodoModal(false)} className="bg-gray-800 hover:bg-gray-700 text-gray-300 px-6 py-2 rounded-lg transition-colors">Cancel</button>
             </div>
           </div>
@@ -1296,15 +1276,79 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
 
       {activeTab === 'assistant' && (
         <div>
-          <TodoChatbot token={token} />
+          {/* Header Row with Page Title and Space Dropdown */}
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-xl font-semibold text-gray-100">Assistant</h2>
+            <SpaceDropdown
+              spaces={spaces}
+              activeSpace={activeSpace}
+              user={user}
+              onSpaceSelect={setActiveSpace}
+              onCreateSpace={() => setShowAddSpaceModal(true)}
+              onEditSpace={(space) => {
+                setSpaceToEdit(space);
+                setEditSpaceName(space.name);
+                const isCollab = (space.member_ids?.length ?? 0) > 1 ||
+                  (space.pending_emails?.length ?? 0) > 0;
+                setEditSpaceCollaborative(isCollab);
+                setInviteEmails(['']);
+                setShowEditSpaceModal(true);
+              }}
+            />
+          </div>
+          <TodoChatbot token={token} activeSpace={activeSpace} />
         </div>
       )}
 
       {activeTab === 'insights' && (
-        <div className="text-center py-12">
-          <div className="text-gray-400 mb-4 text-4xl">📊</div>
-          <h3 className="text-lg font-semibold text-gray-100 mb-2">Insights Coming Soon</h3>
-          <p className="text-gray-400">We&apos;re working on analytics and insights for your tasks.</p>
+        <div>
+          {/* Header Row with Page Title and Space Dropdown */}
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-xl font-semibold text-gray-100">Insights</h2>
+            <SpaceDropdown
+              spaces={spaces}
+              activeSpace={activeSpace}
+              user={user}
+              onSpaceSelect={setActiveSpace}
+              onCreateSpace={() => setShowAddSpaceModal(true)}
+              onEditSpace={(space) => {
+                setSpaceToEdit(space);
+                setEditSpaceName(space.name);
+                const isCollab = (space.member_ids?.length ?? 0) > 1 ||
+                  (space.pending_emails?.length ?? 0) > 0;
+                setEditSpaceCollaborative(isCollab);
+                setInviteEmails(['']);
+                setShowEditSpaceModal(true);
+              }}
+            />
+          </div>
+          <InsightsComponent token={token} activeSpace={activeSpace} authenticatedFetch={authenticatedFetch} />
+        </div>
+      )}
+
+      {activeTab === 'journal' && (
+        <div>
+          {/* Header Row with Page Title and Space Dropdown */}
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-xl font-semibold text-gray-100">Journal</h2>
+            <SpaceDropdown
+              spaces={spaces}
+              activeSpace={activeSpace}
+              user={user}
+              onSpaceSelect={setActiveSpace}
+              onCreateSpace={() => setShowAddSpaceModal(true)}
+              onEditSpace={(space) => {
+                setSpaceToEdit(space);
+                setEditSpaceName(space.name);
+                const isCollab = (space.member_ids?.length ?? 0) > 1 ||
+                  (space.pending_emails?.length ?? 0) > 0;
+                setEditSpaceCollaborative(isCollab);
+                setInviteEmails(['']);
+                setShowEditSpaceModal(true);
+              }}
+            />
+          </div>
+          <JournalComponent token={token} activeSpace={activeSpace} authenticatedFetch={authenticatedFetch} />
         </div>
       )}
 
@@ -1320,7 +1364,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
                   id="emailEnabled"
                   checked={emailEnabled}
                   onChange={(e) => setEmailEnabled(e.target.checked)}
-                  className="w-4 h-4 text-blue-600 bg-gray-900 border-gray-700 rounded focus:ring-blue-500 focus:ring-2"
+                  className="w-4 h-4 text-accent bg-gray-900 border-gray-700 rounded focus:ring-accent focus:ring-2"
                 />
                 <label htmlFor="emailEnabled" className="text-sm text-gray-300">
                   Enable daily email summaries
@@ -1333,7 +1377,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
                   type="time"
                   value={emailTime}
                   onChange={(e) => setEmailTime(e.target.value)}
-                  className="w-full bg-gray-900 border border-gray-700 text-gray-100 p-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full bg-gray-900 border border-gray-700 text-gray-100 p-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent"
                   disabled={!emailEnabled}
                 />
               </div>
@@ -1343,7 +1387,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
                 <textarea
                   value={emailInstructions}
                   onChange={(e) => setEmailInstructions(e.target.value)}
-                  className="w-full bg-gray-900 border border-gray-700 text-gray-100 placeholder-gray-500 p-2 rounded-lg h-24 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full bg-gray-900 border border-gray-700 text-gray-100 placeholder-gray-500 p-2 rounded-lg h-24 resize-none focus:outline-none focus:ring-2 focus:ring-accent"
                   placeholder="Write like a Buddhist monk. Include a haiku at the end."
                 />
               </div>
@@ -1366,7 +1410,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
                             setEmailSpaceIds(emailSpaceIds.filter((sid) => sid !== id));
                           }
                         }}
-                        className="w-4 h-4 text-blue-600 bg-gray-900 border-gray-700 rounded focus:ring-blue-500 focus:ring-2"
+                        className="w-4 h-4 text-accent bg-gray-900 border-gray-700 rounded focus:ring-accent focus:ring-2"
                       />
                       <label htmlFor={`space-${space._id || 'default'}`} className="text-sm text-gray-300">
                         {space.name}
@@ -1380,7 +1424,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
                 <button
                   onClick={handleUpdateSchedule}
                   disabled={savingSchedule}
-                  className="bg-blue-600 hover:bg-blue-500 disabled:bg-blue-800 disabled:text-gray-400 text-white px-6 py-2 rounded-lg transition-colors"
+                  className="bg-accent hover:bg-accent-light disabled:bg-accent-dark disabled:text-gray-400 text-foreground px-6 py-2 rounded-lg transition-colors"
                 >
                   {savingSchedule ? 'Saving...' : 'Save'}
                 </button>

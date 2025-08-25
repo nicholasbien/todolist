@@ -10,7 +10,7 @@ A modern collaborative todo list application with AI-powered task classification
 ## Features
 
 ### Core Functionality
-- **AI-powered task classification** using OpenAI GPT-4.1-nano
+- **AI-powered task classification** using OpenAI GPT-5-nano
 - **Multi-user collaboration spaces** - Create shared workspaces and invite team members
 - **Email verification authentication** with JWT sessions
 - **Space-specific categories** - Each space has its own set of categories
@@ -225,7 +225,22 @@ This application is configured as a PWA and can be installed on mobile devices l
 - **Service Worker** (`public/sw.js`) - Enables offline functionality and caching
 - **App Icons** - Custom 192x192 and 512x512 icons with checkmark design
 - **iOS Safari optimization** - Proper meta tags for iOS home screen installation
-- **Offline support** - Basic caching allows app to load without internet
+- **Offline support** - Full offline functionality for viewing and editing todos
+
+### Offline Functionality Details
+
+The app's service worker provides comprehensive offline support:
+- **Static caching** - All app assets (CSS, JS, images) are cached for offline use
+- **API response caching** - Todo data is cached and served when offline
+- **Background sync** - Changes made offline sync automatically when connection returns
+- **Offline-first design** - App works fully without internet connection
+
+**⚠️ Critical for Offline**: The app uses an intelligent environment-aware URL strategy:
+
+- **Development** (`NEXT_PUBLIC_API_URL` unset): Uses relative URLs (`/todos`, `/chat`) → Service worker intercepts and caches → Full offline functionality
+- **Production** (`NEXT_PUBLIC_API_URL` set): Uses absolute URLs → Direct server calls → Optimal for deployed environments
+
+This design provides the best of both worlds: comprehensive offline development testing and efficient production API calls. The service worker only intercepts same-origin requests, automatically respecting the environment configuration.
 
 ## Production Deployment with Railway
 
@@ -312,9 +327,17 @@ WEBSITE_URL=https://your-site-url.com
 
 ### Frontend (.env.local)
 ```bash
-# Local development uses a proxy to http://localhost:8000
+# Local development - OpenAI key for client-side features
 OPENAI_API_KEY=your_openai_api_key
-# NEXT_PUBLIC_API_URL=https://your-backend-tunnel.loca.lt
+
+# API URL Configuration (Environment-Aware)
+# ⚠️ LEAVE UNSET FOR DEVELOPMENT: This enables offline functionality
+# When unset: Uses relative URLs (/todos, /chat) → Service Worker can intercept and cache
+# When set: Uses absolute URLs → Direct server calls, no offline caching
+#
+# Development: Leave commented out for full offline PWA functionality
+# Production/Testing: Uncomment and set to your deployed backend URL
+# NEXT_PUBLIC_API_URL=https://your-backend-url.com
 ```
 
 ### Generating JWT Secret

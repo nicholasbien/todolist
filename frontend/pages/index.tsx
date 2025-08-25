@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
+import { useRouter } from 'next/router';
 import { useOffline } from '../context/OfflineContext';
 import dynamic from 'next/dynamic';
 import Head from 'next/head';
@@ -17,6 +18,7 @@ interface LoginFormProps {
 }
 
 function LoginForm({ onLogin }: LoginFormProps) {
+  const router = useRouter();
   const [email, setEmail] = useState('');
   const [code, setCode] = useState('');
   const [firstName, setFirstName] = useState('');
@@ -25,6 +27,12 @@ function LoginForm({ onLogin }: LoginFormProps) {
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [needsName, setNeedsName] = useState(false);
+
+  useEffect(() => {
+    if (router.isReady && typeof router.query.email === 'string') {
+      setEmail(router.query.email);
+    }
+  }, [router.isReady]);
 
 
   const handleEmailSubmit = async (e) => {
@@ -188,7 +196,7 @@ function LoginForm({ onLogin }: LoginFormProps) {
                 id="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-gray-900 text-gray-100 placeholder-gray-500"
+                className="w-full px-4 py-2 border border-gray-700 rounded-lg focus:ring-2 focus:ring-accent focus:border-accent outline-none bg-gray-900 text-gray-100 placeholder-gray-500"
                 placeholder="Enter your email"
                 disabled={loading}
                 required
@@ -198,7 +206,7 @@ function LoginForm({ onLogin }: LoginFormProps) {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="w-full bg-accent text-white py-2 px-4 rounded-lg hover:bg-accent-dark focus:ring-2 focus:ring-accent focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {loading ? 'Sending Code...' : 'Send Verification Code'}
             </button>
@@ -214,7 +222,7 @@ function LoginForm({ onLogin }: LoginFormProps) {
                 id="code"
                 value={code}
                 onChange={(e) => setCode(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-center text-lg font-mono"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent focus:border-accent outline-none text-center text-lg font-mono"
                 placeholder="000000"
                 disabled={loading}
                 required
@@ -228,7 +236,7 @@ function LoginForm({ onLogin }: LoginFormProps) {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="w-full bg-accent text-white py-2 px-4 rounded-lg hover:bg-accent-dark focus:ring-2 focus:ring-accent focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {loading ? 'Verifying...' : 'Sign In'}
             </button>
@@ -252,7 +260,7 @@ function LoginForm({ onLogin }: LoginFormProps) {
                 id="firstName"
                 value={firstName}
                 onChange={(e) => setFirstName(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent focus:border-accent outline-none"
                 placeholder="Enter your first name"
                 disabled={loading}
                 required
@@ -262,7 +270,7 @@ function LoginForm({ onLogin }: LoginFormProps) {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="w-full bg-accent text-white py-2 px-4 rounded-lg hover:bg-accent-dark focus:ring-2 focus:ring-accent focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {loading ? 'Saving...' : 'Continue'}
             </button>
@@ -283,6 +291,10 @@ export default function Home() {
   const [showSettingsDropdown, setShowSettingsDropdown] = useState(false);
   const [showContactModal, setShowContactModal] = useState(false);
   const [showEmailSettings, setShowEmailSettings] = useState(false);
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [exportType, setExportType] = useState<'todos' | 'journals'>('todos');
+  const [exportFormat, setExportFormat] = useState<'jsonl' | 'csv'>('jsonl');
+  const [exporting, setExporting] = useState(false);
   const [contactMessage, setContactMessage] = useState('');
   const [sendingContact, setSendingContact] = useState(false);
   const [showOfflineTooltip, setShowOfflineTooltip] = useState(false);
@@ -377,6 +389,33 @@ export default function Home() {
     }
   };
 
+  const handleExportData = async () => {
+    try {
+      setExporting(true);
+      const baseURL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+      const response = await fetch(`${baseURL}/export?data=${exportType}&format=${exportFormat}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (!response.ok) throw new Error('Export failed');
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${exportType}.${exportFormat}`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+      setShowExportModal(false);
+    } catch (err) {
+      console.error('Export error:', err);
+    } finally {
+      setExporting(false);
+    }
+  };
+
   if (!isClient || isChecking) {
     return (
       <>
@@ -433,7 +472,7 @@ export default function Home() {
             <div className="relative" ref={settingsDropdownRef}>
               <button
                 onClick={() => setShowSettingsDropdown(!showSettingsDropdown)}
-                className="text-blue-400 hover:text-blue-300 text-lg w-8 h-8 flex items-center justify-center rounded-lg transition-colors"
+                className="text-accent hover:text-accent-light text-lg w-8 h-8 flex items-center justify-center rounded-lg transition-colors"
                 title="Settings"
               >
                 ⚙️
@@ -449,6 +488,15 @@ export default function Home() {
                     className="w-full text-left px-4 py-3 text-gray-300 hover:bg-gray-900 hover:text-gray-100 transition-colors rounded-t-lg"
                   >
                     Email Settings
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowSettingsDropdown(false);
+                      setShowExportModal(true);
+                    }}
+                    className="w-full text-left px-4 py-3 text-gray-300 hover:bg-gray-900 hover:text-gray-100 transition-colors"
+                  >
+                    Export Data
                   </button>
                   <button
                     onClick={() => {
@@ -480,6 +528,51 @@ export default function Home() {
           onShowEmailSettings={() => setShowEmailSettings(true)}
           onCloseEmailSettings={() => setShowEmailSettings(false)}
         />
+        {/* Export Modal */}
+        {showExportModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50">
+            <div className="bg-black border border-gray-800 p-6 rounded-xl w-80 space-y-4 shadow-2xl">
+              <h3 className="text-gray-100 text-lg font-bold mb-2">Export Data</h3>
+              <div>
+                <label className="block text-sm text-gray-300 mb-2">Data Type</label>
+                <select
+                  value={exportType}
+                  onChange={(e) => setExportType(e.target.value as 'todos' | 'journals')}
+                  className="w-full bg-gray-900 border border-gray-700 text-gray-100 p-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent"
+                >
+                  <option value="todos">Tasks</option>
+                  <option value="journals">Journal Entries</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm text-gray-300 mb-2">Format</label>
+                <select
+                  value={exportFormat}
+                  onChange={(e) => setExportFormat(e.target.value as 'jsonl' | 'csv')}
+                  className="w-full bg-gray-900 border border-gray-700 text-gray-100 p-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent"
+                >
+                  <option value="jsonl">JSONL</option>
+                  <option value="csv">CSV</option>
+                </select>
+              </div>
+              <div className="flex justify-center space-x-3">
+                <button
+                  onClick={handleExportData}
+                  disabled={exporting}
+                  className="bg-accent hover:bg-accent-light disabled:bg-accent-dark disabled:text-gray-400 text-white px-6 py-2 rounded-lg transition-colors"
+                >
+                  {exporting ? 'Exporting...' : 'Download'}
+                </button>
+                <button
+                  onClick={() => setShowExportModal(false)}
+                  className="bg-gray-800 hover:bg-gray-700 text-gray-300 px-6 py-2 rounded-lg transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Contact Modal */}
         {showContactModal && (
@@ -490,13 +583,13 @@ export default function Home() {
                 value={contactMessage}
                 onChange={(e) => setContactMessage(e.target.value)}
                 placeholder="Ask for a new feature... Report a bug... Say hi!"
-                className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 placeholder-gray-500 h-32 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 placeholder-gray-500 h-32 resize-none focus:outline-none focus:ring-2 focus:ring-accent"
               />
               <div className="flex justify-center space-x-3">
                 <button
                   onClick={handleSendContact}
                   disabled={sendingContact || !contactMessage.trim()}
-                  className="bg-blue-600 hover:bg-blue-500 disabled:bg-blue-800 disabled:text-gray-400 text-white px-6 py-2 rounded-lg transition-colors"
+                  className="bg-accent hover:bg-accent-light disabled:bg-accent-dark disabled:text-gray-400 text-white px-6 py-2 rounded-lg transition-colors"
                 >
                   {sendingContact ? 'Sending...' : 'Send'}
                 </button>
@@ -515,6 +608,6 @@ export default function Home() {
         )}
       </div>
     </main>
-    </>
+  </>
   );
 }

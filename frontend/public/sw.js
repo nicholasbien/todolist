@@ -9,6 +9,7 @@ const CATEGORIES = 'categories';
 const SPACES = 'spaces';
 const QUEUE = 'queue';
 const AUTH = 'auth';
+const JOURNALS = 'journals';
 
 const DEFAULT_CATEGORIES = ['General'];
 
@@ -55,6 +56,9 @@ function openUserDB(userId) {
       }
       if (!db.objectStoreNames.contains(QUEUE)) {
         db.createObjectStore(QUEUE, { keyPath: 'id', autoIncrement: true });
+      }
+      if (!db.objectStoreNames.contains(JOURNALS)) {
+        db.createObjectStore(JOURNALS, { keyPath: '_id' });
       }
     };
   });
@@ -193,6 +197,37 @@ const clearQueue = async (userId) => {
   return userDbTx(effectiveUserId, QUEUE, 'readwrite', (s) => s.clear());
 };
 
+// Journal operations
+const getJournals = async (userId, date = null, spaceId = null) => {
+  const authData = userId ? null : await getAuth();
+  const effectiveUserId = userId || (authData ? authData.userId : null);
+  const allJournals = await userDbTx(effectiveUserId, JOURNALS, 'readonly', (s) => s.getAll());
+
+  let filteredJournals = allJournals;
+
+  if (date) {
+    filteredJournals = allJournals.filter(j => j.date === date);
+  }
+
+  if (spaceId !== null) {
+    filteredJournals = filteredJournals.filter(j => j.space_id === spaceId);
+  }
+
+  return filteredJournals;
+};
+
+const putJournal = async (journal, userId) => {
+  const authData = userId ? null : await getAuth();
+  const effectiveUserId = userId || (authData ? authData.userId : null);
+  return userDbTx(effectiveUserId, JOURNALS, 'readwrite', (s) => s.put(journal));
+};
+
+const delJournal = async (id, userId) => {
+  const authData = userId ? null : await getAuth();
+  const effectiveUserId = userId || (authData ? authData.userId : null);
+  return userDbTx(effectiveUserId, JOURNALS, 'readwrite', (s) => s.delete(id));
+};
+
 // ID mapping functions for persisting offline → server ID mappings
 const getIdMap = async (userId) => {
   const authData = userId ? null : await getAuth();
@@ -230,6 +265,132 @@ async function getAuthHeaders() {
     headers['Authorization'] = `Bearer ${authData.token}`;
   }
   return headers;
+}
+
+// Generate insights from todos data (shared logic with backend)
+function generateInsights(todos) {
+  // Convert todos to consistent format
+  const todoArray = Array.isArray(todos) ? todos : Object.values(todos);
+
+  // Calculate basic stats
+  const totalTasks = todoArray.length;
+  const completedTasks = todoArray.filter(todo => todo.completed).length;
+  const pendingTasks = totalTasks - completedTasks;
+  const completionRate = totalTasks > 0 ? (completedTasks / totalTasks * 100) : 0;
+
+  // Weekly stats tracking
+  const weeklyStats = {};
+
+  // Category stats tracking
+  const categoryStats = {};
+
+  // Priority stats tracking
+  const priorityStats = {};
+
+  // Process each todo
+  for (const todo of todoArray) {
+    // Parse dateAdded for weekly creation stats
+    try {
+      if (todo.dateAdded) {
+        const dateAdded = new Date(todo.dateAdded.replace('Z', '+00:00'));
+        if (!isNaN(dateAdded.getTime())) {
+          // Get Monday of the week (ISO week)
+          const weekStart = new Date(dateAdded);
+          weekStart.setDate(dateAdded.getDate() - dateAdded.getDay() + (dateAdded.getDay() === 0 ? -6 : 1));
+          const weekKey = weekStart.toISOString().split('T')[0];
+
+          if (!weeklyStats[weekKey]) {
+            weeklyStats[weekKey] = { created: 0, completed: 0 };
+          }
+          weeklyStats[weekKey].created += 1;
+        }
+      }
+    } catch (error) {
+      // Ignore invalid dates
+    }
+
+    // Parse dateCompleted for weekly completion stats
+    try {
+      if (todo.completed && todo.dateCompleted) {
+        const dateCompleted = new Date(todo.dateCompleted.replace('Z', '+00:00'));
+        if (!isNaN(dateCompleted.getTime())) {
+          const weekStart = new Date(dateCompleted);
+          weekStart.setDate(dateCompleted.getDate() - dateCompleted.getDay() + (dateCompleted.getDay() === 0 ? -6 : 1));
+          const weekKey = weekStart.toISOString().split('T')[0];
+
+          if (!weeklyStats[weekKey]) {
+            weeklyStats[weekKey] = { created: 0, completed: 0 };
+          }
+          weeklyStats[weekKey].completed += 1;
+        }
+      }
+    } catch (error) {
+      // Ignore invalid dates
+    }
+
+    // Category stats
+    const category = todo.category || 'General';
+    if (!categoryStats[category]) {
+      categoryStats[category] = { total: 0, completed: 0 };
+    }
+    categoryStats[category].total += 1;
+    if (todo.completed) {
+      categoryStats[category].completed += 1;
+    }
+
+    // Priority stats
+    const priority = todo.priority || 'Medium';
+    if (!priorityStats[priority]) {
+      priorityStats[priority] = { total: 0, completed: 0 };
+    }
+    priorityStats[priority].total += 1;
+    if (todo.completed) {
+      priorityStats[priority].completed += 1;
+    }
+  }
+
+  // Convert weekly stats to sorted array
+  const weeklyData = Object.keys(weeklyStats)
+    .sort()
+    .map(week => ({
+      week,
+      created: weeklyStats[week].created,
+      completed: weeklyStats[week].completed
+    }));
+
+  // Convert category stats to array
+  const categoryData = Object.entries(categoryStats).map(([category, stats]) => {
+    const completionRate = stats.total > 0 ? (stats.completed / stats.total * 100) : 0;
+    return {
+      category,
+      total: stats.total,
+      completed: stats.completed,
+      completion_rate: Math.round(completionRate * 10) / 10
+    };
+  });
+
+  // Convert priority stats to array
+  const priorityData = Object.entries(priorityStats).map(([priority, stats]) => {
+    const completionRate = stats.total > 0 ? (stats.completed / stats.total * 100) : 0;
+    return {
+      priority,
+      total: stats.total,
+      completed: stats.completed,
+      completion_rate: Math.round(completionRate * 10) / 10
+    };
+  });
+
+  return {
+    overview: {
+      total_tasks: totalTasks,
+      completed_tasks: completedTasks,
+      pending_tasks: pendingTasks,
+      completion_rate: Math.round(completionRate * 10) / 10
+    },
+    weekly_stats: weeklyData,
+    category_breakdown: categoryData,
+    priority_breakdown: priorityData
+  };
 }
 
 // Function to sync server data to local database on startup
@@ -287,15 +448,40 @@ async function syncServerDataToLocal() {
 }
 
 self.addEventListener('install', (event) => {
+  const isDevelopment = self.location.hostname === 'localhost' || self.location.hostname === '127.0.0.1';
+
   event.waitUntil(
     Promise.all([
-      caches.open(STATIC_CACHE).then(cache => cache.addAll(STATIC_FILES)),
+      // Only pre-cache static files in production, with individual error handling
+      isDevelopment ? Promise.resolve() : cacheStaticFiles(),
       caches.open(API_CACHE),
       openGlobalDB()
     ])
   );
   self.skipWaiting();
 });
+
+// Helper function to cache static files with individual error handling
+async function cacheStaticFiles() {
+  const cache = await caches.open(STATIC_CACHE);
+
+  // Cache files individually to avoid failing if one file is missing
+  const cachePromises = STATIC_FILES.map(async (url) => {
+    try {
+      const response = await fetch(url);
+      if (response.ok) {
+        await cache.put(url, response);
+        console.log(`✅ Cached: ${url}`);
+      } else {
+        console.log(`⚠️ Failed to cache ${url}: ${response.status}`);
+      }
+    } catch (error) {
+      console.log(`⚠️ Error caching ${url}:`, error);
+    }
+  });
+
+  await Promise.allSettled(cachePromises);
+}
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
@@ -319,7 +505,7 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
-  // Only handle API requests, let all other requests go through normally
+  // Only handle API requests
   const isApi =
     url.origin === self.location.origin &&
     (url.pathname.startsWith('/todos') ||
@@ -328,6 +514,8 @@ self.addEventListener('fetch', (event) => {
       url.pathname.startsWith('/email') ||
       url.pathname.startsWith('/contact') ||
       url.pathname.startsWith('/chat') ||
+      url.pathname.startsWith('/insights') ||
+      url.pathname.startsWith('/journals') ||
       url.pathname.startsWith('/auth/'));
 
   if (isApi) {
@@ -335,8 +523,10 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Let all non-API requests pass through to the network normally
-  // This prevents the service worker from interfering with static files during development
+  // Cache static assets so the app can load offline
+  if (url.origin === self.location.origin) {
+    event.respondWith(handleStaticRequest(event.request));
+  }
 });
 
 async function handleApiRequest(request) {
@@ -452,6 +642,12 @@ async function handleApiRequest(request) {
       }
       return response;
     } catch (err) {
+      if (err && err.name === 'AbortError') {
+        return new Response(JSON.stringify({ error: 'Request aborted' }), {
+          status: 408,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
       return offlineFallback(request, url);
     }
   }
@@ -461,20 +657,26 @@ async function handleApiRequest(request) {
 
 async function handleStaticRequest(request) {
   const url = new URL(request.url);
+  const isDevelopment = url.hostname === 'localhost' || url.hostname === '127.0.0.1';
 
   try {
     // Try network first for static files
     const response = await fetch(request);
 
-    // Cache successful responses (only for GET requests)
-    if (response.ok && request.method === 'GET') {
+    // Only cache in production to avoid development reload issues
+    if (response.ok && request.method === 'GET' && !isDevelopment) {
       const cache = await caches.open(STATIC_CACHE);
       cache.put(request, response.clone());
     }
 
     return response;
   } catch (error) {
-    // Network failed, try cache
+    // In development, don't use cache fallbacks - let it fail naturally
+    if (isDevelopment) {
+      return new Response('Development server unavailable', { status: 503 });
+    }
+
+    // Production: Network failed, try cache
     const cache = await caches.open(STATIC_CACHE);
     const cachedResponse = await cache.match(request);
 
@@ -507,6 +709,24 @@ async function offlineFallback(request, url) {
       return new Response(JSON.stringify(spaces), { headers: { 'Content-Type': 'application/json' } });
     }
 
+    // Handle journals
+    if (url.pathname === '/journals' || url.pathname.endsWith('/journals')) {
+      const date = url.searchParams.get('date');
+      const spaceId = url.searchParams.get('space_id');
+      const journals = await getJournals(authData ? authData.userId : null, date, spaceId);
+
+      if (date && journals.length > 0) {
+        // Return single entry for specific date
+        return new Response(JSON.stringify(journals[0]), { headers: { 'Content-Type': 'application/json' } });
+      } else if (date) {
+        // No entry found for date
+        return new Response('null', { headers: { 'Content-Type': 'application/json' } });
+      } else {
+        // Return all journals
+        return new Response(JSON.stringify(journals), { headers: { 'Content-Type': 'application/json' } });
+      }
+    }
+
     // Handle todos (space-aware)
     if (url.pathname === '/todos' || url.pathname.endsWith('/todos')) {
       const todos = await getTodos(authData ? authData.userId : null, spaceId);
@@ -524,6 +744,35 @@ async function offlineFallback(request, url) {
         return new Response(JSON.stringify(categoryNames), { headers: { 'Content-Type': 'application/json' } });
       } else {
         return new Response(JSON.stringify(DEFAULT_CATEGORIES), { headers: { 'Content-Type': 'application/json' } });
+      }
+    }
+
+    // Handle insights by reusing the todos path so analytics logic is shared
+    if (url.pathname === '/insights' || url.pathname.endsWith('/insights')) {
+      try {
+        // Build a request for /todos with the same query params and headers
+        const headers = new Headers(request.headers);
+        const todosRequest = new Request(`/todos${url.search}`, { method: 'GET', headers });
+
+        // Use existing handler to get merged todo data (online or offline)
+        const todosResponse = await handleApiRequest(todosRequest);
+        if (!todosResponse || !todosResponse.ok) {
+          return todosResponse;
+        }
+
+        const todos = await todosResponse.clone().json();
+        const insights = generateInsights(todos);
+        return new Response(JSON.stringify(insights), {
+          headers: { 'Content-Type': 'application/json' }
+        });
+      } catch (err) {
+        // Fallback to locally stored todos if any step fails
+        const authData = await getAuth();
+        const todos = await getTodos(authData ? authData.userId : null, spaceId);
+        const insights = generateInsights(todos);
+        return new Response(JSON.stringify(insights), {
+          headers: { 'Content-Type': 'application/json' }
+        });
       }
     }
   }
@@ -747,6 +996,76 @@ async function offlineFallback(request, url) {
 
       return new Response(null, { status: 204 });
     }
+
+    // Create or update journal entry (optimized for auto-save)
+    if ((url.pathname === '/journals' || url.pathname.endsWith('/journals')) && request.method === 'POST') {
+      const existing = await getJournals(
+        authData ? authData.userId : null,
+        data.date,
+        data.space_id || null
+      );
+
+      let journalData;
+      if (existing && existing.length > 0) {
+        // Update existing entry (perfect for auto-save!)
+        journalData = {
+          ...existing[0],
+          text: data.text,
+          updated_at: new Date().toISOString(),
+        };
+      } else {
+        // Create new offline entry only when needed
+        journalData = {
+          _id: `offline_journal_${data.date}_${Date.now()}`,
+          user_id: authData ? authData.userId : 'offline_user',
+          space_id: data.space_id || null,
+          date: data.date,
+          text: data.text,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          created_offline: true,
+        };
+      }
+
+      await putJournal(journalData, authData ? authData.userId : null);
+      await addQueue({ type: 'CREATE_JOURNAL', data: journalData }, authData ? authData.userId : null);
+      return new Response(JSON.stringify(journalData), { headers: { 'Content-Type': 'application/json' } });
+    }
+
+    // Delete journal entry
+    if (url.pathname.startsWith('/journals/') && request.method === 'DELETE') {
+      const id = url.pathname.split('/')[2];
+      console.log(`🗑️ Offline DELETE journal request for ID: ${id}`);
+
+      const existingJournals = await getJournals(authData ? authData.userId : null);
+      const journalExists = existingJournals.find(j => j._id === id);
+
+      if (journalExists) {
+        console.log(`🗑️ Journal ${id} found in IndexedDB, deleting...`);
+        await delJournal(id, authData ? authData.userId : null);
+
+        if (id.startsWith('offline_journal_')) {
+          // Remove the CREATE operation from queue to prevent resurrection
+          const queue = await readQueue(authData ? authData.userId : null);
+          const filteredQueue = queue.filter(op => !(op.type === 'CREATE_JOURNAL' && op.data._id === id));
+          if (filteredQueue.length !== queue.length) {
+            console.log(`🗑️ Removed pending CREATE_JOURNAL operation for deleted offline journal ${id}`);
+            await clearQueue(authData ? authData.userId : null);
+            for (const op of filteredQueue) {
+              await addQueue(op, authData ? authData.userId : null);
+            }
+          }
+          console.log(`🗑️ Offline journal ${id} deleted and CREATE operation cancelled`);
+        } else {
+          await addQueue({ type: 'DELETE_JOURNAL', data: { _id: id } }, authData ? authData.userId : null);
+          console.log(`🗑️ Added server DELETE_JOURNAL to queue for ${id}`);
+        }
+      } else {
+        console.log(`⚠️ Journal ${id} not found in IndexedDB`);
+      }
+
+      return new Response(null, { status: 204 });
+    }
   }
 
   // Gracefully fail all other requests when offline
@@ -927,6 +1246,64 @@ async function syncQueue() {
             await putCategory({ name: op.data.new_name, space_id: op.data.space_id }, authData.userId);
           }
           break;
+        case 'CREATE_JOURNAL':
+          if (op.data._id.startsWith('offline_journal_')) {
+            const { _id: offlineId, ...payload } = op.data;
+            res = await fetch('/journals', {
+              method: 'POST',
+              headers,
+              body: JSON.stringify(payload),
+            });
+            if (res && res.ok) {
+              // Immediately replace offline journal with server version
+              const serverJournal = await res.json();
+              console.log(`🔄 Journal Sync SUCCESS: Replacing offline journal ${offlineId} with server journal ${serverJournal._id}`);
+
+              // Update ID mapping
+              idMap[offlineId] = serverJournal._id;
+              console.log(`🗺️ Added Journal ID mapping: ${offlineId} -> ${serverJournal._id}`);
+
+              // Persist mapping immediately
+              await putIdMap(idMap, authData.userId);
+
+              await delJournal(offlineId, authData.userId); // Remove offline version
+              await putJournal(serverJournal, authData.userId); // Add server version
+              console.log(`✅ Synced offline journal ${offlineId} -> ${serverJournal._id}`);
+            } else {
+              console.log(`❌ Journal Sync FAILED: Offline journal ${offlineId} will be preserved`);
+            }
+          } else {
+            // Handle both offline-generated and regular journal updates
+            res = await fetch('/journals', {
+              method: 'POST',
+              headers,
+              body: JSON.stringify(op.data),
+            });
+            if (res && res.ok) {
+              const serverJournal = await res.json();
+              await putJournal(serverJournal, authData.userId);
+            }
+          }
+          break;
+        case 'DELETE_JOURNAL':
+          // Check if we need to translate offline ID to server ID
+          let deleteJournalId = op.data._id;
+          if (deleteJournalId.startsWith('offline_journal_') && idMap[deleteJournalId]) {
+            deleteJournalId = idMap[deleteJournalId];
+            console.log(`🗺️ Translating DELETE_JOURNAL ID: ${op.data._id} -> ${deleteJournalId}`);
+          }
+
+          if (!deleteJournalId.startsWith('offline_journal_')) {
+            res = await fetch(`/journals/${deleteJournalId}`, {
+              method: 'DELETE',
+              headers
+            });
+            if (res && res.ok) {
+              // Remove from local storage
+              await delJournal(deleteJournalId, authData.userId);
+            }
+          }
+          break;
       }
     } catch (err) {
       // Continue processing other operations on error
@@ -973,6 +1350,9 @@ if (typeof module !== 'undefined') {
     getCategories,
     putCategory,
     delCategory,
+    getJournals,
+    putJournal,
+    delJournal,
     addQueue,
     readQueue,
     clearQueue,

@@ -110,5 +110,9 @@ class Collections:
     def spaces(self):
         return db.spaces
 
+    @property
+    def journals(self):
+        return db.journals
+
 
 collections = Collections()

@@ -5,15 +5,17 @@ Daily todo summary email functionality
 import json
 import logging
 import os
+import random
 import smtplib
 from datetime import datetime, timedelta
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 import openai
 from bson import ObjectId
 from dotenv import load_dotenv
+from journals import get_journal_entries
 from todos import get_todos
 
 # Load environment variables
@@ -75,8 +77,69 @@ def format_date_with_relative(date_str: str) -> str:
     return f"{absolute} ({rel})"
 
 
+def load_haiku_collection() -> List[str]:
+    """Load the haiku collection from JSON file."""
+    try:
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        # Try large collection first, fall back to small one
+        large_haiku_file = os.path.join(current_dir, "haiku_collection_large.json")
+        small_haiku_file = os.path.join(current_dir, "haiku_collection.json")
+
+        haiku_file = large_haiku_file if os.path.exists(large_haiku_file) else small_haiku_file
+
+        with open(haiku_file, "r", encoding="utf-8") as f:
+            haikus = json.load(f)
+
+        logger.info(f"Loaded {len(haikus)} haikus from {os.path.basename(haiku_file)}")
+        return haikus
+    except Exception as e:
+        logger.error(f"Error loading haiku collection: {e}")
+        # Fallback classic haiku if file can't be loaded (from the collection we know works)
+        return [
+            "An old silent pond...\nA frog jumps into the pond,\nsplash! Silence again.",
+            "In the cicada's cry\nNo sign can foretell\nHow soon it must die.",
+            "No one travels\nAlong this way but I,\nThis autumn evening.",
+            "From time to time\nThe clouds give rest\nTo the moon-beholders.",
+            "Autumn moonlight-\na worm digs silently\ninto the chestnut.",
+            "Lightning flash-\nwhat I thought were faces\nare plumes of pampas grass.",
+            "First winter rain-\neven the monkey\nseems to want a raincoat.",
+            "The summer grasses\nAll that remains\nOf brave soldiers dreams",
+            "My life, -\nHow much more of it remains?\nThe night is brief.",
+            "Consider me\nAs one who loved poetry\nAnd persimmons.",
+            "Over the wintry\nforest, winds howl in rage\nwith no leaves to blow.",
+            "The lamp once out\nCool stars enter\nThe window frame.",
+            "The crow has flown away:\nswaying in the evening sun,\na leafless tree.",
+            "O snail\nClimb Mount Fuji,\nBut slowly, slowly!",
+            "What a strange thing!\nto be alive\nbeneath cherry blossoms.",
+        ]
+
+
+def get_random_haiku() -> str:
+    """Get a random haiku from the collection that doesn't contain 'tasks'."""
+    haikus = load_haiku_collection()
+    return random.choice(haikus)
+
+
+def get_default_buddhist_instructions() -> str:
+    """Return default Buddhist monk instructions for users who haven't set custom instructions."""
+    return """
+
+Write like a Buddhist monk. Include a life lesson and famous Buddhist quote or koan.
+
+At the end, highlight the top 5 items that need my attention as a numbered list. For each item, put
+the todo text on the same numbered line and place any details (like priority or due date) on the
+line below without bullet points or hyphens. Indent two spaces and begin directly with the detail
+label (e.g., "Priority: High"). This avoids Gmail formatting issues.
+"""
+
+
 def create_summary_prompt(
-    spaces_json: str, user_name: str = "there", custom_instructions: str = "", user_timezone: str = "America/New_York"
+    spaces_json: str,
+    user_name: str = "there",
+    custom_instructions: str = "",
+    user_timezone: str = "America/New_York",
+    haiku: str = "",
+    journal_entries_json: str = "",
 ) -> str:
     """Create a prompt for generating a daily todo summary with space context."""
     # Localize date to user's timezone
@@ -99,10 +162,14 @@ def create_summary_prompt(
 
 Today's date: {current_date}
 
-Given the following JSON data of todos organized by collaboration space, create a warm, encouraging daily summary email.
+Given the following JSON data of todos organized by collaboration space,
+and recent journal entries, create a warm, encouraging daily summary email.
 
 Todo Data (grouped by space):
 {spaces_json}
+
+Recent Journal Entries:
+{journal_entries_json}
 
 Instructions:
 1. Address the user as "{user_name}" if provided, otherwise use "there"
@@ -131,21 +198,47 @@ Instructions:
 8. Keep it concise but personal (2-3 paragraphs max)
 9. End with a motivational note for the day ahead
 10. If referring to tasks in a specific space, only mention todos from that space
+11. Close with a brief Buddhist koan to encourage reflection
 {custom_instructions}
+
+12. At the very end, add this EXACT haiku from a classical Japanese master.
+    CRITICAL: Use ONLY this haiku - do NOT write any other haiku or poetry:
+
+{haiku}
+
+13. After the haiku above, add exactly ONE emoji that best matches the themes, mood, or imagery
+    from this list:
+   - Nature: 🌸🍃🌺🍂🌱🌼🌻🌷🌹🌿🌳🌲🌴🌾🌵
+   - Sky/Weather: 🌙⭐🌅🌊🌄🌈☀️🌤️⛅🌥️❄️💧🌟✨
+   - Zen/Spiritual: 🧘🕯️🪷🎍🎐🪶🪨🏔️🎋🍀
+
+Add the chosen emoji on a separate line after the haiku.
 
 Format as plain text email content (no HTML, no subject line).
 """
 
 
 async def generate_todo_summary(
-    spaces_data: list, user_name: str = "there", custom_instructions: str = "", user_timezone: str = "America/New_York"
+    spaces_data: list,
+    journal_entries_data: Optional[List[dict]] = None,
+    user_name: str = "there",
+    custom_instructions: str = "",
+    user_timezone: str = "America/New_York",
 ) -> str:
     """Use OpenAI to generate a personalized todo summary."""
     try:
         # Convert spaces and their todos to JSON for the prompt
         spaces_json = json.dumps(spaces_data, indent=2, default=str)
 
-        prompt = create_summary_prompt(spaces_json, user_name, custom_instructions, user_timezone)
+        journal_entries_json = (
+            json.dumps(journal_entries_data, indent=2, default=str) if journal_entries_data is not None else "[]"
+        )
+
+        # Get a haiku to include in the prompt so AI can choose matching emoji
+        haiku = get_random_haiku()
+        prompt = create_summary_prompt(
+            spaces_json, user_name, custom_instructions, user_timezone, haiku, journal_entries_json
+        )
 
         # Use OpenAI to generate the summary
         client = openai.AsyncOpenAI(api_key=openai.api_key)
@@ -154,15 +247,20 @@ async def generate_todo_summary(
             messages=[
                 {
                     "role": "system",
-                    "content": "You are a helpful personal assistant creating daily todo summaries.",
+                    "content": (
+                        "You are a helpful personal assistant creating daily todo summaries. "
+                        "Use ONLY the exact haiku provided in the prompt - never create additional poetry or haiku."
+                    ),
                 },
                 {"role": "user", "content": prompt},
             ],
-            max_tokens=500,
-            temperature=0.7,
+            max_tokens=600,  # Increased slightly for haiku + emoji
+            temperature=1,
         )
 
-        return response.choices[0].message.content.strip()
+        summary = response.choices[0].message.content.strip()
+
+        return summary
 
     except Exception as e:
         logger.error(f"Error generating summary with OpenAI: {e}")
@@ -300,11 +398,40 @@ async def send_daily_summary(
                 all_todos.append(t_copy)
             spaces_data.append({"space": space.name, "todos": relative})
 
+        # Get recent journal entries from the past week (max 7)
+        recent_journals = await get_journal_entries(user_id, limit=7)
+        one_week_ago = (datetime.utcnow() - timedelta(days=7)).date()
+        journal_entries: List[dict] = []
+        for j in recent_journals:
+            j_dict = j.dict() if hasattr(j, "dict") else j
+            date_str = j_dict.get("date")
+            try:
+                entry_date = datetime.fromisoformat(date_str).date()
+            except Exception:
+                continue
+            if entry_date < one_week_ago:
+                continue
+            entry = {
+                "date": date_str,
+                "dateRelative": format_date_with_relative(date_str),
+                "text": j_dict.get("text", ""),
+                "space_id": j_dict.get("space_id"),
+            }
+            journal_entries.append(entry)
+
         if custom_instructions is None:
             custom_instructions = user.get("email_instructions", "") if user else ""
-            user_timezone = user.get("timezone", "America/New_York") if user else "America/New_York"
+
+        # Always include Buddhist monk instructions in addition to any custom instructions
+        buddhist_instructions = get_default_buddhist_instructions()
+        if custom_instructions.strip():
+            # Combine Buddhist monk instructions with custom instructions after
+            custom_instructions = buddhist_instructions + "\n" + custom_instructions
         else:
-            user_timezone = user.get("timezone", "America/New_York") if user else "America/New_York"
+            # Use only Buddhist monk instructions if no custom ones
+            custom_instructions = buddhist_instructions
+
+        user_timezone = user.get("timezone", "America/New_York") if user else "America/New_York"
 
         # Filter out invalid todos (those without dateAdded)
         valid_todos_dict = [todo for todo in all_todos if todo.get("dateAdded")]
@@ -353,7 +480,9 @@ async def send_daily_summary(
 
         # Generate summary
         display_name = user_name or user_email.split("@")[0]
-        summary = await generate_todo_summary(limited_spaces, display_name, custom_instructions or "", user_timezone)
+        summary = await generate_todo_summary(
+            limited_spaces, journal_entries, display_name, custom_instructions or "", user_timezone
+        )
 
         # Create subject with date in user's timezone
         import pytz  # type: ignore

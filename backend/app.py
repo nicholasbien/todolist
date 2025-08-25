@@ -1,8 +1,11 @@
+import csv
 import json
 import logging
 import os
 from collections import defaultdict
+from contextlib import asynccontextmanager
 from datetime import datetime
+from io import StringIO
 from typing import Dict, List, Optional
 
 import httpx
@@ -10,7 +13,6 @@ from auth import (
     LoginRequest,
     SignupRequest,
     UpdateNameRequest,
-    cleanup_expired_sessions,
     login_user,
     logout_user,
     signup_user,
@@ -38,6 +40,18 @@ from classify import classify_task
 from email_summary import send_daily_summary
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response
+
+# Import journal functions
+from journals import (
+    JournalEntry,
+    create_journal_entry,
+    delete_journal_entry,
+    generate_journal_summary,
+    get_journal_entries,
+    get_journal_entry_by_date,
+    journals_collection,
+)
 from pydantic import BaseModel
 from scheduler import get_scheduler_status, start_scheduler, update_schedule_time
 from spaces import (
@@ -50,17 +64,109 @@ from spaces import (
     update_space,
     user_in_space,
 )
-from todos import Todo, complete_todo, create_todo, delete_todo, get_todos, health_check, update_todo_fields
+from todos import (
+    Todo,
+    complete_todo,
+    create_todo,
+    delete_todo,
+    get_todos,
+    health_check,
+    todos_collection,
+    update_todo_fields,
+)
 
 # Set up logging with more detail
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="AI Todo List API")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Initialize application on startup and cleanup on shutdown."""
+    logger.info("🚀 FastAPI startup (lifespan) event triggered")
+
+    try:
+        # Skip startup tasks in test environment
+        if os.getenv("USE_MOCK_DB"):
+            logger.info("Running in test mode - skipping initialization")
+            yield
+            return
+
+        logger.info("Starting initialization tasks...")
+
+        # Import initialization functions
+        from auth import cleanup_expired_sessions, init_auth_indexes
+        from categories import init_category_indexes
+
+        # Test database connection first
+        from db import check_database_health
+        from journals import init_journal_indexes
+        from spaces import init_space_indexes, migrate_default_spaces
+        from todos import init_todo_indexes, migrate_legacy_todos
+
+        if not await check_database_health():
+            logger.error("Database health check failed - continuing anyway")
+
+        # Run each initialization step with individual error handling
+        initialization_steps = [
+            ("migrate_legacy_categories", migrate_legacy_categories),
+            ("migrate_legacy_todos", migrate_legacy_todos),
+            ("migrate_default_spaces", migrate_default_spaces),
+            ("rename_default_spaces_to_personal", rename_default_spaces_to_personal),
+            ("init_todo_indexes", init_todo_indexes),
+            ("init_auth_indexes", init_auth_indexes),
+            ("init_space_indexes", init_space_indexes),
+            ("init_category_indexes", init_category_indexes),
+            ("init_journal_indexes", init_journal_indexes),
+            ("init_default_categories", init_default_categories),
+            ("cleanup_expired_sessions", cleanup_expired_sessions),
+        ]
+
+        failed_steps = []
+        for step_name, step_func in initialization_steps:
+            try:
+                logger.info(f"⏳ Starting {step_name}...")
+                await step_func()  # type: ignore
+                logger.info(f"✓ {step_name} completed")
+            except Exception as e:
+                logger.error(f"✗ {step_name} failed: {e}")
+                failed_steps.append(step_name)
+                # Don't let individual failures stop the entire startup
+
+        # Start scheduler (non-critical, should not fail startup)
+        try:
+            logger.info("⏳ Starting scheduler...")
+            start_scheduler()
+            logger.info("✓ Scheduler started")
+        except Exception as e:
+            logger.error(f"✗ Scheduler failed to start: {e}")
+            failed_steps.append("scheduler")
+
+        if failed_steps:
+            logger.warning(f"⚠️  Startup completed with {len(failed_steps)} failed steps: {', '.join(failed_steps)}")
+        else:
+            logger.info("🚀 All initialization completed successfully")
+
+        logger.info("✅ Startup event completed")
+
+    except Exception as e:
+        logger.error(f"Critical startup error: {e}")
+        # Don't re-raise to prevent crash loop
+        logger.error("App started with startup errors - some features may not work correctly")
+
+    # Application is now running
+    yield
+
+    # Cleanup on shutdown
+    logger.info("🔄 FastAPI shutdown event triggered")
+
+
+app = FastAPI(title="AI Todo List API", lifespan=lifespan)
+
 
 # In-memory conversation history
 conversations: Dict[str, List[dict]] = defaultdict(list)
-MAX_HISTORY = 20
+MAX_HISTORY = 10
 
 
 # Enable CORS - specifically for the Next.js frontend
@@ -308,34 +414,6 @@ async def rename_default_spaces_to_personal():
         logger.error(f"Error renaming Default spaces to Personal: {e}")
 
 
-@app.on_event("startup")
-async def startup_event():
-    """Initialize default categories, cleanup expired sessions, and start scheduler."""
-    # Skip startup tasks in test environment
-    if not os.getenv("USE_MOCK_DB"):
-        # Migrate legacy data to have space_id fields
-        await migrate_legacy_categories()
-        # Also migrate legacy todos
-        from auth import init_auth_indexes
-        from categories import init_category_indexes
-        from spaces import init_space_indexes, migrate_default_spaces
-        from todos import init_todo_indexes, migrate_legacy_todos
-
-        await migrate_legacy_todos()
-        # Migrate conceptual default spaces to actual space documents
-        await migrate_default_spaces()
-        # Rename Default spaces to Personal (one-time migration)
-        await rename_default_spaces_to_personal()
-        await init_todo_indexes()
-        await init_auth_indexes()
-        await init_space_indexes()
-        await init_category_indexes()
-        # Initialize default categories for default space (no space_id)
-        await init_default_categories()
-        await cleanup_expired_sessions()
-        start_scheduler()
-
-
 # Category management endpoints
 @app.get("/categories", response_model=List[str])
 async def api_get_categories(space_id: Optional[str] = None, current_user: dict = Depends(get_current_user)):
@@ -529,6 +607,7 @@ class ContactRequest(BaseModel):
 
 class ChatRequest(BaseModel):
     question: str
+    space_id: str
 
 
 @app.post("/contact")
@@ -562,15 +641,20 @@ async def api_chat(
 ):
     """Answer user questions about their todos using OpenAI."""
     try:
+        # Check if user has access to the requested space
+        if not await user_in_space(current_user["user_id"], req.space_id):
+            raise HTTPException(status_code=403, detail="Access denied to space")
+
+        # Get todos only from the requested space
+        todos = await get_todos(current_user["user_id"], req.space_id)
+        todos_dict = [todo.dict() if hasattr(todo, "dict") else todo for todo in todos]
+
+        # Get space info for context
         spaces = await get_spaces_for_user(current_user["user_id"])
-        if current_user.get("email_spaces"):
-            allowed = set(current_user["email_spaces"])
-            spaces = [s for s in spaces if s.is_default or s.id in allowed]
-        spaces_data = []
-        for space in spaces:
-            todos = await get_todos(current_user["user_id"], space.id)
-            todos_dict = [todo.dict() if hasattr(todo, "dict") else todo for todo in todos]
-            spaces_data.append({"space": space.name, "todos": todos_dict})
+        space = next((s for s in spaces if s.id == req.space_id), None)
+        space_name = space.name if space else "Unknown Space"
+
+        spaces_data = [{"space": space_name, "todos": todos_dict}]
 
         history = conversations[current_user["user_id"]]
         answer = await answer_question(req.question, spaces_data, history)
@@ -588,8 +672,210 @@ async def api_chat(
         raise HTTPException(status_code=500, detail="Failed to generate answer")
 
 
+@app.get("/insights")
+async def get_insights(
+    space_id: Optional[str] = None,
+    current_user: dict = Depends(get_current_user),
+):
+    """Get insights and analytics for user's todos."""
+    try:
+        from insights_utils import generate_insights
+
+        # Get todos for the specified space or all spaces
+        if space_id:
+            # Check if user has access to this space
+            if not await user_in_space(current_user["user_id"], space_id):
+                raise HTTPException(status_code=403, detail="Access denied to this space")
+            todos = await get_todos(current_user["user_id"], space_id)
+        else:
+            # Get todos from all accessible spaces
+            spaces = await get_spaces_for_user(current_user["user_id"])
+            all_todos = []
+            for space in spaces:
+                space_todos = await get_todos(current_user["user_id"], space.id)
+                all_todos.extend(space_todos)
+            todos = all_todos
+
+        # Convert todos to dictionaries if they aren't already
+        todo_dicts = []
+        for todo in todos:
+            if hasattr(todo, "dict"):
+                todo_dicts.append(todo.dict())
+            elif hasattr(todo, "__dict__"):
+                todo_dicts.append(todo.__dict__)
+            else:
+                todo_dicts.append(dict(todo))
+
+        # Use shared insights computation logic
+        insights = generate_insights(todo_dicts)
+        return insights
+
+    except Exception as e:
+        logger.error(f"Error getting insights: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get insights")
+
+
+class JournalCreateRequest(BaseModel):
+    date: str  # YYYY-MM-DD format
+    text: str
+    space_id: Optional[str] = None
+
+
+# Journal endpoints
+@app.get("/journals")
+async def api_get_journal_entries(
+    date: Optional[str] = None, space_id: Optional[str] = None, current_user: dict = Depends(get_current_user)
+):
+    """Get journal entries. If date is provided, get entry for that specific date. Otherwise get recent entries."""
+    try:
+        # Check space access if space_id provided
+        if space_id is not None and not await user_in_space(current_user["user_id"], space_id):
+            raise HTTPException(status_code=403, detail="Access denied to this space")
+
+        if date:
+            # Get specific date entry
+            entry = await get_journal_entry_by_date(current_user["user_id"], date, space_id)
+            return entry.dict() if entry else None
+        else:
+            # Get recent entries
+            entries = await get_journal_entries(current_user["user_id"], space_id)
+            return [entry.dict() for entry in entries]
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching journal entries: {e}")
+        raise HTTPException(status_code=500, detail="Failed to fetch journal entries")
+
+
+@app.post("/journals")
+async def api_create_journal_entry(request: JournalCreateRequest, current_user: dict = Depends(get_current_user)):
+    """Create or update a journal entry."""
+    try:
+        # Check space access if space_id provided
+        if request.space_id is not None and not await user_in_space(current_user["user_id"], request.space_id):
+            raise HTTPException(status_code=403, detail="Access denied to this space")
+
+        # Create journal entry
+        entry = JournalEntry(
+            user_id=current_user["user_id"], space_id=request.space_id, date=request.date, text=request.text
+        )
+
+        result = await create_journal_entry(entry, current_user.get("timezone", "UTC"))
+        logger.info(f"Journal entry created/updated for user {current_user['email']}, date {request.date}")
+        return result.dict()
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error creating journal entry: {e}")
+        raise HTTPException(status_code=500, detail="Failed to create journal entry")
+
+
+@app.delete("/journals/{entry_id}")
+async def api_delete_journal_entry(entry_id: str, current_user: dict = Depends(get_current_user)):
+    """Delete a journal entry."""
+    try:
+        success = await delete_journal_entry(entry_id, current_user["user_id"])
+        if success:
+            logger.info(f"Journal entry {entry_id} deleted by user {current_user['email']}")
+            return {"message": "Journal entry deleted successfully"}
+        else:
+            raise HTTPException(status_code=404, detail="Journal entry not found")
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting journal entry: {e}")
+        raise HTTPException(status_code=500, detail="Failed to delete journal entry")
+
+
+@app.get("/journals/{entry_id}/ai-summary")
+async def api_generate_journal_summary(entry_id: str, current_user: dict = Depends(get_current_user)):
+    """Generate AI summary for a journal entry."""
+    try:
+        # First, get the entry to ensure user owns it and extract text
+        from bson import ObjectId
+        from journals import journals_collection
+
+        entry = await journals_collection.find_one({"_id": ObjectId(entry_id), "user_id": current_user["user_id"]})
+
+        if not entry:
+            raise HTTPException(status_code=404, detail="Journal entry not found")
+
+        summary = await generate_journal_summary(entry["text"])
+        logger.info(f"AI summary generated for journal entry {entry_id}")
+        return {"summary": summary}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error generating journal summary: {e}")
+        raise HTTPException(status_code=500, detail="Failed to generate summary")
+
+
+@app.get("/export")
+async def export_data(
+    data: str,
+    format: str = "jsonl",
+    current_user: dict = Depends(get_current_user),
+):
+    """Export user's todos or journal entries in JSONL or CSV format."""
+    valid_types = {"todos": todos_collection, "journals": journals_collection}
+    if data not in valid_types:
+        raise HTTPException(status_code=400, detail="Invalid data type")
+
+    collection = valid_types[data]
+    cursor = collection.find({"user_id": current_user["user_id"]})
+    items = await cursor.to_list(length=None)
+    for item in items:
+        item.pop("_id", None)
+        item.pop("user_id", None)
+        item["first_name"] = current_user.get("first_name", "")
+
+    if format == "jsonl":
+        lines = [json.dumps(item) for item in items]
+        content = "\n".join(lines)
+        return Response(
+            content=content,
+            media_type="application/json",
+            headers={"Content-Disposition": f"attachment; filename={data}.jsonl"},
+        )
+
+    if format == "csv":
+        if data == "todos":
+            fields = [
+                "text",
+                "category",
+                "priority",
+                "dateAdded",
+                "dueDate",
+                "completed",
+                "notes",
+                "first_name",
+            ]
+        else:
+            fields = ["date", "text", "first_name"]
+
+        output = StringIO()
+        writer = csv.DictWriter(output, fieldnames=fields)
+        writer.writeheader()
+        for item in items:
+            writer.writerow({field: item.get(field, "") for field in fields})
+
+        return Response(
+            content=output.getvalue(),
+            media_type="text/csv",
+            headers={"Content-Disposition": f"attachment; filename={data}.csv"},
+        )
+
+    raise HTTPException(status_code=400, detail="Invalid format")
+
+
 if __name__ == "__main__":
     import uvicorn
 
     port = int(os.environ.get("PORT", 8000))
-    uvicorn.run(app, host="0.0.0.0", port=port)
+    # Only enable hot reload in development
+    is_dev = os.environ.get("ENV", "development") == "development"
+    uvicorn.run(app, host="0.0.0.0", port=port, reload=is_dev)
