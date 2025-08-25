@@ -698,12 +698,12 @@ describe('ID Remapping and Cleanup', () => {
 
     expect(fetch).toHaveBeenNthCalledWith(
       1,
-      '/todos',
+      '/api/todos',
       expect.any(Object)
     );
     expect(fetch).toHaveBeenNthCalledWith(
       2,
-      '/todos/server_map',
+      '/api/todos/server_map',
       expect.objectContaining({ method: 'PUT' })
     );
   });

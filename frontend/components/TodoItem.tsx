@@ -139,15 +139,15 @@ export default function TodoItem({
           >
             {categories
               .sort((a, b) => {
-                const aStr = String(a);
-                const bStr = String(b);
+                const aStr = String(a.name || a);
+                const bStr = String(b.name || b);
                 if (aStr === "General") return -1;
                 if (bStr === "General") return 1;
                 return aStr.localeCompare(bStr);
               })
               .map((cat) => (
-                <option key={cat} value={cat}>
-                  {cat}
+                <option key={cat.name || cat} value={cat.name || cat}>
+                  {cat.name || cat}
                 </option>
               ))}
           </select>
@@ -162,15 +162,15 @@ export default function TodoItem({
           >
             {categories
               .sort((a, b) => {
-                const aStr = String(a);
-                const bStr = String(b);
+                const aStr = String(a.name || a);
+                const bStr = String(b.name || b);
                 if (aStr === "General") return -1;
                 if (bStr === "General") return 1;
                 return aStr.localeCompare(bStr);
               })
               .map((cat) => (
-                <option key={cat} value={cat}>
-                  {cat}
+                <option key={cat.name || cat} value={cat.name || cat}>
+                  {cat.name || cat}
                 </option>
               ))}
           </select>
