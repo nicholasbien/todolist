@@ -1,7 +1,7 @@
 // IMPORTANT: Always increment these versions when modifying this service worker file
 // This forces browsers to download and use the updated service worker
-const STATIC_CACHE = 'todo-static-v51';
-const API_CACHE = 'todo-api-v51';
+const STATIC_CACHE = 'todo-static-v54';
+const API_CACHE = 'todo-api-v54';
 
 const GLOBAL_DB_NAME = 'TodoGlobalDB';
 const USER_DB_PREFIX = 'TodoUserDB_';
@@ -570,137 +570,7 @@ async function handleApiRequest(request) {
           return response; // Return original response
         }
 
-        // For GET /journals, sync server data to IndexedDB (same pattern as todos)
-        if (url.pathname === '/journals') {
-          const authData = await getAuth();
-          if (!authData || !authData.userId) return response; // No user context
-
-          const serverResponse = await response.clone().json();
-
-          // Handle both single journal and array responses
-          const serverJournals = Array.isArray(serverResponse) ? serverResponse : [serverResponse];
-
-          // Save all server journals to IndexedDB for offline access
-          for (const journal of serverJournals) {
-            if (journal && journal._id) {
-              await putJournal(journal, authData.userId);
-            }
-          }
-
-          return response; // Return original response
-        }
-      }
-
-      // Trigger sync for non-GET requests
-      if (request.method !== 'GET' && response.ok) {
-        syncQueue();
-      }
-      return response;
-    } catch (err) {
-      if (err && err.name === 'AbortError') {
-        return new Response(JSON.stringify({ error: 'Request aborted' }), {
-          status: 408,
-          headers: { 'Content-Type': 'application/json' }
-        });
-      }
-      return offlineFallback(request, url);
-    }
-  }
-  console.log(`📱 Falling back to offline handler for: ${request.method} ${url.pathname}`);
-  return offlineFallback(request, url);
-}
-
-        // For GET /todos, sync pending operations then merge with fresh server data
-        if (url.pathname === '/todos') {
-          const authData = await getAuth();
-          if (!authData || !authData.userId) return response; // No user context
-
-          // Sync pending offline operations FIRST (this does immediate ID replacements)
-          await syncQueue();
-
-          // After sync, get fresh server data and merge with any remaining offline todos
-          const freshResponse = await fetch(request.clone());
-          if (!freshResponse.ok) return response; // Fallback to original response
-
-          const serverTodos = await freshResponse.json();
-
-          // Get current local todos (may include unsynced offline todos)
-          // Filter by space if space_id parameter is provided
-          const localTodos = await getTodos(authData.userId, spaceId);
-          const offlineOnlyTodos = localTodos.filter(t => t._id.startsWith('offline_'));
-
-          // Remove any non-offline todos that no longer exist on the server
-          const serverIds = new Set(serverTodos.map(t => t._id));
-          for (const t of localTodos) {
-            if (!t._id.startsWith('offline_') && !serverIds.has(t._id)) {
-              await delTodo(t._id, authData.userId);
-            }
-          }
-
-          // Save fresh server data to IndexedDB
-          for (const todo of serverTodos) {
-            await putTodo(todo, authData.userId);
-          }
-
-
-          // Merge server todos with any remaining offline todos (for the specific space)
-          const mergedTodos = [...serverTodos, ...offlineOnlyTodos];
-
-          // Return the merged data
-          return new Response(JSON.stringify(mergedTodos), {
-            headers: { 'Content-Type': 'application/json' }
-          });
-        }
-
-        // For GET /categories, sync server data to IndexedDB and merge with offline categories
-        if (url.pathname === '/categories') {
-          const authData = await getAuth();
-          if (!authData || !authData.userId) return response; // No user context
-
-          const serverCategories = await response.clone().json(); // Array of strings like ["Work", "Personal"]
-
-          // Get local categories for the specific space
-          const localCategories = await getCategories(authData.userId, spaceId);
-          const offlineOnlyCategories = localCategories.filter(c => c.name.startsWith('offline_'));
-          const offlineOnlyNames = offlineOnlyCategories.map(c => c.name);
-
-          // Remove any local categories that are not on the server and not offline entries
-          const serverSet = new Set(serverCategories);
-          for (const c of localCategories) {
-            if (!c.name.startsWith('offline_') && !serverSet.has(c.name)) {
-              await delCategory(c.name, authData.userId, spaceId);
-            }
-          }
-
-          // Save all server categories to IndexedDB for offline access (as objects with space_id)
-          for (const categoryName of serverCategories) {
-            await putCategory({ name: categoryName, space_id: spaceId }, authData.userId);
-          }
-
-          // Merge server categories with offline-only categories (return as strings)
-          const mergedCategories = [...serverCategories, ...offlineOnlyNames];
-
-          return new Response(JSON.stringify(mergedCategories), {
-            headers: { 'Content-Type': 'application/json' }
-          });
-        }
-
-        // For GET /spaces, sync server data to IndexedDB
-        if (url.pathname === '/spaces') {
-          const authData = await getAuth();
-          if (!authData || !authData.userId) return response; // No user context
-
-          const serverSpaces = await response.clone().json();
-
-          // Save all server spaces to IndexedDB for offline access
-          for (const space of serverSpaces) {
-            await putSpace(space, authData.userId);
-          }
-
-          return response; // Return original response
-        }
-
-        // For GET /journals, sync server data to IndexedDB (same pattern as todos)
+        // For GET /journals, sync server data to IndexedDB
         if (url.pathname === '/journals') {
           const authData = await getAuth();
           if (!authData || !authData.userId) return response; // No user context
@@ -1471,6 +1341,7 @@ if (typeof module !== 'undefined') {
     getAuthHeaders,
     syncQueue,
     handleRequest: handleApiRequest,
+    handleApiRequest,
     generateInsights,
   };
 }

@@ -708,3 +708,319 @@ describe('ID Remapping and Cleanup', () => {
     );
   });
 });
+
+
+describe('Journal Operations', () => {
+  test('syncQueue processes CREATE_JOURNAL operations', async () => {
+    const sw = require('../public/sw.js');
+    await sw.putAuth('token123', 'user1');
+
+    const journalData = {
+      _id: 'offline_journal_2023-12-01_123',
+      user_id: 'user1',
+      space_id: 'space1',
+      date: '2023-12-01',
+      text: 'Today was a great day!',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    await sw.putJournal(journalData, 'user1');
+    await sw.addQueue({ type: 'CREATE_JOURNAL', data: journalData }, 'user1');
+
+    // Mock successful server response
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ ...journalData, _id: 'server_journal_123' }),
+    });
+
+    await sw.syncQueue();
+
+    // Service worker should strip offline _id before sending to server
+    const { _id: offlineId, ...expectedPayload } = journalData;
+    expect(fetch).toHaveBeenCalledWith('/journals', expect.objectContaining({
+      method: 'POST',
+      body: JSON.stringify(expectedPayload),
+    }));
+
+    // Verify offline journal was replaced with server version
+    const journals = await sw.getJournals('user1', '2023-12-01');
+    expect(journals).toHaveLength(1);
+    expect(journals[0]._id).toBe('server_journal_123');
+  });
+
+  test('syncQueue processes DELETE_JOURNAL operations', async () => {
+    const sw = require('../public/sw.js');
+    await sw.putAuth('token123', 'user1');
+
+    const journalId = 'journal123';
+    await sw.addQueue({ type: 'DELETE_JOURNAL', data: { _id: journalId } }, 'user1');
+
+    global.fetch = jest.fn().mockResolvedValue({ ok: true });
+
+    await sw.syncQueue();
+
+    expect(fetch).toHaveBeenCalledWith(`/journals/${journalId}`, expect.objectContaining({
+      method: 'DELETE',
+    }));
+  });
+
+  test('journal data isolation between users', async () => {
+    const sw = require('../public/sw.js');
+
+    const journal1 = {
+      _id: 'journal_user1',
+      user_id: 'user1',
+      date: '2023-12-01',
+      text: 'User 1 journal',
+    };
+
+    const journal2 = {
+      _id: 'journal_user2',
+      user_id: 'user2',
+      date: '2023-12-01',
+      text: 'User 2 journal',
+    };
+
+    await sw.putJournal(journal1, 'user1');
+    await sw.putJournal(journal2, 'user2');
+
+    // User 1 should only see their journal
+    const user1Journals = await sw.getJournals('user1');
+    expect(user1Journals).toHaveLength(1);
+    expect(user1Journals[0].text).toBe('User 1 journal');
+
+    // User 2 should only see their journal
+    const user2Journals = await sw.getJournals('user2');
+    expect(user2Journals).toHaveLength(1);
+    expect(user2Journals[0].text).toBe('User 2 journal');
+  });
+
+  test('journal date filtering works correctly', async () => {
+    const sw = require('../public/sw.js');
+
+    const journal1 = {
+      _id: 'journal_dec1',
+      user_id: 'user1',
+      date: '2023-12-01',
+      text: 'December 1st',
+    };
+
+    const journal2 = {
+      _id: 'journal_dec2',
+      user_id: 'user1',
+      date: '2023-12-02',
+      text: 'December 2nd',
+    };
+
+    await sw.putJournal(journal1, 'user1');
+    await sw.putJournal(journal2, 'user1');
+
+    // Get specific date
+    const dec1Journals = await sw.getJournals('user1', '2023-12-01');
+    expect(dec1Journals).toHaveLength(1);
+    expect(dec1Journals[0].text).toBe('December 1st');
+
+    // Get all journals
+    const allJournals = await sw.getJournals('user1');
+    expect(allJournals).toHaveLength(2);
+  });
+
+  test('journal space filtering works correctly', async () => {
+    const sw = require('../public/sw.js');
+
+    const journal1 = {
+      _id: 'journal_space1',
+      user_id: 'user1',
+      space_id: 'space1',
+      date: '2023-12-01',
+      text: 'Space 1 journal',
+    };
+
+    const journal2 = {
+      _id: 'journal_space2',
+      user_id: 'user1',
+      space_id: 'space2',
+      date: '2023-12-01',
+      text: 'Space 2 journal',
+    };
+
+    await sw.putJournal(journal1, 'user1');
+    await sw.putJournal(journal2, 'user1');
+
+    // Get specific space
+    const space1Journals = await sw.getJournals('user1', null, 'space1');
+    expect(space1Journals).toHaveLength(1);
+    expect(space1Journals[0].text).toBe('Space 1 journal');
+
+    // Get all journals
+    const allJournals = await sw.getJournals('user1');
+    expect(allJournals).toHaveLength(2);
+  });
+
+  test('GET /journals caching works correctly', async () => {
+    const sw = require('../public/sw.js');
+    await sw.putAuth('token123', 'user1');
+
+    // Mock journal data from server
+    const mockJournals = [
+      {
+        _id: 'server_journal_1',
+        user_id: 'user1',
+        date: '2023-12-01',
+        text: 'Server journal 1',
+        space_id: 'space1'
+      },
+      {
+        _id: 'server_journal_2',
+        user_id: 'user1',
+        date: '2023-12-02',
+        text: 'Server journal 2',
+        space_id: 'space1'
+      }
+    ];
+
+    // Mock successful server response
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => mockJournals,
+      clone: function() {
+        return {
+          json: async () => mockJournals
+        };
+      }
+    });
+
+    // Mock navigator.onLine to be true to force online behavior
+    Object.defineProperty(global.navigator, 'onLine', {
+      writable: true,
+      value: true
+    });
+
+    // Test GET /journals request through handleApiRequest
+    const request = new Request('/journals?space_id=space1', {
+      method: 'GET'
+    });
+    const response = await sw.handleApiRequest(request);
+
+    // Verify fetch was called correctly
+    expect(fetch).toHaveBeenCalledWith('/journals?space_id=space1', expect.objectContaining({
+      method: 'GET',
+      headers: expect.objectContaining({
+        'Authorization': 'Bearer token123'
+      })
+    }));
+
+    // Verify response is correct
+    expect(response.ok).toBe(true);
+    const responseData = await response.json();
+    expect(responseData).toEqual(mockJournals);
+
+    // Verify journals were cached in IndexedDB
+    const cachedJournals = await sw.getJournals('user1', null, 'space1');
+    expect(cachedJournals).toHaveLength(2);
+    expect(cachedJournals[0].text).toBe('Server journal 1');
+    expect(cachedJournals[1].text).toBe('Server journal 2');
+
+    // Verify they can be retrieved by date as well
+    const dec1Journals = await sw.getJournals('user1', '2023-12-01');
+    expect(dec1Journals).toHaveLength(1);
+    expect(dec1Journals[0].text).toBe('Server journal 1');
+  });
+
+  test('GET /todos caching works correctly', async () => {
+    const sw = require('../public/sw.js');
+    await sw.putAuth('token123', 'user1');
+
+    // Mock todo data from server
+    const mockTodos = [
+      {
+        _id: 'server_todo_1',
+        text: 'Server todo 1',
+        user_id: 'user1',
+        category: 'Work',
+        priority: 'High',
+        space_id: 'space1'
+      },
+      {
+        _id: 'server_todo_2',
+        text: 'Server todo 2',
+        user_id: 'user1',
+        category: 'Personal',
+        priority: 'Medium',
+        space_id: 'space1'
+      }
+    ];
+
+    // Mock successful server response
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => mockTodos,
+      clone: function() {
+        return {
+          json: async () => mockTodos
+        };
+      }
+    });
+
+    // Test GET /todos request through handleApiRequest
+    const request = new Request('/todos?space_id=space1', {
+      method: 'GET'
+    });
+    const response = await sw.handleApiRequest(request);
+
+    // Verify fetch was called correctly
+    expect(fetch).toHaveBeenCalledWith('/todos?space_id=space1', expect.objectContaining({
+      method: 'GET',
+      headers: expect.objectContaining({
+        'Authorization': 'Bearer token123'
+      })
+    }));
+
+    // Verify response is correct
+    expect(response.ok).toBe(true);
+    const responseData = await response.json();
+    expect(responseData).toEqual(mockTodos);
+
+    // Verify todos were cached in IndexedDB
+    const cachedTodos = await sw.getTodos('user1');
+    expect(cachedTodos).toHaveLength(2);
+    expect(cachedTodos[0].text).toBe('Server todo 1');
+    expect(cachedTodos[1].text).toBe('Server todo 2');
+  });
+
+  test('handleApiRequest returns offline fallback when network fails', async () => {
+    const sw = require('../public/sw.js');
+    await sw.putAuth('token123', 'user1');
+
+    // Pre-populate with offline data
+    const offlineTodos = [
+      {
+        _id: 'offline_todo_1',
+        text: 'Offline todo 1',
+        user_id: 'user1',
+        category: 'Work',
+        space_id: 'space1'
+      }
+    ];
+
+    for (const todo of offlineTodos) {
+      await sw.putTodo(todo, 'user1');
+    }
+
+    // Mock network failure
+    global.fetch = jest.fn().mockRejectedValue(new Error('Network error'));
+
+    // Test GET /todos request when offline
+    const request = new Request('/todos?space_id=space1', {
+      method: 'GET'
+    });
+    const response = await sw.handleApiRequest(request);
+
+    // Should return offline data
+    expect(response.ok).toBe(true);
+    const responseData = await response.json();
+    expect(responseData).toHaveLength(1);
+    expect(responseData[0].text).toBe('Offline todo 1');
+  });
+});
