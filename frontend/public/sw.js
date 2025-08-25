@@ -446,7 +446,7 @@ async function syncServerDataToLocal() {
 
     // Fetch and store todos
     try {
-      const todosResponse = await fetch('/todos', { headers });
+      const todosResponse = await fetch('/api/todos', { headers });
       if (todosResponse.ok) {
         const serverTodos = await todosResponse.json();
         for (const todo of serverTodos) {
@@ -455,6 +455,26 @@ async function syncServerDataToLocal() {
       }
     } catch (err) {
       console.log('Failed to sync todos:', err);
+    }
+
+    // Fetch and store journals
+    try {
+      const journalsResponse = await fetch('/api/journals', { headers });
+      if (journalsResponse.ok) {
+        const serverJournals = await journalsResponse.json();
+
+        // Handle both single journal and array responses
+        if (serverJournals !== null) {
+          const journalArray = Array.isArray(serverJournals) ? serverJournals : [serverJournals];
+          for (const journal of journalArray) {
+            if (journal && journal._id) {
+              await putJournal(journal, authData.userId);
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.log('Failed to sync journals:', err);
     }
   } catch (err) {
     console.log('Failed to sync server data:', err);
@@ -582,18 +602,28 @@ async function handleApiRequest(request) {
         // For GET /api/journals, sync server data to IndexedDB
         if (url.pathname === '/api/journals') {
           const authData = await getAuth();
-          if (!authData || !authData.userId) return response; // No user context
+          if (!authData || !authData.userId) {
+            console.log('⚠️ No auth data for journal caching');
+            return response; // No user context
+          }
 
           const serverResponse = await response.clone().json();
+          console.log('📝 Caching journal response:', serverResponse);
 
-          // Handle both single journal and array responses
-          const serverJournals = Array.isArray(serverResponse) ? serverResponse : [serverResponse];
+          // Only process non-null responses
+          if (serverResponse !== null) {
+            // Handle both single journal and array responses
+            const serverJournals = Array.isArray(serverResponse) ? serverResponse : [serverResponse];
 
-          // Save all server journals to IndexedDB for offline access
-          for (const journal of serverJournals) {
-            if (journal && journal._id) {
-              await putJournal(journal, authData.userId);
+            // Save all server journals to IndexedDB for offline access
+            for (const journal of serverJournals) {
+              if (journal && journal._id) {
+                console.log('💾 Storing journal in IndexedDB:', journal._id);
+                await putJournal(journal, authData.userId);
+              }
             }
+          } else {
+            console.log('📝 Server returned null for journal - no data to cache');
           }
 
           return response; // Return original response
@@ -707,11 +737,13 @@ async function handleOfflineRequest(request, url) {
 
   // Handle journal POST requests
   if (request.method === 'POST' && apiPath === '/journals') {
+    console.log('📝 Processing offline journal POST:', data);
     const existing = await getJournals(
       authData ? authData.userId : null,
       data.date,
       data.space_id || null
     );
+    console.log('📝 Found existing journals:', existing.length);
 
     let journalData;
     if (existing && existing.length > 0) {
@@ -1274,7 +1306,7 @@ async function syncQueue() {
         case 'CREATE':
           if (op.data._id.startsWith('offline_')) {
             const { _id: offlineId, ...payload } = op.data;
-            res = await fetch('/todos', {
+            res = await fetch('/api/todos', {
               method: 'POST',
               headers,
               body: JSON.stringify(payload),
@@ -1308,7 +1340,7 @@ async function syncQueue() {
           }
 
           if (!updateId.startsWith('offline_')) {
-            res = await fetch(`/todos/${updateId}`, {
+            res = await fetch(`/api/todos/${updateId}`, {
               method: 'PUT',
               headers,
               body: JSON.stringify({ ...op.data, _id: updateId }),
@@ -1328,7 +1360,7 @@ async function syncQueue() {
           }
 
           if (!completeId.startsWith('offline_')) {
-            res = await fetch(`/todos/${completeId}/complete`, {
+            res = await fetch(`/api/todos/${completeId}/complete`, {
               method: 'PUT',
               headers
             });
@@ -1357,7 +1389,7 @@ async function syncQueue() {
           }
 
           if (!deleteId.startsWith('offline_')) {
-            res = await fetch(`/todos/${deleteId}`, {
+            res = await fetch(`/api/todos/${deleteId}`, {
               method: 'DELETE',
               headers
             });
@@ -1368,7 +1400,7 @@ async function syncQueue() {
           }
           break;
         case 'CREATE_CATEGORY':
-          res = await fetch('/categories', {
+          res = await fetch('/api/categories', {
             method: 'POST',
             headers,
             body: JSON.stringify(op.data),

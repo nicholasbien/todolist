@@ -52,7 +52,7 @@ function LoginForm({ onLogin }: LoginFormProps) {
     setMessage('');
 
     try {
-      const response = await fetch('/auth/signup', {
+      const response = await fetch('/api/auth/signup', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -86,7 +86,7 @@ function LoginForm({ onLogin }: LoginFormProps) {
     setError('');
 
     try {
-      const response = await fetch('/auth/login', {
+      const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -131,7 +131,7 @@ function LoginForm({ onLogin }: LoginFormProps) {
 
     try {
       const token = localStorage.getItem('auth_token');
-      const response = await fetch('/auth/update-name', {
+      const response = await fetch('/api/auth/update-name', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
