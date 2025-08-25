@@ -1,7 +1,7 @@
 // IMPORTANT: Always increment these versions when modifying this service worker file
 // This forces browsers to download and use the updated service worker
-const STATIC_CACHE = 'todo-static-v45';
-const API_CACHE = 'todo-api-v45';
+const STATIC_CACHE = 'todo-static-v51';
+const API_CACHE = 'todo-api-v51';
 
 const GLOBAL_DB_NAME = 'TodoGlobalDB';
 const USER_DB_PREFIX = 'TodoUserDB_';
@@ -507,10 +507,6 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
-  // Debug: Log all requests to see what the service worker is seeing
-  if (url.hostname.includes('railway.app')) {
-    console.log(`🔍 SW sees Railway request: ${event.request.method} ${url.href}`);
-  }
 
   // Only handle API requests (both same-origin and backend API)
   // Exclude auth requests - they must go to server
@@ -525,13 +521,9 @@ self.addEventListener('fetch', (event) => {
     url.pathname.startsWith('/journals');
     // Note: /auth/ paths excluded - they bypass service worker
 
-  const isApi =
-    (url.origin === self.location.origin && isApiPath) ||
-    (url.hostname.includes('railway.app') && isApiPath) ||
-    (url.hostname === 'localhost' && url.port === '8000' && isApiPath);
+  const isApi = url.origin === self.location.origin && isApiPath;
 
   if (isApi) {
-    console.log(`🔄 Service worker intercepting API request: ${event.request.method} ${url.href}`);
     event.respondWith(handleApiRequest(event.request));
     return;
   }
@@ -554,10 +546,69 @@ async function handleApiRequest(request) {
 
   if (online && !isOfflineId) {
     try {
+      // Pass request through normally - auth headers should be preserved with same-origin requests
       const response = await fetch(request.clone());
+
       if (request.method === 'GET' && response.ok) {
         const cache = await caches.open(API_CACHE);
         cache.put(request, response.clone());
+
+        // For GET /todos, sync pending operations then merge with fresh server data
+        if (url.pathname === '/todos') {
+          const authData = await getAuth();
+          if (!authData || !authData.userId) return response; // No user context
+
+          const serverTodos = await response.clone().json();
+
+          // Save all server todos to IndexedDB for offline access
+          for (const todo of serverTodos) {
+            if (todo && todo._id) {
+              await putTodo(todo, authData.userId);
+            }
+          }
+
+          return response; // Return original response
+        }
+
+        // For GET /journals, sync server data to IndexedDB (same pattern as todos)
+        if (url.pathname === '/journals') {
+          const authData = await getAuth();
+          if (!authData || !authData.userId) return response; // No user context
+
+          const serverResponse = await response.clone().json();
+
+          // Handle both single journal and array responses
+          const serverJournals = Array.isArray(serverResponse) ? serverResponse : [serverResponse];
+
+          // Save all server journals to IndexedDB for offline access
+          for (const journal of serverJournals) {
+            if (journal && journal._id) {
+              await putJournal(journal, authData.userId);
+            }
+          }
+
+          return response; // Return original response
+        }
+      }
+
+      // Trigger sync for non-GET requests
+      if (request.method !== 'GET' && response.ok) {
+        syncQueue();
+      }
+      return response;
+    } catch (err) {
+      if (err && err.name === 'AbortError') {
+        return new Response(JSON.stringify({ error: 'Request aborted' }), {
+          status: 408,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+      return offlineFallback(request, url);
+    }
+  }
+  console.log(`📱 Falling back to offline handler for: ${request.method} ${url.pathname}`);
+  return offlineFallback(request, url);
+}
 
         // For GET /todos, sync pending operations then merge with fresh server data
         if (url.pathname === '/todos') {

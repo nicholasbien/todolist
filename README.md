@@ -263,12 +263,12 @@ This ensures journals work identically to todos in offline mode - you can create
 
 Following this pattern ensures consistent offline behavior across all app features.
 
-**⚠️ Critical for Offline**: The app uses an intelligent environment-aware URL strategy:
+**⚠️ Critical for Offline**: The app uses relative URLs in both development and production to ensure service worker compatibility:
 
-- **Development** (`NEXT_PUBLIC_API_URL` unset): Uses relative URLs (`/todos`, `/chat`) → Service worker intercepts and caches → Full offline functionality
-- **Production** (`NEXT_PUBLIC_API_URL` set): Uses absolute URLs → Direct server calls → Optimal for deployed environments
+- **Development**: Uses relative URLs (`/todos`, `/chat`) → Service worker intercepts → Full offline functionality
+- **Production**: Uses relative URLs with Next.js API proxy → Service worker intercepts → Full offline functionality
 
-This design provides the best of both worlds: comprehensive offline development testing and efficient production API calls. The service worker only intercepts same-origin requests, automatically respecting the environment configuration.
+The Next.js API proxy (`pages/api/[...proxy].js`) forwards all API requests to the Railway backend while maintaining same-origin requests for the service worker. This ensures consistent offline behavior across all environments.
 
 ## Production Deployment with Railway
 
