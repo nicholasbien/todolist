@@ -410,6 +410,35 @@ async function handleApiRequest(request) {
   // Extract space_id from query parameters
   const spaceId = url.searchParams.get('space_id');
 
+  // Handle insights by reusing the todos path so analytics logic is shared
+  if (url.pathname === '/insights' || url.pathname.endsWith('/insights')) {
+    try {
+      // Build a request for /todos with the same query params and headers
+      const headers = new Headers(request.headers);
+      const todosRequest = new Request(`/todos${url.search}`, { method: 'GET', headers });
+
+      // Use existing handler to get merged todo data (online or offline)
+      const todosResponse = await handleApiRequest(todosRequest);
+      if (!todosResponse || !todosResponse.ok) {
+        return todosResponse;
+      }
+
+      const todos = await todosResponse.clone().json();
+      const insights = generateInsights(todos);
+      return new Response(JSON.stringify(insights), {
+        headers: { 'Content-Type': 'application/json' }
+      });
+    } catch (err) {
+      // Fallback to locally stored todos if any step fails
+      const authData = await getAuth();
+      const todos = await getTodos(authData ? authData.userId : null, spaceId);
+      const insights = generateInsights(todos);
+      return new Response(JSON.stringify(insights), {
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+  }
+
   // Check if this is an offline-generated ID that shouldn't go to server
   const isOfflineId = url.pathname.includes('offline_');
 
@@ -620,6 +649,7 @@ async function offlineFallback(request, url) {
         return new Response(JSON.stringify(DEFAULT_CATEGORIES), { headers: { 'Content-Type': 'application/json' } });
       }
     }
+
   }
 
   // Handle core todo mutations offline
@@ -842,18 +872,35 @@ async function offlineFallback(request, url) {
       return new Response(null, { status: 204 });
     }
 
-    // Create/update journal entry
+    // Create or update journal entry
     if ((url.pathname === '/journals' || url.pathname.endsWith('/journals')) && request.method === 'POST') {
-      const journalData = {
-        _id: `offline_journal_${data.date}_${Date.now()}`,
-        user_id: authData ? authData.userId : 'offline_user',
-        space_id: data.space_id || null,
-        date: data.date,
-        text: data.text,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        created_offline: true,
-      };
+      const existing = await getJournals(
+        authData ? authData.userId : null,
+        data.date,
+        data.space_id || null
+      );
+
+      let journalData;
+      if (existing && existing.length > 0) {
+        // Update existing entry
+        journalData = {
+          ...existing[0],
+          text: data.text,
+          updated_at: new Date().toISOString(),
+        };
+      } else {
+        // Create new offline entry
+        journalData = {
+          _id: `offline_journal_${data.date}_${Date.now()}`,
+          user_id: authData ? authData.userId : 'offline_user',
+          space_id: data.space_id || null,
+          date: data.date,
+          text: data.text,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          created_offline: true,
+        };
+      }
 
       await putJournal(journalData, authData ? authData.userId : null);
       await addQueue({ type: 'CREATE_JOURNAL', data: journalData }, authData ? authData.userId : null);
@@ -911,6 +958,87 @@ function normalizePriority(p) {
   if (v === 'high') return 'High';
   if (v === 'low') return 'Low';
   return 'Medium';
+}
+
+function getWeekKey(dateString) {
+  const date = new Date(dateString);
+  if (isNaN(date.getTime())) return null;
+  const weekStart = new Date(date);
+  const day = weekStart.getUTCDay();
+  const diff = (day + 6) % 7; // Monday as start of week
+  weekStart.setUTCDate(weekStart.getUTCDate() - diff);
+  return weekStart.toISOString().split('T')[0];
+}
+
+function generateInsights(todos) {
+  const weeklyStats = {};
+  const categoryStats = {};
+  const priorityStats = {};
+  let completed = 0;
+
+  for (const todo of todos) {
+    if (todo.completed) completed++;
+
+    if (todo.dateAdded) {
+      const week = getWeekKey(todo.dateAdded);
+      if (week) {
+        weeklyStats[week] = weeklyStats[week] || { created: 0, completed: 0 };
+        weeklyStats[week].created++;
+      }
+    }
+
+    if (todo.completed && todo.dateCompleted) {
+      const week = getWeekKey(todo.dateCompleted);
+      if (week) {
+        weeklyStats[week] = weeklyStats[week] || { created: 0, completed: 0 };
+        weeklyStats[week].completed++;
+      }
+    }
+
+    const category = todo.category || 'General';
+    categoryStats[category] = categoryStats[category] || { total: 0, completed: 0 };
+    categoryStats[category].total++;
+    if (todo.completed) categoryStats[category].completed++;
+
+    const priority = todo.priority || 'Medium';
+    priorityStats[priority] = priorityStats[priority] || { total: 0, completed: 0 };
+    priorityStats[priority].total++;
+    if (todo.completed) priorityStats[priority].completed++;
+  }
+
+  const total = todos.length;
+  const pending = total - completed;
+  const completionRate = total > 0 ? Math.round((completed / total) * 1000) / 10 : 0;
+
+  const weekly_data = Object.keys(weeklyStats)
+    .sort()
+    .map((week) => ({ week, created: weeklyStats[week].created, completed: weeklyStats[week].completed }));
+
+  const category_data = Object.entries(categoryStats).map(([category, stats]) => ({
+    category,
+    total: stats.total,
+    completed: stats.completed,
+    completion_rate: stats.total > 0 ? Math.round((stats.completed / stats.total) * 1000) / 10 : 0,
+  }));
+
+  const priority_data = Object.entries(priorityStats).map(([priority, stats]) => ({
+    priority,
+    total: stats.total,
+    completed: stats.completed,
+    completion_rate: stats.total > 0 ? Math.round((stats.completed / stats.total) * 1000) / 10 : 0,
+  }));
+
+  return {
+    overview: {
+      total_tasks: total,
+      completed_tasks: completed,
+      pending_tasks: pending,
+      completion_rate: completionRate,
+    },
+    weekly_stats: weekly_data,
+    category_breakdown: category_data,
+    priority_breakdown: priority_data,
+  };
 }
 
 // Global sync lock to prevent concurrent syncing
@@ -1099,6 +1227,16 @@ async function syncQueue() {
               console.log(`✅ Synced offline journal ${offlineId} -> ${serverJournal._id}`);
             } else {
               console.log(`❌ Journal Sync FAILED: Offline journal ${offlineId} will be preserved`);
+            }
+          } else {
+            res = await fetch('/journals', {
+              method: 'POST',
+              headers,
+              body: JSON.stringify(op.data),
+            });
+            if (res && res.ok) {
+              const serverJournal = await res.json();
+              await putJournal(serverJournal, authData.userId);
             }
           }
           break;
