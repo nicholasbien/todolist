@@ -192,7 +192,7 @@ describe('Offline Journal Functionality', () => {
     await sw.syncQueue();
 
     // Verify correct DELETE API call was made
-    expect(fetch).toHaveBeenCalledWith('/journals/server_journal_456', expect.objectContaining({
+    expect(fetch).toHaveBeenCalledWith('/api/journals/server_journal_456', expect.objectContaining({
       method: 'DELETE',
       headers: expect.objectContaining({
         'Authorization': 'Bearer token123'

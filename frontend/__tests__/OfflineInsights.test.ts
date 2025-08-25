@@ -18,8 +18,9 @@ describe('Offline Insights Functionality', () => {
     const sw = require('../public/sw.js');
     await sw.putAuth('token123', 'user1');
 
-    // Clear any existing todos to ensure clean test state
+    // Clear any existing data to ensure clean test state
     await sw.clearTodos('user1');
+    await sw.clearQueue('user1');
 
     const todos = [
       {
@@ -105,8 +106,9 @@ describe('Offline Insights Functionality', () => {
     const sw = require('../public/sw.js');
     await sw.putAuth('token123', 'user1');
 
-    // Clear any existing todos to ensure clean test state
+    // Clear any existing data to ensure clean test state
     await sw.clearTodos('user1');
+    await sw.clearQueue('user1');
 
     const request = new Request('/api/insights', {
       headers: { 'Authorization': 'Bearer token123' }
@@ -133,8 +135,9 @@ describe('Offline Insights Functionality', () => {
     const sw = require('../public/sw.js');
     await sw.putAuth('token123', 'user1');
 
-    // Clear any existing todos to ensure clean test state
+    // Clear any existing data to ensure clean test state
     await sw.clearTodos('user1');
+    await sw.clearQueue('user1');
 
     const todos = [
       {
@@ -180,9 +183,11 @@ describe('Offline Insights Functionality', () => {
   test('maintains user isolation for insights', async () => {
     const sw = require('../public/sw.js');
 
-    // Clear any existing todos to ensure clean test state
+    // Clear any existing data to ensure clean test state
     await sw.clearTodos('user1');
+    await sw.clearQueue('user1');
     await sw.clearTodos('user2');
+    await sw.clearQueue('user2');
 
     const user1Todo = {
       _id: 'todo_user1',
@@ -241,8 +246,9 @@ describe('Offline Insights Functionality', () => {
     const sw = require('../public/sw.js');
     await sw.putAuth('token123', 'user1');
 
-    // Clear any existing todos to ensure clean test state
+    // Clear any existing data to ensure clean test state
     await sw.clearTodos('user1');
+    await sw.clearQueue('user1');
 
     // Create todos across different weeks
     const todos = [

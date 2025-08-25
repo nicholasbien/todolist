@@ -2,7 +2,16 @@ import React from 'react';
 import { render, screen, waitFor, act } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import AIToDoListApp from '../components/AIToDoListApp';
-import { AuthProvider } from '../context/AuthContext';
+import { AuthProvider, useAuth } from '../context/AuthContext';
+
+// Mock the useAuth hook to return our test data
+jest.mock('../context/AuthContext', () => {
+  const originalModule = jest.requireActual('../context/AuthContext');
+  return {
+    ...originalModule,
+    useAuth: jest.fn(),
+  };
+});
 
 // Mock the fetch function
 global.fetch = jest.fn();
@@ -47,17 +56,36 @@ describe('Online/Offline Event Handling', () => {
       ok: true,
       json: async () => []
     });
+
+    // Mock the useAuth hook to return authenticated state
+    const mockAuthenticatedFetch = jest.fn().mockImplementation(async (url, options = {}) => {
+      return fetch(url, {
+        ...options,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${mockToken}`,
+          ...options.headers
+        }
+      });
+    });
+
+    (useAuth as jest.Mock).mockReturnValue({
+      user: mockUser,
+      token: mockToken,
+      isLoading: false,
+      isAuthenticated: true,
+      authExpired: false,
+      logout: jest.fn(),
+      clearAuthExpired: jest.fn(),
+      authenticatedFetch: mockAuthenticatedFetch
+    });
   });
 
   test('component adds online event listener on mount', async () => {
     const addEventListenerSpy = jest.spyOn(window, 'addEventListener');
 
     await act(async () => {
-      render(
-        <AuthProvider>
-          <AIToDoListApp {...mockProps} />
-        </AuthProvider>
-      );
+      render(<AIToDoListApp {...mockProps} />);
     });
 
     expect(addEventListenerSpy).toHaveBeenCalledWith('online', expect.any(Function));
@@ -70,11 +98,7 @@ describe('Online/Offline Event Handling', () => {
     const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
 
     await act(async () => {
-      render(
-        <AuthProvider>
-          <AIToDoListApp {...mockProps} />
-        </AuthProvider>
-      );
+      render(<AIToDoListApp {...mockProps} />);
     });
 
     // Simulate going online
@@ -99,11 +123,7 @@ describe('Online/Offline Event Handling', () => {
     const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
 
     await act(async () => {
-      render(
-        <AuthProvider>
-          <AIToDoListApp {...mockProps} />
-        </AuthProvider>
-      );
+      render(<AIToDoListApp {...mockProps} />);
     });
 
     // Clear initial fetch calls from component mount
@@ -178,11 +198,7 @@ describe('Online/Offline Event Handling', () => {
 
   test('multiple online events do not cause race conditions', async () => {
     await act(async () => {
-      render(
-        <AuthProvider>
-          <AIToDoListApp {...mockProps} />
-        </AuthProvider>
-      );
+      render(<AIToDoListApp {...mockProps} />);
     });
 
     // Clear initial mount calls
@@ -219,11 +235,7 @@ describe('Online/Offline Event Handling', () => {
     // triggered by the GET /todos call, not explicit sync messages
 
     await act(async () => {
-      render(
-        <AuthProvider>
-          <AIToDoListApp {...mockProps} />
-        </AuthProvider>
-      );
+      render(<AIToDoListApp {...mockProps} />);
     });
 
     // Clear any initial setup calls

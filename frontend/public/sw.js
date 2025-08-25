@@ -122,6 +122,18 @@ const delTodo = async (id, userId) => {
   return userDbTx(effectiveUserId, TODOS, 'readwrite', (s) => s.delete(id));
 };
 
+const clearTodos = async (userId) => {
+  const authData = userId ? null : await getAuth();
+  const effectiveUserId = userId || (authData ? authData.userId : null);
+  return userDbTx(effectiveUserId, TODOS, 'readwrite', (s) => s.clear());
+};
+
+const clearJournals = async (userId) => {
+  const authData = userId ? null : await getAuth();
+  const effectiveUserId = userId || (authData ? authData.userId : null);
+  return userDbTx(effectiveUserId, JOURNALS, 'readwrite', (s) => s.clear());
+};
+
 const getSpaces = async (userId) => {
   const authData = userId ? null : await getAuth();
   const effectiveUserId = userId || (authData ? authData.userId : null);
@@ -673,7 +685,8 @@ async function handleOfflineRequest(request, url) {
 
     if (apiPath === '/insights') {
       const spaceId = url.searchParams.get('space_id');
-      const insights = await generateInsights(authData.userId, spaceId);
+      const todos = await getTodos(authData.userId, spaceId);
+      const insights = generateInsights(todos);
 
       return new Response(JSON.stringify(insights), {
         headers: { 'Content-Type': 'application/json' }
@@ -682,7 +695,114 @@ async function handleOfflineRequest(request, url) {
   }
 
   // Handle non-GET requests (POST, PUT, DELETE)
+  // Extract the actual API path (remove /api prefix)
+  const apiPath = url.pathname.replace('/api', '');
 
+  // Parse request body for write operations
+  let data = {};
+  try {
+    const dataText = await request.clone().text();
+    if (dataText) data = JSON.parse(dataText);
+  } catch (e) {}
+
+  // Handle journal POST requests
+  if (request.method === 'POST' && apiPath === '/journals') {
+    const existing = await getJournals(
+      authData ? authData.userId : null,
+      data.date,
+      data.space_id || null
+    );
+
+    let journalData;
+    if (existing && existing.length > 0) {
+      // Update existing entry
+      journalData = {
+        ...existing[0],
+        text: data.text,
+        updated_at: new Date().toISOString(),
+      };
+    } else {
+      // Create new offline entry
+      journalData = {
+        _id: `offline_journal_${data.date}_${Date.now()}`,
+        user_id: authData ? authData.userId : 'offline_user',
+        space_id: data.space_id || null,
+        date: data.date,
+        text: data.text,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        created_offline: true,
+      };
+    }
+
+    await putJournal(journalData, authData ? authData.userId : null);
+
+    // Auto-save optimization: update existing queue entry or add new one
+    if (existing && existing.length > 0) {
+      // For updates to existing journals, replace the existing queue entry
+      const queue = await readQueue(authData ? authData.userId : null);
+      const existingQueueIndex = queue.findIndex(op =>
+        op.type === 'CREATE_JOURNAL' &&
+        op.data.date === data.date &&
+        op.data.space_id === (data.space_id || null)
+      );
+
+      if (existingQueueIndex !== -1) {
+        // Replace existing queue entry
+        queue[existingQueueIndex].data = journalData;
+        await clearQueue(authData ? authData.userId : null);
+        for (const op of queue) {
+          await addQueue(op, authData ? authData.userId : null);
+        }
+      } else {
+        // No existing queue entry, add new one
+        await addQueue({ type: 'CREATE_JOURNAL', data: journalData }, authData ? authData.userId : null);
+      }
+    } else {
+      // New journal, add to queue
+      await addQueue({ type: 'CREATE_JOURNAL', data: journalData }, authData ? authData.userId : null);
+    }
+
+    return new Response(JSON.stringify(journalData), { headers: { 'Content-Type': 'application/json' } });
+  }
+
+  // Handle journal DELETE requests
+  if (request.method === 'DELETE' && apiPath.startsWith('/journals/')) {
+    const id = apiPath.split('/')[2]; // Get ID from /journals/{id}
+    console.log(`🗑️ Offline DELETE journal request for ID: ${id}`);
+
+    const existingJournals = await getJournals(authData ? authData.userId : null);
+    const journalExists = existingJournals.find(j => j._id === id);
+
+    if (journalExists) {
+      console.log(`🗑️ Journal ${id} found in IndexedDB, deleting...`);
+      await delJournal(id, authData ? authData.userId : null);
+
+      if (id.startsWith('offline_journal_')) {
+        // Remove the CREATE operation from queue to prevent resurrection
+        const queue = await readQueue(authData ? authData.userId : null);
+        const filteredQueue = queue.filter(op => !(op.type === 'CREATE_JOURNAL' && op.data._id === id));
+        if (filteredQueue.length !== queue.length) {
+          console.log(`🗑️ Removed pending CREATE_JOURNAL operation for deleted offline journal ${id}`);
+          await clearQueue(authData ? authData.userId : null);
+          for (const op of filteredQueue) {
+            await addQueue(op, authData ? authData.userId : null);
+          }
+        }
+        console.log(`🗑️ Offline journal ${id} deleted and CREATE operation cancelled`);
+      } else {
+        await addQueue({ type: 'DELETE_JOURNAL', data: { _id: id } }, authData ? authData.userId : null);
+        console.log(`🗑️ Added server DELETE_JOURNAL to queue for ${id}`);
+      }
+
+      return new Response(null, { status: 204 });
+    }
+
+    return new Response(JSON.stringify({ error: 'Journal not found' }), {
+      status: 404,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
 
   // For other write operations, return service unavailable
   return new Response(JSON.stringify({ error: 'Write operation not available offline' }), {
@@ -732,7 +852,7 @@ async function offlineFallback(request, url) {
   // Handle core operations offline
   if (request.method === 'GET') {
     // Handle spaces
-    if (url.pathname === '/api/spaces' || url.pathname.endsWith('/api/spaces')) {
+    if (apiPath === '/spaces') {
       const spaces = await getSpaces(authData ? authData.userId : null);
       return new Response(JSON.stringify(spaces), { headers: { 'Content-Type': 'application/json' } });
     }
@@ -746,7 +866,7 @@ async function offlineFallback(request, url) {
     }
 
     // Handle categories (space-aware)
-    if (url.pathname === '/api/categories' || url.pathname.endsWith('/api/categories')) {
+    if (apiPath === '/categories') {
       const offlineCategories = await getCategories(authData ? authData.userId : null, spaceId);
 
       // If we have stored categories, return their names; otherwise use defaults
@@ -1009,7 +1129,7 @@ async function offlineFallback(request, url) {
     }
 
     // Create or update journal entry (optimized for auto-save)
-    if ((url.pathname === '/api/journals' || url.pathname.endsWith('/api/journals')) && request.method === 'POST') {
+    if (request.method === 'POST' && apiPath === '/journals') {
       const existing = await getJournals(
         authData ? authData.userId : null,
         data.date,
@@ -1071,8 +1191,8 @@ async function offlineFallback(request, url) {
     }
 
     // Delete journal entry
-    if (url.pathname.startsWith('/api/journals/') && request.method === 'DELETE') {
-      const id = url.pathname.split('/')[3]; // Get ID from /api/journals/{id}
+    if (request.method === 'DELETE' && apiPath.startsWith('/journals/')) {
+      const id = apiPath.split('/')[2]; // Get ID from /journals/{id}
       console.log(`🗑️ Offline DELETE journal request for ID: ${id}`);
 
       const existingJournals = await getJournals(authData ? authData.userId : null);
@@ -1382,6 +1502,7 @@ if (typeof module !== 'undefined') {
     getTodos,
     putTodo,
     delTodo,
+    clearTodos,
     getSpaces,
     putSpace,
     delSpace,
