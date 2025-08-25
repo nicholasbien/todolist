@@ -6,6 +6,7 @@ import Link from "next/link";
 import InsightsComponent from "./InsightsComponent";
 import JournalComponent from "./JournalComponent";
 import SpaceDropdown from "./SpaceDropdown";
+import { sortSpaces } from "../utils/spaceUtils";
 
 interface Props {
   user: any;
@@ -53,6 +54,15 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
   const [inviteEmails, setInviteEmails] = useState<string[]>(['']);
   const [spaceToEdit, setSpaceToEdit] = useState<any>(null);
   const [spaceMembers, setSpaceMembers] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (activeSpace && activeSpace._id) {
+      localStorage.setItem('active_space_id', activeSpace._id);
+    } else {
+      localStorage.removeItem('active_space_id');
+    }
+  }, [activeSpace]);
 
   const handleError = useCallback(
     (err: any, prefix?: string) => {
@@ -126,14 +136,21 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
 
   const fetchSpaces = useCallback(async () => {
     try {
-      // For offline functionality, service worker doesn't need token
-      // For online requests, authenticatedFetch handles token automatically
       const response = await authenticatedFetch('/api/spaces');
       if (response.ok) {
         const data = await response.json();
-        setSpaces(data);
-        if (!activeSpace && data.length > 0) {
-          setActiveSpace(data[0]);
+        const sorted = sortSpaces(data);
+        setSpaces(sorted);
+
+        let storedId: string | null = null;
+        if (typeof window !== 'undefined') {
+          storedId = localStorage.getItem('active_space_id');
+        }
+
+        const currentId = activeSpace?._id || storedId;
+        const current = sorted.find(s => s._id === currentId) || sorted[0] || null;
+        if (current?._id !== activeSpace?._id) {
+          setActiveSpace(current);
         }
       }
     } catch (err) {
