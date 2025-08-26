@@ -1,4 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
+import { sortSpaces } from '../utils/spaceUtils';
 
 interface Space {
   _id: string;
@@ -28,6 +29,8 @@ export default function SpaceDropdown({
 }: SpaceDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const sortedSpaces = useMemo(() => sortSpaces(spaces), [spaces]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -93,7 +96,7 @@ export default function SpaceDropdown({
         <div className="absolute right-0 mt-2 w-64 bg-black border border-gray-800 rounded-xl shadow-2xl z-50 max-h-80 overflow-y-auto">
           {/* Current spaces */}
           <div className="py-2">
-            {spaces.map(space => (
+            {sortedSpaces.map(space => (
               <div
                 key={space._id}
                 className={`group flex items-center justify-between px-4 py-3 hover:bg-gray-900 cursor-pointer transition-colors ${
