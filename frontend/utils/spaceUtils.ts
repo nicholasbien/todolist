@@ -2,6 +2,9 @@ export interface Space {
   _id: string;
   name: string;
   is_default?: boolean;
+  owner_id?: string;
+  member_ids?: string[];
+  pending_emails?: string[];
 }
 
 /**

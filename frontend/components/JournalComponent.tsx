@@ -15,6 +15,7 @@ interface JournalEntry {
   text: string;
   created_at: string;
   updated_at: string;
+  created_offline?: boolean;
 }
 
 export default function JournalComponent({ token, activeSpace }: JournalProps) {

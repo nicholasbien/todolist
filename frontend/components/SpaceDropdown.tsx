@@ -99,12 +99,15 @@ export default function SpaceDropdown({
             {sortedSpaces.map(space => (
               <div
                 key={space._id}
-                className={`group flex items-center justify-between px-4 py-3 hover:bg-gray-900 cursor-pointer transition-colors ${
+                className={`group flex items-center justify-between px-4 py-3 hover:bg-gray-900 transition-colors ${
                   activeSpace?._id === space._id ? 'bg-gray-900 border-l-2 border-accent' : ''
                 }`}
-                onClick={() => handleSpaceClick(space)}
               >
-                <div className="flex items-center gap-3 min-w-0 flex-1">
+                {/* Clickable area for space selection */}
+                <div
+                  className="flex items-center gap-3 min-w-0 flex-1 cursor-pointer"
+                  onClick={() => handleSpaceClick(space)}
+                >
                   <span className="text-lg flex-shrink-0">
                     {space.is_default ? '🏠' : isCollaborativeSpace(space) ? '👥' : '📁'}
                   </span>
@@ -123,11 +126,11 @@ export default function SpaceDropdown({
                   </div>
                 </div>
 
-                {/* Edit button for owned spaces */}
+                {/* Edit button for owned spaces - always visible on mobile */}
                 {!space.is_default && (canEditSpace(space) || isCollaborativeSpace(space)) && (
                   <button
                     onClick={(e) => handleEditClick(space, e)}
-                    className="opacity-0 group-hover:opacity-100 p-1 hover:bg-gray-800 rounded text-gray-400 hover:text-gray-200 transition-all flex-shrink-0"
+                    className="p-1 hover:bg-gray-800 rounded text-gray-400 hover:text-gray-200 transition-all flex-shrink-0 opacity-60 sm:opacity-0 sm:group-hover:opacity-100"
                     title={canEditSpace(space) ? "Edit space" : "Space options"}
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
