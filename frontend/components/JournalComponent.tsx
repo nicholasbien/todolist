@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useOffline } from '../context/OfflineContext';
 
 interface JournalProps {
   token: string;
@@ -18,6 +19,7 @@ interface JournalEntry {
 
 export default function JournalComponent({ token, activeSpace }: JournalProps) {
   const { authenticatedFetch } = useAuth();
+  const isOffline = useOffline();
   const [selectedDate, setSelectedDate] = useState<string>(() => {
     // Default to today's date in user's local timezone in YYYY-MM-DD format
     const today = new Date();
@@ -161,7 +163,8 @@ export default function JournalComponent({ token, activeSpace }: JournalProps) {
   const getSaveStatus = () => {
     if (saving) return 'Saving...';
     if (journalText !== lastSavedText && journalText.trim()) return 'Unsaved changes';
-    if (lastSavedText) return 'Saved';
+    if (currentEntry?.created_offline) return isOffline ? 'Saved offline' : 'Syncing...';
+    if (lastSavedText) return 'Synced online';
     return '';
   };
 
