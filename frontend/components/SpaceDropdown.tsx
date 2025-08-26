@@ -14,6 +14,7 @@ interface SpaceDropdownProps {
   spaces: Space[];
   activeSpace: Space | null;
   user: any;
+  loadingSpaces: boolean;
   onSpaceSelect: (space: Space) => void;
   onCreateSpace: () => void;
   onEditSpace: (space: Space) => void;
@@ -23,6 +24,7 @@ export default function SpaceDropdown({
   spaces,
   activeSpace,
   user,
+  loadingSpaces,
   onSpaceSelect,
   onCreateSpace,
   onEditSpace
@@ -79,7 +81,7 @@ export default function SpaceDropdown({
       >
         <span className="text-lg">🏠</span>
         <span className="font-medium">
-          {activeSpace?.name || 'No Space'}
+          {loadingSpaces ? 'Loading...' : activeSpace?.name || 'No Space'}
         </span>
         <svg
           className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`}

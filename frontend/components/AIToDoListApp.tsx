@@ -45,6 +45,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
   const [emailEnabled, setEmailEnabled] = useState(false);
   const [emailSpaceIds, setEmailSpaceIds] = useState<string[]>([]);
   const [spaces, setSpaces] = useState([]);
+  const [loadingSpaces, setLoadingSpaces] = useState(true);
   const [activeSpace, setActiveSpace] = useState(null);
   const [showAddSpaceModal, setShowAddSpaceModal] = useState(false);
   const [newSpaceName, setNewSpaceName] = useState('');
@@ -141,6 +142,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
 
 
   const fetchSpaces = useCallback(async () => {
+    setLoadingSpaces(true);
     try {
       const response = await authenticatedFetch('/api/spaces');
       if (response.ok) {
@@ -163,6 +165,8 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
     } catch (err) {
       console.error('Error loading spaces', err);
       handleError(err);
+    } finally {
+      setLoadingSpaces(false);
     }
     return [];
   }, [authenticatedFetch, activeSpace, handleError]);
@@ -923,6 +927,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
               spaces={spaces}
               activeSpace={activeSpace}
               user={user}
+              loadingSpaces={loadingSpaces}
               onSpaceSelect={setActiveSpace}
               onCreateSpace={() => setShowAddSpaceModal(true)}
               onEditSpace={(space) => {
@@ -1304,6 +1309,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
               spaces={spaces}
               activeSpace={activeSpace}
               user={user}
+              loadingSpaces={loadingSpaces}
               onSpaceSelect={setActiveSpace}
               onCreateSpace={() => setShowAddSpaceModal(true)}
               onEditSpace={(space) => {
@@ -1330,6 +1336,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
               spaces={spaces}
               activeSpace={activeSpace}
               user={user}
+              loadingSpaces={loadingSpaces}
               onSpaceSelect={setActiveSpace}
               onCreateSpace={() => setShowAddSpaceModal(true)}
               onEditSpace={(space) => {
@@ -1356,6 +1363,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
               spaces={spaces}
               activeSpace={activeSpace}
               user={user}
+              loadingSpaces={loadingSpaces}
               onSpaceSelect={setActiveSpace}
               onCreateSpace={() => setShowAddSpaceModal(true)}
               onEditSpace={(space) => {
