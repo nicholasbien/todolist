@@ -220,6 +220,7 @@ async def signup_user(email: str) -> dict:
             )
             user_dict = user.dict(by_alias=True)
             user_dict.pop("_id", None)
+            user_dict.pop("email_spaces", None)
 
             await users_collection.insert_one(user_dict)
             logger.info(f"Created new user: {email}")
@@ -412,7 +413,15 @@ async def ensure_user_has_default_space(user_id: str) -> None:
             }
 
             result = await spaces_collection.insert_one(default_space)
-            logger.info(f"Created default space {result.inserted_id} for user {user_id}")
+            space_id = str(result.inserted_id)
+            logger.info(f"Created default space {space_id} for user {user_id}")
+        else:
+            space_id = str(existing_default["_id"])
+
+        # Ensure email summaries include the default space by default
+        await users_collection.update_one(
+            {"_id": ObjectId(user_id), "email_spaces": {"$exists": False}}, {"$set": {"email_spaces": [space_id]}}
+        )
 
     except Exception as e:
         logger.error(f"Error ensuring default space for user {user_id}: {str(e)}")

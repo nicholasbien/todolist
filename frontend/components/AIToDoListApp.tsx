@@ -113,9 +113,15 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
       setEmailTime(`${h}:${m}`);
       setEmailInstructions(userData?.email_instructions ?? '');
       setEmailEnabled(userData?.email_enabled ?? false);
-      setEmailSpaceIds(userData?.email_spaces ?? []);
-      if (spaces.length === 0) {
-        await fetchSpaces();
+      let spacesData = spaces;
+      if (spacesData.length === 0) {
+        spacesData = await fetchSpaces();
+      }
+      const allIds = (spacesData || []).map((s: any) => s._id);
+      if (userData?.email_spaces == null) {
+        setEmailSpaceIds(allIds);
+      } else {
+        setEmailSpaceIds(userData.email_spaces);
       }
       onShowEmailSettings?.();
       setError('');
@@ -152,11 +158,13 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
         if (current?._id !== activeSpace?._id) {
           setActiveSpace(current);
         }
+        return data;
       }
     } catch (err) {
       console.error('Error loading spaces', err);
       handleError(err);
     }
+    return [];
   }, [authenticatedFetch, activeSpace, handleError]);
 
   const fetchMembers = useCallback(async () => {
@@ -1413,8 +1421,8 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
                       <input
                         type="checkbox"
                         id={`space-${space._id || 'default'}`}
-                        disabled={!emailEnabled || space.is_default}
-                        checked={space.is_default || emailSpaceIds.includes(space._id)}
+                        disabled={!emailEnabled}
+                        checked={emailSpaceIds.includes(space._id)}
                         onChange={(e) => {
                           const id = space._id;
                           if (e.target.checked) {
@@ -1453,7 +1461,12 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
                         setEmailTime(`${h}:${m}`);
                         setEmailInstructions(userData?.email_instructions ?? '');
                         setEmailEnabled(userData?.email_enabled ?? false);
-                        setEmailSpaceIds(userData?.email_spaces ?? []);
+                        const allIds = spaces.map((s: any) => s._id);
+                        if (userData?.email_spaces == null) {
+                          setEmailSpaceIds(allIds);
+                        } else {
+                          setEmailSpaceIds(userData.email_spaces);
+                        }
                       }
                     } catch (err) {
                       // If fetch fails, just close the modal
