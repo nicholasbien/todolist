@@ -108,6 +108,38 @@ describe('Offline Journal Functionality', () => {
     expect(journals[0].text).toBe('Offline journal entry');
   });
 
+  test('marks journal updates made offline', async () => {
+    const sw = require('../public/sw.js');
+    await sw.putAuth('token123', 'user1');
+
+    const journalData = {
+      date: '2023-12-02',
+      text: 'First version',
+      space_id: 'space123'
+    };
+
+    // Initial offline create
+    let request = new Request('/api/journals', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer token123' },
+      body: JSON.stringify(journalData)
+    });
+    await sw.handleRequest(request);
+
+    // Offline update to same journal
+    request = new Request('/api/journals', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer token123' },
+      body: JSON.stringify({ ...journalData, text: 'Updated offline' })
+    });
+    await sw.handleRequest(request);
+
+    const journals = await sw.getJournals('user1');
+    expect(journals.length).toBe(1);
+    expect(journals[0].text).toBe('Updated offline');
+    expect(journals[0].updated_offline).toBe(true);
+  });
+
   test('deletes offline journal and cancels pending create operation', async () => {
     const sw = require('../public/sw.js');
     await sw.putAuth('token123', 'user1');

@@ -779,6 +779,7 @@ async function handleOfflineRequest(request, url) {
         ...existing[0],
         text: data.text,
         updated_at: new Date().toISOString(),
+        updated_offline: true,
       };
     } else {
       // Create new offline entry

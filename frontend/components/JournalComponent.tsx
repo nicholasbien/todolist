@@ -16,6 +16,7 @@ interface JournalEntry {
   created_at: string;
   updated_at: string;
   created_offline?: boolean;
+  updated_offline?: boolean;
 }
 
 export default function JournalComponent({ token, activeSpace }: JournalProps) {
@@ -164,7 +165,8 @@ export default function JournalComponent({ token, activeSpace }: JournalProps) {
   const getSaveStatus = () => {
     if (saving) return 'Saving...';
     if (journalText !== lastSavedText && journalText.trim()) return 'Unsaved changes';
-    if (currentEntry?.created_offline) return isOffline ? 'Saved offline' : 'Syncing...';
+    if (currentEntry?.created_offline || currentEntry?.updated_offline)
+      return isOffline ? 'Saved offline' : 'Syncing...';
     if (lastSavedText) return 'Synced online';
     return '';
   };
