@@ -7,9 +7,21 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "jest"
+    "test": "jest",
+    "cap:build": "next build && npx cap sync",
+    "cap:ios": "npx cap open ios",
+    "cap:sync": "npx cap sync ios"
   },
   "dependencies": {
+    "@capacitor/cli": "^7.4.3",
+    "@capacitor/core": "^7.4.3",
+    "@capacitor/haptics": "^7.0.2",
+    "@capacitor/ios": "^7.4.3",
+    "@capacitor/keyboard": "^7.0.2",
+    "@capacitor/network": "^7.0.2",
+    "@capacitor/share": "^7.0.2",
+    "@capacitor/splash-screen": "^7.0.2",
+    "@capacitor/status-bar": "^7.0.2",
     "next": "14.1.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
