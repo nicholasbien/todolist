@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "next lint",
     "test": "jest",
-    "cap:build": "next build && npx cap sync",
+    "cap:build": "CAPACITOR_BUILD=true next build && npx cap sync",
     "cap:ios": "npx cap open ios",
     "cap:sync": "npx cap sync ios"
   },

@@ -2,8 +2,9 @@
 const nextConfig = {
   reactStrictMode: true,
   swcMinify: true,
-  output: 'export',
   trailingSlash: true,
+  // Use static export for Capacitor builds
+  ...(process.env.CAPACITOR_BUILD && { output: 'export' }),
   images: {
     unoptimized: true,
   },
