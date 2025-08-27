@@ -4,10 +4,6 @@ const config: CapacitorConfig = {
   appId: 'com.todolistnyc.aitodo',
   appName: 'AI Todo List',
   webDir: 'out',
-  server: {
-    url: 'https://todolist.nyc',
-    cleartext: false
-  },
   plugins: {
     SplashScreen: {
       launchShowDuration: 2000,

@@ -8,14 +8,17 @@ function MyApp({ Component, pageProps }: AppProps) {
   useEffect(() => {
     // Register service worker in all environments
     if ('serviceWorker' in navigator) {
+      console.log('📱 Registering service worker...');
       navigator.serviceWorker
         .register('/sw.js')
-        .then(() => {
-          // Service Worker registered successfully
+        .then((registration) => {
+          console.log('✅ Service Worker registered successfully:', registration);
         })
         .catch((registrationError) => {
-          console.log('Service Worker registration failed: ', registrationError);
+          console.log('❌ Service Worker registration failed: ', registrationError);
         });
+    } else {
+      console.log('❌ Service Worker not supported');
     }
 
     // OfflineProvider handles online/offline events

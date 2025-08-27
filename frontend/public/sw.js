@@ -1,7 +1,7 @@
 // IMPORTANT: Always increment these versions when modifying this service worker file
 // This forces browsers to download and use the updated service worker
-const STATIC_CACHE = 'todo-static-v63';
-const API_CACHE = 'todo-api-v63';
+const STATIC_CACHE = 'todo-static-v70';
+const API_CACHE = 'todo-api-v70';
 
 const GLOBAL_DB_NAME = 'TodoGlobalDB';
 const USER_DB_PREFIX = 'TodoUserDB_';
@@ -547,12 +547,13 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
+  // Check if this is a same-origin request or a Capacitor file:// request
+  const isSameOrigin = url.origin === self.location.origin;
+  const isCapacitorLocal = self.location.protocol === 'file:' && url.pathname.startsWith('/api/');
 
-  // Only handle API requests through /api/* paths
-  // Exclude auth requests - they must go to server
-  const isApi = url.origin === self.location.origin &&
-                url.pathname.startsWith('/api/') &&
-                !url.pathname.startsWith('/api/auth');
+  // Handle all API requests through /api/* paths including auth
+  const isApi = (isSameOrigin || isCapacitorLocal) &&
+                url.pathname.startsWith('/api/');
 
   if (isApi) {
     event.respondWith(handleApiRequest(event.request));
@@ -560,7 +561,7 @@ self.addEventListener('fetch', (event) => {
   }
 
   // Cache static assets so the app can load offline
-  if (url.origin === self.location.origin) {
+  if (isSameOrigin) {
     event.respondWith(handleStaticRequest(event.request));
   }
 });
@@ -577,14 +578,36 @@ async function handleApiRequest(request) {
 
   if (online && !isOfflineId) {
     try {
-      // All requests go through Next.js API proxy (already at /api/* path)
-      // Just forward the request with auth headers
+      // Determine if we're in a Capacitor environment (file:// protocol)
+      const isCapacitor = self.location.protocol === 'file:';
+      let targetUrl;
+
+      if (isCapacitor || self.location.protocol === 'http:') {
+        // In Capacitor or static export, route directly to backend
+        const apiPath = url.pathname.replace('/api/', '');
+        const queryString = url.search;
+
+        // Use production backend if deployed or in Capacitor (iOS doesn't allow http)
+        const backendUrl = (self.location.hostname === 'todolist.nyc' || isCapacitor)
+          ? 'https://backend-production-e920.up.railway.app'
+          : 'http://localhost:8000';
+
+        targetUrl = `${backendUrl}/${apiPath}${queryString}`;
+      } else {
+        // In web environment, use the existing /api/* proxy
+        targetUrl = request.url;
+      }
+
+      // Forward the request with auth headers
       const authHeaders = await getAuthHeaders();
-      const proxyRequest = new Request(request.url, {
+      const proxyRequest = new Request(targetUrl, {
         method: request.method,
         headers: authHeaders,
         body: request.method !== 'GET' && request.method !== 'HEAD' ? await request.blob() : null
       });
+
+      console.log(`🔗 Service worker routing: ${request.url} -> ${targetUrl}`);
+      console.log(`📱 Is Capacitor: ${isCapacitor}, Protocol: ${self.location.protocol}`);
 
       const response = await fetch(proxyRequest);
 

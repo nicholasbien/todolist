@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import { apiRequest } from '../utils/api';
 
 interface AuthContextValue {
   user: any;
@@ -39,11 +40,8 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     try {
       if (token) {
         // Call logout endpoint to invalidate token on server
-        await fetch('/api/auth/logout', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
+        await apiRequest('auth/logout', {
+          method: 'POST'
         });
       }
     } catch (error) {
@@ -64,7 +62,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
   const verifyToken = async (tokenToVerify: string) => {
     try {
-      const response = await fetch('/api/auth/me', {
+      const response = await apiRequest('auth/me', {
         headers: {
           'Authorization': `Bearer ${tokenToVerify}`
         }
@@ -115,13 +113,13 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
   const signup = async (email: string): Promise<{ success: boolean; message?: string; error?: string }> => {
     try {
-      const response = await fetch('/api/auth/signup', {
+      console.log('🚀 Starting signup for:', email);
+      alert(`Starting signup for: ${email}`);
+      const response = await apiRequest('auth/signup', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
         body: JSON.stringify({ email })
       });
+      console.log('📡 Signup response:', response.status, response.statusText);
 
       const data = await response.json();
 
@@ -131,17 +129,15 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         return { success: false, error: data.detail || 'Signup failed' };
       }
     } catch (error) {
+      console.log('❌ Signup network error:', error);
       return { success: false, error: 'Network error during signup' };
     }
   };
 
   const login = async (email: string, code: string): Promise<{ success: boolean; error?: string }> => {
     try {
-      const response = await fetch('/api/auth/login', {
+      const response = await apiRequest('auth/login', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
         body: JSON.stringify({ email, code })
       });
 
@@ -172,32 +168,16 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
   // Helper function to make authenticated API calls
   const authenticatedFetch = useCallback(async (url: string, options: RequestInit = {}): Promise<Response> => {
-    // Always use relative URLs to go through Next.js proxy and service worker
-    const fullURL = url;
+    // Extract endpoint from URL (remove /api/ prefix if present)
+    const endpoint = url.startsWith('/api/') ? url.replace('/api/', '') : url;
 
-    if (!token) {
-      // No token available - this will go to service worker for offline functionality
-      // Service worker doesn't need authentication headers
-      const response = await fetch(fullURL, {
-        ...options,
-        headers: {
-          'Content-Type': 'application/json',
-          ...options.headers
-        }
-      });
-      return response;
-    }
-
-    // Token available - add authentication headers for online requests
-    const headers = {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`,
-      ...options.headers
-    };
-
-    const response = await fetch(fullURL, {
+    // Use apiRequest which handles environment-specific routing
+    const response = await apiRequest(endpoint, {
       ...options,
-      headers
+      headers: {
+        ...(token && { 'Authorization': `Bearer ${token}` }),
+        ...options.headers
+      }
     });
 
     // If token is invalid, logout
