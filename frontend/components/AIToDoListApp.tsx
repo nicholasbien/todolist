@@ -118,9 +118,9 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
       if (spacesData.length === 0) {
         spacesData = await fetchSpaces();
       }
-      const allIds = (spacesData || []).map((s: any) => s._id);
-      if (userData?.email_spaces == null) {
-        setEmailSpaceIds(allIds);
+      const personal = (spacesData || []).find((s: any) => s.is_default || s.name === 'Personal');
+      if (!userData?.email_spaces || userData.email_spaces.length === 0) {
+        setEmailSpaceIds(personal ? [personal._id] : []);
       } else {
         setEmailSpaceIds(userData.email_spaces);
       }
