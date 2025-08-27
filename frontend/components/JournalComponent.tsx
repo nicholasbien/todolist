@@ -169,6 +169,16 @@ export default function JournalComponent({ token, activeSpace }: JournalProps) {
     return '';
   };
 
+  const adjustDate = (days: number) => {
+    const [year, month, day] = selectedDate.split('-').map((num) => parseInt(num, 10));
+    const newDate = new Date(year, month - 1, day);
+    newDate.setDate(newDate.getDate() + days);
+    const newYear = newDate.getFullYear();
+    const newMonth = String(newDate.getMonth() + 1).padStart(2, '0');
+    const newDay = String(newDate.getDate()).padStart(2, '0');
+    setSelectedDate(`${newYear}-${newMonth}-${newDay}`);
+  };
+
   return (
     <div className="space-y-6">
 
@@ -182,6 +192,14 @@ export default function JournalComponent({ token, activeSpace }: JournalProps) {
       <div className="flex items-center space-x-4">
         <div className="flex items-center space-x-2">
           <label htmlFor="journal-date" className="text-sm text-gray-400">Date:</label>
+          <button
+            type="button"
+            onClick={() => adjustDate(-1)}
+            aria-label="Previous day"
+            className="bg-gray-900 border border-gray-700 text-gray-100 px-3 py-2 rounded-lg hover:bg-gray-800"
+          >
+            ←
+          </button>
           <input
             id="journal-date"
             type="date"
@@ -190,6 +208,14 @@ export default function JournalComponent({ token, activeSpace }: JournalProps) {
             className="bg-gray-900 border border-gray-700 text-gray-100 px-3 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent"
             style={{ colorScheme: 'dark' }}
           />
+          <button
+            type="button"
+            onClick={() => adjustDate(1)}
+            aria-label="Next day"
+            className="bg-gray-900 border border-gray-700 text-gray-100 px-3 py-2 rounded-lg hover:bg-gray-800"
+          >
+            →
+          </button>
         </div>
 
         <div className="flex-1"></div>
