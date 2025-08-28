@@ -132,7 +132,7 @@ async def send_verification_email(email: str, code: str) -> bool:
         if not SMTP_USERNAME or not SMTP_PASSWORD or not FROM_EMAIL:
             logger.warning("Email credentials not configured, printing code to console")
             print(f"VERIFICATION CODE for {email}: {code}")
-            return True
+            return False
 
         # Run SMTP operations in thread pool to avoid blocking the event loop
         import asyncio
@@ -158,7 +158,9 @@ Nicholas"""
             msg.attach(MIMEText(body, "plain"))
 
             server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
+            server.ehlo()
             server.starttls()
+            server.ehlo()
             server.login(SMTP_USERNAME, SMTP_PASSWORD)
             text = msg.as_string()
             server.sendmail(FROM_EMAIL, email, text)
@@ -179,7 +181,7 @@ Nicholas"""
         logger.error(f"Failed to send email to {email}: {str(e)}")
         # For development, print to console if email fails
         print(f"EMAIL FAILED - VERIFICATION CODE for {email}: {code}")
-        return True  # Return True anyway for development
+        return False
 
 
 async def signup_user(email: str) -> dict:

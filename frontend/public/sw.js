@@ -578,23 +578,24 @@ async function handleApiRequest(request) {
 
   if (online && !isOfflineId) {
     try {
-      // Determine if we're in a Capacitor environment (file:// protocol)
+      // Determine environment
       const isCapacitor = self.location.protocol === 'file:';
+      const isProdHost = self.location.hostname.endsWith('todolist.nyc');
+      const isHttp = self.location.protocol === 'http:';
       let targetUrl;
 
-      if (isCapacitor || self.location.protocol === 'http:') {
-        // In Capacitor or static export, route directly to backend
+      if (isCapacitor || isProdHost || isHttp) {
         const apiPath = url.pathname.replace('/api/', '');
         const queryString = url.search;
 
-        // Use production backend if deployed or in Capacitor (iOS doesn't allow http)
-        const backendUrl = (self.location.hostname === 'todolist.nyc' || isCapacitor)
+        // Use production backend for deployed domains and Capacitor
+        const backendUrl = (isProdHost || isCapacitor)
           ? 'https://backend-production-e920.up.railway.app'
           : 'http://localhost:8000';
 
         targetUrl = `${backendUrl}/${apiPath}${queryString}`;
       } else {
-        // In web environment, use the existing /api/* proxy
+        // Local web environment with existing /api proxy
         targetUrl = request.url;
       }
 
@@ -607,7 +608,7 @@ async function handleApiRequest(request) {
       });
 
       console.log(`🔗 Service worker routing: ${request.url} -> ${targetUrl}`);
-      console.log(`📱 Is Capacitor: ${isCapacitor}, Protocol: ${self.location.protocol}`);
+      console.log(`📱 Is Capacitor: ${isCapacitor}, Prod host: ${isProdHost}, Protocol: ${self.location.protocol}`);
 
       const response = await fetch(proxyRequest);
 
