@@ -912,7 +912,7 @@ describe('Journal Operations', () => {
     // Verify fetch was called correctly (service worker forwards the /api/* request)
     expect(fetch).toHaveBeenCalledWith(expect.objectContaining({
       method: 'GET',
-      url: expect.stringContaining('/api/journals?space_id=space1')
+      url: expect.stringContaining('/journals?space_id=space1')
     }));
 
     // Verify response is correct
@@ -990,6 +990,43 @@ describe('Journal Operations', () => {
     expect(queue).toHaveLength(0);
   });
 
+  test('clears updated_offline after successful journal sync and notifies clients', async () => {
+    const sw = require('../public/sw.js');
+    await sw.putAuth('token123', 'user1');
+
+    const offlineJournal = {
+      _id: 'offline_journal_2024-01-01_temp',
+      user_id: 'user1',
+      space_id: 'space1',
+      date: '2024-01-01',
+      text: 'Offline text',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      updated_offline: true
+    };
+
+    await sw.putJournal(offlineJournal, 'user1');
+    await sw.addQueue({ type: 'CREATE_JOURNAL', data: offlineJournal }, 'user1');
+
+    const serverJournal = { ...offlineJournal, _id: 'server_journal_789' };
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => serverJournal
+    });
+
+    const postMessage = jest.fn();
+    (self as any).clients = { matchAll: async () => [{ postMessage }] };
+
+    await sw.syncQueue();
+
+    const journals = await sw.getJournals('user1', '2024-01-01', 'space1');
+    expect(journals).toHaveLength(1);
+    expect(journals[0]._id).toBe('server_journal_789');
+    expect(journals[0].updated_offline).toBe(false);
+
+    expect(postMessage).toHaveBeenCalledWith({ type: 'SYNC_COMPLETE' });
+  });
+
   test('GET /todos caching works correctly', async () => {
     const sw = require('../public/sw.js');
     await sw.putAuth('token123', 'user1');
@@ -1046,7 +1083,7 @@ describe('Journal Operations', () => {
     // Verify fetch was called correctly (service worker forwards the /api/* request)
     expect(fetch).toHaveBeenCalledWith(expect.objectContaining({
       method: 'GET',
-      url: expect.stringContaining('/api/todos?space_id=space1')
+      url: expect.stringContaining('/todos?space_id=space1')
     }));
 
     // Verify response is correct
