@@ -802,7 +802,7 @@ async function handleOfflineRequest(request, url) {
         ...existing[0],
         text: data.text,
         updated_at: new Date().toISOString(),
-        updated_offline: true,
+        updated_offline: true, // last updated offline
       };
     } else {
       // Create new offline entry
@@ -814,7 +814,10 @@ async function handleOfflineRequest(request, url) {
         text: data.text,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
+        // Flag to indicate this entry was created while offline. "updated_offline"
+        // also tracks when the entry was last updated offline.
         created_offline: true,
+        updated_offline: true,
       };
     }
 
@@ -1342,7 +1345,8 @@ async function syncQueue() {
               await putIdMap(idMap, authData.userId);
 
               await delJournal(offlineId, authData.userId); // Remove offline version
-              await putJournal(serverJournal, authData.userId); // Add server version
+              // Store synced version without offline flags
+              await putJournal({ ...serverJournal, updated_offline: false }, authData.userId);
               console.log(`✅ Synced offline journal ${offlineId} -> ${serverJournal._id}`);
             } else {
               console.log(`❌ Journal Sync FAILED: Offline journal ${offlineId} will be preserved`);
@@ -1356,7 +1360,7 @@ async function syncQueue() {
             });
             if (res && res.ok) {
               const serverJournal = await res.json();
-              await putJournal(serverJournal, authData.userId);
+              await putJournal({ ...serverJournal, updated_offline: false }, authData.userId);
             }
           }
           break;
@@ -1397,6 +1401,14 @@ async function syncQueue() {
     // console.log('Sync completed');
   } finally {
     syncInProgress = false;
+
+    // Notify all clients that sync has completed
+    if (self.clients && self.clients.matchAll) {
+      const clientList = await self.clients.matchAll({ type: 'window' });
+      for (const client of clientList) {
+        client.postMessage({ type: 'SYNC_COMPLETE' });
+      }
+    }
   }
 }
 

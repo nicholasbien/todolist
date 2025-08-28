@@ -16,7 +16,7 @@ interface JournalEntry {
   created_at: string;
   updated_at: string;
   created_offline?: boolean;
-  updated_offline?: boolean;
+  updated_offline?: boolean; // true if the entry was last updated while offline
 }
 
 export default function JournalComponent({ token, activeSpace }: JournalProps) {
@@ -143,6 +143,25 @@ export default function JournalComponent({ token, activeSpace }: JournalProps) {
     };
   }, [journalText, lastSavedText]); // Removed saveJournalEntry and saveTimeout to prevent infinite loop
 
+  // Refresh journal entry after offline sync completes
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data?.type === 'SYNC_COMPLETE' && currentEntry?.updated_offline) {
+        fetchJournalEntry(selectedDate);
+      }
+    };
+
+    if (navigator.serviceWorker) {
+      navigator.serviceWorker.addEventListener('message', handleMessage);
+    }
+
+    return () => {
+      if (navigator.serviceWorker) {
+        navigator.serviceWorker.removeEventListener('message', handleMessage);
+      }
+    };
+  }, [currentEntry, fetchJournalEntry, selectedDate]);
+
   const handleManualSave = async () => {
     // Allow saving even if empty
     await saveJournalEntry(journalText, true);
@@ -165,8 +184,7 @@ export default function JournalComponent({ token, activeSpace }: JournalProps) {
   const getSaveStatus = () => {
     if (saving) return 'Saving...';
     if (journalText !== lastSavedText && journalText.trim()) return 'Unsaved changes';
-    if (currentEntry?.created_offline || currentEntry?.updated_offline)
-      return isOffline ? 'Saved offline' : 'Syncing...';
+    if (currentEntry?.updated_offline) return isOffline ? 'Saved offline' : 'Syncing...';
     if (lastSavedText) return 'Synced online';
     return '';
   };
