@@ -45,9 +45,13 @@ export async function apiRequest(endpoint: string, options: RequestInit = {}): P
   const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
 
   const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
     ...((options.headers as Record<string, string>) || {}),
   };
+
+  // Only set JSON content type when a body is provided
+  if (options.body !== undefined && options.body !== null) {
+    headers['Content-Type'] = 'application/json';
+  }
 
   if (token) {
     headers.Authorization = `Bearer ${token}`;

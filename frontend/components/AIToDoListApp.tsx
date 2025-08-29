@@ -730,8 +730,11 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
       setSendingEmail(true);
       setError('');
 
+      // Send an empty JSON body to satisfy some environments that
+      // require a body when the content type is set
       const response = await authenticatedFetch('/email/send-summary', {
         method: 'POST',
+        body: JSON.stringify({}),
       });
 
       if (!response.ok) {
