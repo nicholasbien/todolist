@@ -4,6 +4,12 @@ import { Capacitor } from '@capacitor/core';
  * Get the correct API base URL for the current environment
  */
 function getApiBaseUrl(forceBackend = false): string {
+  // Allow environment variable override
+  const envUrl = process.env.NEXT_PUBLIC_API_URL;
+  if (envUrl) {
+    return envUrl;
+  }
+
   // Check if we're in Capacitor (native app)
   if (Capacitor.isNativePlatform()) {
     // Always use production backend for iOS (no localhost access)
