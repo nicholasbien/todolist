@@ -35,7 +35,8 @@ export async function apiRequest(endpoint: string, options: RequestInit = {}): P
   const cleanEndpoint = endpoint.startsWith('/') ? endpoint.slice(1) : endpoint;
   const isAuthEndpoint = cleanEndpoint.startsWith('auth');
 
-  const baseUrl = getApiBaseUrl(isAuthEndpoint);
+  // Always use service worker routing - auth just bypasses caching, not routing
+  const baseUrl = getApiBaseUrl(false);
 
   // Build URL
   let url;
