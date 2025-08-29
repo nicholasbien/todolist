@@ -1,7 +1,7 @@
 // IMPORTANT: Always increment these versions when modifying this service worker file
 // This forces browsers to download and use the updated service worker
-const STATIC_CACHE = 'todo-static-v70';
-const API_CACHE = 'todo-api-v70';
+const STATIC_CACHE = 'todo-static-v71';
+const API_CACHE = 'todo-api-v71';
 
 const GLOBAL_DB_NAME = 'TodoGlobalDB';
 const USER_DB_PREFIX = 'TodoUserDB_';
@@ -430,7 +430,7 @@ async function syncServerDataToLocal() {
 
     // Fetch and store spaces first
     try {
-      const spacesResponse = await fetch('/api/spaces', { headers });
+      const spacesResponse = await fetch('/spaces', { headers });
       if (spacesResponse.ok) {
         const serverSpaces = await spacesResponse.json();
         for (const space of serverSpaces) {
@@ -443,7 +443,7 @@ async function syncServerDataToLocal() {
 
     // Fetch and store categories (now space-aware)
     try {
-      const categoriesResponse = await fetch('/api/categories', { headers });
+      const categoriesResponse = await fetch('/categories', { headers });
       if (categoriesResponse.ok) {
         const serverCategories = await categoriesResponse.json();
         for (const categoryName of serverCategories) {
@@ -456,7 +456,7 @@ async function syncServerDataToLocal() {
 
     // Fetch and store todos
     try {
-      const todosResponse = await fetch('/api/todos', { headers });
+      const todosResponse = await fetch('/todos', { headers });
       if (todosResponse.ok) {
         const serverTodos = await todosResponse.json();
         for (const todo of serverTodos) {
@@ -469,7 +469,7 @@ async function syncServerDataToLocal() {
 
     // Fetch and store journals
     try {
-      const journalsResponse = await fetch('/api/journals', { headers });
+      const journalsResponse = await fetch('/journals', { headers });
       if (journalsResponse.ok) {
         const serverJournals = await journalsResponse.json();
 
@@ -549,16 +549,30 @@ self.addEventListener('fetch', (event) => {
 
   // Check if this is a same-origin request or a Capacitor file:// request
   const isSameOrigin = url.origin === self.location.origin;
-  const isCapacitorLocal = self.location.protocol === 'file:' && url.pathname.startsWith('/api/');
+  const isCapacitorLocal = self.location.protocol === 'file:' &&
+                        (url.pathname.startsWith('/todos') ||
+                         url.pathname.startsWith('/categories') ||
+                         url.pathname.startsWith('/spaces') ||
+                         url.pathname.startsWith('/journals') ||
+                         url.pathname.startsWith('/insights') ||
+                         url.pathname.startsWith('/chat') ||
+                         url.pathname.startsWith('/auth'));
 
-  const isAuthRequest = url.pathname.startsWith('/api/auth');
+  const isAuthRequest = url.pathname.startsWith('/auth');
 
-  // Handle all API requests through /api/* paths except auth
+  // Handle all API requests except auth
   const isApi = (isSameOrigin || isCapacitorLocal) &&
-                url.pathname.startsWith('/api/');
+                (url.pathname.startsWith('/todos') ||
+                 url.pathname.startsWith('/categories') ||
+                 url.pathname.startsWith('/spaces') ||
+                 url.pathname.startsWith('/journals') ||
+                 url.pathname.startsWith('/insights') ||
+                 url.pathname.startsWith('/chat'));
 
   if (isAuthRequest) {
-    return; // Always go to network for auth requests
+    // For auth requests, we need to route through service worker but bypass caching
+    event.respondWith(handleAuthRequest(event.request));
+    return;
   }
 
   if (isApi) {
@@ -590,20 +604,16 @@ async function handleApiRequest(request) {
       const isHttp = self.location.protocol === 'http:';
       let targetUrl;
 
-      if (isCapacitor || isProdHost || isHttp) {
-        const apiPath = url.pathname.replace('/api/', '');
-        const queryString = url.search;
+      // Route directly to backend
+      const apiPath = url.pathname.startsWith('/') ? url.pathname.slice(1) : url.pathname;
+      const queryString = url.search;
 
-        // Use production backend for deployed domains and Capacitor
-        const backendUrl = (isProdHost || isCapacitor)
-          ? 'https://backend-production-e920.up.railway.app'
-          : 'http://localhost:8000';
+      // Use production backend for deployed domains and Capacitor
+      const backendUrl = (isProdHost || isCapacitor)
+        ? 'https://backend-production-e920.up.railway.app'
+        : 'http://localhost:8000';
 
-        targetUrl = `${backendUrl}/${apiPath}${queryString}`;
-      } else {
-        // Local web environment with existing /api proxy
-        targetUrl = request.url;
-      }
+      targetUrl = `${backendUrl}/${apiPath}${queryString}`;
 
       // Forward the request with auth headers
       const authHeaders = await getAuthHeaders();
@@ -622,8 +632,8 @@ async function handleApiRequest(request) {
         const cache = await caches.open(API_CACHE);
         cache.put(request, response.clone());
 
-        // For GET /api/todos, sync pending operations then merge with fresh server data
-        if (url.pathname === '/api/todos') {
+        // For GET /todos, sync pending operations then merge with fresh server data
+        if (url.pathname === '/todos') {
           const authData = await getAuth();
           if (!authData || !authData.userId) return response; // No user context
 
@@ -639,8 +649,8 @@ async function handleApiRequest(request) {
           return response; // Return original response
         }
 
-        // For GET /api/journals, sync server data to IndexedDB
-        if (url.pathname === '/api/journals') {
+        // For GET /journals, sync server data to IndexedDB
+        if (url.pathname === '/journals') {
           const authData = await getAuth();
           if (!authData || !authData.userId) {
             console.log('⚠️ No auth data for journal caching');
@@ -702,6 +712,46 @@ async function handleApiRequest(request) {
   }
   console.log(`📱 Falling back to offline handler for: ${request.method} ${url.pathname}`);
   return handleOfflineRequest(request, url);
+}
+
+// Handle auth requests - route directly to backend without caching
+async function handleAuthRequest(request) {
+  try {
+    const url = new URL(request.url);
+
+    // Determine environment
+    const isCapacitor = self.location.protocol === 'file:';
+    const isProdHost = self.location.hostname.endsWith('todolist.nyc');
+
+    // Route directly to backend
+    const apiPath = url.pathname.startsWith('/') ? url.pathname.slice(1) : url.pathname;
+    const queryString = url.search;
+
+    // Use production backend for deployed domains and Capacitor
+    const backendUrl = (isProdHost || isCapacitor)
+      ? 'https://backend-production-e920.up.railway.app'
+      : 'http://localhost:8000';
+
+    const targetUrl = `${backendUrl}/${apiPath}${queryString}`;
+
+    // Forward the request without auth headers (auth endpoints don't need them)
+    const proxyRequest = new Request(targetUrl, {
+      method: request.method,
+      headers: {
+        'Content-Type': 'application/json',
+        // Don't include auth headers for auth requests
+        ...(request.headers.get('Content-Type') && { 'Content-Type': request.headers.get('Content-Type') })
+      },
+      body: request.method !== 'GET' && request.method !== 'HEAD' ? await request.blob() : null
+    });
+
+    console.log(`🔐 Auth request routing: ${request.url} -> ${targetUrl}`);
+
+    return await fetch(proxyRequest);
+  } catch (error) {
+    console.error('Auth request failed:', error);
+    return new Response(JSON.stringify({ error: 'Auth request failed' }), { status: 500 });
+  }
 }
 
 // Handle offline API requests
@@ -1201,7 +1251,7 @@ async function syncQueue() {
         case 'CREATE':
           if (op.data._id.startsWith('offline_')) {
             const { _id: offlineId, ...payload } = op.data;
-            res = await fetch('/api/todos', {
+            res = await fetch('/todos', {
               method: 'POST',
               headers,
               body: JSON.stringify(payload),
@@ -1235,7 +1285,7 @@ async function syncQueue() {
           }
 
           if (!updateId.startsWith('offline_')) {
-            res = await fetch(`/api/todos/${updateId}`, {
+            res = await fetch(`/todos/${updateId}`, {
               method: 'PUT',
               headers,
               body: JSON.stringify({ ...op.data, _id: updateId }),
@@ -1255,7 +1305,7 @@ async function syncQueue() {
           }
 
           if (!completeId.startsWith('offline_')) {
-            res = await fetch(`/api/todos/${completeId}/complete`, {
+            res = await fetch(`/todos/${completeId}/complete`, {
               method: 'PUT',
               headers
             });
@@ -1284,7 +1334,7 @@ async function syncQueue() {
           }
 
           if (!deleteId.startsWith('offline_')) {
-            res = await fetch(`/api/todos/${deleteId}`, {
+            res = await fetch(`/todos/${deleteId}`, {
               method: 'DELETE',
               headers
             });
@@ -1295,7 +1345,7 @@ async function syncQueue() {
           }
           break;
         case 'CREATE_CATEGORY':
-          res = await fetch('/api/categories', {
+          res = await fetch('/categories', {
             method: 'POST',
             headers,
             body: JSON.stringify(op.data),
@@ -1307,8 +1357,8 @@ async function syncQueue() {
           break;
         case 'DELETE_CATEGORY':
           const deleteUrl = op.data.space_id
-            ? `/api/categories/${encodeURIComponent(op.data.name)}?space_id=${op.data.space_id}`
-            : `/api/categories/${encodeURIComponent(op.data.name)}`;
+            ? `/categories/${encodeURIComponent(op.data.name)}?space_id=${op.data.space_id}`
+            : `/categories/${encodeURIComponent(op.data.name)}`;
           res = await fetch(deleteUrl, {
             method: 'DELETE',
             headers
@@ -1319,8 +1369,8 @@ async function syncQueue() {
           break;
         case 'RENAME_CATEGORY':
           const renameUrl = op.data.space_id
-            ? `/api/categories/${encodeURIComponent(op.data.old_name)}?space_id=${op.data.space_id}`
-            : `/api/categories/${encodeURIComponent(op.data.old_name)}`;
+            ? `/categories/${encodeURIComponent(op.data.old_name)}?space_id=${op.data.space_id}`
+            : `/categories/${encodeURIComponent(op.data.old_name)}`;
           res = await fetch(renameUrl, {
             method: 'PUT',
             headers,
@@ -1334,7 +1384,7 @@ async function syncQueue() {
         case 'CREATE_JOURNAL':
           if (op.data._id.startsWith('offline_journal_')) {
             const { _id: offlineId, ...payload } = op.data;
-            res = await fetch('/api/journals', {
+            res = await fetch('/journals', {
               method: 'POST',
               headers,
               body: JSON.stringify(payload),
@@ -1360,7 +1410,7 @@ async function syncQueue() {
             }
           } else {
             // Handle both offline-generated and regular journal updates
-            res = await fetch('/api/journals', {
+            res = await fetch('/journals', {
               method: 'POST',
               headers,
               body: JSON.stringify(op.data),
@@ -1380,7 +1430,7 @@ async function syncQueue() {
           }
 
           if (!deleteJournalId.startsWith('offline_journal_')) {
-            res = await fetch(`/api/journals/${deleteJournalId}`, {
+            res = await fetch(`/journals/${deleteJournalId}`, {
               method: 'DELETE',
               headers
             });

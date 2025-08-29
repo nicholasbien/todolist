@@ -28,8 +28,8 @@ export async function apiRequest(endpoint: string, options: RequestInit = {}): P
   // Build URL
   let url;
   if (baseUrl === '') {
-    // Use /api/ prefix for service worker routing
-    url = `/api/${cleanEndpoint}`;
+    // Use relative URLs - service worker will handle routing
+    url = `/${cleanEndpoint}`;
   } else {
     // Direct backend call
     url = `${baseUrl}/${cleanEndpoint}`;
