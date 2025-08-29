@@ -1,4 +1,4 @@
-// Simple API proxy for service worker routing
+// Improved API proxy for offline PWA functionality
 const BACKEND_URL = process.env.BACKEND_URL || (
   process.env.NODE_ENV === 'production'
     ? 'https://backend-production-e920.up.railway.app'
@@ -9,70 +9,97 @@ export default async function handler(req, res) {
   const { proxy } = req.query;
   let path = Array.isArray(proxy) ? proxy.join('/') : proxy;
 
-  // Remove trailing slash from path since backend doesn't expect it
-  if (path && path.endsWith('/')) {
-    path = path.slice(0, -1);
+  // Log all incoming requests - force to console and alert in dev
+  const logMsg = `🔗 PROXY START: ${req.method} /api/${path} -> ${BACKEND_URL}/${path}`;
+  console.log(logMsg);
+  console.error(logMsg); // Also log as error to make sure it shows up
+
+  // Test endpoint to verify proxy is working
+  if (path === 'test-proxy') {
+    return res.status(200).json({
+      message: 'Proxy is working!',
+      path: path,
+      method: req.method,
+      backend: BACKEND_URL
+    });
   }
 
-  console.log(`🔗 PROXY: ${req.method} /${path} -> ${BACKEND_URL}`);
-
-  // Construct backend URL with query parameters
-  const queryString = req.url.includes('?') ? req.url.substring(req.url.indexOf('?')) : '';
-  const backendUrl = `${BACKEND_URL}/${path}${queryString}`;
-
-  console.log(`🔗 PROXY: Full URL: ${backendUrl}`);
-
   try {
-    // Forward headers (remove Next.js specific ones)
-    const headers = { ...req.headers };
-    delete headers.host;
-    delete headers.connection;
+    // Build backend URL
+    const queryString = req.url.includes('?') ? req.url.substring(req.url.indexOf('?')) : '';
+    const backendUrl = `${BACKEND_URL}/${path}${queryString}`;
+
+    // Simple header handling
+    const headers = {
+      'content-type': 'application/json',
+    };
+
+    // Add auth header if present
+    if (req.headers.authorization) {
+      headers.authorization = req.headers.authorization;
+    }
 
     // Handle request body
-    let body;
-    if (req.method !== 'GET' && req.method !== 'HEAD') {
-      if (req.body && typeof req.body === 'object') {
-        body = JSON.stringify(req.body);
-        headers['content-type'] = 'application/json';
-        headers['content-length'] = Buffer.byteLength(body).toString();
-      } else if (req.body && typeof req.body === 'string') {
-        body = req.body;
-        headers['content-length'] = Buffer.byteLength(body).toString();
-      } else {
-        body = null;
+    let body = null;
+    if (req.method !== 'GET' && req.method !== 'HEAD' && req.method !== 'OPTIONS') {
+      if (req.body) {
+        body = typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
+        console.log(`🔗 PROXY BODY: ${body.substring(0, 200)}`);
       }
     }
 
-    console.log(`🔗 PROXY: Body type: ${typeof req.body}, Body: ${body?.substring(0, 100)}`);
-
-    // Forward to backend
+    // Make request to backend
+    console.log(`🔗 PROXY FETCH: ${backendUrl}`);
     const response = await fetch(backendUrl, {
       method: req.method,
       headers,
       body,
     });
 
-    // Forward response
-    res.status(response.status);
-    const contentType = response.headers.get('content-type');
-    if (contentType) {
-      res.setHeader('content-type', contentType);
+    console.log(`🔗 PROXY RESPONSE: ${response.status} ${response.statusText}`);
+
+    // Handle special responses
+    if (req.method === 'OPTIONS') {
+      res.setHeader('Access-Control-Allow-Origin', req.headers.origin || '*');
+      res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
+      return res.status(200).end();
     }
 
+    // Forward response
+    res.status(response.status);
+
+    // Forward important headers
+    ['content-type', 'cache-control', 'etag', 'last-modified'].forEach(header => {
+      const value = response.headers.get(header);
+      if (value) res.setHeader(header, value);
+    });
+
+    // Send response data
     const data = await response.text();
+    console.log(`🔗 PROXY SUCCESS: ${data.length} bytes`);
     res.send(data);
+
   } catch (error) {
-    console.error('🔗 PROXY ERROR:', {
+    console.error(`🔗 PROXY ERROR for ${req.method} /api/${path}:`, {
       message: error.message,
-      stack: error.stack,
-      url: backendUrl,
-      method: req.method
+      code: error.code,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
-    res.status(500).json({
-      error: 'Proxy failed',
-      details: error.message,
-      url: backendUrl
-    });
+
+    // Return detailed error in development, generic in production
+    const errorResponse = {
+      error: 'Proxy request failed',
+      path: path,
+      backend: BACKEND_URL,
+      ...(process.env.NODE_ENV === 'development' && {
+        details: error.message,
+        code: error.code
+      })
+    };
+
+    res.status(500).json(errorResponse);
   }
 }
 
@@ -81,5 +108,6 @@ export const config = {
     bodyParser: {
       sizeLimit: '1mb',
     },
+    responseLimit: '10mb',
   },
 }

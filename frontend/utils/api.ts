@@ -29,8 +29,7 @@ export async function apiRequest(endpoint: string, options: RequestInit = {}): P
   let url;
   if (baseUrl === '') {
     // Use /api/ prefix for service worker routing
-    // Add trailing slash to avoid Railway edge redirects
-    url = `/api/${cleanEndpoint}/`;
+    url = `/api/${cleanEndpoint}`;
   } else {
     // Direct backend call
     url = `${baseUrl}/${cleanEndpoint}`;
@@ -60,5 +59,14 @@ export async function apiRequest(endpoint: string, options: RequestInit = {}): P
     alert(`API Call: ${endpoint} -> ${url}`);
   }
 
-  return fetch(url, requestOptions);
+  // Handle Railway redirects by following them automatically
+  return fetch(url, {
+    ...requestOptions,
+    redirect: 'follow', // Automatically follow redirects
+    headers: {
+      ...requestOptions.headers,
+      // Prevent Railway from adding trailing slashes by indicating we're an API call
+      'X-Requested-With': 'XMLHttpRequest'
+    }
+  });
 }
