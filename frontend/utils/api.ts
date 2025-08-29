@@ -1,12 +1,18 @@
 import { Capacitor } from '@capacitor/core';
 
+// Configuration - keep in sync with service worker
+const CONFIG = {
+  PRODUCTION_BACKEND: 'https://backend-production-e920.up.railway.app',
+  PRODUCTION_DOMAIN: 'todolist.nyc'
+};
+
 /**
  * Get the correct API base URL for the current environment
  */
 function getApiBaseUrl(forceBackend = false): string {
   // Check if we're in Capacitor (native app) - special case for mobile
   if (Capacitor.isNativePlatform()) {
-    return 'https://backend-production-e920.up.railway.app';
+    return CONFIG.PRODUCTION_BACKEND;
   }
 
   // For web environments (both dev and production), always use service worker + proxy
@@ -54,9 +60,9 @@ export async function apiRequest(endpoint: string, options: RequestInit = {}): P
 
   console.log(`🔗 API Request: ${endpoint} -> ${url} (Capacitor: ${Capacitor.isNativePlatform()})`);
 
-  // Add alert for iOS debugging
+  // Debug logging for Capacitor (console only, no alerts)
   if (Capacitor.isNativePlatform()) {
-    alert(`API Call: ${endpoint} -> ${url}`);
+    console.log(`📱 Capacitor API Call: ${endpoint} -> ${url}`);
   }
 
   // Handle Railway redirects by following them automatically

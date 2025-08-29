@@ -1,11 +1,18 @@
 // IMPORTANT: Always increment these versions when modifying this service worker file
 // This forces browsers to download and use the updated service worker
-const STATIC_CACHE = 'todo-static-v76';
-const API_CACHE = 'todo-api-v76';
+const STATIC_CACHE = 'todo-static-v78';
+const API_CACHE = 'todo-api-v78';
 
 const GLOBAL_DB_NAME = 'TodoGlobalDB';
 const USER_DB_PREFIX = 'TodoUserDB_';
 const DB_VERSION = 11;
+
+// Configuration
+const CONFIG = {
+  PRODUCTION_BACKEND: 'https://backend-production-e920.up.railway.app',
+  LOCAL_BACKEND: 'http://localhost:8000',
+  PRODUCTION_DOMAIN: 'todolist.nyc'
+};
 const TODOS = 'todos';
 const CATEGORIES = 'categories';
 const SPACES = 'spaces';
@@ -547,11 +554,6 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
-  // Debug logging for auth requests
-  if (url.pathname.startsWith('/auth')) {
-    console.log(`🔐 SW v75: Auth request detected: ${event.request.method} ${url.pathname}`);
-    console.log(`🔐 SW v75: Origin: ${url.origin}, Self origin: ${self.location.origin}`);
-  }
 
   // Check if this is a same-origin request or a Capacitor file:// request
   const isSameOrigin = url.origin === self.location.origin;
@@ -574,9 +576,6 @@ self.addEventListener('fetch', (event) => {
                  url.pathname.startsWith('/chat') ||
                  url.pathname.startsWith('/auth'));
 
-  if (url.pathname.startsWith('/auth')) {
-    console.log(`🔐 SW v75: isApi=${isApi}, isSameOrigin=${isSameOrigin}, isCapacitorLocal=${isCapacitorLocal}`);
-  }
 
   if (isApi) {
     event.respondWith(handleApiRequest(event.request));
@@ -593,25 +592,19 @@ async function handleApiRequest(request) {
   const online = self.navigator.onLine;
   const url = new URL(request.url);
 
-  // Debug logging
-  if (url.pathname.startsWith('/auth')) {
-    console.log(`🔐 SW v75: handleApiRequest called for ${request.method} ${url.pathname}`);
-    console.log(`🔐 SW v75: online=${online}`);
-  }
 
   // Extract space_id from query parameters
   const spaceId = url.searchParams.get('space_id');
 
   // Check if this is an offline-generated ID that shouldn't go to server
-  const isOfflineId = url.pathname.includes('offline_');
+  const pathParts = url.pathname.split('/');
+  const isOfflineId = pathParts.some(part => part.startsWith('offline_'));
 
   if (online && !isOfflineId) {
     try {
       // Determine environment
       const isCapacitor = self.location.protocol === 'file:';
-      const isProdHost = self.location.hostname.endsWith('todolist.nyc');
-      const isHttp = self.location.protocol === 'http:';
-      let targetUrl;
+      const isProdHost = self.location.hostname.endsWith(CONFIG.PRODUCTION_DOMAIN);
 
       // Route directly to backend
       const apiPath = url.pathname.startsWith('/') ? url.pathname.slice(1) : url.pathname;
@@ -619,16 +612,17 @@ async function handleApiRequest(request) {
 
       // Use production backend for deployed domains and Capacitor
       const backendUrl = (isProdHost || isCapacitor)
-        ? 'https://backend-production-e920.up.railway.app'
-        : 'http://localhost:8000';
+        ? CONFIG.PRODUCTION_BACKEND
+        : CONFIG.LOCAL_BACKEND;
 
       targetUrl = `${backendUrl}/${apiPath}${queryString}`;
 
-      // Forward the request with auth headers (except for auth endpoints)
-      const isAuthEndpoint = url.pathname.startsWith('/auth');
-      const headers = isAuthEndpoint
-        ? { 'Content-Type': 'application/json' }
-        : await getAuthHeaders();
+      // Forward the request with auth headers (except for signup/login endpoints)
+      const noAuthRequired = ['/auth/signup', '/auth/login'];
+      const needsAuth = !noAuthRequired.includes(url.pathname);
+      const headers = needsAuth
+        ? await getAuthHeaders()
+        : { 'Content-Type': 'application/json' };
 
       const proxyRequest = new Request(targetUrl, {
         method: request.method,
@@ -639,29 +633,11 @@ async function handleApiRequest(request) {
       console.log(`🔗 Service worker routing: ${request.url} -> ${targetUrl}`);
       console.log(`📱 Is Capacitor: ${isCapacitor}, Prod host: ${isProdHost}, Protocol: ${self.location.protocol}`);
 
-      if (url.pathname.startsWith('/auth')) {
-        console.log(`🔐 SW v75: About to fetch ${targetUrl}`);
-        console.log(`🔐 SW v75: Headers:`, Object.fromEntries(proxyRequest.headers.entries()));
-        console.log(`🔐 SW v75: Method: ${proxyRequest.method}`);
-        if (proxyRequest.body) {
-          const bodyClone = proxyRequest.clone();
-          const bodyText = await bodyClone.text();
-          console.log(`🔐 SW v75: Body:`, bodyText);
-        }
-      }
 
       let response;
       try {
         response = await fetch(proxyRequest);
-
-        if (url.pathname.startsWith('/auth')) {
-          console.log(`🔐 SW v75: Response status: ${response.status} ${response.statusText}`);
-          console.log(`🔐 SW v75: Response headers:`, Object.fromEntries(response.headers.entries()));
-        }
       } catch (error) {
-        if (url.pathname.startsWith('/auth')) {
-          console.error(`🔐 SW v75: Fetch error:`, error);
-        }
         throw error;
       }
 
