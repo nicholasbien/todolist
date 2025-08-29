@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
-import { apiRequest } from '../utils/api';
+import { apiRequest } from '../utils/apiWithOffline';
 
 interface AuthContextValue {
   user: any;
@@ -97,7 +97,10 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       const storedToken = localStorage.getItem('auth_token');
       const storedUser = localStorage.getItem('auth_user');
 
+      console.log('🔐 AuthContext initializing - Token:', !!storedToken, 'User:', !!storedUser);
+
       if (storedToken && storedUser) {
+        console.log('🔐 Setting user and token in AuthContext');
         setToken(storedToken);
         setUser(JSON.parse(storedUser));
 
@@ -186,11 +189,18 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     return response;
   }, [token, logout]);
 
+  const isAuthenticated = mounted && !!token && !!user;
+
+  // Debug auth state
+  useEffect(() => {
+    console.log('🔐 Auth state - mounted:', mounted, 'token:', !!token, 'user:', !!user, 'isAuthenticated:', isAuthenticated, 'isLoading:', isLoading);
+  }, [mounted, token, user, isAuthenticated, isLoading]);
+
   const value: AuthContextValue = {
     user,
     token,
     isLoading: !mounted || isLoading,
-    isAuthenticated: mounted && !!token && !!user,
+    isAuthenticated,
     authExpired,
     signup,
     login,

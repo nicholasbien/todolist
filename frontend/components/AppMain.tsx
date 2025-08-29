@@ -1,4 +1,4 @@
-import AIToDoListApp from './AIToDoListApp';
+import AIToDoListAppWithOffline from './AIToDoListAppWithOffline';
 import AuthForm from './AuthForm';
 import { useAuth } from '../context/AuthContext';
 import Link from 'next/link';
@@ -28,7 +28,7 @@ export default function AppMain() {
           </div>
         </div>
       )}
-      {isAuthenticated ? <AIToDoListApp user={user} token={token} /> : <AuthForm />}
+      {isAuthenticated ? <AIToDoListAppWithOffline user={user} token={token} /> : <AuthForm />}
     </main>
   );
 }

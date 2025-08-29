@@ -1,34 +1,29 @@
 import '../styles/globals.css';
 import { useEffect } from 'react';
-import { OfflineProvider } from '../context/OfflineContext';
 import { AuthProvider } from '../context/AuthContext';
 import type { AppProps } from 'next/app';
 
 function MyApp({ Component, pageProps }: AppProps) {
   useEffect(() => {
-    // Register service worker in all environments
+    // Service worker disabled - using React-based offline functionality instead
+    console.log('📱 Service Worker disabled - using React offline hooks');
+
+    // Clean up any existing service workers
     if ('serviceWorker' in navigator) {
-      console.log('📱 Registering service worker...');
-      navigator.serviceWorker
-        .register('/sw.js')
-        .then((registration) => {
-          console.log('✅ Service Worker registered successfully:', registration);
-        })
-        .catch((registrationError) => {
-          console.log('❌ Service Worker registration failed: ', registrationError);
+      navigator.serviceWorker.getRegistrations().then((registrations) => {
+        registrations.forEach(registration => {
+          console.log('🧹 Unregistering existing service worker');
+          registration.unregister();
         });
-    } else {
-      console.log('❌ Service Worker not supported');
+      });
     }
 
-    // OfflineProvider handles online/offline events
+    // Offline functionality now handled by useOfflineData hook in components
   }, []);
 
   return (
     <AuthProvider>
-      <OfflineProvider>
-        <Component {...pageProps} />
-      </OfflineProvider>
+      <Component {...pageProps} />
     </AuthProvider>
   );
 }

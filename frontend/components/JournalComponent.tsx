@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { useOffline } from '../context/OfflineContext';
 
 interface JournalProps {
   token: string;
   activeSpace: any;
+  getJournals: (spaceId?: string) => Promise<any[]>;
+  saveJournal: (journal: any) => Promise<any>;
 }
 
 interface JournalEntry {
@@ -19,9 +20,9 @@ interface JournalEntry {
   updated_offline?: boolean; // true if the entry was last updated while offline
 }
 
-export default function JournalComponent({ token, activeSpace }: JournalProps) {
+export default function JournalComponent({ token, activeSpace, getJournals, saveJournal }: JournalProps) {
   const { authenticatedFetch } = useAuth();
-  const isOffline = useOffline();
+  // Using offline-enabled functions for journal operations
   const [selectedDate, setSelectedDate] = useState<string>(() => {
     // Default to today's date in user's local timezone in YYYY-MM-DD format
     const today = new Date();
@@ -42,28 +43,22 @@ export default function JournalComponent({ token, activeSpace }: JournalProps) {
   const [saveTimeout, setSaveTimeout] = useState<NodeJS.Timeout | null>(null);
 
   const fetchJournalEntry = useCallback(async (date: string) => {
-    if (!authenticatedFetch) return;
+    if (!activeSpace?._id) return;
 
     try {
       setLoading(true);
       setError('');
 
-      const url = activeSpace?._id
-        ? `/journals?date=${date}&space_id=${activeSpace._id}`
-        : `/journals?date=${date}`;
+      // Use offline-enabled getJournals function
+      const journals = await getJournals(activeSpace._id);
 
-      const response = await authenticatedFetch(url);
+      // Find the journal entry for the specific date
+      const entry = journals.find(j => j.date === date);
 
-      if (!response?.ok) {
-        throw new Error('Failed to fetch journal entry');
-      }
-
-      const data = await response.json();
-
-      if (data) {
-        setCurrentEntry(data);
-        setJournalText(data.text || '');
-        setLastSavedText(data.text || '');
+      if (entry) {
+        setCurrentEntry(entry);
+        setJournalText(entry.text || '');
+        setLastSavedText(entry.text || '');
       } else {
         // No entry for this date
         setCurrentEntry(null);
@@ -79,7 +74,7 @@ export default function JournalComponent({ token, activeSpace }: JournalProps) {
     } finally {
       setLoading(false);
     }
-  }, [authenticatedFetch, activeSpace]);
+  }, [getJournals, activeSpace]);
 
   // Fetch entry when date or space changes
   useEffect(() => {
@@ -89,29 +84,20 @@ export default function JournalComponent({ token, activeSpace }: JournalProps) {
   }, [selectedDate, fetchJournalEntry]);
 
   const saveJournalEntry = useCallback(async (text: string, showSaving: boolean = false) => {
-    if (!authenticatedFetch || text === lastSavedText) return;
+    if (text === lastSavedText) return;
 
     try {
       if (showSaving) setSaving(true);
       setError('');
 
-      const requestBody = {
+      const journalData = {
         date: selectedDate,
         text: text.trim(),
         space_id: activeSpace?._id || null
       };
 
-      const response = await authenticatedFetch('/journals', {
-        method: 'POST',
-        body: JSON.stringify(requestBody)
-      });
-
-      if (!response?.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || 'Failed to save journal entry');
-      }
-
-      const savedEntry = await response.json();
+      // Use offline-enabled saveJournal function
+      const savedEntry = await saveJournal(journalData);
       setCurrentEntry(savedEntry);
       setLastSavedText(text);
 
@@ -120,7 +106,7 @@ export default function JournalComponent({ token, activeSpace }: JournalProps) {
     } finally {
       if (showSaving) setSaving(false);
     }
-  }, [authenticatedFetch, selectedDate, activeSpace, lastSavedText]);
+  }, [saveJournal, selectedDate, activeSpace, lastSavedText]);
 
   // Auto-save functionality
   useEffect(() => {
@@ -147,7 +133,10 @@ export default function JournalComponent({ token, activeSpace }: JournalProps) {
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
       if (event.data?.type === 'SYNC_COMPLETE' && currentEntry?.updated_offline) {
-        fetchJournalEntry(selectedDate);
+        // Add small delay to allow sync completion to fully process
+        setTimeout(() => {
+          fetchJournalEntry(selectedDate);
+        }, 100);
       }
     };
 
@@ -184,7 +173,7 @@ export default function JournalComponent({ token, activeSpace }: JournalProps) {
   const getSaveStatus = () => {
     if (saving) return 'Saving...';
     if (journalText !== lastSavedText && journalText.trim()) return 'Unsaved changes';
-    if (currentEntry?.updated_offline) return isOffline ? 'Saved offline' : 'Syncing...';
+    if (currentEntry?.updated_offline) return 'Syncing...'; // Simplified - no offline check needed
     if (lastSavedText) return 'Synced online';
     return '';
   };

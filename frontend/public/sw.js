@@ -1,7 +1,7 @@
 // IMPORTANT: Always increment these versions when modifying this service worker file
 // This forces browsers to download and use the updated service worker
-const STATIC_CACHE = 'todo-static-v81';
-const API_CACHE = 'todo-api-v81';
+const STATIC_CACHE = 'todo-static-v84';
+const API_CACHE = 'todo-api-v84';
 
 const GLOBAL_DB_NAME = 'TodoGlobalDB';
 const USER_DB_PREFIX = 'TodoUserDB_';
@@ -602,6 +602,56 @@ async function handleApiRequest(request) {
 
   if (online && !isOfflineId) {
     try {
+      // For GET /journals requests, check if we have pending offline changes
+      if (request.method === 'GET' && url.pathname === '/journals') {
+        const authData = await getAuth();
+        if (authData?.userId) {
+          // Check queue for pending journal updates
+          const queue = await readQueue(authData.userId);
+          const pendingDates = new Set(
+            queue
+              .filter(op => op.type === 'CREATE_JOURNAL' && op.data.date)
+              .map(op => `${op.data.date}_${op.data.space_id || 'default'}`)
+          );
+
+          // Also check IndexedDB for journals with updated_offline flag
+          const localJournals = await getJournals(authData.userId);
+          for (const journal of localJournals) {
+            if (journal.updated_offline) {
+              const journalKey = `${journal.date}_${journal.space_id || 'default'}`;
+              pendingDates.add(journalKey);
+            }
+          }
+
+          // Extract date and space_id from query params to check if this specific journal has pending changes
+          const urlParams = new URLSearchParams(queryString);
+          const requestedDate = urlParams.get('date');
+          const requestedSpaceId = urlParams.get('space_id') || 'default';
+          const requestedKey = `${requestedDate}_${requestedSpaceId}`;
+
+          if (pendingDates.has(requestedKey)) {
+            console.log(`🚫 Blocking server fetch for journal ${requestedDate} (space: ${requestedSpaceId}) - returning offline version instead`);
+
+            // Return offline version from IndexedDB instead of fetching from server
+            const spaceId = requestedSpaceId === 'default' ? null : requestedSpaceId;
+            const offlineJournals = await getJournals(authData.userId, spaceId);
+            const matchingJournal = offlineJournals.find(j => j.date === requestedDate);
+
+            if (matchingJournal) {
+              return new Response(JSON.stringify(matchingJournal), {
+                status: 200,
+                headers: { 'Content-Type': 'application/json' }
+              });
+            } else {
+              return new Response('null', {
+                status: 200,
+                headers: { 'Content-Type': 'application/json' }
+              });
+            }
+          }
+        }
+      }
+
       // Determine environment
       const isCapacitor = self.location.protocol === 'file:';
       const isProdHost = self.location.hostname.endsWith(CONFIG.PRODUCTION_DOMAIN);
@@ -681,18 +731,28 @@ async function handleApiRequest(request) {
 
             // Check queue for pending journal updates to avoid overwriting offline changes
             const queue = await readQueue(authData.userId);
-            const pendingIds = new Set(
+            const pendingDates = new Set(
               queue
-                .filter(op => op.type === 'CREATE_JOURNAL' && op.data._id && !op.data._id.startsWith('offline_journal_'))
-                .map(op => op.data._id)
+                .filter(op => op.type === 'CREATE_JOURNAL' && op.data.date)
+                .map(op => `${op.data.date}_${op.data.space_id || 'default'}`)
             );
+
+            // Also check IndexedDB for journals with updated_offline flag
+            const localJournals = await getJournals(authData.userId);
+            for (const journal of localJournals) {
+              if (journal.updated_offline) {
+                const journalKey = `${journal.date}_${journal.space_id || 'default'}`;
+                pendingDates.add(journalKey);
+              }
+            }
 
             // Save all server journals to IndexedDB for offline access
             let cachedCount = 0;
             for (const journal of serverJournals) {
               if (journal && journal._id) {
-                if (pendingIds.has(journal._id)) {
-                  console.log(`⏭️ Skipping cache for journal ${journal._id} due to pending offline update`);
+                const journalKey = `${journal.date}_${journal.space_id || 'default'}`;
+                if (pendingDates.has(journalKey)) {
+                  console.log(`⏭️ Skipping cache for journal ${journal.date} (space: ${journal.space_id}) due to pending offline update`);
                   continue;
                 }
                 await putJournal(journal, authData.userId);

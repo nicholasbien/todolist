@@ -1,11 +1,10 @@
 import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/router';
-import { useOffline } from '../context/OfflineContext';
 import dynamic from 'next/dynamic';
 import Head from 'next/head';
-import { apiRequest } from '../utils/api';
+import { apiRequest } from '../utils/apiWithOffline';
 
-const AIToDoListApp = dynamic(() => import('../components/AIToDoListApp'), {
+const AIToDoListApp = dynamic(() => import('../components/AIToDoListAppWithOffline'), {
   ssr: false,
   loading: () => (
     <div className="container mx-auto p-4 max-w-md">
@@ -64,7 +63,17 @@ function LoginForm({ onLogin }: LoginFormProps) {
         setStep('code');
         // setMessage('Verification code sent! Check your email.');
       } else {
-        setError(data.detail || 'Signup failed');
+        // Handle different error response formats
+        let errorMessage = 'Signup failed';
+        if (typeof data.detail === 'string') {
+          errorMessage = data.detail;
+        } else if (Array.isArray(data.detail)) {
+          // FastAPI validation errors
+          errorMessage = data.detail.map(err => err.msg).join(', ');
+        } else if (data.detail && data.detail.msg) {
+          errorMessage = data.detail.msg;
+        }
+        setError(errorMessage);
       }
     } catch (error) {
       setError('Network error during signup');
@@ -105,7 +114,17 @@ function LoginForm({ onLogin }: LoginFormProps) {
           onLogin(user, token);
         }
       } else {
-        setError(data.detail || 'Login failed');
+        // Handle different error response formats
+        let errorMessage = 'Login failed';
+        if (typeof data.detail === 'string') {
+          errorMessage = data.detail;
+        } else if (Array.isArray(data.detail)) {
+          // FastAPI validation errors
+          errorMessage = data.detail.map(err => err.msg).join(', ');
+        } else if (data.detail && data.detail.msg) {
+          errorMessage = data.detail.msg;
+        }
+        setError(errorMessage);
       }
     } catch (error) {
       setError('Network error during login');
@@ -138,7 +157,17 @@ function LoginForm({ onLogin }: LoginFormProps) {
         localStorage.setItem('auth_user', JSON.stringify(updatedUser));
         onLogin(updatedUser, token);
       } else {
-        setError(data.detail || 'Failed to update name');
+        // Handle different error response formats
+        let errorMessage = 'Failed to update name';
+        if (typeof data.detail === 'string') {
+          errorMessage = data.detail;
+        } else if (Array.isArray(data.detail)) {
+          // FastAPI validation errors
+          errorMessage = data.detail.map(err => err.msg).join(', ');
+        } else if (data.detail && data.detail.msg) {
+          errorMessage = data.detail.msg;
+        }
+        setError(errorMessage);
       }
     } catch (error) {
       setError('Network error during name update');
@@ -295,9 +324,15 @@ export default function Home() {
   const [exporting, setExporting] = useState(false);
   const [contactMessage, setContactMessage] = useState('');
   const [sendingContact, setSendingContact] = useState(false);
-  const [showOfflineTooltip, setShowOfflineTooltip] = useState(false);
+  const [isOffline, setIsOffline] = useState(false);
+  const [queuedCount, setQueuedCount] = useState(0);
   const settingsDropdownRef = useRef(null);
-  const isOffline = useOffline();
+
+  // Handle offline status updates from the main component
+  const handleOfflineStatusChange = (online: boolean, queueCount: number) => {
+    setIsOffline(!online);
+    setQueuedCount(queueCount);
+  };
 
   useEffect(() => {
     setIsClient(true);
@@ -320,18 +355,9 @@ export default function Home() {
     // OfflineProvider handles network status updates
   }, []);
 
-  useEffect(() => {
-    if (showOfflineTooltip) {
-      const timer = setTimeout(() => setShowOfflineTooltip(false), 3000);
-      return () => clearTimeout(timer);
-    }
-  }, [showOfflineTooltip]);
+  // Removed offline tooltip functionality - handled by AIToDoListAppWithOffline
 
-  useEffect(() => {
-    if (!isOffline) {
-      setShowOfflineTooltip(false);
-    }
-  }, [isOffline]);
+  // Offline indicator is now handled by AIToDoListAppWithOffline component
 
   useEffect(() => {
     if (showExportModal && token) {
@@ -472,20 +498,15 @@ export default function Home() {
             <h1 className="text-2xl font-bold">todolist.nyc</h1>
           <div className="flex items-center space-x-4">
             <div className="flex items-center">
+              {/* Offline Status Icon */}
               {isOffline && (
                 <div className="relative mr-2">
                   <button
-                    onClick={() => setShowOfflineTooltip(true)}
-                    title="Offline"
-                    className="focus:outline-none"
+                    title={`You're offline. Changes will sync when you're back online.${queuedCount > 0 ? ` (${queuedCount} pending)` : ''}`}
+                    className="focus:outline-none text-yellow-400 hover:text-yellow-300 text-lg"
                   >
                     📴
                   </button>
-                  {showOfflineTooltip && (
-                    <div className="absolute left-1/2 -translate-x-1/2 mt-2 w-64 bg-gray-800 text-gray-100 text-xs p-2 rounded-lg shadow-lg z-10">
-                      {"You're offline. Todos will be synced when you're back online."}
-                    </div>
-                  )}
                 </div>
               )}
               <span className="text-sm text-gray-400">Hello, {user?.first_name || user?.email}</span>
@@ -548,6 +569,7 @@ export default function Home() {
           showEmailSettings={showEmailSettings}
           onShowEmailSettings={() => setShowEmailSettings(true)}
           onCloseEmailSettings={() => setShowEmailSettings(false)}
+          onOfflineStatusChange={handleOfflineStatusChange}
         />
         {/* Export Modal */}
         {showExportModal && (
