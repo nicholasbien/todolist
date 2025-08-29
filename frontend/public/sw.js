@@ -1,7 +1,7 @@
 // IMPORTANT: Always increment these versions when modifying this service worker file
 // This forces browsers to download and use the updated service worker
-const STATIC_CACHE = 'todo-static-v71';
-const API_CACHE = 'todo-api-v71';
+const STATIC_CACHE = 'todo-static-v72';
+const API_CACHE = 'todo-api-v72';
 
 const GLOBAL_DB_NAME = 'TodoGlobalDB';
 const USER_DB_PREFIX = 'TodoUserDB_';
@@ -558,22 +558,15 @@ self.addEventListener('fetch', (event) => {
                          url.pathname.startsWith('/chat') ||
                          url.pathname.startsWith('/auth'));
 
-  const isAuthRequest = url.pathname.startsWith('/auth');
-
-  // Handle all API requests except auth
+  // Handle all API requests including auth
   const isApi = (isSameOrigin || isCapacitorLocal) &&
                 (url.pathname.startsWith('/todos') ||
                  url.pathname.startsWith('/categories') ||
                  url.pathname.startsWith('/spaces') ||
                  url.pathname.startsWith('/journals') ||
                  url.pathname.startsWith('/insights') ||
-                 url.pathname.startsWith('/chat'));
-
-  if (isAuthRequest) {
-    // For auth requests, we need to route through service worker but bypass caching
-    event.respondWith(handleAuthRequest(event.request));
-    return;
-  }
+                 url.pathname.startsWith('/chat') ||
+                 url.pathname.startsWith('/auth'));
 
   if (isApi) {
     event.respondWith(handleApiRequest(event.request));
@@ -615,11 +608,15 @@ async function handleApiRequest(request) {
 
       targetUrl = `${backendUrl}/${apiPath}${queryString}`;
 
-      // Forward the request with auth headers
-      const authHeaders = await getAuthHeaders();
+      // Forward the request with auth headers (except for auth endpoints)
+      const isAuthEndpoint = url.pathname.startsWith('/auth');
+      const headers = isAuthEndpoint
+        ? { 'Content-Type': 'application/json' }
+        : await getAuthHeaders();
+
       const proxyRequest = new Request(targetUrl, {
         method: request.method,
-        headers: authHeaders,
+        headers,
         body: request.method !== 'GET' && request.method !== 'HEAD' ? await request.blob() : null
       });
 
@@ -628,7 +625,8 @@ async function handleApiRequest(request) {
 
       const response = await fetch(proxyRequest);
 
-      if (request.method === 'GET' && response.ok) {
+      // Don't cache auth requests
+      if (request.method === 'GET' && response.ok && !url.pathname.startsWith('/auth')) {
         const cache = await caches.open(API_CACHE);
         cache.put(request, response.clone());
 
@@ -714,45 +712,6 @@ async function handleApiRequest(request) {
   return handleOfflineRequest(request, url);
 }
 
-// Handle auth requests - route directly to backend without caching
-async function handleAuthRequest(request) {
-  try {
-    const url = new URL(request.url);
-
-    // Determine environment
-    const isCapacitor = self.location.protocol === 'file:';
-    const isProdHost = self.location.hostname.endsWith('todolist.nyc');
-
-    // Route directly to backend
-    const apiPath = url.pathname.startsWith('/') ? url.pathname.slice(1) : url.pathname;
-    const queryString = url.search;
-
-    // Use production backend for deployed domains and Capacitor
-    const backendUrl = (isProdHost || isCapacitor)
-      ? 'https://backend-production-e920.up.railway.app'
-      : 'http://localhost:8000';
-
-    const targetUrl = `${backendUrl}/${apiPath}${queryString}`;
-
-    // Forward the request without auth headers (auth endpoints don't need them)
-    const proxyRequest = new Request(targetUrl, {
-      method: request.method,
-      headers: {
-        'Content-Type': 'application/json',
-        // Don't include auth headers for auth requests
-        ...(request.headers.get('Content-Type') && { 'Content-Type': request.headers.get('Content-Type') })
-      },
-      body: request.method !== 'GET' && request.method !== 'HEAD' ? await request.blob() : null
-    });
-
-    console.log(`🔐 Auth request routing: ${request.url} -> ${targetUrl}`);
-
-    return await fetch(proxyRequest);
-  } catch (error) {
-    console.error('Auth request failed:', error);
-    return new Response(JSON.stringify({ error: 'Auth request failed' }), { status: 500 });
-  }
-}
 
 // Handle offline API requests
 async function handleOfflineRequest(request, url) {
