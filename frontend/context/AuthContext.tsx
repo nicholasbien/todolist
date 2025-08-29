@@ -168,11 +168,8 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
   // Helper function to make authenticated API calls
   const authenticatedFetch = useCallback(async (url: string, options: RequestInit = {}): Promise<Response> => {
-    // Extract endpoint from URL (remove /api/ prefix if present)
-    const endpoint = url.startsWith('/api/') ? url.replace('/api/', '') : url;
-
     // Use apiRequest which handles environment-specific routing
-    const response = await apiRequest(endpoint, {
+    const response = await apiRequest(url, {
       ...options,
       headers: {
         ...(token && { 'Authorization': `Bearer ${token}` }),
