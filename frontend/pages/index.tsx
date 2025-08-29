@@ -210,7 +210,7 @@ function LoginForm({ onLogin }: LoginFormProps) {
         ) : step === 'code' ? (
           <form onSubmit={handleCodeSubmit} className="space-y-6">
             <div>
-              <label htmlFor="code" className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="code" className="block text-sm font-medium text-gray-100 mb-2">
                 Verification Code
               </label>
               <input
@@ -218,14 +218,14 @@ function LoginForm({ onLogin }: LoginFormProps) {
                 id="code"
                 value={code}
                 onChange={(e) => setCode(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-center text-lg font-mono bg-white"
+                className="w-full px-4 py-2 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-center text-lg font-mono bg-white text-gray-900"
                 placeholder="000000"
                 disabled={loading}
                 required
                 maxLength={6}
               />
-              <p className="text-sm text-gray-500 mt-1">
-                Code sent to: <span className="font-medium">{email}</span>
+              <p className="text-sm text-gray-300 mt-1">
+                Code sent to: <span className="font-medium text-gray-100">{email}</span>
               </p>
             </div>
 

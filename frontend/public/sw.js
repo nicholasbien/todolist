@@ -1,7 +1,7 @@
 // IMPORTANT: Always increment these versions when modifying this service worker file
 // This forces browsers to download and use the updated service worker
-const STATIC_CACHE = 'todo-static-v78';
-const API_CACHE = 'todo-api-v78';
+const STATIC_CACHE = 'todo-static-v81';
+const API_CACHE = 'todo-api-v81';
 
 const GLOBAL_DB_NAME = 'TodoGlobalDB';
 const USER_DB_PREFIX = 'TodoUserDB_';
@@ -610,12 +610,13 @@ async function handleApiRequest(request) {
       const apiPath = url.pathname.startsWith('/') ? url.pathname.slice(1) : url.pathname;
       const queryString = url.search;
 
+
       // Use production backend for deployed domains and Capacitor
       const backendUrl = (isProdHost || isCapacitor)
         ? CONFIG.PRODUCTION_BACKEND
         : CONFIG.LOCAL_BACKEND;
 
-      targetUrl = `${backendUrl}/${apiPath}${queryString}`;
+      const targetUrl = `${backendUrl}/${apiPath}${queryString}`;
 
       // Forward the request with auth headers (except for signup/login endpoints)
       const noAuthRequired = ['/auth/signup', '/auth/login'];

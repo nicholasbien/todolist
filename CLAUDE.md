@@ -69,14 +69,50 @@ This is an AI-powered collaborative todo list application with a React/Next.js f
 - **Isolation**: Todos and categories are completely isolated between spaces
 - **Email Invitations**: Support for inviting both existing and new users
 
-### Data Flow (With Service Worker Architecture)
+### Service Worker Routing Architecture
+
+The app uses an **offline-first service worker proxy** for all API communication, providing seamless online/offline functionality.
+
+#### Request Flow
+1. **Frontend API Layer** (`utils/api.ts`):
+   - Detects environment (Capacitor native vs web)
+   - Routes Capacitor directly to production backend
+   - Routes web requests through relative URLs for service worker interception
+
+2. **Service Worker Proxy** (`public/sw.js`):
+   - Intercepts all same-origin API requests (`/todos`, `/categories`, `/spaces`, `/journals`, `/auth`, etc.)
+   - Routes to appropriate backend based on environment:
+     - **Production**: `https://backend-production-e920.up.railway.app`
+     - **Local Development**: `http://localhost:8000`
+     - **Capacitor**: Direct to production backend (bypasses service worker)
+
+3. **Offline-First Functionality**:
+   - **Online**: Forwards requests to backend, caches responses in IndexedDB
+   - **Offline**: Serves from IndexedDB, queues write operations for later sync
+   - **Sync**: Automatically syncs queued operations when back online
+
+#### Authentication Handling
+- **No Auth Required**: `/auth/signup`, `/auth/login` (no auth headers sent)
+- **Auth Required**: `/auth/logout`, `/auth/me`, all other endpoints (includes JWT token)
+- **Token Management**: Stored in localStorage and IndexedDB for offline access
+
+#### Environment Detection
+```javascript
+const isCapacitor = Capacitor.isNativePlatform(); // Mobile app
+const isProdHost = hostname.endsWith('todolist.nyc'); // Production web
+const backendUrl = (isProdHost || isCapacitor)
+  ? CONFIG.PRODUCTION_BACKEND
+  : CONFIG.LOCAL_BACKEND;
+```
+
+### Data Flow (Current Architecture)
 1. User selects or creates a space in the frontend
 2. User adds a task within the active space context
-3. Frontend sends task with space_id to `/api/todos` (proxied to backend)
-4. Service Worker intercepts same-origin `/api/*` requests for offline capability
-5. Backend classifies the task using space-specific categories and stores in MongoDB
-6. Service Worker provides offline storage and sync when back online
-7. Frontend refreshes todo list filtered by active space
+3. Frontend calls `apiRequest('/todos')` with space_id
+4. Service Worker intercepts request and routes to backend
+5. Backend classifies task using space-specific categories and stores in MongoDB
+6. Service Worker caches response in IndexedDB for offline access
+7. Frontend displays updated todo list filtered by active space
 
 ### Database Schema
 - **Spaces Collection**: `{_id, name, owner_id, member_ids, pending_emails}`
@@ -117,31 +153,32 @@ Both frontend and backend require OpenAI API keys:
 
 ## API Endpoints
 
-**Note**: All frontend requests use `/api/*` pattern (e.g., `/api/todos`) which are proxied to the backend at the corresponding path (e.g., `/todos`).
+**Note**: All frontend requests use direct paths (e.g., `/todos`, `/auth/signup`) that are intercepted by the service worker and routed to the appropriate backend.
 
 ### Spaces
-- `GET /api/spaces` - List user's accessible spaces
-- `POST /api/spaces` - Create new space
-- `PUT /api/spaces/{id}` - Rename space (owner only)
-- `DELETE /api/spaces/{id}` - Delete space (owner only)
-- `POST /api/spaces/{id}/invite` - Invite users to space
+- `GET /spaces` - List user's accessible spaces
+- `POST /spaces` - Create new space
+- `PUT /spaces/{id}` - Rename space (owner only)
+- `DELETE /spaces/{id}` - Delete space (owner only)
+- `POST /spaces/{id}/invite` - Invite users to space
 
 ### Todos (Space-Aware)
-- `GET /api/todos?space_id={id}` - Get todos for specific space
-- `POST /api/todos` - Create todo with space_id
-- `PUT /api/todos/{id}` - Update todo
-- `DELETE /api/todos/{id}` - Delete todo
+- `GET /todos?space_id={id}` - Get todos for specific space
+- `POST /todos` - Create todo with space_id
+- `PUT /todos/{id}` - Update todo
+- `DELETE /todos/{id}` - Delete todo
 
 ### Categories (Space-Aware)
-- `GET /api/categories?space_id={id}` - Get categories for space
-- `POST /api/categories` - Add category to space
-- `PUT /api/categories/{name}?space_id={id}` - Rename category
-- `DELETE /api/categories/{name}?space_id={id}` - Delete category
+- `GET /categories?space_id={id}` - Get categories for space
+- `POST /categories` - Add category to space
+- `PUT /categories/{name}?space_id={id}` - Rename category
+- `DELETE /categories/{name}?space_id={id}` - Delete category
 
 ### Authentication
-- `POST /api/auth/signup` - Sign up with email
-- `POST /api/auth/login` - Login with email and verification code
-- `POST /api/auth/logout` - Logout and invalidate session
+- `POST /auth/signup` - Sign up with email (no auth required)
+- `POST /auth/login` - Login with email and verification code (no auth required)
+- `POST /auth/logout` - Logout and invalidate session (auth required)
+- `GET /auth/me` - Get current user info (auth required)
 
 ### Journals
 - `GET /api/journals?date={date}&space_id={id}` - Get journal entry for specific date and space
