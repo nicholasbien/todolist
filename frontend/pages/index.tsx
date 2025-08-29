@@ -3,6 +3,7 @@ import { useRouter } from 'next/router';
 import { useOffline } from '../context/OfflineContext';
 import dynamic from 'next/dynamic';
 import Head from 'next/head';
+import { apiRequest } from '../utils/api';
 
 const AIToDoListApp = dynamic(() => import('../components/AIToDoListApp'), {
   ssr: false,
@@ -52,11 +53,8 @@ function LoginForm({ onLogin }: LoginFormProps) {
     setMessage('');
 
     try {
-      const response = await fetch('/api/auth/signup', {
+      const response = await apiRequest('auth/signup', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
         body: JSON.stringify({ email })
       });
 
@@ -86,11 +84,8 @@ function LoginForm({ onLogin }: LoginFormProps) {
     setError('');
 
     try {
-      const response = await fetch('/api/auth/login', {
+      const response = await apiRequest('auth/login', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
         body: JSON.stringify({ email, code })
       });
 
@@ -131,12 +126,8 @@ function LoginForm({ onLogin }: LoginFormProps) {
 
     try {
       const token = localStorage.getItem('auth_token');
-      const response = await fetch('/api/auth/update-name', {
+      const response = await apiRequest('auth/update-name', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
         body: JSON.stringify({ first_name: firstName })
       });
 

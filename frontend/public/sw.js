@@ -551,9 +551,15 @@ self.addEventListener('fetch', (event) => {
   const isSameOrigin = url.origin === self.location.origin;
   const isCapacitorLocal = self.location.protocol === 'file:' && url.pathname.startsWith('/api/');
 
-  // Handle all API requests through /api/* paths including auth
+  const isAuthRequest = url.pathname.startsWith('/api/auth');
+
+  // Handle all API requests through /api/* paths except auth
   const isApi = (isSameOrigin || isCapacitorLocal) &&
                 url.pathname.startsWith('/api/');
+
+  if (isAuthRequest) {
+    return; // Always go to network for auth requests
+  }
 
   if (isApi) {
     event.respondWith(handleApiRequest(event.request));
