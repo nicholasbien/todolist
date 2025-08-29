@@ -1,0 +1,204 @@
+/**
+ * Automated validation to ensure service worker routes stay synchronized with backend endpoints
+ * This test helps prevent the "Missing Route Syndrome" where new backend endpoints
+ * are added but not included in the service worker's route whitelist.
+ */
+
+import fs from 'fs';
+import path from 'path';
+
+describe('Service Worker Route Synchronization', () => {
+  let serviceWorkerContent: string;
+  let backendEndpoints: string[];
+  let serviceWorkerRoutes: string[];
+
+  beforeAll(() => {
+    // Read service worker file
+    const swPath = path.join(process.cwd(), 'public', 'sw.js');
+    serviceWorkerContent = fs.readFileSync(swPath, 'utf8');
+
+    // Extract backend endpoints from backend/app.py
+    const backendPath = path.join(process.cwd(), '..', 'backend', 'app.py');
+    if (fs.existsSync(backendPath)) {
+      const backendContent = fs.readFileSync(backendPath, 'utf8');
+      backendEndpoints = extractBackendEndpoints(backendContent);
+    } else {
+      // Fallback: known endpoints as of 2025-08-29
+      backendEndpoints = [
+        '/',
+        '/auth/signup',
+        '/auth/login',
+        '/auth/logout',
+        '/auth/me',
+        '/auth/update-name',
+        '/todos',
+        '/health',
+        '/categories',
+        '/spaces',
+        '/email/send-summary',
+        '/email/scheduler-status',
+        '/email/update-schedule',
+        '/email/update-instructions',
+        '/email/update-spaces',
+        '/contact',
+        '/chat',
+        '/insights',
+        '/journals',
+        '/export'
+      ];
+    }
+
+    // Extract service worker routes
+    serviceWorkerRoutes = extractServiceWorkerRoutes(serviceWorkerContent);
+  });
+
+  test('service worker includes all required API endpoint prefixes', () => {
+    // Get unique prefixes from backend endpoints (first path segment)
+    const requiredPrefixes = new Set<string>();
+
+    backendEndpoints.forEach(endpoint => {
+      if (endpoint === '/') return; // Skip root
+
+      const pathParts = endpoint.split('/').filter(part => part);
+      if (pathParts.length > 0) {
+        requiredPrefixes.add(pathParts[0]);
+      }
+    });
+
+    console.log('Required prefixes from backend:', Array.from(requiredPrefixes).sort());
+    console.log('Service worker routes:', serviceWorkerRoutes.sort());
+
+    // Check that all required prefixes are in service worker routes
+    const missingRoutes: string[] = [];
+    requiredPrefixes.forEach(prefix => {
+      if (!serviceWorkerRoutes.includes(prefix)) {
+        missingRoutes.push(prefix);
+      }
+    });
+
+    if (missingRoutes.length > 0) {
+      throw new Error(`Missing service worker routes for endpoints: ${missingRoutes.join(', ')}\n\n` +
+           `Add these to both route checks in public/sw.js:\n` +
+           missingRoutes.map(route => `url.pathname.startsWith('/${route}') ||`).join('\n'));
+    }
+
+    expect(missingRoutes).toHaveLength(0);
+  });
+
+  test('service worker routes are synchronized in both locations', () => {
+    // Extract routes from both isCapacitorLocal and isApi checks
+    const capacitorRoutes = extractRoutesFromSection(serviceWorkerContent, 'isCapacitorLocal');
+    const apiRoutes = extractRoutesFromSection(serviceWorkerContent, 'isApi');
+
+    console.log('Capacitor routes:', capacitorRoutes.sort());
+    console.log('API routes:', apiRoutes.sort());
+
+    // Both sections should have identical routes
+    expect(capacitorRoutes.sort()).toEqual(apiRoutes.sort());
+  });
+
+  test('service worker cache versions are incremented format', () => {
+    const staticCacheMatch = serviceWorkerContent.match(/STATIC_CACHE = 'todo-static-v(\d+)'/);
+    const apiCacheMatch = serviceWorkerContent.match(/API_CACHE = 'todo-api-v(\d+)'/);
+
+    expect(staticCacheMatch).toBeTruthy();
+    expect(apiCacheMatch).toBeTruthy();
+
+    if (staticCacheMatch && apiCacheMatch) {
+      const staticVersion = parseInt(staticCacheMatch[1]);
+      const apiVersion = parseInt(apiCacheMatch[1]);
+
+      // Versions should be numbers and match each other
+      expect(staticVersion).toBeGreaterThan(0);
+      expect(apiVersion).toBeGreaterThan(0);
+      expect(staticVersion).toBe(apiVersion);
+    }
+  });
+
+  test('all current endpoints are properly routed', () => {
+    // These are the endpoints that should definitely be routed through service worker
+    const criticalEndpoints = [
+      'todos',
+      'categories',
+      'spaces',
+      'journals',
+      'insights',
+      'chat',
+      'auth',
+      'email',
+      'contact',
+      'export'
+    ];
+
+    const missingCritical = criticalEndpoints.filter(endpoint =>
+      !serviceWorkerRoutes.includes(endpoint)
+    );
+
+    if (missingCritical.length > 0) {
+      throw new Error(`Critical endpoints missing from service worker routes: ${missingCritical.join(', ')}`);
+    }
+
+    expect(missingCritical).toHaveLength(0);
+  });
+});
+
+/**
+ * Extract backend endpoints from app.py content
+ */
+function extractBackendEndpoints(content: string): string[] {
+  const endpoints: string[] = [];
+
+  // Match @app.get("/path") and @app.post("/path") patterns
+  const endpointRegex = /@app\.(get|post|put|delete)\("([^"]+)"\)/g;
+  let match;
+
+  while ((match = endpointRegex.exec(content)) !== null) {
+    const endpoint = match[2];
+    // Only include endpoints from main app.py, not from dependencies
+    if (!endpoint.includes('{') && !endpoint.includes('*')) {
+      endpoints.push(endpoint);
+    }
+  }
+
+  return [...new Set(endpoints)]; // Remove duplicates
+}
+
+/**
+ * Extract service worker routes from content
+ */
+function extractServiceWorkerRoutes(content: string): string[] {
+  const routes: string[] = [];
+
+  // Find all startsWith patterns in the isApi check
+  const startsWithRegex = /url\.pathname\.startsWith\('\/([^']+)'\)/g;
+  let match;
+
+  while ((match = startsWithRegex.exec(content)) !== null) {
+    routes.push(match[1]);
+  }
+
+  return [...new Set(routes)]; // Remove duplicates
+}
+
+/**
+ * Extract routes from a specific section (isCapacitorLocal or isApi)
+ */
+function extractRoutesFromSection(content: string, sectionName: string): string[] {
+  const routes: string[] = [];
+
+  // Find the section
+  const sectionRegex = new RegExp(`const ${sectionName}[\\s\\S]*?;`, 'g');
+  const sectionMatch = sectionRegex.exec(content);
+
+  if (sectionMatch) {
+    const section = sectionMatch[0];
+    const startsWithRegex = /url\.pathname\.startsWith\('\/([^']+)'\)/g;
+    let match;
+
+    while ((match = startsWithRegex.exec(section)) !== null) {
+      routes.push(match[1]);
+    }
+  }
+
+  return routes;
+}

@@ -20,6 +20,9 @@ npm start
 
 # Run linter
 npm run lint
+
+# Check API route synchronization
+node scripts/check-api-routes.js
 ```
 
 ### Backend (FastAPI)
@@ -271,3 +274,38 @@ async def get_items():
 - Always use `response_model` in FastAPI endpoints for consistency
 - Test offline functionality after adding new endpoints
 - Monitor service worker logs for "Found 0" vs expected counts
+
+## API Routing Maintenance
+
+### ⚠️ CRITICAL: When Adding New Backend Endpoints
+
+**THE #1 CAUSE OF 404 ERRORS**: New backend endpoints added without updating service worker routes.
+
+**Problem**: Service worker only intercepts whitelisted paths. New endpoints fall through to Next.js and return 404.
+
+**Solution**: Always follow these steps when adding backend endpoints:
+
+1. **Add endpoint to backend** (`backend/app.py`)
+2. **Update service worker routes** (`public/sw.js`) - ADD TO BOTH LOCATIONS:
+   - `isCapacitorLocal` check (line ~560)
+   - `isApi` check (line ~570)
+3. **Increment cache versions** (`STATIC_CACHE` and `API_CACHE`)
+4. **Test both routes**: Service worker + proxy fallback
+
+**Quick Check**:
+```bash
+# Verify route synchronization
+node scripts/check-api-routes.js
+
+# Test both routing layers
+curl http://localhost:3000/new-endpoint      # Service worker
+curl http://localhost:3000/api/new-endpoint  # Proxy fallback
+```
+
+**Current API Routes** (as of 2025-08-29):
+- `/todos`, `/categories`, `/spaces`, `/journals`, `/insights`, `/chat`
+- `/auth`, `/email`, `/contact`, `/export`, `/health`
+
+**Documentation**: See `docs/API_ROUTING_ARCHITECTURE.md` for complete details.
+
+**Automated Testing**: `__tests__/ServiceWorkerRouteValidation.test.ts` catches missing routes.

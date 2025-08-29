@@ -1,7 +1,7 @@
 // IMPORTANT: Always increment these versions when modifying this service worker file
 // This forces browsers to download and use the updated service worker
-const STATIC_CACHE = 'todo-static-v99';
-const API_CACHE = 'todo-api-v99';
+const STATIC_CACHE = 'todo-static-v100';
+const API_CACHE = 'todo-api-v100';
 
 const GLOBAL_DB_NAME = 'TodoGlobalDB';
 const USER_DB_PREFIX = 'TodoUserDB_';
@@ -567,7 +567,8 @@ self.addEventListener('fetch', (event) => {
                          url.pathname.startsWith('/auth') ||
                          url.pathname.startsWith('/email') ||
                          url.pathname.startsWith('/contact') ||
-                         url.pathname.startsWith('/export'));
+                         url.pathname.startsWith('/export') ||
+                         url.pathname.startsWith('/health'));
 
   // Handle all API requests including auth
   const isApi = (isSameOrigin || isCapacitorLocal) &&
@@ -580,7 +581,8 @@ self.addEventListener('fetch', (event) => {
                  url.pathname.startsWith('/auth') ||
                  url.pathname.startsWith('/email') ||
                  url.pathname.startsWith('/contact') ||
-                 url.pathname.startsWith('/export'));
+                 url.pathname.startsWith('/export') ||
+                 url.pathname.startsWith('/health'));
 
 
   if (isApi) {
