@@ -1,7 +1,7 @@
 // IMPORTANT: Always increment these versions when modifying this service worker file
 // This forces browsers to download and use the updated service worker
-const STATIC_CACHE = 'todo-static-v81';
-const API_CACHE = 'todo-api-v81';
+const STATIC_CACHE = 'todo-static-v94';
+const API_CACHE = 'todo-api-v94';
 
 const GLOBAL_DB_NAME = 'TodoGlobalDB';
 const USER_DB_PREFIX = 'TodoUserDB_';
@@ -602,6 +602,9 @@ async function handleApiRequest(request) {
 
   if (online && !isOfflineId) {
     try {
+      // For GET requests, we need to be careful about sync timing to preserve offline data
+      // Sync will be triggered after response handling to avoid overwriting offline changes
+
       // Determine environment
       const isCapacitor = self.location.protocol === 'file:';
       const isProdHost = self.location.hostname.endsWith(CONFIG.PRODUCTION_DOMAIN);
@@ -676,43 +679,58 @@ async function handleApiRequest(request) {
 
           // Only process non-null responses
           if (serverResponse !== null) {
-            // Handle both single journal and array responses
-            const serverJournals = Array.isArray(serverResponse) ? serverResponse : [serverResponse];
-
-            // Check queue for pending journal updates to avoid overwriting offline changes
+            // Simple approach: Don't cache ANY server journal data if sync is in progress or there's pending data
             const queue = await readQueue(authData.userId);
-            const pendingIds = new Set(
-              queue
-                .filter(op => op.type === 'CREATE_JOURNAL' && op.data._id && !op.data._id.startsWith('offline_journal_'))
-                .map(op => op.data._id)
-            );
+            console.log(`🔍 JOURNAL DEBUG - Queue length: ${queue.length}, User: ${authData.userId}`);
+            console.log(`🔍 JOURNAL DEBUG - Queue contents:`, queue.map(op => `${op.type}:${op.data.date}`));
 
-            // Save all server journals to IndexedDB for offline access
-            let cachedCount = 0;
-            for (const journal of serverJournals) {
-              if (journal && journal._id) {
-                if (pendingIds.has(journal._id)) {
-                  console.log(`⏭️ Skipping cache for journal ${journal._id} due to pending offline update`);
-                  continue;
+            const hasPendingJournals = queue.some(op =>
+              (op.type === 'CREATE_JOURNAL' || op.type === 'UPDATE_JOURNAL') &&
+              (op.data.space_id === spaceId || (!spaceId && !op.data.space_id))
+            );
+            console.log(`🔍 JOURNAL DEBUG - Pending journals for space ${spaceId}: ${hasPendingJournals}`);
+            console.log(`🔍 JOURNAL DEBUG - Sync in progress: ${syncInProgress}`);
+
+            if (syncInProgress || hasPendingJournals) {
+              console.log(`⏸️ BLOCKING journal server data - sync: ${syncInProgress}, pending: ${hasPendingJournals}`);
+              // Don't cache server data, return original response
+            } else {
+              // Safe to cache server data
+              const serverJournals = Array.isArray(serverResponse) ? serverResponse : [serverResponse];
+              let cachedCount = 0;
+              for (const journal of serverJournals) {
+                if (journal && journal._id && journal.date) {
+                  await putJournal(journal, authData.userId);
+                  cachedCount++;
                 }
-                await putJournal(journal, authData.userId);
-                cachedCount++;
               }
-            }
-            if (cachedCount > 0) {
-              console.log(`📝 Cached ${cachedCount} journal(s) to IndexedDB`);
+              if (cachedCount > 0) {
+                console.log(`📝 Cached ${cachedCount} journal(s) to IndexedDB`);
+              }
             }
           } else {
             console.log('📝 No journal data to cache');
+          }
+
+          // Now sync queued journal operations after response caching to preserve offline changes
+          if (url.pathname === '/journals' && request.method === 'GET') {
+            console.log(`🔄 Syncing journal queue after GET response caching`);
+            syncQueue().catch(err => console.error('Journal sync error:', err));
           }
 
           return response; // Return original response
         }
       }
 
-      // Trigger sync for non-GET requests
-      if (request.method !== 'GET' && response.ok) {
-        syncQueue();
+      // Trigger sync for non-GET requests and GET requests that weren't already synced
+      if (response.ok) {
+        if (request.method !== 'GET') {
+          syncQueue();
+        } else if (url.pathname !== '/journals') {
+          // Sync for other GET requests after caching
+          console.log(`🔄 Syncing queue after GET ${url.pathname}`);
+          syncQueue().catch(err => console.error('GET sync error:', err));
+        }
       }
       return response;
     } catch (err) {
@@ -829,6 +847,8 @@ async function handleOfflineRequest(request, url) {
     console.log('📝 Found existing journals:', existing.length);
 
     let journalData;
+    let operationType;
+
     if (existing && existing.length > 0) {
       // Update existing entry
       journalData = {
@@ -837,6 +857,7 @@ async function handleOfflineRequest(request, url) {
         updated_at: new Date().toISOString(),
         updated_offline: true, // last updated offline
       };
+      operationType = existing[0]._id.startsWith('offline_journal_') ? 'CREATE_JOURNAL' : 'UPDATE_JOURNAL';
     } else {
       // Create new offline entry
       journalData = {
@@ -847,39 +868,32 @@ async function handleOfflineRequest(request, url) {
         text: data.text,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
-        // Flag to indicate this entry was created while offline. "updated_offline"
-        // also tracks when the entry was last updated offline.
         created_offline: true,
         updated_offline: true,
       };
+      operationType = 'CREATE_JOURNAL';
     }
 
     await putJournal(journalData, authData ? authData.userId : null);
 
-    // Auto-save optimization: update existing queue entry or add new one
-    if (existing && existing.length > 0) {
-      // For updates to existing journals, replace the existing queue entry
-      const queue = await readQueue(authData ? authData.userId : null);
-      const existingQueueIndex = queue.findIndex(op =>
-        op.type === 'CREATE_JOURNAL' &&
-        op.data.date === data.date &&
-        op.data.space_id === (data.space_id || null)
-      );
+    // Use queue optimization for all journal operations - replace existing entries with latest state
+    const queue = await readQueue(authData ? authData.userId : null);
+    const existingQueueIndex = queue.findIndex(op =>
+      (op.type === 'CREATE_JOURNAL' || op.type === 'UPDATE_JOURNAL') &&
+      op.data.date === data.date &&
+      op.data.space_id === (data.space_id || null)
+    );
 
-      if (existingQueueIndex !== -1) {
-        // Replace existing queue entry
-        queue[existingQueueIndex].data = journalData;
-        await clearQueue(authData ? authData.userId : null);
-        for (const op of queue) {
-          await addQueue(op, authData ? authData.userId : null);
-        }
-      } else {
-        // No existing queue entry, add new one
-        await addQueue({ type: 'CREATE_JOURNAL', data: journalData }, authData ? authData.userId : null);
+    if (existingQueueIndex !== -1) {
+      // Replace existing queue entry with latest state
+      queue[existingQueueIndex] = { type: operationType, data: journalData };
+      await clearQueue(authData ? authData.userId : null);
+      for (const op of queue) {
+        await addQueue(op, authData ? authData.userId : null);
       }
     } else {
-      // New journal, add to queue
-      await addQueue({ type: 'CREATE_JOURNAL', data: journalData }, authData ? authData.userId : null);
+      // Add new queue entry
+      await addQueue({ type: operationType, data: journalData }, authData ? authData.userId : null);
     }
 
     return new Response(JSON.stringify(journalData), { headers: { 'Content-Type': 'application/json' } });
@@ -1212,6 +1226,10 @@ async function syncQueue() {
   syncInProgress = true;
   // console.log('Starting sync...');
 
+  // Determine environment for sync requests
+  const isCapacitor = self.location.protocol === 'file:';
+  const isProdHost = self.location.hostname.endsWith(CONFIG.PRODUCTION_DOMAIN);
+
   try {
     const queue = await readQueue(authData.userId);
     const headers = await getAuthHeaders();
@@ -1227,7 +1245,8 @@ async function syncQueue() {
         case 'CREATE':
           if (op.data._id.startsWith('offline_')) {
             const { _id: offlineId, ...payload } = op.data;
-            res = await fetch('/todos', {
+            const todoSyncUrl = `${isCapacitor ? CONFIG.PRODUCTION_BACKEND : (isProdHost ? CONFIG.PRODUCTION_BACKEND : CONFIG.LOCAL_BACKEND)}/todos`;
+            res = await fetch(todoSyncUrl, {
               method: 'POST',
               headers,
               body: JSON.stringify(payload),
@@ -1321,7 +1340,8 @@ async function syncQueue() {
           }
           break;
         case 'CREATE_CATEGORY':
-          res = await fetch('/categories', {
+          const categorySyncUrl = `${isCapacitor ? CONFIG.PRODUCTION_BACKEND : (isProdHost ? CONFIG.PRODUCTION_BACKEND : CONFIG.LOCAL_BACKEND)}/categories`;
+          res = await fetch(categorySyncUrl, {
             method: 'POST',
             headers,
             body: JSON.stringify(op.data),
@@ -1360,7 +1380,8 @@ async function syncQueue() {
         case 'CREATE_JOURNAL':
           if (op.data._id.startsWith('offline_journal_')) {
             const { _id: offlineId, ...payload } = op.data;
-            res = await fetch('/journals', {
+            const createJournalUrl = `${isCapacitor ? CONFIG.PRODUCTION_BACKEND : (isProdHost ? CONFIG.PRODUCTION_BACKEND : CONFIG.LOCAL_BACKEND)}/journals`;
+            res = await fetch(createJournalUrl, {
               method: 'POST',
               headers,
               body: JSON.stringify(payload),
@@ -1386,7 +1407,8 @@ async function syncQueue() {
             }
           } else {
             // Handle both offline-generated and regular journal updates
-            res = await fetch('/journals', {
+            const createJournalUrl2 = `${isCapacitor ? CONFIG.PRODUCTION_BACKEND : (isProdHost ? CONFIG.PRODUCTION_BACKEND : CONFIG.LOCAL_BACKEND)}/journals`;
+            res = await fetch(createJournalUrl2, {
               method: 'POST',
               headers,
               body: JSON.stringify(op.data),
@@ -1395,6 +1417,32 @@ async function syncQueue() {
               const serverJournal = await res.json();
               await putJournal({ ...serverJournal, updated_offline: false }, authData.userId);
             }
+          }
+          break;
+        case 'UPDATE_JOURNAL':
+          // Update existing server journal with offline changes
+          const { _id, created_offline, updated_offline, ...updatePayload } = op.data;
+          console.log(`🔄 Processing UPDATE_JOURNAL for ${op.data.date}, ID: ${_id}`);
+          console.log(`📝 UPDATE_JOURNAL payload:`, updatePayload);
+          // Use the proper API routing for sync requests
+          const updateJournalUrl = `${isCapacitor ? CONFIG.PRODUCTION_BACKEND : (isProdHost ? CONFIG.PRODUCTION_BACKEND : CONFIG.LOCAL_BACKEND)}/journals`;
+          res = await fetch(updateJournalUrl, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify(updatePayload),
+          });
+          console.log(`📡 UPDATE_JOURNAL response status: ${res?.status}`);
+          if (res && res.ok) {
+            const serverJournal = await res.json();
+            console.log(`✅ UPDATE_JOURNAL Sync SUCCESS: Updated server journal ${serverJournal._id} for date ${op.data.date}`);
+            console.log(`📝 UPDATE_JOURNAL server response:`, serverJournal);
+            console.log(`📝 UPDATE_JOURNAL original offline data:`, op.data);
+            // Store synced version without offline flags but preserve any local changes
+            await putJournal({ ...serverJournal, updated_offline: false }, authData.userId);
+          } else {
+            const errorText = res ? await res.text() : 'No response';
+            console.log(`❌ UPDATE_JOURNAL Sync FAILED: Journal ${_id} offline changes preserved`);
+            console.log(`❌ Error details: Status ${res?.status}, Response: ${errorText}`);
           }
           break;
         case 'DELETE_JOURNAL':
