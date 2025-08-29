@@ -549,7 +549,9 @@ self.addEventListener('fetch', (event) => {
 
   // Check if this is a same-origin request or a Capacitor file:// request
   const isSameOrigin = url.origin === self.location.origin;
-  const isCapacitorLocal = self.location.protocol === 'file:' && url.pathname.startsWith('/api/');
+  const isCapacitorLocal =
+    (self.location.protocol === 'file:' || self.location.protocol === 'capacitor:') &&
+    url.pathname.startsWith('/api/');
 
   // Handle all API requests through /api/* paths including auth
   const isApi = (isSameOrigin || isCapacitorLocal) &&
@@ -567,51 +569,60 @@ self.addEventListener('fetch', (event) => {
 });
 
 async function handleApiRequest(request) {
-  const online = self.navigator.onLine;
   const url = new URL(request.url);
+  const online = self.navigator.onLine;
 
   // Extract space_id from query parameters
   const spaceId = url.searchParams.get('space_id');
 
   // Check if this is an offline-generated ID that shouldn't go to server
   const isOfflineId = url.pathname.includes('offline_');
+  const isAuth = url.pathname.startsWith('/api/auth/');
 
-  if (online && !isOfflineId) {
+  if ((online && !isOfflineId) || isAuth) {
     try {
-      // Determine if we're in a Capacitor environment (file:// protocol)
-      const isCapacitor = self.location.protocol === 'file:';
+      // Determine environment
+      const isCapacitor = self.location.protocol === 'file:' || self.location.protocol === 'capacitor:';
+      const isProdHost = self.location.hostname.endsWith('todolist.nyc');
+      const isHttp = self.location.protocol === 'http:';
       let targetUrl;
 
-      if (isCapacitor || self.location.protocol === 'http:') {
-        // In Capacitor or static export, route directly to backend
+      if (isCapacitor || isProdHost || isHttp) {
         const apiPath = url.pathname.replace('/api/', '');
         const queryString = url.search;
 
-        // Use production backend if deployed or in Capacitor (iOS doesn't allow http)
-        const backendUrl = (self.location.hostname === 'todolist.nyc' || isCapacitor)
+        // Use production backend for deployed domains and Capacitor
+        const backendUrl = (isProdHost || isCapacitor)
           ? 'https://backend-production-e920.up.railway.app'
           : 'http://localhost:8000';
 
         targetUrl = `${backendUrl}/${apiPath}${queryString}`;
       } else {
-        // In web environment, use the existing /api/* proxy
+        // Local web environment with existing /api proxy
         targetUrl = request.url;
       }
 
-      // Forward the request with auth headers
+      // Merge auth headers with original headers
       const authHeaders = await getAuthHeaders();
+      const headers = new Headers(request.headers);
+      for (const [k, v] of Object.entries(authHeaders)) {
+        headers.set(k, v);
+      }
+
       const proxyRequest = new Request(targetUrl, {
         method: request.method,
-        headers: authHeaders,
-        body: request.method !== 'GET' && request.method !== 'HEAD' ? await request.blob() : null
+        headers,
+        body: request.method !== 'GET' && request.method !== 'HEAD' ? await request.text() : null
       });
 
       console.log(`🔗 Service worker routing: ${request.url} -> ${targetUrl}`);
-      console.log(`📱 Is Capacitor: ${isCapacitor}, Protocol: ${self.location.protocol}`);
+      console.log(
+        `📱 Is Capacitor: ${isCapacitor}, Prod host: ${isProdHost}, Protocol: ${self.location.protocol}, Auth: ${isAuth}`
+      );
 
       const response = await fetch(proxyRequest);
 
-      if (request.method === 'GET' && response.ok) {
+      if (!isAuth && request.method === 'GET' && response.ok) {
         const cache = await caches.open(API_CACHE);
         cache.put(request, response.clone());
 
@@ -678,8 +689,8 @@ async function handleApiRequest(request) {
         }
       }
 
-      // Trigger sync for non-GET requests
-      if (request.method !== 'GET' && response.ok) {
+      // Trigger sync for non-GET requests (skip auth routes)
+      if (!isAuth && request.method !== 'GET' && response.ok) {
         syncQueue();
       }
       return response;
