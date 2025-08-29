@@ -425,16 +425,13 @@ describe('Immediate Replacement Sync Strategy', () => {
     expect(localTodos).toHaveLength(0);
   });
 
-  test('authentication routing prevents POST caching errors', async () => {
-    // This test validates that /auth/* endpoints are properly routed to handleApiRequest
-    // The routing logic is in the service worker fetch event handler
+  test('auth endpoints bypass service worker routing', async () => {
+    // This test validates that /auth/* endpoints are excluded from service worker routing
 
-    // Since testing the actual event handler is complex in this environment,
-    // we'll test the routing logic directly by checking the isApi condition
     const testCases = [
-      { pathname: '/auth/login', expected: true },
-      { pathname: '/auth/signup', expected: true },
-      { pathname: '/auth/me', expected: true },
+      { pathname: '/auth/login', expected: false },
+      { pathname: '/auth/signup', expected: false },
+      { pathname: '/auth/me', expected: false },
       { pathname: '/todos', expected: true },
       { pathname: '/categories', expected: true },
       { pathname: '/email/send', expected: true },
@@ -445,12 +442,14 @@ describe('Immediate Replacement Sync Strategy', () => {
     ];
 
     testCases.forEach(({ pathname, expected }) => {
-      const isApi = pathname.startsWith('/todos') ||
-                   pathname.startsWith('/categories') ||
-                   pathname.startsWith('/email') ||
-                   pathname.startsWith('/contact') ||
-                   pathname.startsWith('/chat') ||
-                   pathname.startsWith('/auth/');
+      const isAuth = pathname.startsWith('/auth/');
+      const isApi = !isAuth && (
+        pathname.startsWith('/todos') ||
+        pathname.startsWith('/categories') ||
+        pathname.startsWith('/email') ||
+        pathname.startsWith('/contact') ||
+        pathname.startsWith('/chat')
+      );
 
       expect(isApi).toBe(expected);
     });

@@ -3,7 +3,7 @@ import { Capacitor } from '@capacitor/core';
 /**
  * Get the correct API base URL for the current environment
  */
-function getApiBaseUrl(): string {
+function getApiBaseUrl(forceBackend = false): string {
   // Check if we're in Capacitor (native app)
   if (Capacitor.isNativePlatform()) {
     // Always use production backend for iOS (no localhost access)
@@ -11,12 +11,12 @@ function getApiBaseUrl(): string {
   }
 
   // Check if service worker is available (web environment)
-  if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+  if (!forceBackend && typeof window !== 'undefined' && 'serviceWorker' in navigator) {
     // Use relative URLs - service worker will handle routing
     return '';
   }
 
-  // Fallback for web without service worker
+  // Fallback for web without service worker or when forcing direct backend access
   return window.location.hostname === 'todolist.nyc'
     ? 'https://backend-production-e920.up.railway.app'
     : 'http://localhost:8000';
@@ -26,10 +26,11 @@ function getApiBaseUrl(): string {
  * Enhanced fetch wrapper that handles environment-specific routing
  */
 export async function apiRequest(endpoint: string, options: RequestInit = {}): Promise<Response> {
-  const baseUrl = getApiBaseUrl();
-
   // Clean endpoint
   const cleanEndpoint = endpoint.startsWith('/') ? endpoint.slice(1) : endpoint;
+  const isAuthEndpoint = cleanEndpoint.startsWith('auth');
+
+  const baseUrl = getApiBaseUrl(isAuthEndpoint);
 
   // Build URL
   let url;
