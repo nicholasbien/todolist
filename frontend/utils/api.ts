@@ -17,7 +17,12 @@ function getApiBaseUrl(forceBackend = false): string {
   }
 
   // Fallback for web without service worker or when forcing direct backend access
-  return window.location.hostname === 'todolist.nyc'
+  // Check if we're in production (Railway domains or custom domain)
+  const isProduction = window.location.hostname.includes('.up.railway.app') ||
+                      window.location.hostname.includes('todolist.nyc') ||  // Covers app.todolist.nyc
+                      window.location.protocol === 'https:';
+
+  return isProduction
     ? 'https://backend-production-e920.up.railway.app'
     : 'http://localhost:8000';
 }
