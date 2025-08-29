@@ -4,27 +4,14 @@ import { Capacitor } from '@capacitor/core';
  * Get the correct API base URL for the current environment
  */
 function getApiBaseUrl(forceBackend = false): string {
-  // Check if we're in Capacitor (native app)
+  // Check if we're in Capacitor (native app) - special case for mobile
   if (Capacitor.isNativePlatform()) {
-    // Always use production backend for iOS (no localhost access)
     return 'https://backend-production-e920.up.railway.app';
   }
 
-  // Check if service worker is available (web environment)
-  if (!forceBackend && typeof window !== 'undefined' && 'serviceWorker' in navigator) {
-    // Use relative URLs - service worker will handle routing
-    return '';
-  }
-
-  // Fallback for web without service worker or when forcing direct backend access
-  // Check if we're in production (Railway domains or custom domain)
-  const isProduction = window.location.hostname.includes('.up.railway.app') ||
-                      window.location.hostname.includes('todolist.nyc') ||  // Covers app.todolist.nyc
-                      window.location.protocol === 'https:';
-
-  return isProduction
-    ? 'https://backend-production-e920.up.railway.app'
-    : 'http://localhost:8000';
+  // For web environments (both dev and production), always use service worker + proxy
+  // This ensures consistent behavior everywhere
+  return '';
 }
 
 /**
@@ -35,14 +22,15 @@ export async function apiRequest(endpoint: string, options: RequestInit = {}): P
   const cleanEndpoint = endpoint.startsWith('/') ? endpoint.slice(1) : endpoint;
   const isAuthEndpoint = cleanEndpoint.startsWith('auth');
 
-  // Always use service worker routing - auth just bypasses caching, not routing
+  // Always use consistent routing approach
   const baseUrl = getApiBaseUrl(false);
 
   // Build URL
   let url;
   if (baseUrl === '') {
     // Use /api/ prefix for service worker routing
-    url = `/api/${cleanEndpoint}`;
+    // Add trailing slash to avoid Railway edge redirects
+    url = `/api/${cleanEndpoint}/`;
   } else {
     // Direct backend call
     url = `${baseUrl}/${cleanEndpoint}`;
