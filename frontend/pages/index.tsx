@@ -337,7 +337,7 @@ export default function Home() {
     if (showExportModal && token) {
       const loadSpaces = async () => {
         try {
-          const resp = await fetch('/api/spaces', {
+          const resp = await fetch('/spaces', {
             headers: { Authorization: `Bearer ${token}` }
           });
           if (resp.ok) {
@@ -387,7 +387,7 @@ export default function Home() {
     try {
       setSendingContact(true);
 
-      const response = await fetch('/api/contact', {
+      const response = await fetch('/contact', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -412,7 +412,7 @@ export default function Home() {
     try {
       setExporting(true);
       const response = await fetch(
-        `/api/export?data=${exportType}&format=${exportFormat}&space_id=${exportSpaceId}`,
+        `/export?data=${exportType}&format=${exportFormat}&space_id=${exportSpaceId}`,
         {
           headers: {
             'Authorization': `Bearer ${token}`

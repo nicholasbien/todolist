@@ -76,7 +76,7 @@ export default function TodoChatbot({ token, activeSpace }: ChatbotProps) {
     setError('');
 
     try {
-      const resp = await fetch('/api/chat', {
+      const resp = await fetch('/chat', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
