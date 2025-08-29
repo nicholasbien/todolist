@@ -22,7 +22,7 @@ describe('Email settings initialization', () => {
     const mockToken = 'token123';
 
     const mockAuthenticatedFetch = jest.fn(async (url: string) => {
-      if (url === '/api/auth/me') {
+      if (url === '/auth/me') {
         return {
           ok: true,
           json: async () => ({
@@ -34,7 +34,7 @@ describe('Email settings initialization', () => {
           })
         } as any;
       }
-      if (url === '/api/spaces') {
+      if (url === '/spaces') {
         return {
           ok: true,
           json: async () => ([

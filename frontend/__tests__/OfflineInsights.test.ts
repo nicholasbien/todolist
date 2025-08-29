@@ -110,7 +110,7 @@ describe('Offline Insights Functionality', () => {
     await sw.clearTodos('user1');
     await sw.clearQueue('user1');
 
-    const request = new Request('/api/insights', {
+    const request = new Request('/insights', {
       headers: { 'Authorization': 'Bearer token123' }
     });
 
@@ -216,7 +216,7 @@ describe('Offline Insights Functionality', () => {
 
     // Test user1 insights
     await sw.putAuth('token123', 'user1');
-    const request1 = new Request('/api/insights', {
+    const request1 = new Request('/insights', {
       headers: { 'Authorization': 'Bearer token123' }
     });
 
@@ -228,7 +228,7 @@ describe('Offline Insights Functionality', () => {
 
     // Test user2 insights
     await sw.putAuth('token456', 'user2');
-    const request2 = new Request('/api/insights', {
+    const request2 = new Request('/insights', {
       headers: { 'Authorization': 'Bearer token456' }
     });
 
@@ -287,7 +287,7 @@ describe('Offline Insights Functionality', () => {
       await sw.putTodo(todo, 'user1');
     }
 
-    const request = new Request('/api/insights', {
+    const request = new Request('/insights', {
       headers: { 'Authorization': 'Bearer token123' }
     });
 

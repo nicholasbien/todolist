@@ -15,7 +15,8 @@ import JournalComponent from '../components/JournalComponent';
 
 describe('JournalComponent date navigation', () => {
   beforeAll(() => {
-    jest.useFakeTimers().setSystemTime(new Date('2024-05-15'));
+    // Set system time to noon to avoid timezone issues
+    jest.useFakeTimers().setSystemTime(new Date('2024-05-15T12:00:00Z'));
   });
 
   afterAll(() => {
@@ -29,6 +30,7 @@ describe('JournalComponent date navigation', () => {
     const prevButton = screen.getByRole('button', { name: 'Previous day' });
     const nextButton = screen.getByRole('button', { name: 'Next day' });
 
+    // The component should initialize with today's date
     expect(dateInput.value).toBe('2024-05-15');
 
     fireEvent.click(prevButton);

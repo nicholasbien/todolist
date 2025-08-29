@@ -1,7 +1,7 @@
 // IMPORTANT: Always increment these versions when modifying this service worker file
 // This forces browsers to download and use the updated service worker
-const STATIC_CACHE = 'todo-static-v94';
-const API_CACHE = 'todo-api-v94';
+const STATIC_CACHE = 'todo-static-v96';
+const API_CACHE = 'todo-api-v96';
 
 const GLOBAL_DB_NAME = 'TodoGlobalDB';
 const USER_DB_PREFIX = 'TodoUserDB_';
@@ -1227,8 +1227,8 @@ async function syncQueue() {
   // console.log('Starting sync...');
 
   // Determine environment for sync requests
-  const isCapacitor = self.location.protocol === 'file:';
-  const isProdHost = self.location.hostname.endsWith(CONFIG.PRODUCTION_DOMAIN);
+  const isCapacitor = self.location?.protocol === 'file:';
+  const isProdHost = self.location?.hostname?.endsWith(CONFIG.PRODUCTION_DOMAIN);
 
   try {
     const queue = await readQueue(authData.userId);
@@ -1454,7 +1454,8 @@ async function syncQueue() {
           }
 
           if (!deleteJournalId.startsWith('offline_journal_')) {
-            res = await fetch(`/journals/${deleteJournalId}`, {
+            const deleteJournalUrl = `${isCapacitor ? CONFIG.PRODUCTION_BACKEND : (isProdHost ? CONFIG.PRODUCTION_BACKEND : CONFIG.LOCAL_BACKEND)}/journals/${deleteJournalId}`;
+            res = await fetch(deleteJournalUrl, {
               method: 'DELETE',
               headers
             });

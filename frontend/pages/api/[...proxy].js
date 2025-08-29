@@ -1,4 +1,22 @@
-// Next.js API proxy to route requests to the backend
+/**
+ * Next.js API proxy to route requests to the backend
+ *
+ * IMPORTANT: This proxy serves as a FALLBACK for when the service worker is unavailable.
+ *
+ * Primary request flow:
+ *   Frontend → Service Worker → Backend (handles 95% of requests with offline capability)
+ *
+ * Fallback request flow (when this proxy is used):
+ *   Frontend → Next.js Proxy → Backend
+ *
+ * This proxy is used in these scenarios:
+ *   1. Service worker registration failed or is disabled
+ *   2. Browser doesn't support service workers
+ *   3. Auth endpoints that intentionally bypass service worker
+ *   4. Development/debugging when service worker is disabled
+ *
+ * Do NOT remove this proxy - it ensures the app works even when the service worker fails.
+ */
 const BACKEND_URL = process.env.NODE_ENV === 'production'
   ? 'https://backend-production-e920.up.railway.app'
   : 'http://localhost:8000';

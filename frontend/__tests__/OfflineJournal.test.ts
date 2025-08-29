@@ -29,7 +29,7 @@ describe('Offline Journal Functionality', () => {
     global.fetch = mockFetch;
 
     // Create offline journal request
-    const request = new Request('/api/journals', {
+    const request = new Request('/journals', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer token123' },
       body: JSON.stringify(journalData)
@@ -88,8 +88,8 @@ describe('Offline Journal Functionality', () => {
 
     await sw.syncQueue();
 
-    // Verify correct API call was made
-    expect(fetch).toHaveBeenCalledWith('/api/journals', expect.objectContaining({
+    // Verify correct API call was made (should use backend URL due to sync routing)
+    expect(fetch).toHaveBeenCalledWith('http://localhost:8000/journals', expect.objectContaining({
       method: 'POST',
       headers: expect.objectContaining({
         'Authorization': 'Bearer token123',
@@ -119,7 +119,7 @@ describe('Offline Journal Functionality', () => {
     };
 
     // Initial offline create
-    let request = new Request('/api/journals', {
+    let request = new Request('/journals', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer token123' },
       body: JSON.stringify(journalData)
@@ -127,7 +127,7 @@ describe('Offline Journal Functionality', () => {
     await sw.handleRequest(request);
 
     // Offline update to same journal
-    request = new Request('/api/journals', {
+    request = new Request('/journals', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer token123' },
       body: JSON.stringify({ ...journalData, text: 'Updated offline' })
@@ -157,7 +157,7 @@ describe('Offline Journal Functionality', () => {
     await sw.addQueue({ type: 'CREATE_JOURNAL', data: offlineJournal }, 'user1');
 
     // Mock DELETE request
-    const request = new Request('/api/journals/offline_journal_2023-12-01_12345', {
+    const request = new Request('/journals/offline_journal_2023-12-01_12345', {
       method: 'DELETE',
       headers: { 'Authorization': 'Bearer token123' }
     });
@@ -189,7 +189,7 @@ describe('Offline Journal Functionality', () => {
     await sw.putJournal(syncedJournal, 'user1');
 
     // Mock DELETE request
-    const request = new Request('/api/journals/server_journal_456', {
+    const request = new Request('/journals/server_journal_456', {
       method: 'DELETE',
       headers: { 'Authorization': 'Bearer token123' }
     });
@@ -223,8 +223,8 @@ describe('Offline Journal Functionality', () => {
 
     await sw.syncQueue();
 
-    // Verify correct DELETE API call was made
-    expect(fetch).toHaveBeenCalledWith('/api/journals/server_journal_456', expect.objectContaining({
+    // Verify correct DELETE API call was made (should use backend URL due to sync routing)
+    expect(fetch).toHaveBeenCalledWith('http://localhost:8000/journals/server_journal_456', expect.objectContaining({
       method: 'DELETE',
       headers: expect.objectContaining({
         'Authorization': 'Bearer token123'
@@ -371,7 +371,7 @@ describe('Journal Auto-save Integration', () => {
 
     // Simulate rapid auto-save updates
     for (let i = 1; i <= 5; i++) {
-      const request = new Request('/api/journals', {
+      const request = new Request('/journals', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer token123' },
         body: JSON.stringify({ ...baseJournal, text: `Update ${i}` })
