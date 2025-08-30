@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import TodoItem from "./TodoItem";
 import TodoChatbot from "./TodoChatbot";
+import AgentChatbot from "./AgentChatbot";
 import { useAuth } from "../context/AuthContext";
 import Link from "next/link";
 import InsightsComponent from "./InsightsComponent";
@@ -102,7 +103,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
   const membersFetchIdRef = useRef(0);
 
   // Tab state
-  const [activeTab, setActiveTab] = useState<'tasks' | 'assistant' | 'insights' | 'journal'>('tasks');
+  const [activeTab, setActiveTab] = useState<'tasks' | 'assistant' | 'agent' | 'insights' | 'journal'>('tasks');
 
   const handleOpenEmailSettings = async () => {
     try {
@@ -868,6 +869,16 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
           Assistant
         </button>
         <button
+          onClick={() => setActiveTab('agent')}
+          className={`flex-1 py-3 px-2 sm:px-6 font-medium text-sm transition-colors ${
+            activeTab === 'agent'
+              ? 'text-accent border-b-2 border-accent'
+              : 'text-gray-400 hover:text-gray-300'
+          }`}
+        >
+          Agent
+        </button>
+        <button
           onClick={() => setActiveTab('insights')}
           className={`flex-1 py-3 px-2 sm:px-6 font-medium text-sm transition-colors ${
             activeTab === 'insights'
@@ -1331,6 +1342,32 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
             />
           </div>
           <TodoChatbot token={token} activeSpace={activeSpace} />
+        </div>
+      )}
+      {activeTab === 'agent' && (
+        <div>
+          {/* Header Row with Page Title and Space Dropdown */}
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-xl font-semibold text-gray-100">Agent</h2>
+            <SpaceDropdown
+              spaces={spaces}
+              activeSpace={activeSpace}
+              user={user}
+              loadingSpaces={loadingSpaces}
+              onSpaceSelect={setActiveSpace}
+              onCreateSpace={() => setShowAddSpaceModal(true)}
+              onEditSpace={(space) => {
+                setSpaceToEdit(space);
+                setEditSpaceName(space.name);
+                const isCollab = (space.member_ids?.length ?? 0) > 1 ||
+                  (space.pending_emails?.length ?? 0) > 0;
+                setEditSpaceCollaborative(isCollab);
+                setInviteEmails(['']);
+                setShowEditSpaceModal(true);
+              }}
+            />
+          </div>
+          <AgentChatbot activeSpace={activeSpace} token={token} />
         </div>
       )}
 
