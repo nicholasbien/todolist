@@ -37,6 +37,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     Connection: 'keep-alive',
   });
 
+  let hub: McpHub | null = null;
+
+  // Handle client disconnect to ensure cleanup
+  req.on('close', async () => {
+    if (hub) {
+      try {
+        await hub.dispose();
+      } catch (error) {
+        console.error('Error disposing MCP hub on client disconnect:', error);
+      }
+    }
+  });
+
   try {
     // Get OpenAI API key from environment
     const openaiApiKey = process.env.OPENAI_API_KEY;
@@ -54,7 +67,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const llm = new OpenAILlm(openaiApiKey);
 
     // Initialize MCP Hub with multiple servers
-    const hub = new McpHub();
+    hub = new McpHub();
     const tsxCommand = path.join(process.cwd(), 'node_modules', '.bin', 'tsx');
 
     // Set up environment variables for the servers
@@ -88,10 +101,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     sseWrite(res, 'done', { ok: true });
-    res.end();
   } catch (e: any) {
     console.error('Agent stream error:', e);
     sseWrite(res, 'error', { message: e?.message ?? String(e) });
+  } finally {
+    // Always clean up hub resources to prevent process leaks
+    if (hub) {
+      try {
+        await hub.dispose();
+      } catch (error) {
+        console.error('Error disposing MCP hub:', error);
+      }
+    }
     res.end();
   }
 }

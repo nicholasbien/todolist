@@ -55,4 +55,19 @@ export class McpHub {
     if (!conn.allowed.has(tool)) throw new Error(`Tool not allowed: ${fqTool}`);
     return conn.client.callTool({ name: tool, arguments: args });
   }
+
+  async dispose() {
+    // Close all client connections and terminate child processes
+    const closePromises = [...this.#conns.values()].map(async (conn) => {
+      try {
+        // Close the client connection, which should terminate the child process
+        await conn.client.close();
+      } catch (error) {
+        console.error(`Error closing connection ${conn.name}:`, error);
+      }
+    });
+
+    await Promise.all(closePromises);
+    this.#conns.clear();
+  }
 }
