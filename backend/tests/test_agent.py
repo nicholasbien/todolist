@@ -99,16 +99,12 @@ class TestAgentToolsUnit:
         assert "No active weather alerts" in result["alerts"][0]
 
     @pytest.mark.asyncio
-    @patch("agent.tools.db_create_todo")
-    @patch("agent.tools.collections.todos.find_one", new_callable=AsyncMock)
-    async def test_add_task(self, mock_find_one, mock_create_todo):
+    @patch("agent.tools.db_create_todo", new_callable=AsyncMock)
+    async def test_add_task(self, mock_create_todo):
         """Test task creation."""
-        # Mock database responses
-        mock_result = MagicMock()
-        mock_result.inserted_id = "test_id_123"
-        mock_create_todo.return_value = mock_result
-
-        mock_task = {
+        # Mock Todo object that db_create_todo returns
+        mock_todo = MagicMock()
+        mock_todo.dict.return_value = {
             "_id": "test_id_123",
             "text": "Test task",
             "category": "Work",
@@ -118,7 +114,7 @@ class TestAgentToolsUnit:
             "space_id": "test_space",
             "user_id": "test_user",
         }
-        mock_find_one.return_value = mock_task
+        mock_create_todo.return_value = mock_todo
 
         request = TaskAddRequest(text="Test task", category="Work", priority="high")
         result = await add_task(request, "test_user", "test_space")
@@ -175,23 +171,29 @@ class TestAgentToolsUnit:
         assert all(task["completed"] for task in result["tasks"])
 
     @pytest.mark.asyncio
-    @patch("agent.tools.update_todo_fields")
-    @patch("agent.tools.collections.todos.find_one", new_callable=AsyncMock)
-    async def test_update_task(self, mock_find_one, mock_update_todo_fields):
+    @patch("agent.tools.update_todo_fields", new_callable=AsyncMock)
+    @patch("agent.tools.collections")
+    async def test_update_task(self, mock_collections, mock_update_todo_fields):
         """Test task updates."""
         # Mock successful update
         mock_update_todo_fields.return_value = None  # No exception means success
 
+        # Use a proper ObjectId-formatted string
+        task_id = "507f1f77bcf86cd799439011"
         mock_updated_task = {
-            "_id": "task_123",
+            "_id": task_id,
             "text": "Updated task",
             "priority": "high",
             "completed": True,
             "dateCompleted": "2024-08-30T10:00:00",
         }
-        mock_find_one.return_value = mock_updated_task
 
-        request = TaskUpdateRequest(id="task_123", completed=True, priority="high")
+        # Mock collections.todos.find_one
+        mock_todos = AsyncMock()
+        mock_todos.find_one = AsyncMock(return_value=mock_updated_task)
+        mock_collections.todos = mock_todos
+
+        request = TaskUpdateRequest(id=task_id, completed=True, priority="high")
         result = await update_task(request, "test_user", "test_space")
 
         assert result["ok"] is True
@@ -221,19 +223,21 @@ class TestAgentToolsUnit:
         assert result["journal"]["date"] == "2024-08-30"
 
     @pytest.mark.asyncio
-    @patch("agent.tools.get_todos")
-    @patch("agent.tools.collections.journals.find")
-    async def test_search_content(self, mock_journals_find, mock_get_todos):
+    @patch("agent.tools.get_todos", new_callable=AsyncMock)
+    @patch("agent.tools.collections")
+    async def test_search_content(self, mock_collections, mock_get_todos):
         """Test content search across tasks and journals."""
         # Mock tasks
         mock_todo = MagicMock()
         mock_todo.dict.return_value = {"_id": "task_123", "text": "Important meeting notes", "category": "Work"}
         mock_get_todos.return_value = [mock_todo]
 
-        # Mock journals
+        # Mock journals - mock the entire collections object
         mock_cursor = MagicMock()
-        mock_cursor.to_list.return_value = [{"_id": "journal_123", "content": "Met with team about important project"}]
-        mock_journals_find.return_value = mock_cursor
+        mock_cursor.to_list = AsyncMock(
+            return_value=[{"_id": "journal_123", "content": "Met with team about important project"}]
+        )
+        mock_collections.journals.find.return_value = mock_cursor
 
         request = SearchRequest(query="important", limit=5)
         result = await search_content(request, "test_user", "test_space")
@@ -371,7 +375,6 @@ class TestAgentIntegration:
         """Test agent endpoint with valid authentication."""
         # Get valid token
         token = await get_token(client, test_email)
-        headers = {"Authorization": f"Bearer {token}"}
 
         # Mock OpenAI to avoid real API calls
         with patch("agent.agent.AsyncOpenAI") as mock_openai_class:
@@ -390,7 +393,8 @@ class TestAgentIntegration:
             mock_client.chat.completions.create.return_value = mock_stream
 
             with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
-                response = await client.get("/agent/stream?q=hello", headers=headers)
+                # Agent endpoint might expect token as query param, not header
+                response = await client.get(f"/agent/stream?q=hello&token={token}")
 
         assert response.status_code == 200
         assert response.headers["content-type"] == "text/event-stream; charset=utf-8"
@@ -422,7 +426,8 @@ class TestAgentIntegration:
             mock_client.chat.completions.create.return_value = mock_stream
 
             with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
-                response = await client.get(f"/agent/stream?q=help&space_id={space_id}", headers=headers)
+                # Agent endpoint might expect token as query param, not header
+                response = await client.get(f"/agent/stream?q=help&space_id={space_id}&token={token}")
 
         assert response.status_code == 200
 

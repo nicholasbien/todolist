@@ -201,23 +201,23 @@ async def add_task(request: TaskAddRequest, user_id: str, space_id: Optional[str
             dateAdded=datetime.utcnow().isoformat(),
         )
 
-        result = await db_create_todo(todo)
+        created_todo = await db_create_todo(todo)
 
-        # Get the created task details
-        created_task = await collections.todos.find_one({"_id": result.inserted_id})
+        # db_create_todo returns a Todo object, convert to dict
+        created_task_dict = created_todo.dict(by_alias=True)
 
         return {
             "ok": True,
-            "id": str(result.inserted_id),
+            "id": str(created_task_dict["_id"]),
             "task": {
-                "_id": str(created_task["_id"]),
-                "text": created_task["text"],
-                "category": created_task.get("category"),
-                "priority": created_task.get("priority"),
-                "completed": created_task.get("completed", False),
-                "dateAdded": created_task.get("dateAdded"),
-                "space_id": created_task.get("space_id"),
-                "user_id": created_task.get("user_id"),
+                "_id": str(created_task_dict["_id"]),
+                "text": created_task_dict["text"],
+                "category": created_task_dict.get("category"),
+                "priority": created_task_dict.get("priority"),
+                "completed": created_task_dict.get("completed", False),
+                "dateAdded": created_task_dict.get("dateAdded"),
+                "space_id": created_task_dict.get("space_id"),
+                "user_id": created_task_dict.get("user_id"),
             },
         }
     except Exception as e:
@@ -294,7 +294,12 @@ async def update_task(request: TaskUpdateRequest, user_id: str, space_id: Option
             },
         }
     except Exception as e:
-        return {"ok": False, "error": f"Failed to update task: {str(e)}"}
+        # Handle HTTPException which has a detail attribute
+        if hasattr(e, "detail"):
+            error_msg = str(e.detail)
+        else:
+            error_msg = str(e)
+        return {"ok": False, "error": f"Failed to update task: {error_msg}"}
 
 
 async def add_journal_entry(request: JournalAddRequest, user_id: str, space_id: Optional[str] = None) -> Dict[str, Any]:
