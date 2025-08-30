@@ -71,7 +71,8 @@ export async function startMemoryServerOverStdio() {
   const TaskAddSchema = z.object({
     text: z.string().min(1).describe("Task description"),
     category: z.string().optional().describe("Task category (optional)"),
-    priority: z.enum(['low', 'med', 'high']).default('med').describe("Task priority")
+    priority: z.enum(['low', 'med', 'high']).default('med').describe("Task priority"),
+    space_id: z.string().optional().describe("Space ID for the task")
   });
 
   server.registerTool("mem.task.add", {

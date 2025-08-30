@@ -141,7 +141,7 @@ export default function JournalComponent({ token, activeSpace }: JournalProps) {
         clearTimeout(saveTimeout);
       }
     };
-  }, [journalText, lastSavedText]); // Removed saveJournalEntry and saveTimeout to prevent infinite loop
+  }, [journalText, lastSavedText, saveJournalEntry, saveTimeout]);
 
   // Refresh journal entry after offline sync completes
   useEffect(() => {

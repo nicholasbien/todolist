@@ -33,7 +33,7 @@ export class McpHub {
   }
 
   async addWebsocketServer(name: string, url: string, allowedTools?: string[]) {
-    const transport = new WebSocketClientTransport(url);
+    const transport = new WebSocketClientTransport(new URL(url));
     const client = new Client({ name: "mcp-hub", version: "1.0.0" }, {
       capabilities: {}
     });
