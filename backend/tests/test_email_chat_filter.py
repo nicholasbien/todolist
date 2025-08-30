@@ -47,10 +47,10 @@ async def test_email_space_filtering(client, test_email, monkeypatch):
         captured["spaces"] = spaces_data
         return "ok"
 
+    from email_summary import send_daily_summary
+
     monkeypatch.setattr("email_summary.generate_todo_summary", fake_summary)
     monkeypatch.setattr("email_summary.send_email", AsyncMock(return_value=True))
-
-    from email_summary import send_daily_summary
 
     await send_daily_summary(user_id, test_email, "")
 
