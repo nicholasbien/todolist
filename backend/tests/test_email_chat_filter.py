@@ -43,6 +43,7 @@ async def test_email_space_filtering(client, test_email, monkeypatch):
     captured = {}
 
     async def fake_summary(spaces_data, *_args, **_kwargs):
+        print(f"DEBUG: fake_summary called with spaces_data: {spaces_data}")
         captured["spaces"] = spaces_data
         return "ok"
 
@@ -52,7 +53,17 @@ async def test_email_space_filtering(client, test_email, monkeypatch):
     from email_summary import send_daily_summary
 
     await send_daily_summary(user_id, test_email, "")
-    names = {s["space"] for s in captured["spaces"]}
+
+    print(f"DEBUG: captured after send_daily_summary: {captured}")
+
+    # The generate_todo_summary function should be called with spaces_data parameter
+    # Structure: [{"space": "A", "todos": [...]}]
+    if "spaces" not in captured:
+        print("FAIL: Mock was not called, monkeypatch may have been overridden by another test")
+        assert False, "Mock generate_todo_summary was not called - test isolation issue"
+
+    spaces_data = captured["spaces"]
+    names = {s["space"] for s in spaces_data}
     assert names == {"A"}
 
 

@@ -9,7 +9,7 @@ from typing import Any, AsyncGenerator, Dict, Optional
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
 from auth import verify_session  # noqa: E402
-from fastapi import APIRouter, Depends, HTTPException, Query  # noqa: E402
+from fastapi import APIRouter, Depends, Header, HTTPException, Query  # noqa: E402
 from fastapi.responses import StreamingResponse  # noqa: E402
 from openai import AsyncOpenAI  # noqa: E402
 
@@ -17,6 +17,25 @@ from .schemas import OPENAI_TOOL_SCHEMAS  # noqa: E402
 from .tools import AVAILABLE_TOOLS  # noqa: E402
 
 router = APIRouter(prefix="/agent")
+
+
+async def get_current_user(authorization: str = Header(None)):
+    """Extract user from Authorization header."""
+    if not authorization:
+        raise HTTPException(status_code=401, detail="Authorization header required")
+
+    # Expect format: "Bearer <token>"
+    try:
+        scheme, token = authorization.split()
+        if scheme.lower() != "bearer":
+            raise HTTPException(status_code=401, detail="Invalid authentication scheme")
+    except ValueError:
+        raise HTTPException(status_code=401, detail="Invalid authorization header format")
+
+    # Verify the session token
+    user_info = await verify_session(token)
+    user_info["token"] = token  # Add token to user info for logout
+    return user_info
 
 
 # System prompt for the agent
@@ -189,7 +208,7 @@ async def stream_agent_response(
 async def agent_stream(
     q: str = Query(..., description="User query"),
     space_id: Optional[str] = Query(None, description="Space ID"),
-    user_data: dict = Depends(verify_session),
+    user_data: dict = Depends(get_current_user),
 ):
     """Stream agent responses with tool calls via Server-Sent Events."""
 

@@ -354,21 +354,21 @@ class TestAgentIntegration:
         """Test that agent router is properly registered."""
         # Test that the agent endpoint exists
         response = await client.get("/agent/stream")
-        # Should get 422 for missing query param, not 404 for missing route
-        assert response.status_code == 422
+        # Should get 401 for missing auth header, not 404 for missing route
+        assert response.status_code == 401
 
     @pytest.mark.asyncio
     async def test_agent_endpoint_no_auth(self, client):
         """Test agent endpoint without authentication."""
         response = await client.get("/agent/stream?q=test")
-        assert response.status_code == 422  # Missing token
+        assert response.status_code == 401  # Missing auth header
 
     @pytest.mark.asyncio
     async def test_agent_endpoint_invalid_auth(self, client):
         """Test agent endpoint with invalid token."""
         headers = {"Authorization": "Bearer invalid-token"}
         response = await client.get("/agent/stream?q=test", headers=headers)
-        assert response.status_code == 422  # FastAPI validation error
+        assert response.status_code == 401  # Invalid token
 
     @pytest.mark.asyncio
     async def test_agent_endpoint_with_auth(self, client, test_email):
@@ -393,8 +393,9 @@ class TestAgentIntegration:
             mock_client.chat.completions.create.return_value = mock_stream
 
             with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
-                # Agent endpoint might expect token as query param, not header
-                response = await client.get(f"/agent/stream?q=hello&token={token}")
+                # Agent endpoint expects token in Authorization header
+                headers = {"Authorization": f"Bearer {token}"}
+                response = await client.get("/agent/stream?q=hello", headers=headers)
 
         assert response.status_code == 200
         assert response.headers["content-type"] == "text/event-stream; charset=utf-8"
@@ -426,8 +427,9 @@ class TestAgentIntegration:
             mock_client.chat.completions.create.return_value = mock_stream
 
             with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
-                # Agent endpoint might expect token as query param, not header
-                response = await client.get(f"/agent/stream?q=help&space_id={space_id}&token={token}")
+                # Agent endpoint expects token in Authorization header
+                headers = {"Authorization": f"Bearer {token}"}
+                response = await client.get(f"/agent/stream?q=help&space_id={space_id}", headers=headers)
 
         assert response.status_code == 200
 
