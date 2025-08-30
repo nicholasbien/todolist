@@ -1,28 +1,34 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import path from 'path';
 import { McpHub } from '../../../src/mcp-hub';
-import { runAgent, Llm } from '../../../src/agent';
+import { runAgent } from '../../../src/agent';
+import { OpenAILlm } from '../../../src/openai-llm';
 
 function sseWrite(res: NextApiResponse, event: string, data: any) {
   res.write(`event: ${event}\n`);
   res.write(`data: ${JSON.stringify(data)}\n\n`);
 }
 
-// Mock LLM that emits one tool call then text
-const mockLlm: Llm = {
-  async *stream() {
-    const text = `Let me check your tasks…`;
-    for (const ch of text.split(' ')) {
-      yield { type: 'text' as const, token: ch + ' ' };
-    }
-    yield {
-      type: 'tool_call' as const,
-      tool: 'memory.mem.search',
-      args: { query: 'rent', types: ['task'], limit: 5 },
-    };
-    yield { type: 'text' as const, token: 'Here are relevant items. ' };
-  },
-};
+// Extract auth token from request (query param or header)
+function getAuthToken(req: NextApiRequest): string | null {
+  // Try query param first (for EventSource)
+  if (req.query.token && typeof req.query.token === 'string') {
+    return req.query.token;
+  }
+
+  // Fall back to Authorization header
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    return authHeader.slice(7);
+  }
+
+  return null;
+}
+
+// Extract space ID from request
+function getCurrentSpaceId(req: NextApiRequest): string | null {
+  return (req.query.space_id as string) || null;
+}
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   res.writeHead(200, {
@@ -31,24 +37,61 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     Connection: 'keep-alive',
   });
 
-  const hub = new McpHub();
-  const memoryCommand = path.join(process.cwd(), 'node_modules', '.bin', 'tsx');
-  await hub.addBuiltinMemory('memory', memoryCommand, ['src/memory-server.ts']);
-
-  (async () => {
-    try {
-      sseWrite(res, 'ready', { ok: true });
-      const userMessage = typeof req.query.q === 'string' ? req.query.q : 'Hello';
-      for await (const ev of runAgent({ llm: mockLlm, hub, userMessage })) {
-        if (ev.type === 'text') sseWrite(res, 'token', { token: ev.token });
-        if (ev.type === 'tool_result')
-          sseWrite(res, 'tool_result', { tool: ev.tool, data: ev.data });
-      }
-      sseWrite(res, 'done', { ok: true });
+  try {
+    // Get OpenAI API key from environment
+    const openaiApiKey = process.env.OPENAI_API_KEY;
+    if (!openaiApiKey) {
+      sseWrite(res, 'error', { message: 'OpenAI API key not configured' });
       res.end();
-    } catch (e: any) {
-      sseWrite(res, 'error', { message: e?.message ?? String(e) });
-      res.end();
+      return;
     }
-  })();
+
+    // Get auth context
+    const authToken = getAuthToken(req);
+    const spaceId = getCurrentSpaceId(req);
+
+    // Initialize LLM
+    const llm = new OpenAILlm(openaiApiKey);
+
+    // Initialize MCP Hub with multiple servers
+    const hub = new McpHub();
+    const tsxCommand = path.join(process.cwd(), 'node_modules', '.bin', 'tsx');
+
+    // Set up environment variables for the servers
+    const serverEnv = {
+      ...process.env,
+      AUTH_TOKEN: authToken,
+      CURRENT_SPACE_ID: spaceId,
+    };
+
+    // Add memory server (connected to real backend)
+    await hub.addBuiltinMemory('memory', tsxCommand, ['src/memory-server.ts'], undefined, serverEnv);
+
+    // Add weather server
+    await hub.addBuiltinMemory('weather', tsxCommand, ['src/weather-server.ts'], undefined, serverEnv);
+
+    sseWrite(res, 'ready', {
+      ok: true,
+      tools: hub.listAllTools().map(t => t.fq),
+      space_id: spaceId
+    });
+
+    const userMessage = typeof req.query.q === 'string' ? req.query.q : 'Hello! How can I help you with your tasks or get weather information?';
+
+    for await (const ev of runAgent({ llm, hub, userMessage })) {
+      if (ev.type === 'text') {
+        sseWrite(res, 'token', { token: ev.token });
+      }
+      if (ev.type === 'tool_result') {
+        sseWrite(res, 'tool_result', { tool: ev.tool, data: ev.data });
+      }
+    }
+
+    sseWrite(res, 'done', { ok: true });
+    res.end();
+  } catch (e: any) {
+    console.error('Agent stream error:', e);
+    sseWrite(res, 'error', { message: e?.message ?? String(e) });
+    res.end();
+  }
 }

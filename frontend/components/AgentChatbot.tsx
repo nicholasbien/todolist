@@ -2,12 +2,13 @@ import React, { useState, useEffect, useRef } from 'react';
 
 interface ChatbotProps {
   activeSpace: any;
+  token?: string;
 }
 
 // Maximum number of messages to retain (matches backend MAX_HISTORY)
 const MAX_MESSAGES = 10;
 
-export default function AgentChatbot({ activeSpace }: ChatbotProps) {
+export default function AgentChatbot({ activeSpace, token }: ChatbotProps) {
   const [question, setQuestion] = useState('');
   const [messages, setMessages] = useState<{ role: string; content: string }[]>(() => {
     if (typeof window !== 'undefined') {
@@ -75,11 +76,20 @@ export default function AgentChatbot({ activeSpace }: ChatbotProps) {
     });
 
     try {
-      const es = new EventSource(`/api/agent/stream?q=${encodeURIComponent(userQuestion)}`);
+      const params = new URLSearchParams();
+      params.append('q', userQuestion);
+      if (activeSpace?._id) {
+        params.append('space_id', activeSpace._id);
+      }
+      if (token) {
+        params.append('token', token);
+      }
+
+      const es = new EventSource(`/api/agent/stream?${params.toString()}`);
 
       es.addEventListener('token', (e) => {
-        const { token } = JSON.parse((e as MessageEvent).data);
-        assistantResponse.content += token;
+        const { token: responseToken } = JSON.parse((e as MessageEvent).data);
+        assistantResponse.content += responseToken;
         setMessages((prev) => [...prev]);
       });
 

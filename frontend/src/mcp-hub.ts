@@ -1,10 +1,10 @@
-import { createClient } from "@modelcontextprotocol/sdk/client/index.js";
-import { stdio } from "@modelcontextprotocol/sdk/client/node/stdio.js";
-import { websocket } from "@modelcontextprotocol/sdk/client/web/websocket.js";
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+import { WebSocketClientTransport } from "@modelcontextprotocol/sdk/client/websocket.js";
 
 type Conn = {
   name: string;
-  client: ReturnType<typeof createClient>;
+  client: Client;
   allowed: Set<string>;
 };
 
@@ -17,11 +17,13 @@ export class McpHub {
     );
   }
 
-  async addBuiltinMemory(name: string, command: string, args: string[], allowedTools?: string[]) {
-    const transport = await stdio({ command, args, env: process.env });
-    const client = createClient(transport);
-    await client.initialize();
-    const tools = await client.tools.list();
+  async addBuiltinMemory(name: string, command: string, args: string[], allowedTools?: string[], env?: Record<string, string>) {
+    const transport = new StdioClientTransport({ command, args, env: env || process.env });
+    const client = new Client({ name: "mcp-hub", version: "1.0.0" }, {
+      capabilities: {}
+    });
+    await client.connect(transport);
+    const tools = await client.listTools();
     const allowed = new Set(
       (allowedTools ?? tools.tools.map((t) => t.name)).filter((tool) =>
         tools.tools.some((tt) => tt.name === tool)
@@ -31,10 +33,12 @@ export class McpHub {
   }
 
   async addWebsocketServer(name: string, url: string, allowedTools?: string[]) {
-    const transport = await websocket({ url });
-    const client = createClient(transport);
-    await client.initialize();
-    const tools = await client.tools.list();
+    const transport = new WebSocketClientTransport(url);
+    const client = new Client({ name: "mcp-hub", version: "1.0.0" }, {
+      capabilities: {}
+    });
+    await client.connect(transport);
+    const tools = await client.listTools();
     const allowed = new Set(
       (allowedTools ?? tools.tools.map((t) => t.name)).filter((tool) =>
         tools.tools.some((tt) => tt.name === tool)
@@ -49,6 +53,6 @@ export class McpHub {
     const conn = this.#conns.get(ns);
     if (!conn) throw new Error(`Unknown server: ${ns}`);
     if (!conn.allowed.has(tool)) throw new Error(`Tool not allowed: ${fqTool}`);
-    return conn.client.tools.call({ name: tool, arguments: args });
+    return conn.client.callTool({ name: tool, arguments: args });
   }
 }
