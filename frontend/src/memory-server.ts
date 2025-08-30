@@ -139,7 +139,8 @@ export async function startMemoryServerOverStdio() {
 
   const JournalAddSchema = z.object({
     content: z.string().min(1).describe("Journal entry content"),
-    date: z.string().optional().describe("Date in YYYY-MM-DD format (optional, defaults to today)")
+    date: z.string().optional().describe("Date in YYYY-MM-DD format (optional, defaults to today)"),
+    space_id: z.string().optional().describe("Space ID for the journal entry")
   });
 
   server.registerTool("mem.journal.add", {
@@ -166,7 +167,8 @@ export async function startMemoryServerOverStdio() {
   const SearchSchema = z.object({
     query: z.string().min(1).describe("Search query"),
     types: z.array(z.enum(['task', 'journal'])).optional().describe("Types to search (optional)"),
-    limit: z.number().min(1).max(50).default(8).describe("Maximum results")
+    limit: z.number().min(1).max(50).default(8).describe("Maximum results"),
+    space_id: z.string().optional().describe("Space ID for the search")
   });
 
   server.registerTool("mem.search", {
