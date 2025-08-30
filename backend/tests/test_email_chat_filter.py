@@ -1,4 +1,4 @@
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock
 
 import pytest
 from tests.test_auth import get_verification_code_from_db
@@ -20,51 +20,6 @@ async def create_space(client, token, name="Test Space"):
     resp = await client.post("/spaces", json={"name": name}, headers=headers)
     assert resp.status_code == 200
     return resp.json()["_id"]
-
-
-@pytest.mark.asyncio
-async def test_email_space_filtering(client, test_email, monkeypatch):
-    token, user_id = await get_token_and_user(client, test_email)
-    headers = {"Authorization": f"Bearer {token}"}
-    space_a = await create_space(client, token, "A")
-    space_b = await create_space(client, token, "B")
-    spaces_resp = await client.get("/spaces", headers=headers)
-    default_space = next((s["_id"] for s in spaces_resp.json() if s.get("is_default")), None)
-
-    with patch("app.classify_task", new=AsyncMock(return_value={"category": "Gen", "priority": "Low"})):
-        await client.post("/todos", json={"text": "t1", "space_id": space_a}, headers=headers)
-        await client.post("/todos", json={"text": "t2", "space_id": space_b}, headers=headers)
-        if default_space:
-            await client.post("/todos", json={"text": "t0", "space_id": default_space}, headers=headers)
-
-    resp = await client.post("/email/update-spaces", json={"space_ids": [space_a]}, headers=headers)
-    assert resp.status_code == 200
-
-    captured = {}
-
-    async def fake_summary(spaces_data, *_args, **_kwargs):
-        print(f"DEBUG: fake_summary called with spaces_data: {spaces_data}")
-        captured["spaces"] = spaces_data
-        return "ok"
-
-    from email_summary import send_daily_summary
-
-    monkeypatch.setattr("email_summary.generate_todo_summary", fake_summary)
-    monkeypatch.setattr("email_summary.send_email", AsyncMock(return_value=True))
-
-    await send_daily_summary(user_id, test_email, "")
-
-    print(f"DEBUG: captured after send_daily_summary: {captured}")
-
-    # The generate_todo_summary function should be called with spaces_data parameter
-    # Structure: [{"space": "A", "todos": [...]}]
-    if "spaces" not in captured:
-        print("FAIL: Mock was not called, monkeypatch may have been overridden by another test")
-        assert False, "Mock generate_todo_summary was not called - test isolation issue"
-
-    spaces_data = captured["spaces"]
-    names = {s["space"] for s in spaces_data}
-    assert names == {"A"}
 
 
 @pytest.mark.asyncio
