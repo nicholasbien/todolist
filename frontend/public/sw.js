@@ -1,7 +1,7 @@
 // IMPORTANT: Always increment these versions when modifying this service worker file
 // This forces browsers to download and use the updated service worker
-const STATIC_CACHE = 'todo-static-v102';
-const API_CACHE = 'todo-api-v102';
+const STATIC_CACHE = 'todo-static-v103';
+const API_CACHE = 'todo-api-v103';
 
 const GLOBAL_DB_NAME = 'TodoGlobalDB';
 const USER_DB_PREFIX = 'TodoUserDB_';

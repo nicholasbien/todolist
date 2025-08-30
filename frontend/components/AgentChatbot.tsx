@@ -86,7 +86,12 @@ export default function AgentChatbot({ activeSpace, token }: ChatbotProps) {
         params.append('token', token);
       }
 
-      const es = new EventSource(`/api/agent/stream?${params.toString()}`);
+      // In Capacitor, use absolute URL to production frontend server
+      const agentUrl = Capacitor.isNativePlatform()
+        ? `https://app.todolist.nyc/api/agent/stream?${params.toString()}`
+        : `/api/agent/stream?${params.toString()}`;
+
+      const es = new EventSource(agentUrl);
 
       es.addEventListener('token', (e) => {
         const { token: responseToken } = JSON.parse((e as MessageEvent).data);
