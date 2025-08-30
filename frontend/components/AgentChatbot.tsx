@@ -86,10 +86,10 @@ export default function AgentChatbot({ activeSpace, token }: ChatbotProps) {
         params.append('token', token);
       }
 
-      // In Capacitor, use absolute URL to production frontend server
+      // Route to backend agent endpoint via service worker
       const agentUrl = Capacitor.isNativePlatform()
-        ? `https://app.todolist.nyc/api/agent/stream?${params.toString()}`
-        : `/api/agent/stream?${params.toString()}`;
+        ? `https://backend-production-e920.up.railway.app/agent/stream?${params.toString()}`
+        : `/agent/stream?${params.toString()}`;
 
       const es = new EventSource(agentUrl);
 

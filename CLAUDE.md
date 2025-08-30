@@ -64,6 +64,18 @@ This is an AI-powered collaborative todo list application with a React/Next.js f
   - `categories.py`: Space-aware category management
   - `spaces.py`: Multi-user space collaboration system
   - `auth.py`: User authentication and session management
+  - `agent/`: AI agent module with streaming SSE endpoint and direct tool functions
+
+### AI Agent Architecture
+- **Backend Implementation**: AI agent runs entirely on Python FastAPI backend (migrated from Node.js MCP)
+- **Streaming SSE Endpoint**: `/agent/stream` provides real-time responses with Server-Sent Events
+- **Direct Tool Integration**: Tools directly call existing backend functions (no IPC overhead)
+- **OpenAI GPT-4.1**: Chat completions with function calling for weather, tasks, journals, and search
+- **Cross-Platform**: Works seamlessly on web (via service worker) and mobile (Capacitor direct calls)
+- **Available Tools**:
+  - Weather: `get_current_weather`, `get_weather_forecast`, `get_weather_alerts`
+  - Tasks: `add_task`, `list_tasks`, `update_task`
+  - Content: `add_journal_entry`, `search_content`
 
 ### Spaces System
 - **Default Spaces**: Every user gets a personal "Default" space automatically
@@ -157,6 +169,9 @@ Both frontend and backend require OpenAI API keys:
 ## API Endpoints
 
 **Note**: All frontend requests use direct paths (e.g., `/todos`, `/auth/signup`) that are intercepted by the service worker and routed to the appropriate backend.
+
+### AI Agent
+- `GET /agent/stream?q={query}&space_id={id}` - AI agent streaming endpoint with tool calling
 
 ### Spaces
 - `GET /spaces` - List user's accessible spaces
@@ -302,9 +317,9 @@ curl http://localhost:3000/new-endpoint      # Service worker
 curl http://localhost:3000/api/new-endpoint  # Proxy fallback
 ```
 
-**Current API Routes** (as of 2025-08-29):
+**Current API Routes** (as of 2025-08-30):
 - `/todos`, `/categories`, `/spaces`, `/journals`, `/insights`, `/chat`
-- `/auth`, `/email`, `/contact`, `/export`, `/health`
+- `/agent`, `/auth`, `/email`, `/contact`, `/export`, `/health`
 
 **Documentation**: See `docs/API_ROUTING_ARCHITECTURE.md` for complete details.
 

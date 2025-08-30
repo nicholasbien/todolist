@@ -9,6 +9,7 @@ from io import StringIO
 from typing import Dict, List, Optional, Union
 
 import httpx
+from agent import agent_router
 from auth import (
     LoginRequest,
     SignupRequest,
@@ -163,6 +164,8 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="AI Todo List API", lifespan=lifespan)
 
+# Include agent router
+app.include_router(agent_router)
 
 # In-memory conversation history
 conversations: Dict[str, List[dict]] = defaultdict(list)

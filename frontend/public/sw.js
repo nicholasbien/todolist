@@ -1,7 +1,7 @@
 // IMPORTANT: Always increment these versions when modifying this service worker file
 // This forces browsers to download and use the updated service worker
-const STATIC_CACHE = 'todo-static-v103';
-const API_CACHE = 'todo-api-v103';
+const STATIC_CACHE = 'todo-static-v104';
+const API_CACHE = 'todo-api-v104';
 
 const GLOBAL_DB_NAME = 'TodoGlobalDB';
 const USER_DB_PREFIX = 'TodoUserDB_';
@@ -564,6 +564,7 @@ self.addEventListener('fetch', (event) => {
                          url.pathname.startsWith('/journals') ||
                          url.pathname.startsWith('/insights') ||
                          url.pathname.startsWith('/chat') ||
+                         url.pathname.startsWith('/agent') ||
                          url.pathname.startsWith('/auth') ||
                          url.pathname.startsWith('/email') ||
                          url.pathname.startsWith('/contact') ||
@@ -578,6 +579,7 @@ self.addEventListener('fetch', (event) => {
                  url.pathname.startsWith('/journals') ||
                  url.pathname.startsWith('/insights') ||
                  url.pathname.startsWith('/chat') ||
+                 url.pathname.startsWith('/agent') ||
                  url.pathname.startsWith('/auth') ||
                  url.pathname.startsWith('/email') ||
                  url.pathname.startsWith('/contact') ||
