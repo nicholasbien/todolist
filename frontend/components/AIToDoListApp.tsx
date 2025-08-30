@@ -512,54 +512,59 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
     }
   };
 
-  // Add new todo
+  // Add new todo(s)
   const handleAddTodo = async () => {
-    if (!newTodo.trim()) return;
+    const lines = newTodo
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean);
+    if (lines.length === 0) return;
 
     setLoading(true);
     setError('');
 
     try {
-      // Create new todo object; backend will classify and set category/priority
       // Create dateAdded in user's local timezone
       const now = new Date();
       const localDateString = now.toLocaleDateString('en-CA'); // YYYY-MM-DD format
       const localTimeString = now.toLocaleTimeString('en-GB', { hour12: false }); // HH:MM:SS format
       const localISOString = `${localDateString}T${localTimeString}`;
 
-      const todo: any = {
-        text: newTodo,
-        dateAdded: localISOString,
-        completed: false,
-        space_id: activeSpace ? activeSpace._id : null
-      };
+      for (const line of lines) {
+        const todo: any = {
+          text: line,
+          dateAdded: localISOString,
+          completed: false,
+          space_id: activeSpace ? activeSpace._id : null
+        };
 
-      // If a category is selected (not "All"), skip AI classification on backend
-      if (activeCat !== 'All') {
-        todo.category = activeCat;
-        todo.priority = 'Medium';
-      }
+        // If a category is selected (not "All"), skip AI classification on backend
+        if (activeCat !== 'All') {
+          todo.category = activeCat;
+          todo.priority = 'Medium';
+        }
 
-      // Store link if it's a URL so backend can fetch title
-      if (isUrl(newTodo)) {
-        todo.link = newTodo;
-      }
+        // Store link if it's a URL so backend can fetch title
+        if (isUrl(line)) {
+          todo.link = line;
+        }
 
-      // Save to MongoDB with timeout
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+        // Save to MongoDB with timeout
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
 
-      const response = await authenticatedFetch('/todos', {
-        method: 'POST',
-        body: JSON.stringify(todo),
-        signal: controller.signal
-      });
+        const response = await authenticatedFetch('/todos', {
+          method: 'POST',
+          body: JSON.stringify(todo),
+          signal: controller.signal
+        });
 
-      clearTimeout(timeoutId);
+        clearTimeout(timeoutId);
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || 'Failed to save todo');
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.detail || 'Failed to save todo');
+        }
       }
 
       // Refresh todos list
@@ -1001,13 +1006,12 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
       {/* Add new todo */}
       <div className="mb-6">
         <div className="flex gap-2">
-          <input
-            type="text"
+          <textarea
+            rows={3}
             value={newTodo}
             onChange={(e) => setNewTodo(e.target.value)}
-            placeholder="Add a new task..."
+            placeholder="Add new tasks... (one per line)"
             className="flex-1 p-3 border border-gray-800 rounded-xl bg-black text-gray-100 placeholder-gray-500 focus:border-accent focus:outline-none transition-colors"
-            onKeyPress={(e) => e.key === 'Enter' && handleAddTodo()}
           />
           <button
             onClick={handleAddTodo}
