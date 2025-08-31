@@ -9,6 +9,8 @@ import sys
 from datetime import datetime, timedelta
 from typing import Any, Dict, Optional
 
+import httpx
+
 # Add parent directory to path for imports  # noqa: E402
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
@@ -23,6 +25,7 @@ from todos import get_todos, update_todo_fields  # noqa: E402
 
 # Local imports  # noqa: E402
 from .schemas import (  # noqa: E402
+    BookRecommendationRequest,
     JournalAddRequest,
     SearchRequest,
     TaskAddRequest,
@@ -186,6 +189,33 @@ async def get_weather_alerts(
         return {"ok": True, "location": request.location, "alerts": alerts}
     except Exception as e:
         return {"ok": False, "error": f"Failed to get alerts for {request.location}: {str(e)}"}
+
+
+async def get_book_recommendations(
+    request: BookRecommendationRequest, user_id: str, space_id: Optional[str] = None
+) -> Dict[str, Any]:
+    """Fetch book recommendations from Open Library."""
+    try:
+        url = f"https://openlibrary.org/subjects/{request.subject}.json?limit={request.limit}"
+        async with httpx.AsyncClient(timeout=10) as client:
+            response = await client.get(url)
+            response.raise_for_status()
+        data = response.json()
+        books = []
+        for work in data.get("works", [])[: request.limit]:
+            author = None
+            if work.get("authors"):
+                author = work["authors"][0].get("name")
+            books.append(
+                {
+                    "title": work.get("title"),
+                    "author": author,
+                    "year": work.get("first_publish_year"),
+                }
+            )
+        return {"ok": True, "books": books}
+    except Exception as e:
+        return {"ok": False, "error": f"Failed to get recommendations: {str(e)}"}
 
 
 async def add_task(request: TaskAddRequest, user_id: str, space_id: Optional[str] = None) -> Dict[str, Any]:
@@ -391,6 +421,11 @@ AVAILABLE_TOOLS: Dict[str, Dict[str, Any]] = {
         "func": get_weather_alerts,
         "description": "Check for weather alerts in a specific location",
         "schema": WeatherAlertsRequest,
+    },
+    "get_book_recommendations": {
+        "func": get_book_recommendations,
+        "description": "Fetch book recommendations from Open Library",
+        "schema": BookRecommendationRequest,
     },
     "add_task": {"func": add_task, "description": "Add a new task to user's todo list", "schema": TaskAddRequest},
     "list_tasks": {"func": list_tasks, "description": "List tasks in the current space", "schema": TaskListRequest},

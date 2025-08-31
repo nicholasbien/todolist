@@ -50,6 +50,11 @@ class SearchRequest(BaseModel):
     limit: int = Field(default=8, ge=1, le=50, description="Maximum results")
 
 
+class BookRecommendationRequest(BaseModel):
+    subject: str = Field(..., description="Book subject or genre")
+    limit: int = Field(default=5, ge=1, le=20, description="Number of books to return")
+
+
 # OpenAI function schema generators
 def get_openai_tool_schema(model_class: BaseModel) -> dict:
     """Convert Pydantic model to OpenAI function schema format."""
@@ -82,6 +87,11 @@ OPENAI_TOOL_SCHEMAS = {
         "name": "get_weather_alerts",
         "description": "Check for weather alerts in a specific location. Call when user asks about weather warnings, alerts, storms, or weather safety.",  # noqa: E501
         "parameters": get_openai_tool_schema(WeatherAlertsRequest),
+    },
+    "get_book_recommendations": {
+        "name": "get_book_recommendations",
+        "description": "Get book suggestions from Open Library based on subject or genre.",
+        "parameters": get_openai_tool_schema(BookRecommendationRequest),
     },
     "add_task": {
         "name": "add_task",

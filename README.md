@@ -17,6 +17,7 @@ A modern collaborative todo list application with AI-powered task classification
 - **Daily email summaries** with AI-generated insights
 - **Space-aware summaries and chatbot** - Emails and chat responses organize todos by space
 - **Customizable email instructions** for personalized summaries
+- **Book recommendations** via Open Library integration
 
 ### Collaboration Features
 - **Default personal spaces** - Every user gets a private "Default" space
