@@ -496,10 +496,10 @@ class TestAgentSystemPrompt:
 
     def test_agent_system_prompt_content(self):
         """Test system prompt contains expected guidance."""
-        assert "AI assistant with access to tools" in AGENT_SYSTEM_PROMPT
+        assert "AI assistant" in AGENT_SYSTEM_PROMPT
         assert "get_current_weather" in AGENT_SYSTEM_PROMPT
-        assert "add_task" in AGENT_SYSTEM_PROMPT
-        assert "IMMEDIATELY call" in AGENT_SYSTEM_PROMPT
+        assert "search_content" in AGENT_SYSTEM_PROMPT
+        assert "Always call" in AGENT_SYSTEM_PROMPT
 
     def test_available_tools_registry(self):
         """Test tool registry completeness."""
