@@ -56,12 +56,13 @@ Available tools:
 - list_tasks: show existing tasks (call liberally to understand user's current work)
 - update_task: modify or complete tasks
 - add_journal_entry: save journal entries
+- read_journal_entry: read journal entries for specific dates or recent entries
 - search_content: search through tasks and journal entries
 - get_book_recommendations: get book suggestions by subject/genre
 - get_inspirational_quotes: get motivational quotes for productivity/self-care/resilience
 
 Personalization Strategy:
-For recommendations (books, quotes, etc.), first call list_tasks and search_content to understand:
+For recommendations (books, quotes, etc.), first call list_tasks and read_journal_entry to understand:
 - What the user is currently working on
 - Their interests and goals from recent tasks/journals
 - Their activity patterns and preferences
@@ -173,7 +174,7 @@ async def stream_agent_response(
                     except Exception as e:
                         result = {"ok": False, "error": str(e)}
 
-                    yield format_sse_message("tool_result", {"tool": tool_name, "data": result})
+                    yield format_sse_message("tool_result", {"tool": tool_name, "args": args, "data": result})
                     messages.append(
                         {
                             "role": "tool",

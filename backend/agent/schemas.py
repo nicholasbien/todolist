@@ -44,6 +44,13 @@ class JournalAddRequest(BaseModel):
     date: Optional[str] = Field(None, description="Date in YYYY-MM-DD format (optional, defaults to today)")
 
 
+class JournalReadRequest(BaseModel):
+    date: Optional[str] = Field(
+        None, description="Date in YYYY-MM-DD format (optional, gets recent entries if not provided)"
+    )
+    limit: int = Field(default=5, description="Number of recent entries to return if no date specified")
+
+
 class SearchRequest(BaseModel):
     query: str = Field(..., min_length=1, description="Search query")
     types: Optional[List[Literal["task", "journal"]]] = Field(None, description="Types to search (optional)")
@@ -125,6 +132,11 @@ OPENAI_TOOL_SCHEMAS = {
         "name": "add_journal_entry",
         "description": "Create or update a journal entry. Call when user wants to add journal entry, diary entry, or save notes for a specific date.",  # noqa: E501
         "parameters": get_openai_tool_schema(JournalAddRequest),
+    },
+    "read_journal_entry": {
+        "name": "read_journal_entry",
+        "description": "Read journal entries. Call when user asks about their past journal entries, thoughts, or activities, or when you need context from their journals for personalization.",  # noqa: E501
+        "parameters": get_openai_tool_schema(JournalReadRequest),
     },
     "search_content": {
         "name": "search_content",

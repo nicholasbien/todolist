@@ -12,8 +12,10 @@ import pytest
 from agent.agent import AGENT_SYSTEM_PROMPT, format_sse_message, stream_agent_response
 from agent.schemas import (
     OPENAI_TOOL_SCHEMAS,
+    BookRecommendationRequest,
     InspirationalQuoteRequest,
     JournalAddRequest,
+    JournalReadRequest,
     SearchRequest,
     TaskAddRequest,
     TaskListRequest,
@@ -26,11 +28,13 @@ from agent.tools import (
     AVAILABLE_TOOLS,
     add_journal_entry,
     add_task,
+    get_book_recommendations,
     get_current_weather,
     get_inspirational_quotes,
     get_weather_alerts,
     get_weather_forecast,
     list_tasks,
+    read_journal_entry,
     search_content,
     update_task,
 )
@@ -282,6 +286,123 @@ class TestAgentToolsUnit:
         # Check journal result
         journal_result = next(r for r in result["results"] if r["type"] == "journal")
         assert "important project" in journal_result["snippet"]
+
+    @pytest.mark.asyncio
+    @patch("httpx.AsyncClient")
+    async def test_get_book_recommendations_success(self, mock_client_class):
+        """Test successful book recommendations."""
+        # Mock the API response
+        mock_response = MagicMock()
+        mock_response.json.return_value = {
+            "works": [
+                {"title": "Test Book 1", "authors": [{"name": "Author 1"}], "first_publish_year": 2020},
+                {"title": "Test Book 2", "authors": [{"name": "Author 2"}], "first_publish_year": 2021},
+            ]
+        }
+        mock_response.raise_for_status.return_value = None
+
+        mock_client = AsyncMock()
+        mock_client.get.return_value = mock_response
+        mock_client_class.return_value.__aenter__.return_value = mock_client
+
+        # Test the function
+        request = BookRecommendationRequest(subject="productivity", limit=2)
+        result = await get_book_recommendations(request, "user123")
+
+        # Verify results
+        assert result["ok"] is True
+        assert len(result["books"]) == 2
+        assert result["books"][0]["title"] == "Test Book 1"
+        assert result["books"][0]["author"] == "Author 1"
+        assert result["books"][0]["year"] == 2020
+
+        # Verify API call
+        mock_client.get.assert_called_once_with("https://openlibrary.org/subjects/productivity.json?limit=2")
+
+    @pytest.mark.asyncio
+    @patch("httpx.AsyncClient")
+    async def test_get_book_recommendations_api_error(self, mock_client_class):
+        """Test book recommendations API error handling."""
+        mock_client = AsyncMock()
+        mock_client.get.side_effect = httpx.RequestError("Network error")
+        mock_client_class.return_value.__aenter__.return_value = mock_client
+
+        request = BookRecommendationRequest(subject="productivity")
+        result = await get_book_recommendations(request, "user123")
+
+        assert result["ok"] is False
+        assert "Failed to get recommendations" in result["error"]
+
+    @pytest.mark.asyncio
+    @patch("agent.tools.collections")
+    async def test_read_journal_entry_specific_date(self, mock_collections):
+        """Test reading journal entry for specific date."""
+        # Mock MongoDB response
+        mock_journal = {
+            "_id": "journal123",
+            "content": "Today was a productive day",
+            "date": "2025-08-31",
+            "space_id": "space123",
+        }
+        mock_collections.journals.find_one = AsyncMock(return_value=mock_journal)
+
+        request = JournalReadRequest(date="2025-08-31")
+        result = await read_journal_entry(request, "6843a5933e5a5d8cf5b169f8", "space123")
+
+        assert result["ok"] is True
+        assert result["entry"]["content"] == "Today was a productive day"
+        assert result["entry"]["date"] == "2025-08-31"
+        assert result["entry"]["id"] == "journal123"
+
+    @pytest.mark.asyncio
+    @patch("agent.tools.collections")
+    async def test_read_journal_entry_recent_entries(self, mock_collections):
+        """Test reading recent journal entries."""
+        # Mock MongoDB response
+        mock_journals = [
+            {"_id": "journal1", "content": "Recent entry 1", "date": "2025-08-31", "space_id": "space123"},
+            {"_id": "journal2", "content": "Recent entry 2", "date": "2025-08-30", "space_id": "space123"},
+        ]
+
+        # Mock the chained calls properly for motor (Motor returns cursors from find, not async methods)
+        mock_cursor = MagicMock()
+        mock_cursor.sort.return_value = mock_cursor
+        mock_cursor.limit.return_value = mock_cursor
+        mock_cursor.to_list = AsyncMock(return_value=mock_journals)
+        mock_collections.journals.find.return_value = mock_cursor
+
+        request = JournalReadRequest(limit=2)
+        result = await read_journal_entry(request, "6843a5933e5a5d8cf5b169f8", "space123")
+
+        assert result["ok"] is True
+        assert len(result["entries"]) == 2
+        assert result["count"] == 2
+        assert result["entries"][0]["content"] == "Recent entry 1"
+
+    @pytest.mark.asyncio
+    @patch("agent.tools.collections")
+    async def test_read_journal_entry_not_found(self, mock_collections):
+        """Test reading journal entry when none exists."""
+        mock_collections.journals.find_one = AsyncMock(return_value=None)
+
+        request = JournalReadRequest(date="2025-08-31")
+        result = await read_journal_entry(request, "6843a5933e5a5d8cf5b169f8")
+
+        assert result["ok"] is True
+        assert result["entry"] is None
+        assert "No journal entry found" in result["message"]
+
+    @pytest.mark.asyncio
+    @patch("agent.tools.collections")
+    async def test_read_journal_entry_database_error(self, mock_collections):
+        """Test read journal entry database error handling."""
+        mock_collections.journals.find_one = AsyncMock(side_effect=Exception("Database error"))
+
+        request = JournalReadRequest(date="2025-08-31")
+        result = await read_journal_entry(request, "user123")
+
+        assert result["ok"] is False
+        assert "Failed to read journal entries" in result["error"]
 
 
 class TestAgentStreaming:
@@ -608,6 +729,7 @@ class TestAgentSystemPrompt:
             "list_tasks",
             "update_task",
             "add_journal_entry",
+            "read_journal_entry",
             "search_content",
             "get_book_recommendations",
             "get_inspirational_quotes",

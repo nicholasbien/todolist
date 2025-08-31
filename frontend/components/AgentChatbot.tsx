@@ -11,7 +11,8 @@ const MAX_MESSAGES = 10;
 
 export default function AgentChatbot({ activeSpace, token }: ChatbotProps) {
   const [question, setQuestion] = useState('');
-  const [messages, setMessages] = useState<{ role: string; content: string }[]>(() => {
+  const [expandedTools, setExpandedTools] = useState<Set<number>>(new Set());
+  const [messages, setMessages] = useState<{ role: string; content: string; toolData?: any }[]>(() => {
     if (typeof window !== 'undefined') {
       try {
         const spaceKey = `agent_chat_messages_${activeSpace?._id || 'default'}`;
@@ -82,11 +83,8 @@ export default function AgentChatbot({ activeSpace, token }: ChatbotProps) {
     setLoading(true);
     setError('');
 
-    const assistantResponse = { role: 'assistant', content: '' };
-    setMessages((prev) => {
-      const updated = [...prev, assistantResponse];
-      return updated.length > MAX_MESSAGES ? updated.slice(-MAX_MESSAGES) : updated;
-    });
+    let assistantResponse = { role: 'assistant', content: '' };
+    let assistantMessageAdded = false;
 
     try {
       const params = new URLSearchParams();
@@ -108,21 +106,55 @@ export default function AgentChatbot({ activeSpace, token }: ChatbotProps) {
       es.addEventListener('token', (e) => {
         const { token: responseToken } = JSON.parse((e as MessageEvent).data);
         assistantResponse.content += responseToken;
-        setMessages((prev) => [...prev.slice(0, -1), { ...assistantResponse }]);
+
+        if (!assistantMessageAdded) {
+          // First token - add assistant message to the conversation and stop loading
+          setMessages((prev) => {
+            const updated = [...prev, { ...assistantResponse }];
+            return updated.length > MAX_MESSAGES ? updated.slice(-MAX_MESSAGES) : updated;
+          });
+          setLoading(false);
+          assistantMessageAdded = true;
+        } else {
+          // Update existing assistant message
+          setMessages((prev) => [...prev.slice(0, -1), { ...assistantResponse }]);
+        }
       });
 
       es.addEventListener('tool_result', (e) => {
-        const { tool, data } = JSON.parse((e as MessageEvent).data);
+        const { tool, args, data } = JSON.parse((e as MessageEvent).data);
+
+        // Format tool inputs in a readable way
+        const formatArgs = (args: any) => {
+          if (!args || Object.keys(args).length === 0) return '';
+          const readable = Object.entries(args)
+            .map(([key, value]) => `${key}: ${value}`)
+            .join(', ');
+          return `(${readable})`;
+        };
+
+        // Format tool results more concisely
+        const formatResult = (data: any) => {
+          if (data.ok === false) return `❌ ${data.error}`;
+          if (data.tasks) return `✅ Found ${data.tasks.length} tasks`;
+          if (data.weather) return `🌤️ ${data.weather.location}: ${data.weather.temperature_display}`;
+          if (data.books) return `📚 Found ${data.books.length} book recommendations`;
+          if (data.quotes) return `💭 "${data.quotes[0]}"`;
+          if (data.results) return `🔍 Found ${data.results.length} results`;
+          if (data.entries) return `📖 Found ${data.entries.length} journal entries`;
+          if (data.entry) return data.entry ? `📖 Journal entry from ${data.entry.date}` : `📖 No journal entry found`;
+          return '✅ Success';
+        };
+
+        const toolMessage = `🔧 ${tool}${formatArgs(args)}: ${formatResult(data)}`;
+
         setMessages((prev) => {
-          const updated = [...prev, { role: 'assistant', content: `[${tool}] ${JSON.stringify(data)}` }];
+          const updated = [...prev, { role: 'system', content: toolMessage, toolData: { tool, args, data } }];
           return updated.length > MAX_MESSAGES ? updated.slice(-MAX_MESSAGES) : updated;
         });
       });
 
       es.addEventListener('done', () => {
-        // Ensure final message is properly set
-        setMessages((prev) => [...prev.slice(0, -1), { ...assistantResponse }]);
-        setLoading(false);
         es.close();
       });
 
@@ -135,6 +167,18 @@ export default function AgentChatbot({ activeSpace, token }: ChatbotProps) {
       setError(err.message || 'Error');
       setLoading(false);
     }
+  };
+
+  const toggleToolExpansion = (index: number) => {
+    setExpandedTools((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(index)) {
+        newSet.delete(index);
+      } else {
+        newSet.add(index);
+      }
+      return newSet;
+    });
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -153,12 +197,38 @@ export default function AgentChatbot({ activeSpace, token }: ChatbotProps) {
             <div className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
               msg.role === 'user'
                 ? 'bg-accent text-foreground'
+                : msg.role === 'system'
+                ? 'bg-blue-900/30 text-blue-200 border border-blue-700/50'
                 : 'bg-gray-800 text-gray-100 border border-gray-700'
             }`}>
-              <div className="text-xs mb-1 opacity-75">
-                {msg.role === 'user' ? 'You' : 'Agent'}
+              <div className="text-xs mb-1 opacity-75 flex justify-between items-center">
+                <span>{msg.role === 'user' ? 'You' : msg.role === 'system' ? 'Tool' : 'Agent'}</span>
+                {msg.role === 'system' && msg.toolData && (
+                  <button
+                    onClick={() => toggleToolExpansion(idx)}
+                    className="text-xs text-blue-300 hover:text-blue-100 transition-colors"
+                  >
+                    {expandedTools.has(idx) ? '▼' : '▶'}
+                  </button>
+                )}
               </div>
               <div className="whitespace-pre-wrap text-sm">{msg.content}</div>
+              {msg.role === 'system' && msg.toolData && expandedTools.has(idx) && (
+                <div className="mt-2 pt-2 border-t border-blue-700/30 text-xs">
+                  <div className="mb-1">
+                    <span className="text-blue-300 font-medium">Input:</span>
+                    <pre className="mt-1 bg-blue-950/50 p-2 rounded text-blue-100 overflow-x-auto">
+                      {JSON.stringify(msg.toolData.args, null, 2)}
+                    </pre>
+                  </div>
+                  <div>
+                    <span className="text-blue-300 font-medium">Output:</span>
+                    <pre className="mt-1 bg-blue-950/50 p-2 rounded text-blue-100 overflow-x-auto">
+                      {JSON.stringify(msg.toolData.data, null, 2)}
+                    </pre>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         ))}

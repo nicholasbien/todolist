@@ -28,6 +28,7 @@ from .schemas import (  # noqa: E402
     BookRecommendationRequest,
     InspirationalQuoteRequest,
     JournalAddRequest,
+    JournalReadRequest,
     SearchRequest,
     TaskAddRequest,
     TaskListRequest,
@@ -416,6 +417,61 @@ async def add_journal_entry(request: JournalAddRequest, user_id: str, space_id: 
         return {"ok": False, "error": f"Failed to add journal entry: {str(e)}"}
 
 
+async def read_journal_entry(
+    request: JournalReadRequest, user_id: str, space_id: Optional[str] = None
+) -> Dict[str, Any]:
+    """Read journal entries for a specific date or get recent entries."""
+    try:
+        # Convert user_id string back to ObjectId for MongoDB query
+        try:
+            user_object_id = ObjectId(user_id)
+        except Exception:
+            user_object_id = user_id  # fallback if not a valid ObjectId string
+
+        query_filter = {"user_id": user_object_id}
+        if space_id:
+            query_filter["space_id"] = space_id
+
+        if request.date:
+            # Get specific date entry
+            query_filter["date"] = request.date
+            journal = await collections.journals.find_one(query_filter)
+            if journal:
+                return {
+                    "ok": True,
+                    "entry": {
+                        "id": str(journal["_id"]),
+                        "content": journal.get("content", ""),
+                        "date": journal.get("date", ""),
+                        "space_id": journal.get("space_id"),
+                    },
+                }
+            else:
+                return {"ok": True, "entry": None, "message": f"No journal entry found for {request.date}"}
+        else:
+            # Get recent entries
+            journals = (
+                await collections.journals.find(query_filter)
+                .sort("date", -1)
+                .limit(request.limit)
+                .to_list(length=request.limit)
+            )
+            entries = []
+            for journal in journals:
+                entries.append(
+                    {
+                        "id": str(journal["_id"]),
+                        "content": journal.get("content", ""),
+                        "date": journal.get("date", ""),
+                        "space_id": journal.get("space_id"),
+                    }
+                )
+            return {"ok": True, "entries": entries, "count": len(entries)}
+
+    except Exception as e:
+        return {"ok": False, "error": f"Failed to read journal entries: {str(e)}"}
+
+
 async def search_content(request: SearchRequest, user_id: str, space_id: Optional[str] = None) -> Dict[str, Any]:
     """Search through tasks and journal entries."""
     try:
@@ -444,7 +500,13 @@ async def search_content(request: SearchRequest, user_id: str, space_id: Optiona
         # Search journals if requested
         if not request.types or "journal" in request.types:
             # Note: simplified search - production might use full-text search
-            query_filter = {"user_id": user_id}
+            # Convert user_id string back to ObjectId for MongoDB query
+            try:
+                user_object_id = ObjectId(user_id)
+            except Exception:
+                user_object_id = user_id  # fallback if not a valid ObjectId string
+
+            query_filter = {"user_id": user_object_id}
             if space_id:
                 query_filter["space_id"] = space_id
 
@@ -496,6 +558,11 @@ AVAILABLE_TOOLS: Dict[str, Dict[str, Any]] = {
         "func": add_journal_entry,
         "description": "Create or update a journal entry",
         "schema": JournalAddRequest,
+    },
+    "read_journal_entry": {
+        "func": read_journal_entry,
+        "description": "Read journal entries for specific date or recent entries",
+        "schema": JournalReadRequest,
     },
     "search_content": {
         "func": search_content,

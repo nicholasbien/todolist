@@ -327,6 +327,20 @@ data: {"ok": true}
 
 **Important**: The final response is assembled from all the `token` events. The frontend must properly accumulate these tokens to display the complete response to the user.
 
+### Tool Input/Output Display
+
+The frontend now displays tool inputs and outputs in a user-friendly format:
+
+- **Tool Messages**: Blue-tinted messages showing tool calls with inputs and formatted results
+- **Format**: `🔧 tool_name(arg: value): ✅ Formatted result`
+- **Examples**:
+  - `🔧 get_current_weather(location: Tokyo): 🌤️ Tokyo, Japan: 82°F`
+  - `🔧 list_tasks(): ✅ Found 6 tasks`
+  - `🔧 get_book_recommendations(subject: programming): 📚 Found 5 book recommendations`
+  - `🔧 get_inspirational_quotes(goal: productivity): 💭 "Focus on being productive instead of busy."`
+
+This gives users transparency into what tools the agent is calling and with what parameters.
+
 ## Key Implementation Details
 
 - **Next.js API Proxy**: All frontend requests use `/api/*` pattern routed through `pages/api/[...proxy].js`
