@@ -110,7 +110,9 @@ async def stream_agent_response(
         )
 
         # Track partial tool calls across chunks
-        partial_tool_calls = {}
+        partial_tool_calls: Dict[int, Dict[str, Any]] = {}
+        executed_tools = []
+        assistant_tool_calls = []
 
         async for chunk in stream:
             choice = chunk.choices[0] if chunk.choices else None
@@ -128,7 +130,10 @@ async def stream_agent_response(
 
                     # Initialize partial tool call if not exists
                     if index not in partial_tool_calls:
-                        partial_tool_calls[index] = {"name": "", "arguments": ""}
+                        partial_tool_calls[index] = {"id": "", "name": "", "arguments": ""}
+
+                    if delta_tool_call.id:
+                        partial_tool_calls[index]["id"] = delta_tool_call.id
 
                     # Accumulate function name
                     if delta_tool_call.function and delta_tool_call.function.name:
@@ -143,12 +148,10 @@ async def stream_agent_response(
                     partial = partial_tool_calls[index]
                     if partial["name"] and partial["arguments"]:
                         try:
-                            # Try to parse complete JSON arguments
                             args = json.loads(partial["arguments"])
                             tool_name = partial["name"]
 
                             if tool_name in AVAILABLE_TOOLS:
-                                # Execute the tool
                                 tool_info = AVAILABLE_TOOLS[tool_name]
 
                                 # Validate arguments with Pydantic schema
@@ -157,7 +160,20 @@ async def stream_agent_response(
                                 # Call the tool function
                                 result = await tool_info["func"](request=request, user_id=user_id, space_id=space_id)
 
-                                # Send tool result
+                                # Record tool call for follow-up completion
+                                assistant_tool_calls.append(
+                                    {
+                                        "id": partial["id"],
+                                        "type": "function",
+                                        "function": {
+                                            "name": tool_name,
+                                            "arguments": json.dumps(args),
+                                        },
+                                    }
+                                )
+                                executed_tools.append({"id": partial["id"], "name": tool_name, "result": result})
+
+                                # Send tool result to client
                                 tool_result_data: Dict[str, Any] = {"tool": tool_name, "data": result}
                                 yield format_sse_message("tool_result", tool_result_data)
 
@@ -168,9 +184,8 @@ async def stream_agent_response(
                             # JSON not complete yet, continue accumulating
                             pass
                         except Exception as e:
-                            # Tool execution error
                             tool_error_data: Dict[str, Any] = {
-                                "tool": partial["name"],
+                                "tool": partial.get("name", ""),
                                 "data": {"ok": False, "error": str(e)},
                             }
                             yield format_sse_message("tool_result", tool_error_data)
@@ -178,7 +193,6 @@ async def stream_agent_response(
 
             # Handle completion
             if choice.finish_reason == "tool_calls":
-                # Process any remaining partial tool calls
                 for index, partial in list(partial_tool_calls.items()):
                     if partial["name"] and partial["arguments"]:
                         try:
@@ -190,16 +204,58 @@ async def stream_agent_response(
                                 request = tool_info["schema"](**args)
                                 result = await tool_info["func"](request=request, user_id=user_id, space_id=space_id)
 
-                                completion_tool_result: Dict[str, Any] = {"tool": tool_name, "data": result}
+                                assistant_tool_calls.append(
+                                    {
+                                        "id": partial["id"],
+                                        "type": "function",
+                                        "function": {
+                                            "name": tool_name,
+                                            "arguments": json.dumps(args),
+                                        },
+                                    }
+                                )
+                                executed_tools.append({"id": partial["id"], "name": tool_name, "result": result})
+
+                                completion_tool_result: Dict[str, Any] = {
+                                    "tool": tool_name,
+                                    "data": result,
+                                }
                                 yield format_sse_message("tool_result", completion_tool_result)
                         except Exception as e:
                             completion_error_data: Dict[str, Any] = {
-                                "tool": partial["name"],
+                                "tool": partial.get("name", ""),
                                 "data": {"ok": False, "error": str(e)},
                             }
                             yield format_sse_message("tool_result", completion_error_data)
 
                 partial_tool_calls.clear()
+
+        # If tools were called, get final assistant response
+        if executed_tools:
+            followup_messages = messages + [{"role": "assistant", "content": None, "tool_calls": assistant_tool_calls}]
+
+            for tool in executed_tools:
+                followup_messages.append(
+                    {
+                        "role": "tool",
+                        "tool_call_id": tool["id"],
+                        "content": json.dumps(tool["result"]),
+                    }
+                )
+
+            followup_stream = await client.chat.completions.create(
+                model="gpt-4.1",
+                messages=followup_messages,
+                stream=True,
+                temperature=0.7,
+            )
+
+            async for chunk in followup_stream:
+                choice = chunk.choices[0] if chunk.choices else None
+                if not choice:
+                    continue
+                if choice.delta.content:
+                    yield format_sse_message("token", {"token": choice.delta.content})
 
         # Send completion event
         yield format_sse_message("done", {"ok": True})
