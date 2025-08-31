@@ -55,6 +55,11 @@ class BookRecommendationRequest(BaseModel):
     limit: int = Field(default=5, ge=1, le=20, description="Number of books to return")
 
 
+class InspirationalQuoteRequest(BaseModel):
+    goal: Literal["productivity", "self-care", "resilience"] = Field(..., description="User's current focus area")
+    limit: int = Field(default=1, ge=1, le=5, description="Number of quotes to return")
+
+
 # OpenAI function schema generators
 def get_openai_tool_schema(model_class: BaseModel) -> dict:
     """Convert Pydantic model to OpenAI function schema format."""
@@ -92,6 +97,14 @@ OPENAI_TOOL_SCHEMAS = {
         "name": "get_book_recommendations",
         "description": "Get book suggestions from Open Library based on subject or genre.",
         "parameters": get_openai_tool_schema(BookRecommendationRequest),
+    },
+    "get_inspirational_quotes": {
+        "name": "get_inspirational_quotes",
+        "description": (
+            "Fetch motivational quotes or affirmations tailored to a goal. "
+            "Call when user asks for inspiration, motivation, or positive affirmations."
+        ),
+        "parameters": get_openai_tool_schema(InspirationalQuoteRequest),
     },
     "add_task": {
         "name": "add_task",

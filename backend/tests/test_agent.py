@@ -7,10 +7,12 @@ Tests all tools, streaming functionality, and edge cases.
 import os
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import httpx
 import pytest
 from agent.agent import AGENT_SYSTEM_PROMPT, format_sse_message, stream_agent_response
 from agent.schemas import (
     OPENAI_TOOL_SCHEMAS,
+    InspirationalQuoteRequest,
     JournalAddRequest,
     SearchRequest,
     TaskAddRequest,
@@ -25,6 +27,7 @@ from agent.tools import (
     add_journal_entry,
     add_task,
     get_current_weather,
+    get_inspirational_quotes,
     get_weather_alerts,
     get_weather_forecast,
     list_tasks,
@@ -99,6 +102,31 @@ class TestAgentToolsUnit:
         assert result["ok"] is True
         assert result["location"] == "TestCity"
         assert "No active weather alerts" in result["alerts"][0]
+
+    @pytest.mark.asyncio
+    @patch("agent.tools.httpx.AsyncClient.get", new_callable=AsyncMock)
+    async def test_get_inspirational_quotes_api_success(self, mock_get):
+        """Test inspirational quotes retrieval with successful API call."""
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"affirmation": "You are capable"}
+        mock_get.return_value = mock_response
+
+        request = InspirationalQuoteRequest(goal="self-care", limit=1)
+        result = await get_inspirational_quotes(request, "test_user", "test_space")
+
+        assert result["ok"] is True
+        assert result["quotes"] == ["You are capable"]
+
+    @pytest.mark.asyncio
+    @patch("agent.tools.httpx.AsyncClient.get", side_effect=httpx.RequestError("fail"))
+    async def test_get_inspirational_quotes_fallback(self, mock_get):
+        """Test inspirational quotes fallback when API call fails."""
+        request = InspirationalQuoteRequest(goal="resilience", limit=2)
+        result = await get_inspirational_quotes(request, "test_user", "test_space")
+
+        assert result["ok"] is True
+        assert len(result["quotes"]) == 2
 
     @pytest.mark.asyncio
     @patch("agent.tools.db_create_todo", new_callable=AsyncMock)
@@ -566,6 +594,7 @@ class TestAgentSystemPrompt:
         assert "AI assistant with access to tools" in AGENT_SYSTEM_PROMPT
         assert "get_current_weather" in AGENT_SYSTEM_PROMPT
         assert "add_task" in AGENT_SYSTEM_PROMPT
+        assert "get_inspirational_quotes" in AGENT_SYSTEM_PROMPT
         assert "IMMEDIATELY call" in AGENT_SYSTEM_PROMPT
         assert "human-readable summary" in AGENT_SYSTEM_PROMPT
 
@@ -581,6 +610,7 @@ class TestAgentSystemPrompt:
             "add_journal_entry",
             "search_content",
             "get_book_recommendations",
+            "get_inspirational_quotes",
         }
 
         assert set(AVAILABLE_TOOLS.keys()) == expected_tools
