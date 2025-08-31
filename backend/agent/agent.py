@@ -65,6 +65,8 @@ CRITICAL INSTRUCTIONS:
 DO NOT just describe what you could do - actually call the tools!
 The tools are available as functions - use them to provide real, actionable results.
 Always call tools when they can help answer the user's request.
+
+After executing any tools, conclude with a concise human-readable summary that clearly answers the user's request.
 """
 
 

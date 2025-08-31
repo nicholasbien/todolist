@@ -500,6 +500,7 @@ class TestAgentSystemPrompt:
         assert "get_current_weather" in AGENT_SYSTEM_PROMPT
         assert "add_task" in AGENT_SYSTEM_PROMPT
         assert "IMMEDIATELY call" in AGENT_SYSTEM_PROMPT
+        assert "human-readable summary" in AGENT_SYSTEM_PROMPT
 
     def test_available_tools_registry(self):
         """Test tool registry completeness."""
