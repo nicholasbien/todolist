@@ -1,7 +1,7 @@
 import json
 import logging
 import os
-from datetime import datetime
+from datetime import date, datetime
 from typing import List
 
 from dotenv import load_dotenv
@@ -30,7 +30,8 @@ async def answer_question(question: str, spaces_data: List[dict], history: List[
             "Use the following JSON data (organized by space) to inform your responses. "
             "When discussing dates, use relative terms like 'today', 'yesterday', 'tomorrow', "
             "or 'this week' when appropriate. "
-            "If the user asks about a specific space, only discuss that space.\n" + json.dumps(spaces_data)
+            "If the user asks about a specific space, only discuss that space.\n"
+            + json.dumps(spaces_data, default=lambda o: o.isoformat() if isinstance(o, (datetime, date)) else str(o))
         )
         messages = [{"role": "system", "content": system_prompt}] + history + [{"role": "user", "content": question}]
         completion = client.chat.completions.create(
