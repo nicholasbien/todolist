@@ -9,13 +9,13 @@ from pydantic import BaseModel, Field
 
 class WeatherCurrentRequest(BaseModel):
     location: str = Field(..., description="City name (e.g., 'Tokyo', 'New York')")
-    units: Literal["metric", "imperial", "kelvin"] = Field(default="metric", description="Temperature units")
+    units: Literal["metric", "imperial", "kelvin"] = Field(default="imperial", description="Temperature units")
 
 
 class WeatherForecastRequest(BaseModel):
     location: str = Field(..., description="City name")
     days: int = Field(default=3, ge=1, le=5, description="Number of forecast days (1-5)")
-    units: Literal["metric", "imperial", "kelvin"] = Field(default="metric", description="Temperature units")
+    units: Literal["metric", "imperial", "kelvin"] = Field(default="imperial", description="Temperature units")
 
 
 class WeatherAlertsRequest(BaseModel):
