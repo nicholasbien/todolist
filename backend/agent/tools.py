@@ -36,6 +36,7 @@ from .schemas import (  # noqa: E402
     WeatherAlertsRequest,
     WeatherCurrentRequest,
     WeatherForecastRequest,
+    WebSearchRequest,
 )
 
 # Mock weather data (can be replaced with real weather API)
@@ -620,6 +621,97 @@ async def search_content(request: SearchRequest, user_id: str, space_id: Optiona
         return {"ok": False, "error": f"Failed to search content: {str(e)}"}
 
 
+async def web_search(request: WebSearchRequest, user_id: str, space_id: Optional[str] = None) -> Dict[str, Any]:
+    """
+    Search the web using Brave Search API.
+
+    Args:
+        request: WebSearchRequest containing query, count, freshness, and summary params
+        user_id: User ID for the request
+        space_id: Optional space ID
+
+    Returns:
+        Dict with search results and optional summary
+    """
+    try:
+        # Check if BRAVE_API_KEY is set
+        brave_api_key = os.getenv("BRAVE_API_KEY")
+        if not brave_api_key or brave_api_key == "your_brave_api_key_here":
+            return {
+                "ok": False,
+                "error": "Brave Search API key not configured. Please set BRAVE_API_KEY environment variable.",
+                "results": [],
+                "summary": None,
+            }
+
+        # Direct Brave Search API integration (much cleaner than MCP)
+        async with httpx.AsyncClient() as client:
+            try:
+                # Call Brave Search API directly
+                url = "https://api.search.brave.com/res/v1/web/search"
+                headers = {
+                    "Accept": "application/json",
+                    "Accept-Encoding": "gzip",
+                    "X-Subscription-Token": brave_api_key,
+                }
+                params = {
+                    "q": request.query,
+                    "count": request.count,
+                    "freshness": request.freshness,
+                    "summary": "1" if request.summary else "0",
+                }
+
+                response = await client.get(url, headers=headers, params=params)
+                response.raise_for_status()
+
+                data = response.json()
+
+                # Extract search results
+                web_results = data.get("web", {}).get("results", [])
+                formatted_results = []
+
+                for result_item in web_results[: request.count]:
+                    formatted_results.append(
+                        {
+                            "title": result_item.get("title", ""),
+                            "url": result_item.get("url", ""),
+                            "snippet": result_item.get("description", ""),
+                        }
+                    )
+
+                # Extract summary if available
+                summary_text = None
+                if request.summary:
+                    summary_data = data.get("summarizer", {})
+                    summary_text = summary_data.get("key", "") if summary_data else None
+
+                return {
+                    "ok": True,
+                    "results": formatted_results,
+                    "summary": summary_text,
+                    "query": request.query,
+                    "count": len(formatted_results),
+                }
+
+            except httpx.HTTPStatusError as e:
+                return {
+                    "ok": False,
+                    "error": f"Brave API error {e.response.status_code}: {e.response.text}",
+                    "results": [],
+                    "summary": None,
+                }
+            except Exception as e:
+                return {
+                    "ok": False,
+                    "error": f"Web search failed: {str(e)}",
+                    "results": [],
+                    "summary": None,
+                }
+
+    except Exception as e:
+        return {"ok": False, "error": f"Failed to perform web search: {str(e)}"}
+
+
 # Tool registry for easy access
 AVAILABLE_TOOLS: Dict[str, Dict[str, Any]] = {
     "get_current_weather": {
@@ -664,5 +756,10 @@ AVAILABLE_TOOLS: Dict[str, Dict[str, Any]] = {
         "func": search_content,
         "description": "Search through tasks and journal entries",
         "schema": SearchRequest,
+    },
+    "web_search": {
+        "func": web_search,
+        "description": "Search the web for current information, news, or specific queries",
+        "schema": WebSearchRequest,
     },
 }

@@ -86,6 +86,16 @@ class InspirationalQuoteRequest(BaseModel):
     limit: int = Field(default=1, ge=1, le=5, description="Number of quotes to return")
 
 
+class WebSearchRequest(BaseModel):
+    query: str = Field(..., min_length=1, description="Search query")
+    count: int = Field(default=5, ge=1, le=10, description="Number of results to return")
+    freshness: Optional[str] = Field(
+        default="pm",
+        description="Freshness filter: 'pd' (past day), 'pw' (past week), 'pm' (past month), 'py' (past year)",
+    )
+    summary: bool = Field(default=True, description="Include AI summary of results")
+
+
 # OpenAI function schema generators
 def get_openai_tool_schema(model_class: BaseModel) -> dict:
     """Convert Pydantic model to OpenAI function schema format."""
@@ -166,5 +176,14 @@ OPENAI_TOOL_SCHEMAS = {
         "name": "search_content",
         "description": "Search through tasks and journal entries. Call when user wants to search through their tasks or journal entries for specific content.",  # noqa: E501
         "parameters": get_openai_tool_schema(SearchRequest),
+    },
+    "web_search": {
+        "name": "web_search",
+        "description": (
+            "Search the web for current information, news, or specific queries. "
+            "Call when user asks for recent information, current events, or web searches. "
+            "Provides both search results and AI-generated summaries."
+        ),
+        "parameters": get_openai_tool_schema(WebSearchRequest),
     },
 }
