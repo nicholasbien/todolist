@@ -369,14 +369,22 @@ async def get_inspirational_quotes(
     return {"ok": True, "quotes": quotes}
 
 
+def _map_priority_to_ui_format(priority: str) -> str:
+    """Convert priority to UI format (capitalize first letter)."""
+    return priority.capitalize() if priority else "Medium"
+
+
 async def add_task(request: TaskAddRequest, user_id: str, space_id: Optional[str] = None) -> Dict[str, Any]:
     """Add a new task to user's todo list."""
     try:
+        # Map priority from agent format to UI format
+        ui_priority = _map_priority_to_ui_format(request.priority)
+
         # Create Todo object
         todo = Todo(
             text=request.text,
             category=request.category or "General",
-            priority=request.priority or "Medium",
+            priority=ui_priority,
             user_id=user_id,
             space_id=space_id,
             dateAdded=datetime.utcnow().isoformat(),
@@ -452,7 +460,7 @@ async def update_task(request: TaskUpdateRequest, user_id: str, space_id: Option
         if request.text is not None:
             update_data["text"] = request.text
         if request.priority is not None:
-            update_data["priority"] = request.priority
+            update_data["priority"] = _map_priority_to_ui_format(request.priority)
 
         # Update using existing backend function
         await update_todo_fields(todo_id=request.id, updates=update_data, user_id=user_id)

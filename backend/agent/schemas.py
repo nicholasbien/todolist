@@ -25,14 +25,18 @@ class WeatherAlertsRequest(BaseModel):
 class TaskAddRequest(BaseModel):
     text: str = Field(..., min_length=1, description="Task description")
     category: Optional[str] = Field(None, description="Task category (optional)")
-    priority: Literal["low", "med", "high"] = Field(default="med", description="Task priority")
+    priority: Literal["low", "medium", "high"] = Field(
+        default="medium", description="Task priority: 'low', 'medium', or 'high'"
+    )
 
 
 class TaskUpdateRequest(BaseModel):
     id: str = Field(..., min_length=1, description="Task ID to update")
     completed: Optional[bool] = Field(None, description="Mark as completed/incomplete")
     text: Optional[str] = Field(None, description="New task text (optional)")
-    priority: Optional[Literal["low", "med", "high"]] = Field(None, description="New priority (optional)")
+    priority: Optional[Literal["low", "medium", "high"]] = Field(
+        None, description="New priority: 'low', 'medium', or 'high' (optional)"
+    )
 
 
 class TaskListRequest(BaseModel):
