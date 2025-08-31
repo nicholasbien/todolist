@@ -214,26 +214,119 @@ async def get_weather_alerts(
 async def get_book_recommendations(
     request: BookRecommendationRequest, user_id: str, space_id: Optional[str] = None
 ) -> Dict[str, Any]:
-    """Fetch book recommendations from Open Library."""
+    """Fetch book recommendations from Open Library using Search or Subject API."""
     try:
-        url = f"https://openlibrary.org/subjects/{request.subject}.json?limit={request.limit}"
-        async with httpx.AsyncClient(timeout=10) as client:
-            response = await client.get(url)
+        # Handle multiple queries first (early return avoids variable conflicts)
+        if request.queries:
+            # Handle multiple queries - combine results from multiple searches
+            all_books = []
+            books_per_query = max(2, request.limit // len(request.queries))
+
+            for query in request.queries[:3]:  # Limit to 3 queries max
+                query_url = "https://openlibrary.org/search.json"
+                query_params: Dict[str, Any] = {
+                    "q": query,
+                    "limit": books_per_query,
+                }
+
+                async with httpx.AsyncClient(timeout=15) as client:
+                    response = await client.get(query_url, params=query_params)
+                    response.raise_for_status()
+
+                data = response.json()
+                for doc in (data.get("docs") or [])[:books_per_query]:
+                    authors = doc.get("author_name") or []
+                    book_data = {
+                        "title": doc.get("title", "Unknown Title"),
+                        "author_name": authors,
+                        "year": doc.get("first_publish_year"),
+                        "query_source": query,  # Track which query found this book
+                    }
+                    all_books.append(book_data)
+
+            # Remove duplicates based on title
+            seen_titles = set()
+            unique_books = []
+            for book in all_books:
+                title_lower = book["title"].lower()
+                if title_lower not in seen_titles:
+                    seen_titles.add(title_lower)
+                    unique_books.append(book)
+
+            return {
+                "ok": True,
+                "books": unique_books[: request.limit],
+                "count": len(unique_books[: request.limit]),
+                "search_term": ", ".join(request.queries),
+                "api_used": "multi_search",
+            }
+
+        # Determine which API to use for single requests
+        if request.subject:
+            # Use subject-specific API for curated subject lists
+            clean_subject = request.subject.lower().replace(" ", "_")
+            search_url = f"https://openlibrary.org/subjects/{clean_subject}.json"
+            search_params: Dict[str, Any] = {"limit": request.limit}
+            search_term = request.subject
+            api_type = "subject"
+        elif request.author:
+            # Use search API with author-specific query
+            search_url = "https://openlibrary.org/search.json"
+            search_params = {
+                "author": request.author,
+                "limit": request.limit,
+            }
+            search_term = request.author
+            api_type = "author"
+        elif request.query:
+            # Use general search API for single short query
+            search_url = "https://openlibrary.org/search.json"
+            search_params = {
+                "q": request.query,
+                "limit": request.limit,
+            }
+            search_term = request.query
+            api_type = "search"
+        else:
+            return {"ok": False, "error": "Either query, queries, subject, or author must be provided"}
+
+        async with httpx.AsyncClient(timeout=15) as client:
+            response = await client.get(search_url, params=search_params)
             response.raise_for_status()
+
         data = response.json()
         books = []
-        for work in data.get("works", [])[: request.limit]:
-            author = None
-            if work.get("authors"):
-                author = work["authors"][0].get("name")
-            books.append(
-                {
-                    "title": work.get("title"),
-                    "author": author,
+
+        if api_type == "subject":
+            # Subject API returns works in a different format
+            works = data.get("works", [])
+            for work in works[: request.limit]:
+                authors = [author.get("name", "") for author in (work.get("authors") or []) if author]
+                book_data = {
+                    "title": work.get("title", "Unknown Title"),
+                    "author_name": authors,
                     "year": work.get("first_publish_year"),
                 }
-            )
-        return {"ok": True, "books": books}
+                books.append(book_data)
+        else:
+            # Search API format - this is generally better for complex queries
+            for doc in (data.get("docs") or [])[: request.limit]:
+                authors = doc.get("author_name") or []
+                book_data = {
+                    "title": doc.get("title", "Unknown Title"),
+                    "author_name": authors,
+                    "year": doc.get("first_publish_year"),
+                }
+                books.append(book_data)
+
+        return {
+            "ok": True,
+            "books": books,
+            "count": len(books),
+            "search_term": search_term,
+            "api_used": api_type,
+        }
+
     except Exception as e:
         return {"ok": False, "error": f"Failed to get recommendations: {str(e)}"}
 
@@ -422,13 +515,8 @@ async def read_journal_entry(
 ) -> Dict[str, Any]:
     """Read journal entries for a specific date or get recent entries."""
     try:
-        # Convert user_id string back to ObjectId for MongoDB query
-        try:
-            user_object_id = ObjectId(user_id)
-        except Exception:
-            user_object_id = user_id  # fallback if not a valid ObjectId string
-
-        query_filter = {"user_id": user_object_id}
+        # Use user_id as string for MongoDB query (journals store user_id as string)
+        query_filter = {"user_id": user_id}
         if space_id:
             query_filter["space_id"] = space_id
 
@@ -441,7 +529,7 @@ async def read_journal_entry(
                     "ok": True,
                     "entry": {
                         "id": str(journal["_id"]),
-                        "content": journal.get("content", ""),
+                        "content": journal.get("text", ""),  # Database uses 'text' field
                         "date": journal.get("date", ""),
                         "space_id": journal.get("space_id"),
                     },
@@ -461,7 +549,7 @@ async def read_journal_entry(
                 entries.append(
                     {
                         "id": str(journal["_id"]),
-                        "content": journal.get("content", ""),
+                        "content": journal.get("text", ""),  # Database uses 'text' field
                         "date": journal.get("date", ""),
                         "space_id": journal.get("space_id"),
                     }
@@ -512,7 +600,7 @@ async def search_content(request: SearchRequest, user_id: str, space_id: Optiona
 
             journals = await collections.journals.find(query_filter).to_list(length=100)
             for journal in journals:
-                content = journal.get("content", "")
+                content = journal.get("text", "")  # Database uses 'text' field
                 if query_lower in content.lower():
                     # Create snippet with length limit
                     snippet = content[:200] + "..." if len(content) > 200 else content
@@ -543,7 +631,7 @@ AVAILABLE_TOOLS: Dict[str, Dict[str, Any]] = {
     },
     "get_book_recommendations": {
         "func": get_book_recommendations,
-        "description": "Fetch book recommendations from Open Library",
+        "description": "Search for books using flexible queries - subjects, genres, authors, titles",
         "schema": BookRecommendationRequest,
     },
     "get_inspirational_quotes": {

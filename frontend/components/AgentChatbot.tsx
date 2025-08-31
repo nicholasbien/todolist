@@ -35,7 +35,7 @@ export default function AgentChatbot({ activeSpace, token }: ChatbotProps) {
   };
 
   useEffect(() => {
-    scrollToBottom();
+    // scrollToBottom(); // Disabled auto-scroll
     if (typeof window !== 'undefined') {
       try {
         const spaceKey = `agent_chat_messages_${activeSpace?._id || 'default'}`;
@@ -190,6 +190,19 @@ export default function AgentChatbot({ activeSpace, token }: ChatbotProps) {
 
   return (
     <div className="flex flex-col">
+      {/* Clear button at top */}
+      {messages.length > 0 && (
+        <div className="mb-2 flex justify-end">
+          <button
+            onClick={handleClear}
+            disabled={loading}
+            className="bg-gray-700 text-gray-200 px-3 py-1 rounded text-sm hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            Clear Chat
+          </button>
+        </div>
+      )}
+
       {/* Messages container */}
       <div className="mb-4 space-y-4">
         {messages.map((msg, idx) => (
@@ -260,13 +273,6 @@ export default function AgentChatbot({ activeSpace, token }: ChatbotProps) {
           placeholder="Ask a question..."
           disabled={loading}
         />
-        <button
-          onClick={handleClear}
-          disabled={loading || messages.length === 0}
-          className="bg-gray-700 text-gray-200 px-4 py-2 rounded-lg hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors self-end"
-        >
-          Clear
-        </button>
         <button
           onClick={handleAsk}
           disabled={loading || !question.trim() }

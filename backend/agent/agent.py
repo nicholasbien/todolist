@@ -58,7 +58,7 @@ Available tools:
 - add_journal_entry: save journal entries
 - read_journal_entry: read journal entries for specific dates or recent entries
 - search_content: search through tasks and journal entries
-- get_book_recommendations: get book suggestions by subject/genre
+- get_book_recommendations: search for books using flexible queries (subjects, authors, titles, detailed descriptions)
 - get_inspirational_quotes: get motivational quotes for productivity/self-care/resilience
 
 Personalization Strategy:

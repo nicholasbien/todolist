@@ -291,12 +291,12 @@ class TestAgentToolsUnit:
     @patch("httpx.AsyncClient")
     async def test_get_book_recommendations_success(self, mock_client_class):
         """Test successful book recommendations."""
-        # Mock the API response
+        # Mock the API response from Search API
         mock_response = MagicMock()
         mock_response.json.return_value = {
-            "works": [
-                {"title": "Test Book 1", "authors": [{"name": "Author 1"}], "first_publish_year": 2020},
-                {"title": "Test Book 2", "authors": [{"name": "Author 2"}], "first_publish_year": 2021},
+            "docs": [
+                {"title": "Test Book 1", "author_name": ["Author 1"], "first_publish_year": 2020},
+                {"title": "Test Book 2", "author_name": ["Author 2"], "first_publish_year": 2021},
             ]
         }
         mock_response.raise_for_status.return_value = None
@@ -317,7 +317,9 @@ class TestAgentToolsUnit:
         assert result["books"][0]["year"] == 2020
 
         # Verify API call
-        mock_client.get.assert_called_once_with("https://openlibrary.org/subjects/productivity.json?limit=2")
+        mock_client.get.assert_called_once_with(
+            "https://openlibrary.org/search.json", params={"q": "productivity", "limit": 2}
+        )
 
     @pytest.mark.asyncio
     @patch("httpx.AsyncClient")

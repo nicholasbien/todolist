@@ -4,7 +4,7 @@ Pydantic schemas for agent tool validation and OpenAI function calling.
 
 from typing import List, Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class WeatherCurrentRequest(BaseModel):
@@ -58,8 +58,23 @@ class SearchRequest(BaseModel):
 
 
 class BookRecommendationRequest(BaseModel):
-    subject: str = Field(..., description="Book subject or genre")
+    query: Optional[str] = Field(
+        None,
+        description="Short search query for books - keep it brief (e.g., 'productivity', 'Python basics', 'sci-fi')",
+    )
+    queries: Optional[List[str]] = Field(None, description="Multiple short search queries to combine results from")
+    subject: Optional[str] = Field(
+        None,
+        description="Subject-specific search using single words/topics (e.g., 'python', 'programming', 'meditation')",
+    )
+    author: Optional[str] = Field(None, description="Search for books by a specific author name")
     limit: int = Field(default=5, ge=1, le=20, description="Number of books to return")
+
+    @model_validator(mode="after")
+    def check_parameters(self):
+        if not self.query and not self.queries and not self.subject and not self.author:
+            raise ValueError("Either query, queries, subject, or author must be provided")
+        return self
 
 
 class InspirationalQuoteRequest(BaseModel):
@@ -102,7 +117,12 @@ OPENAI_TOOL_SCHEMAS = {
     },
     "get_book_recommendations": {
         "name": "get_book_recommendations",
-        "description": "Get book suggestions from Open Library based on subject or genre.",
+        "description": (
+            "Search for book recommendations using SHORT queries, subjects, or authors. "
+            "KEEP QUERIES BRIEF: use 'query' for short terms like 'productivity', 'Python basics', 'sci-fi'. "
+            "Use 'queries' for multiple short searches like ['meditation', 'mindfulness', 'habits']. "
+            "Use 'subject' for topics like 'programming', 'fiction'. Use 'author' for names like 'Stephen King'."
+        ),
         "parameters": get_openai_tool_schema(BookRecommendationRequest),
     },
     "get_inspirational_quotes": {
