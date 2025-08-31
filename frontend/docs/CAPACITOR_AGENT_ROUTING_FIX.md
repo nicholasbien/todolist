@@ -2,30 +2,30 @@
 
 ## Problem
 
-The MCP (Model Context Protocol) agent functionality was implemented as a Next.js API route at `/api/agent/stream` but was not accessible from Capacitor mobile apps, causing agent features to fail on iOS/Android.
+The Python backend agent functionality at `/agent/stream` was not accessible from Capacitor mobile apps, causing agent features to fail on iOS/Android.
 
 ## Root Cause
 
-**Incorrect Assumption**: Initially assumed Capacitor apps couldn't access the frontend server and would need backend-only agent implementation.
+**Incorrect Assumption**: Initially assumed Capacitor apps couldn't access the backend server and would need frontend-proxied agent implementation.
 
-**Actual Issue**: The `AgentChatbot` component was using relative URLs (`/api/agent/stream`) which resolve to `file:///api/agent/stream` in Capacitor's `file://` protocol context, causing requests to fail.
+**Actual Issue**: The `AgentChatbot` component was using relative URLs (`/agent/stream`) which resolve to `file:///agent/stream` in Capacitor's `file://` protocol context, causing requests to fail.
 
 ## Architecture Understanding
 
 ### Request Flow Comparison
 
-#### Web Browser (localhost:3000 or app.todolist.nyc)
+#### Web Browser (localhost:3001 or app.todolist.nyc)
 ```
-User → AgentChatbot → "/api/agent/stream" (relative)
-                  ↓ (same-origin)
-Service Worker → Next.js API Route → MCP Servers → Backend/Weather APIs
+User → AgentChatbot → "/agent/stream" (relative)
+                  ↓ (intercepted by service worker)
+Service Worker → Python Backend Agent → Direct Tools → Backend APIs
 ```
 
 #### Capacitor Mobile Apps
 ```
-User → AgentChatbot → "https://app.todolist.nyc/api/agent/stream" (absolute)
-                  ↓ (cross-origin, bypasses service worker)
-Production Frontend Server → MCP Servers → Backend/Weather APIs
+User → AgentChatbot → "https://backend-production-e920.up.railway.app/agent/stream" (absolute)
+                  ↓ (direct to backend)
+Python Backend Agent → Direct Tools → Backend APIs
 ```
 
 ## Solution
@@ -36,19 +36,19 @@ Production Frontend Server → MCP Servers → Backend/Weather APIs
 
 ```typescript
 // BEFORE (broken in Capacitor)
-const es = new EventSource(`/api/agent/stream?${params.toString()}`);
+const es = new EventSource(`/agent/stream?${params.toString()}`);
 
 // AFTER (works in both web and Capacitor)
 const agentUrl = Capacitor.isNativePlatform()
-  ? `https://app.todolist.nyc/api/agent/stream?${params.toString()}`
-  : `/api/agent/stream?${params.toString()}`;
+  ? `https://backend-production-e920.up.railway.app/agent/stream?${params.toString()}`
+  : `/agent/stream?${params.toString()}`;
 
 const es = new EventSource(agentUrl);
 ```
 
 ### Key Insight
 
-Capacitor apps **can** make requests to the production frontend server - they just need absolute URLs instead of relative ones. The frontend server (`app.todolist.nyc`) runs the same Next.js application with MCP functionality.
+Capacitor apps **can** make requests to the backend server directly - they just need absolute URLs instead of relative ones. The backend server (`backend-production-e920.up.railway.app`) provides the Python agent functionality via FastAPI.
 
 ## Implementation Details
 
