@@ -58,6 +58,18 @@ export default function AgentChatbot({ activeSpace, token }: ChatbotProps) {
     }
   }, [activeSpace]);
 
+  const handleClear = () => {
+    setMessages([]);
+    if (typeof window !== 'undefined') {
+      try {
+        const spaceKey = `agent_chat_messages_${activeSpace?._id || 'default'}`;
+        sessionStorage.removeItem(spaceKey);
+      } catch {
+        // Ignore storage errors
+      }
+    }
+  };
+
   const handleAsk = async () => {
     if (!question.trim()) return;
 
@@ -176,6 +188,13 @@ export default function AgentChatbot({ activeSpace, token }: ChatbotProps) {
           placeholder="Ask a question..."
           disabled={loading}
         />
+        <button
+          onClick={handleClear}
+          disabled={loading || messages.length === 0}
+          className="bg-gray-700 text-gray-200 px-4 py-2 rounded-lg hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors self-end"
+        >
+          Clear
+        </button>
         <button
           onClick={handleAsk}
           disabled={loading || !question.trim() }
