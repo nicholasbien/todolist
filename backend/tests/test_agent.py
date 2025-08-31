@@ -46,10 +46,10 @@ class TestAgentToolsUnit:
 
         assert result["ok"] is True
         assert result["weather"]["location"] == "New York, NY"
-        assert result["weather"]["temperature"] == 22
+        assert result["weather"]["temperature"] == 72
         assert result["weather"]["description"] == "Partly cloudy"
-        assert "temperature_display" in result["weather"]
-        assert "wind_speed_display" in result["weather"]
+        assert "°F" in result["weather"]["temperature_display"]
+        assert "mph" in result["weather"]["wind_speed_display"]
 
     @pytest.mark.asyncio
     async def test_get_current_weather_unknown_location(self):
@@ -59,20 +59,22 @@ class TestAgentToolsUnit:
 
         assert result["ok"] is True
         assert result["weather"]["location"] == "UnknownCity"
-        assert 5 <= result["weather"]["temperature"] <= 35  # Random range
+        assert 41 <= result["weather"]["temperature"] <= 95  # Random range in °F
+        assert "°F" in result["weather"]["temperature_display"]
+        assert "mph" in result["weather"]["wind_speed_display"]
         assert result["weather"]["description"] in ["Clear", "Partly cloudy", "Cloudy", "Light rain"]
 
     @pytest.mark.asyncio
-    async def test_get_current_weather_imperial_units(self):
-        """Test weather with imperial units."""
-        request = WeatherCurrentRequest(location="New York", units="imperial")
+    async def test_get_current_weather_metric_units(self):
+        """Test weather with metric units."""
+        request = WeatherCurrentRequest(location="New York", units="metric")
         result = await get_current_weather(request, "test_user", "test_space")
 
         assert result["ok"] is True
-        # 22°C should convert to ~72°F
-        assert result["weather"]["temperature"] == 72
-        assert "°F" in result["weather"]["temperature_display"]
-        assert "mph" in result["weather"]["wind_speed_display"]
+        # 22°C should remain 22°C
+        assert result["weather"]["temperature"] == 22
+        assert "°C" in result["weather"]["temperature_display"]
+        assert "km/h" in result["weather"]["wind_speed_display"]
 
     @pytest.mark.asyncio
     async def test_get_weather_forecast(self):
@@ -442,7 +444,7 @@ class TestAgentSchemas:
         # Valid request
         request = WeatherCurrentRequest(location="Tokyo")
         assert request.location == "Tokyo"
-        assert request.units == "metric"  # default
+        assert request.units == "imperial"  # default
 
         # Invalid units
         with pytest.raises(Exception):
