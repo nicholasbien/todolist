@@ -9,8 +9,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 # Install dependencies
 npm install
 
-# Run development server
-npm run dev
+# Run development server (from project root)
+cd frontend && npm run dev
 
 # Build for production
 npm run build
@@ -33,8 +33,11 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 # Install dependencies
 pip install -r backend/requirements.txt
 
-# Run development server
-cd backend && python app.py
+# Run development server (recommended with uvicorn)
+cd backend && source venv/bin/activate && uvicorn app:app --host 0.0.0.0 --port 8000 --reload
+
+# Alternative: Direct Python (shows deprecation warning)
+cd backend && source venv/bin/activate && python app.py
 
 # The backend runs on http://localhost:8000
 ```
@@ -146,9 +149,183 @@ Both frontend and backend require OpenAI API keys:
 ## Development Workflow
 
 1. Start MongoDB (if not using cloud MongoDB)
-2. Start backend server: `cd backend && python app.py`
-3. Start frontend server: `npm run dev`
+2. Start backend server: `cd backend && source venv/bin/activate && uvicorn app:app --host 0.0.0.0 --port 8000 --reload`
+3. Start frontend server: `cd frontend && npm run dev`
 4. Frontend runs on http://localhost:3000, backend on http://localhost:8000
+
+## Testing the AI Agent
+
+The AI agent (`/agent/stream`) supports sequential tool calling with personalization. Here's how to test it:
+
+### 1. Setup and Start Servers
+
+```bash
+# Terminal 1: Start Backend
+cd backend
+source venv/bin/activate
+uvicorn app:app --host 0.0.0.0 --port 8000 --reload
+
+# Terminal 2: Start Frontend
+cd frontend
+npm run dev
+```
+
+### 2. Create Test User and Get Auth Token
+
+```bash
+# Sign up test user
+curl -H "Content-Type: application/json" -d '{"email": "test@example.com"}' http://localhost:8000/auth/signup
+
+# Check backend logs for verification code (printed to console)
+# Example: "VERIFICATION CODE for test@example.com: 123456"
+
+# Login with verification code
+curl -H "Content-Type: application/json" -d '{"email": "test@example.com", "code": "123456"}' http://localhost:8000/auth/login
+
+# Save the returned token for testing
+```
+
+### 3. Get User's Space ID
+
+```bash
+# Get user's spaces (need space_id for personalized queries)
+curl -H "Authorization: Bearer YOUR_TOKEN" http://localhost:8000/spaces
+
+# Note the "Personal" space _id (e.g., "6854d7bf9d0963f036459719")
+```
+
+### 4. Test Agent Queries
+
+#### Basic Tool Calling
+```bash
+# Weather query (single tool call)
+curl -N -H "Authorization: Bearer YOUR_TOKEN" \
+  "http://localhost:8000/agent/stream?q=What%27s%20the%20weather%20in%20New%20York?"
+
+# Task management
+curl -N -H "Authorization: Bearer YOUR_TOKEN" \
+  "http://localhost:8000/agent/stream?q=Add%20task%20to%20learn%20Python%20programming&space_id=SPACE_ID"
+```
+
+#### Sequential Tool Calling with Personalization
+```bash
+# This should trigger multiple sequential tool calls:
+# 1. list_tasks (gather user context)
+# 2. search_content (analyze user interests)
+# 3. get_book_recommendations (personalized suggestions)
+curl -N -H "Authorization: Bearer YOUR_TOKEN" \
+  "http://localhost:8000/agent/stream?q=Recommend%20books%20based%20on%20my%20current%20tasks&space_id=SPACE_ID"
+
+# Multiple tool types in sequence
+curl -N -H "Authorization: Bearer YOUR_TOKEN" \
+  "http://localhost:8000/agent/stream?q=Give%20me%20productivity%20quotes%20and%20programming%20book%20suggestions&space_id=SPACE_ID"
+```
+
+### 5. Expected Agent Behavior
+
+#### ✅ Sequential Tool Execution
+The agent should call tools in logical order:
+1. **Context Gathering**: `list_tasks`, `search_content` to understand user
+2. **Action/Retrieval**: `get_book_recommendations`, `get_inspirational_quotes`, etc.
+3. **Final Response**: Complete streaming response synthesizing all tool results
+4. **Completion**: `event: done` with `{"ok": true}` signals end of response
+
+#### ✅ Personalization Strategy
+For recommendations, the agent will:
+- First check user's current tasks (`list_tasks`)
+- Analyze journal entries and task history (`search_content`)
+- Make personalized suggestions based on actual user data
+- Provide context-aware responses
+
+#### ✅ Tool Categories
+- **Weather**: `get_current_weather`, `get_weather_forecast`, `get_weather_alerts`
+- **Tasks**: `add_task`, `list_tasks`, `update_task`
+- **Content**: `add_journal_entry`, `search_content`
+- **External APIs**: `get_book_recommendations`, `get_inspirational_quotes`
+
+### 6. Monitoring and Debugging
+
+#### Backend Logs
+```bash
+# Watch backend logs for:
+# - OpenAI API calls: "INFO:httpx:HTTP Request: POST https://api.openai.com/v1/chat/completions"
+# - External API calls: "INFO:httpx:HTTP Request: GET https://openlibrary.org/subjects/..."
+# - Tool execution results
+# - Authentication verification codes
+```
+
+#### Frontend Testing
+```bash
+# Access web interface at http://localhost:3000
+# Use the Agent tab to test queries interactively
+# Monitor browser console for any errors
+```
+
+### 7. Common Test Queries
+
+```bash
+# Weather functionality
+"What's the weather like in London?"
+"Give me a 5-day forecast for Tokyo"
+
+# Task management with personalization
+"Add task to study machine learning"
+"What are my current tasks?"
+"Recommend books for my current projects"
+
+# Multi-tool queries (triggers sequential calls)
+"I need motivation and book suggestions for programming"
+"Help me plan my learning goals with quotes and resources"
+
+# Complex personalized queries
+"Based on my recent tasks, suggest productivity improvements"
+"What books should I read next given my current work?"
+```
+
+### 8. Testing Space Isolation
+
+```bash
+# Create tasks in different spaces and verify isolation
+curl -H "Authorization: Bearer TOKEN" -H "Content-Type: application/json" \
+  -d '{"text": "Space A task", "space_id": "SPACE_A_ID"}' http://localhost:8000/todos
+
+# Query agent with different space_ids to verify context isolation
+curl -N -H "Authorization: Bearer TOKEN" \
+  "http://localhost:8000/agent/stream?q=What%20are%20my%20tasks?&space_id=SPACE_A_ID"
+```
+
+The agent now provides intelligent, context-aware responses by analyzing user data and calling multiple tools sequentially before responding.
+
+### 9. Expected SSE Response Flow
+
+A complete agent interaction should follow this pattern:
+
+```
+event: ready
+data: {"ok": true, "tools": [...], "space_id": "..."}
+
+event: tool_result
+data: {"tool": "list_tasks", "data": {"ok": true, "tasks": [...]}}
+
+event: tool_result
+data: {"tool": "get_book_recommendations", "data": {"ok": true, "books": [...]}}
+
+event: token
+data: {"token": "Here"}
+
+event: token
+data: {"token": " are"}
+
+...more tokens...
+
+event: token
+data: {"token": "!"}
+
+event: done
+data: {"ok": true}
+```
+
+**Important**: The final response is assembled from all the `token` events. The frontend must properly accumulate these tokens to display the complete response to the user.
 
 ## Key Implementation Details
 

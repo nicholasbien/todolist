@@ -108,7 +108,7 @@ export default function AgentChatbot({ activeSpace, token }: ChatbotProps) {
       es.addEventListener('token', (e) => {
         const { token: responseToken } = JSON.parse((e as MessageEvent).data);
         assistantResponse.content += responseToken;
-        setMessages((prev) => [...prev]);
+        setMessages((prev) => [...prev.slice(0, -1), { ...assistantResponse }]);
       });
 
       es.addEventListener('tool_result', (e) => {
@@ -120,6 +120,8 @@ export default function AgentChatbot({ activeSpace, token }: ChatbotProps) {
       });
 
       es.addEventListener('done', () => {
+        // Ensure final message is properly set
+        setMessages((prev) => [...prev.slice(0, -1), { ...assistantResponse }]);
         setLoading(false);
         es.close();
       });
