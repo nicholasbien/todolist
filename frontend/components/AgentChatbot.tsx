@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Capacitor } from '@capacitor/core';
+import { MessageRenderer, PlainTextRenderer } from './MessageRenderer';
 
 interface ChatbotProps {
   activeSpace: any;
@@ -225,7 +226,11 @@ export default function AgentChatbot({ activeSpace, token }: ChatbotProps) {
                   </button>
                 )}
               </div>
-              <div className="whitespace-pre-wrap text-sm">{msg.content}</div>
+              {msg.role === 'assistant' ? (
+                <MessageRenderer content={msg.content} className="text-sm" />
+              ) : (
+                <PlainTextRenderer content={msg.content} className="text-sm" />
+              )}
               {msg.role === 'system' && msg.toolData && expandedTools.has(idx) && (
                 <div className="mt-2 pt-2 border-t border-blue-700/30 text-xs">
                   <div className="mb-1">
