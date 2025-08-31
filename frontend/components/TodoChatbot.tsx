@@ -10,6 +10,8 @@ const MAX_MESSAGES = 10;
 
 export default function TodoChatbot({ token, activeSpace }: ChatbotProps) {
   const [question, setQuestion] = useState('');
+  const [includeTasks, setIncludeTasks] = useState(true);
+  const [includeJournals, setIncludeJournals] = useState(true);
   const [messages, setMessages] = useState<{ role: string; content: string }[]>(() => {
     if (typeof window !== 'undefined') {
       try {
@@ -84,7 +86,9 @@ export default function TodoChatbot({ token, activeSpace }: ChatbotProps) {
         },
         body: JSON.stringify({
           question: userQuestion,
-          space_id: activeSpace._id
+          space_id: activeSpace._id,
+          include_tasks: includeTasks,
+          include_journals: includeJournals
         }),
       });
       if (!resp.ok) {
@@ -146,6 +150,27 @@ export default function TodoChatbot({ token, activeSpace }: ChatbotProps) {
           <p className="text-red-300 text-sm">{error}</p>
         </div>
       )}
+
+      <div className="flex items-center gap-4 mb-2">
+        <label className="flex items-center gap-1 text-sm">
+          <input
+            type="checkbox"
+            checked={includeTasks}
+            onChange={(e) => setIncludeTasks(e.target.checked)}
+            className="rounded"
+          />
+          Tasks
+        </label>
+        <label className="flex items-center gap-1 text-sm">
+          <input
+            type="checkbox"
+            checked={includeJournals}
+            onChange={(e) => setIncludeJournals(e.target.checked)}
+            className="rounded"
+          />
+          Journals
+        </label>
+      </div>
 
       {/* Input area */}
       <div className="flex gap-2">

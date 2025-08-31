@@ -21,11 +21,11 @@ client = OpenAI(api_key=api_key, timeout=15.0, max_retries=0)
 
 
 async def answer_question(question: str, spaces_data: List[dict], history: List[dict]) -> str:
-    """Use OpenAI to answer a question about the provided todos with space context."""
+    """Use OpenAI to answer a question about the provided tasks and journals."""
     try:
         current_date = datetime.now().strftime("%A, %B %d, %Y")
         system_prompt = (
-            f"You are a helpful assistant who answers questions about the user's todo spaces. "
+            f"You are a helpful assistant who answers questions about the user's tasks and journal entries. "
             f"Today's date is {current_date}. "
             "Use the following JSON data (organized by space) to inform your responses. "
             "When discussing dates, use relative terms like 'today', 'yesterday', 'tomorrow', "

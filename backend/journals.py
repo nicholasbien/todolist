@@ -2,12 +2,14 @@ import logging
 from datetime import datetime
 from typing import List, Optional
 
+import auth
 import pytz  # type: ignore
 from bson import ObjectId
 from db import db
 from dotenv import load_dotenv
 from fastapi import HTTPException
 from pydantic import BaseModel, Field
+from spaces import user_in_space
 
 # Import will be done locally to avoid circular import
 
@@ -136,6 +138,36 @@ async def get_journal_entries(user_id: str, space_id: Optional[str] = None, limi
 
     except Exception as e:
         logger.error(f"Error fetching journal entries: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch journal entries: {str(e)}")
+
+
+async def get_space_journal_entries(user_id: str, space_id: str, limit: int = 30) -> List[dict]:
+    """Get recent journal entries for a space including all members."""
+    try:
+        if not await user_in_space(user_id, space_id):
+            raise HTTPException(status_code=403, detail="Not in space")
+
+        cursor = journals_collection.find({"space_id": space_id}).sort("date", -1).limit(limit)
+        entries = await cursor.to_list(length=limit)
+
+        user_ids = {ObjectId(e["user_id"]) for e in entries}
+        user_map: dict[str, str] = {}
+        if user_ids:
+            async for u in auth.users_collection.find({"_id": {"$in": list(user_ids)}}):
+                user_map[str(u["_id"])] = u.get("first_name", "")
+
+        result: List[dict] = []
+        for entry in entries:
+            entry["_id"] = str(entry["_id"])
+            entry["first_name"] = user_map.get(entry["user_id"], "")
+            result.append(entry)
+
+        logger.info(f"Retrieved {len(result)} journal entries for space {space_id} including all members")
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching space journal entries: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to fetch journal entries: {str(e)}")
 
 
