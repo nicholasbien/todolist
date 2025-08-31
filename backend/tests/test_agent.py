@@ -348,6 +348,73 @@ class TestAgentStreaming:
         assert "OpenAI API Error" in messages[-1]
 
 
+class TestAgentConversationState:
+    """Tests for maintaining conversation state between requests."""
+
+    @pytest.mark.asyncio
+    @patch("agent.agent.AsyncOpenAI")
+    async def test_conversation_state_persists(self, mock_openai_class):
+        from agent.agent import conversation_state
+
+        conversation_state.clear()
+
+        mock_client = AsyncMock()
+        mock_openai_class.return_value = mock_client
+
+        # First call: produce a tool call
+        chunk1 = MagicMock()
+        chunk1.choices = [MagicMock()]
+        chunk1.choices[0].delta.content = "The weather in New York is "
+        chunk1.choices[0].delta.tool_calls = None
+        chunk1.choices[0].finish_reason = None
+
+        chunk2 = MagicMock()
+        chunk2.choices = [MagicMock()]
+        chunk2.choices[0].delta.content = None
+        chunk2.choices[0].delta.tool_calls = [MagicMock()]
+        chunk2.choices[0].delta.tool_calls[0].index = 0
+        chunk2.choices[0].delta.tool_calls[0].function = MagicMock()
+        chunk2.choices[0].delta.tool_calls[0].function.name = "get_current_weather"
+        chunk2.choices[0].delta.tool_calls[0].function.arguments = '{"location": "New York"}'
+        chunk2.choices[0].finish_reason = "stop"
+
+        stream1 = AsyncMock()
+        stream1.__aiter__.return_value = [chunk1, chunk2]
+
+        # Second call: simple response
+        chunk3 = MagicMock()
+        chunk3.choices = [MagicMock()]
+        chunk3.choices[0].delta.content = "You're welcome"
+        chunk3.choices[0].delta.tool_calls = None
+        chunk3.choices[0].finish_reason = "stop"
+
+        stream2 = AsyncMock()
+        stream2.__aiter__.return_value = [chunk3]
+
+        mock_client.chat.completions.create.side_effect = [stream1, stream2]
+
+        with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
+            async for _ in stream_agent_response("What's the weather in New York?", "user1", None):
+                pass
+
+            # Verify history after first call
+            key = "user1"
+            history = conversation_state.get(key)
+            assert history[0] == {"role": "user", "content": "What's the weather in New York?"}
+            assert history[1]["role"] == "tool"
+            assert history[1]["name"] == "get_current_weather"
+
+            async for _ in stream_agent_response("Thanks", "user1", None):
+                pass
+
+        # Second call should include previous interaction
+        second_call = mock_client.chat.completions.create.call_args_list[1]
+        messages = second_call.kwargs["messages"]
+        assert {"role": "user", "content": "What's the weather in New York?"} in messages
+        assert any(m.get("role") == "tool" and m.get("name") == "get_current_weather" for m in messages)
+        assert {"role": "assistant", "content": "The weather in New York is "} in messages
+
+
 class TestAgentIntegration:
     """Integration tests with FastAPI app."""
 
