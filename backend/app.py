@@ -6,7 +6,7 @@ from collections import defaultdict
 from contextlib import asynccontextmanager
 from datetime import datetime
 from io import StringIO
-from typing import Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 
 import httpx
 from auth import (
@@ -50,6 +50,7 @@ from journals import (
     generate_journal_summary,
     get_journal_entries,
     get_journal_entry_by_date,
+    get_space_journal_entries,
     journals_collection,
 )
 from pydantic import BaseModel
@@ -608,6 +609,8 @@ class ContactRequest(BaseModel):
 class ChatRequest(BaseModel):
     question: str
     space_id: str
+    include_tasks: bool = True
+    include_journals: bool = True
 
 
 @app.post("/contact")
@@ -639,21 +642,28 @@ async def api_chat(
     req: ChatRequest,
     current_user: dict = Depends(get_current_user),
 ):
-    """Answer user questions about their todos using OpenAI."""
+    """Answer user questions using tasks and journals from the requested space."""
     try:
-        # Check if user has access to the requested space
         if not await user_in_space(current_user["user_id"], req.space_id):
             raise HTTPException(status_code=403, detail="Access denied to space")
 
-        # Only include todos from the requested space
         spaces = await get_spaces_for_user(current_user["user_id"])
         requested_space = next((s for s in spaces if s.id == req.space_id), None)
         if not requested_space:
             raise HTTPException(status_code=404, detail="Space not found")
 
-        todos = await get_todos(current_user["user_id"], req.space_id)
-        todos_dict = [todo.dict(by_alias=True) if hasattr(todo, "dict") else todo for todo in todos]
-        spaces_data = [{"space": requested_space.name, "todos": todos_dict}]
+        space_context: dict[str, Any] = {"space": requested_space.name}
+
+        if req.include_tasks:
+            todos = await get_todos(current_user["user_id"], req.space_id)
+            todos_dict = [todo.dict(by_alias=True) if hasattr(todo, "dict") else todo for todo in todos]
+            space_context["todos"] = todos_dict
+
+        if req.include_journals:
+            journals = await get_space_journal_entries(current_user["user_id"], req.space_id)
+            space_context["journals"] = journals
+
+        spaces_data = [space_context]
 
         history = conversations[current_user["user_id"]]
         answer = await answer_question(req.question, spaces_data, history)
