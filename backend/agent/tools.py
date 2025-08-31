@@ -26,6 +26,7 @@ from todos import get_todos, update_todo_fields  # noqa: E402
 # Local imports  # noqa: E402
 from .schemas import (  # noqa: E402
     BookRecommendationRequest,
+    InspirationalQuoteRequest,
     JournalAddRequest,
     SearchRequest,
     TaskAddRequest,
@@ -70,6 +71,24 @@ MOCK_WEATHER_DATA = {
         "wind_speed": 6,
         "condition": "foggy",
     },
+}
+
+FALLBACK_QUOTES = {
+    "productivity": [
+        "Focus on being productive instead of busy. — Tim Ferriss",
+        "The secret of getting ahead is getting started. — Mark Twain",
+        "Your future is created by what you do today, not tomorrow. — Robert Kiyosaki",
+    ],
+    "self-care": [
+        "Self-care is how you take your power back.",
+        "You deserve the love you so freely give to others.",
+        "Nurture yourself and your mind will flourish.",
+    ],
+    "resilience": [
+        "Fall seven times, stand up eight. — Japanese Proverb",
+        "The oak fought the wind and was broken, the willow bent when it must and survived. — Robert Jordan",
+        "Hard times may have held you down, but they will not last forever.",
+    ],
 }
 
 
@@ -216,6 +235,44 @@ async def get_book_recommendations(
         return {"ok": True, "books": books}
     except Exception as e:
         return {"ok": False, "error": f"Failed to get recommendations: {str(e)}"}
+
+
+async def get_inspirational_quotes(
+    request: InspirationalQuoteRequest, user_id: str, space_id: Optional[str] = None
+) -> Dict[str, Any]:
+    """Fetch inspirational quotes or affirmations based on user's goal."""
+    quotes = []
+    url_map = {
+        "productivity": "https://zenquotes.io/api/random",
+        "self-care": "https://www.affirmations.dev/",
+        "resilience": "https://www.affirmations.dev/",
+    }
+
+    for _ in range(request.limit):
+        url = url_map.get(request.goal)
+        try:
+            async with httpx.AsyncClient(timeout=10) as client:
+                response = await client.get(url)
+                if response.status_code == 200:
+                    data = response.json()
+                    if request.goal == "productivity":
+                        if isinstance(data, list) and data:
+                            quote_text = data[0].get("q")
+                            author = data[0].get("a")
+                            if quote_text and author:
+                                quotes.append(f"{quote_text} — {author}")
+                                continue
+                    else:
+                        affirmation = data.get("affirmation")
+                        if affirmation:
+                            quotes.append(affirmation)
+                            continue
+        except Exception:
+            pass
+
+        quotes.append(random.choice(FALLBACK_QUOTES[request.goal]))
+
+    return {"ok": True, "quotes": quotes}
 
 
 async def add_task(request: TaskAddRequest, user_id: str, space_id: Optional[str] = None) -> Dict[str, Any]:
@@ -426,6 +483,11 @@ AVAILABLE_TOOLS: Dict[str, Dict[str, Any]] = {
         "func": get_book_recommendations,
         "description": "Fetch book recommendations from Open Library",
         "schema": BookRecommendationRequest,
+    },
+    "get_inspirational_quotes": {
+        "func": get_inspirational_quotes,
+        "description": "Get motivational quotes or affirmations tailored to a goal",
+        "schema": InspirationalQuoteRequest,
     },
     "add_task": {"func": add_task, "description": "Add a new task to user's todo list", "schema": TaskAddRequest},
     "list_tasks": {"func": list_tasks, "description": "List tasks in the current space", "schema": TaskListRequest},
