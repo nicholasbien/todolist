@@ -3,7 +3,7 @@
 import json
 import os
 import sys
-from typing import Any, AsyncGenerator, Dict, Optional
+from typing import Any, AsyncGenerator, Dict, List, Optional
 
 # Add parent directory to path for imports  # noqa: E402
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
@@ -17,6 +17,9 @@ from .schemas import OPENAI_TOOL_SCHEMAS  # noqa: E402
 from .tools import AVAILABLE_TOOLS  # noqa: E402
 
 router = APIRouter(prefix="/agent")
+
+# In-memory conversation history keyed by user and space
+conversation_state: Dict[str, List[Dict[str, Any]]] = {}
 
 
 async def get_current_user(authorization: str = Header(None)):
@@ -99,8 +102,16 @@ async def stream_agent_response(
     yield format_sse_message("ready", ready_data)
 
     try:
+        # Load conversation history for this user/space
+        key = f"{user_id}:{space_id}" if space_id else user_id
+        history = conversation_state.get(key, [])
+
         # Create streaming chat completion
-        messages = [{"role": "system", "content": AGENT_SYSTEM_PROMPT}, {"role": "user", "content": user_message}]
+        messages = [
+            {"role": "system", "content": AGENT_SYSTEM_PROMPT},
+            *history,
+            {"role": "user", "content": user_message},
+        ]
         stream = await client.chat.completions.create(
             model="gpt-4.1",
             messages=messages,
@@ -109,8 +120,10 @@ async def stream_agent_response(
             temperature=0.7,
         )
 
-        # Track partial tool calls across chunks
+        # Track partial tool calls across chunks and build history additions
         partial_tool_calls = {}
+        assistant_content = ""
+        tool_history: List[Dict[str, Any]] = []
 
         async for chunk in stream:
             choice = chunk.choices[0] if chunk.choices else None
@@ -119,6 +132,7 @@ async def stream_agent_response(
 
             # Handle text content
             if choice.delta.content:
+                assistant_content += choice.delta.content
                 yield format_sse_message("token", {"token": choice.delta.content})
 
             # Handle tool calls
@@ -159,6 +173,7 @@ async def stream_agent_response(
 
                                 # Send tool result
                                 tool_result_data: Dict[str, Any] = {"tool": tool_name, "data": result}
+                                tool_history.append({"role": "tool", "name": tool_name, "content": json.dumps(result)})
                                 yield format_sse_message("tool_result", tool_result_data)
 
                                 # Clear this tool call
@@ -191,6 +206,7 @@ async def stream_agent_response(
                                 result = await tool_info["func"](request=request, user_id=user_id, space_id=space_id)
 
                                 completion_tool_result: Dict[str, Any] = {"tool": tool_name, "data": result}
+                                tool_history.append({"role": "tool", "name": tool_name, "content": json.dumps(result)})
                                 yield format_sse_message("tool_result", completion_tool_result)
                         except Exception as e:
                             completion_error_data: Dict[str, Any] = {
@@ -203,6 +219,16 @@ async def stream_agent_response(
 
         # Send completion event
         yield format_sse_message("done", {"ok": True})
+
+        # Update conversation history
+        history.extend(
+            [
+                {"role": "user", "content": user_message},
+                *tool_history,
+                {"role": "assistant", "content": assistant_content},
+            ]
+        )
+        conversation_state[key] = history[-20:]
 
     except Exception as e:
         yield format_sse_message("error", {"message": str(e)})
