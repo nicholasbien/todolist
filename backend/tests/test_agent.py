@@ -512,6 +512,7 @@ class TestAgentSystemPrompt:
             "update_task",
             "add_journal_entry",
             "search_content",
+            "get_book_recommendations",
         }
 
         assert set(AVAILABLE_TOOLS.keys()) == expected_tools

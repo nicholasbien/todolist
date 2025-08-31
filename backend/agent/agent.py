@@ -53,6 +53,7 @@ TOOL USAGE GUIDELINES:
 - update_task: Call when user wants to mark task complete, update task text, change priority, or modify existing tasks
 - add_journal_entry: Call when user wants to add journal entry, diary entry, or save notes for a specific date
 - search_content: Call when user wants to search through their tasks or journal entries for specific content
+- get_book_recommendations: Call when user wants book suggestions or reading recommendations
 
 CRITICAL INSTRUCTIONS:
 1. When user asks about weather → IMMEDIATELY call appropriate weather tool
@@ -61,6 +62,7 @@ CRITICAL INSTRUCTIONS:
 4. When user wants to complete/update task → IMMEDIATELY call update_task
 5. When user wants to add journal → IMMEDIATELY call add_journal_entry
 6. When user wants to search → IMMEDIATELY call search_content
+7. When user wants book recommendations → IMMEDIATELY call get_book_recommendations
 
 DO NOT just describe what you could do - actually call the tools!
 The tools are available as functions - use them to provide real, actionable results.
