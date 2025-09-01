@@ -57,6 +57,7 @@ from journals import (
 from pydantic import BaseModel
 from scheduler import get_scheduler_status, start_scheduler, update_schedule_time
 from spaces import (
+    Space,
     create_space,
     delete_space,
     get_spaces_for_user,
@@ -473,12 +474,12 @@ class SpaceUpdateRequest(BaseModel):
 
 
 # Space management endpoints
-@app.get("/spaces")
+@app.get("/spaces", response_model=List[Space])
 async def api_get_spaces(current_user: dict = Depends(get_current_user)):
     return await get_spaces_for_user(current_user["user_id"])
 
 
-@app.post("/spaces")
+@app.post("/spaces", response_model=Space)
 async def api_create_space_endpoint(req: SpaceCreateRequest, current_user: dict = Depends(get_current_user)):
     return await create_space(req.name, current_user["user_id"])
 
@@ -503,7 +504,7 @@ async def api_leave_space(space_id: str, current_user: dict = Depends(get_curren
     return await leave_space(space_id, current_user["user_id"])
 
 
-@app.put("/spaces/{space_id}")
+@app.put("/spaces/{space_id}", response_model=Space)
 async def api_update_space(space_id: str, req: SpaceUpdateRequest, current_user: dict = Depends(get_current_user)):
     return await update_space(space_id, current_user["user_id"], req.name, req.collaborative)
 

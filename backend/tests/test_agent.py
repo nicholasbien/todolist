@@ -20,7 +20,6 @@ from agent.schemas import (
     TaskAddRequest,
     TaskListRequest,
     TaskUpdateRequest,
-    WeatherAlertsRequest,
     WeatherCurrentRequest,
     WeatherForecastRequest,
 )
@@ -31,7 +30,6 @@ from agent.tools import (
     get_book_recommendations,
     get_current_weather,
     get_inspirational_quotes,
-    get_weather_alerts,
     get_weather_forecast,
     list_tasks,
     read_journal_entry,
@@ -96,16 +94,6 @@ class TestAgentToolsUnit:
         # Check first day matches current weather
         first_day = result["forecast"]["forecast"][0]
         assert first_day["description"] == "Light rain"  # London's mock description
-
-    @pytest.mark.asyncio
-    async def test_get_weather_alerts(self):
-        """Test weather alerts (mock implementation)."""
-        request = WeatherAlertsRequest(location="TestCity")
-        result = await get_weather_alerts(request, "test_user", "test_space")
-
-        assert result["ok"] is True
-        assert result["location"] == "TestCity"
-        assert "No active weather alerts" in result["alerts"][0]
 
     @pytest.mark.asyncio
     @patch("agent.tools.httpx.AsyncClient.get", new_callable=AsyncMock)

@@ -111,6 +111,35 @@ class UpdateNameRequest(BaseModel):
     first_name: str
 
 
+class UserResponse(BaseModel):
+    """User response model with consistent id field."""
+
+    id: str
+    email: str
+    first_name: str
+    summary_hour: Optional[int] = None
+    summary_minute: Optional[int] = None
+    email_instructions: str = ""
+    timezone: str = "America/New_York"
+    email_enabled: bool = False
+    email_spaces: List[str] = []
+
+    @classmethod
+    def from_db(cls, user_dict: dict) -> "UserResponse":
+        """Create UserResponse from database document."""
+        return cls(
+            id=str(user_dict["_id"]),
+            email=user_dict["email"],
+            first_name=user_dict.get("first_name", ""),
+            summary_hour=user_dict.get("summary_hour"),
+            summary_minute=user_dict.get("summary_minute"),
+            email_instructions=user_dict.get("email_instructions", ""),
+            timezone=user_dict.get("timezone", "America/New_York"),
+            email_enabled=user_dict.get("email_enabled", False),
+            email_spaces=user_dict.get("email_spaces", []),
+        )
+
+
 def generate_verification_code() -> str:
     """Generate a 6-digit verification code."""
     return f"{secrets.randbelow(1000000):06d}"
@@ -286,17 +315,7 @@ async def login_user(email: str, code: str) -> dict:
         return {
             "message": "Login successful",
             "token": token,
-            "user": {
-                "id": str(user["_id"]),
-                "email": user["email"],
-                "first_name": user.get("first_name", ""),
-                "summary_hour": user.get("summary_hour"),
-                "summary_minute": user.get("summary_minute"),
-                "email_instructions": user.get("email_instructions", ""),
-                "timezone": user.get("timezone", "America/New_York"),
-                "email_enabled": user.get("email_enabled", False),
-                "email_spaces": user.get("email_spaces", []),
-            },
+            "user": UserResponse.from_db(user).dict(),
         }
 
     except HTTPException:
@@ -329,6 +348,7 @@ async def verify_session(token: str) -> dict:
         # Record last active time
         await users_collection.update_one({"_id": user["_id"]}, {"$set": {"last_login": datetime.now()}})
 
+        # Note: verify_session keeps user_id for backward compatibility with get_current_user
         return {
             "user_id": str(user["_id"]),
             "email": user["email"],
@@ -381,11 +401,7 @@ async def update_user_name(user_id: str, first_name: str) -> dict:
 
         return {
             "message": "Name updated successfully",
-            "user": {
-                "id": str(user["_id"]),
-                "email": user["email"],
-                "first_name": user["first_name"],
-            },
+            "user": UserResponse.from_db(user).dict(),
         }
 
     except HTTPException:
