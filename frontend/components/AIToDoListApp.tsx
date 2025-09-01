@@ -105,6 +105,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
   // Tab state
   const [activeTab, setActiveTab] = useState<'tasks' | 'assistant' | 'agent' | 'insights' | 'journal'>('tasks');
 
+
   const handleOpenEmailSettings = async () => {
     try {
       const response = await authenticatedFetch('/auth/me');
@@ -345,6 +346,15 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
       window.removeEventListener('offline', handleOffline);
     };
   }, [token, user, fetchTodos]);
+
+  // Refresh data when navigating between main tabs
+  useEffect(() => {
+    if (activeTab === 'tasks') {
+      // Always load latest tasks when entering tasks tab
+      fetchTodos(false);
+    }
+    // Journal component fetches latest entry on mount when tab becomes active
+  }, [activeTab, fetchTodos]);
 
   // Function to handle app update
   const handleUpdate = () => {
