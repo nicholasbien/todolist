@@ -65,7 +65,8 @@ You can call multiple tools in sequence to gather information before providing c
 Be proactive in using tools to personalize your responses based on the user's data.
 
 FORMATTING GUIDELINES:
-- Use markdown formatting to make responses clear and readable
+- Output responses directly in markdown format (without wrapping in code blocks)
+- Never start responses with ```markdown or similar code fence markers
 - Use **bold** for emphasis on important points
 - Use bullet points (- or *) for lists
 - Use numbered lists (1. 2. 3.) for sequential steps

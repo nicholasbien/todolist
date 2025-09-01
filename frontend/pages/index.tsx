@@ -126,6 +126,8 @@ function LoginForm({ onLogin }: LoginFormProps) {
 
     try {
       const token = localStorage.getItem('auth_token');
+      console.log('Token for update-name:', token ? 'Present' : 'Missing');
+
       const response = await apiRequest('auth/update-name', {
         method: 'POST',
         body: JSON.stringify({ first_name: firstName })
@@ -256,7 +258,7 @@ function LoginForm({ onLogin }: LoginFormProps) {
                 id="firstName"
                 value={firstName}
                 onChange={(e) => setFirstName(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent focus:border-accent outline-none"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent focus:border-accent outline-none text-gray-900 placeholder-gray-500"
                 placeholder="Enter your first name"
                 disabled={loading}
                 required
