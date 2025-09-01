@@ -24,6 +24,7 @@ export default function AgentChatbot({ activeSpace, token }: ChatbotProps) {
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [thinkingDots, setThinkingDots] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -43,6 +44,20 @@ export default function AgentChatbot({ activeSpace, token }: ChatbotProps) {
       }
     }
   }, [messages, activeSpace]);
+
+  useEffect(() => {
+    let interval: ReturnType<typeof setInterval>;
+    if (loading) {
+      interval = setInterval(() => {
+        setThinkingDots((d) => (d + 1) % 4);
+      }, 500);
+    } else {
+      setThinkingDots(0);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [loading]);
 
   // Clear messages when space changes
   useEffect(() => {
@@ -242,7 +257,7 @@ export default function AgentChatbot({ activeSpace, token }: ChatbotProps) {
           <div className="flex justify-start">
             <div className="bg-gray-800 text-gray-100 border border-gray-700 max-w-xs lg:max-w-md px-4 py-2 rounded-lg">
               <div className="text-xs mb-1 opacity-75">Agent</div>
-              <div className="text-sm">Thinking...</div>
+              <div className="text-sm">{`Thinking${'.'.repeat(thinkingDots)}`}</div>
             </div>
           </div>
         )}
