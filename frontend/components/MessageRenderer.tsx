@@ -45,12 +45,12 @@ export const MessageRenderer: React.FC<MessageRendererProps> = ({ content, class
     // Convert bullet lists (- or *)
     escapedText = escapedText.replace(/^[-*]\s+(.+)$/gm, '<li class="ml-6 list-disc">$1</li>');
 
-    // Wrap consecutive list items in <ul> or <ol> - no margins, no spacing between items
+    // Wrap consecutive list items in <ul> or <ol> - add top margin for spacing from text above
     escapedText = escapedText.replace(/(<li class="ml-6 list-disc">.*?<\/li>(\s*<br>)?)+/g, (match) => {
-      return `<ul class="my-0 leading-tight">${match.replace(/<br>/g, '')}</ul>`;
+      return `<ul class="mt-1.5 mb-1.5 space-y-0.5">${match.replace(/<br>/g, '')}</ul>`;
     });
     escapedText = escapedText.replace(/(<li class="ml-6 list-decimal">.*?<\/li>(\s*<br>)?)+/g, (match) => {
-      return `<ol class="my-0 leading-tight">${match.replace(/<br>/g, '')}</ol>`;
+      return `<ol class="mt-1.5 mb-1.5 space-y-0.5">${match.replace(/<br>/g, '')}</ol>`;
     });
 
     // Convert *italic* markdown to HTML (more specific to avoid conflicts)
@@ -105,8 +105,13 @@ export const MessageRenderer: React.FC<MessageRendererProps> = ({ content, class
       return match;
     });
 
-    // Convert newlines to <br> tags but with smaller spacing
-    escapedText = escapedText.replace(/\n/g, '<br class="leading-relaxed">');
+    // Don't convert single newlines to <br> - let block elements handle their own spacing
+    // Only convert double newlines to paragraph breaks
+    escapedText = escapedText.replace(/\n\n+/g, '</p><p class="mt-2">')
+    // Wrap in paragraph tags if not already wrapped
+    if (!escapedText.startsWith('<')) {
+      escapedText = `<p>${escapedText}</p>`;
+    }
 
     return escapedText;
   };
