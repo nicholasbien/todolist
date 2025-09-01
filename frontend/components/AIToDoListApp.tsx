@@ -1017,11 +1017,13 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
       {/* Add new todo */}
       <div className="mb-6">
         <div className="flex gap-2">
-          <textarea
-            rows={3}
+          <input
+            type="text"
             value={newTodo}
             onChange={(e) => setNewTodo(e.target.value)}
-            placeholder="Add new tasks... (one per line)"
+            onKeyPress={(e) => e.key === 'Enter' && handleAddTodo()}
+            placeholder="Add a new task..."
+            disabled={loading}
             className="flex-1 p-3 border border-gray-800 rounded-xl bg-black text-gray-100 placeholder-gray-500 focus:border-accent focus:outline-none transition-colors"
           />
           <button
