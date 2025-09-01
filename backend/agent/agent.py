@@ -34,8 +34,24 @@ mcp_contexts: Dict[str, Any] = {}
 
 async def connect_to_mcp_server() -> Optional[ClientSession]:
     """Connect to the MCP server if not already connected."""
+    # Check if we have an existing session and if it's still alive
     if "mcp" in mcp_sessions:
-        return mcp_sessions["mcp"]
+        session = mcp_sessions["mcp"]
+        try:
+            # Ping the session to check if it's still alive
+            await session.list_tools()
+            logger.debug("MCP session is healthy, reusing existing connection")
+            return session
+        except Exception as e:
+            logger.warning(f"MCP session unhealthy, reconnecting: {e}")
+            # Clean up dead session
+            mcp_sessions.pop("mcp", None)
+            if "mcp" in mcp_contexts:
+                try:
+                    await mcp_contexts["mcp"].__aexit__(None, None, None)
+                except Exception:
+                    pass
+                mcp_contexts.pop("mcp", None)
 
     try:
         mcp_server_path = os.path.join(os.path.dirname(__file__), "..", "mcp_server.py")
@@ -98,20 +114,26 @@ async def get_current_user(authorization: str = Header(None)):
 AGENT_SYSTEM_PROMPT = """You are an AI assistant with access to tools for managing tasks, journals, weather, and
 web content.
 
-IMPORTANT: When you search the web and find relevant results, you should use fetch_webpage to read the actual
-content from those URLs to provide more detailed information.
+CRITICAL: When you search the web, you MUST ALWAYS follow up by using fetch_webpage to read the actual content.
+DO NOT just summarize search results - fetch and read the actual pages to provide detailed, accurate information.
 
 Available tools include:
-- web_search: Search the web using Brave API
-- fetch_webpage: Extract full content from any URL (USE THIS after searching!)
+- web_search: Search the web using Brave API (returns URLs and snippets only)
+- fetch_webpage: Extract full content from any URL (ALWAYS USE THIS after web_search!)
 - fetch_json: Get JSON data from APIs
 - extract_links: Extract all links from a webpage
 - Task management, journal, weather, and recommendation tools
 
-WORKFLOW FOR WEB SEARCHES:
+MANDATORY WORKFLOW FOR WEB SEARCHES:
 1. Use web_search to find relevant URLs
-2. Use fetch_webpage on the most relevant results to get full content
-3. Provide a comprehensive answer based on the actual content
+2. ALWAYS use fetch_webpage on at least the top 2-3 most relevant results
+3. Read and analyze the actual fetched content
+4. Provide a comprehensive answer based on the ACTUAL CONTENT you fetched, not just search snippets
+
+Example: If asked about "geology of Kilimanjaro":
+- First: web_search for "geology of Kilimanjaro"
+- Then: fetch_webpage on Wikipedia and other authoritative results
+- Finally: Provide detailed answer from the fetched content
 
 You can call multiple tools in sequence to gather information before providing comprehensive responses.
 Be proactive in using tools to personalize your responses based on the user's data.

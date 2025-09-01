@@ -32,6 +32,7 @@ export default function AgentChatbot({ activeSpace, token }: ChatbotProps) {
   const checkIfAtBottom = () => {
     if (!chatContainerRef.current) return true;
     const { scrollTop, scrollHeight, clientHeight } = chatContainerRef.current;
+    // TODO: simplify the scrolling logic
     return scrollTop + clientHeight >= scrollHeight - 50; // 50px threshold for "at bottom"
   };
 
