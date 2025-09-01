@@ -2,11 +2,10 @@ import csv
 import json
 import logging
 import os
-from collections import defaultdict
 from contextlib import asynccontextmanager
 from datetime import datetime
 from io import StringIO
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, List, Optional, Union
 
 import httpx
 from agent import agent_router
@@ -35,6 +34,7 @@ from categories import (
     rename_category,
 )
 from chatbot import answer_question
+from chats import ChatMessage, get_chat_history, save_chat_message
 
 # Import the classification function and todo management
 from classify import classify_task
@@ -99,6 +99,7 @@ async def lifespan(app: FastAPI):
         # Import initialization functions
         from auth import cleanup_expired_sessions, init_auth_indexes
         from categories import init_category_indexes
+        from chats import init_chat_indexes
 
         # Test database connection first
         from db import check_database_health
@@ -120,6 +121,7 @@ async def lifespan(app: FastAPI):
             ("init_space_indexes", init_space_indexes),
             ("init_category_indexes", init_category_indexes),
             ("init_journal_indexes", init_journal_indexes),
+            ("init_chat_indexes", init_chat_indexes),
             ("init_default_categories", init_default_categories),
             ("cleanup_expired_sessions", cleanup_expired_sessions),
         ]
@@ -168,8 +170,6 @@ app = FastAPI(title="AI Todo List API", lifespan=lifespan)
 # Include agent router
 app.include_router(agent_router)
 
-# In-memory conversation history
-conversations: Dict[str, List[dict]] = defaultdict(list)
 MAX_HISTORY = 10
 
 
@@ -668,15 +668,16 @@ async def api_chat(
 
         spaces_data = [space_context]
 
-        history = conversations[current_user["user_id"]]
+        history_messages = await get_chat_history(current_user["user_id"], req.space_id, limit=MAX_HISTORY)
+        history = [{"role": m.role, "content": m.content} for m in history_messages]
         answer = await answer_question(req.question, spaces_data, history)
 
-        history.append({"role": "user", "content": req.question})
-        history.append({"role": "assistant", "content": answer})
-        if len(history) > MAX_HISTORY:
-            conversations[current_user["user_id"]] = history[-MAX_HISTORY:]
-        else:
-            conversations[current_user["user_id"]] = history
+        await save_chat_message(
+            ChatMessage(user_id=current_user["user_id"], space_id=req.space_id, role="user", content=req.question)
+        )
+        await save_chat_message(
+            ChatMessage(user_id=current_user["user_id"], space_id=req.space_id, role="assistant", content=answer)
+        )
 
         return {"answer": answer}
     except Exception as e:

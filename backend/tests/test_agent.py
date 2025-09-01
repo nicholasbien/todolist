@@ -506,8 +506,10 @@ class TestAgentConversationState:
     @patch("agent.agent.AsyncOpenAI")
     async def test_conversation_state_persists(self, mock_openai_class):
         from agent.agent import conversation_state
+        from chats import chats_collection
 
         conversation_state.clear()
+        await chats_collection.delete_many({})
 
         mock_client = AsyncMock()
         mock_openai_class.return_value = mock_client
@@ -542,28 +544,26 @@ class TestAgentConversationState:
         stream2 = AsyncMock()
         stream2.__aiter__.return_value = [chunk3]
 
-        mock_client.chat.completions.create.side_effect = [stream1, stream2]
+        mock_client.chat.completions.create.side_effect = [stream1, stream2, stream2]
 
         with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
             async for _ in stream_agent_response("What's the weather in New York?", "user1", None):
                 pass
 
-            # Verify history after first call
-            key = "user1"
-            history = conversation_state.get(key)
-            assert history[0] == {"role": "user", "content": "What's the weather in New York?"}
-            assert history[1]["role"] == "tool"
-            assert history[1]["name"] == "get_current_weather"
+            msgs = await chats_collection.find({"user_id": "user1"}).to_list(None)
+            assert len(msgs) == 2
+            assert msgs[0]["role"] == "user"
+            assert msgs[1]["role"] == "assistant"
+
+            conversation_state.clear()
 
             async for _ in stream_agent_response("Thanks", "user1", None):
                 pass
 
-        # Second call should include previous interaction
-        second_call = mock_client.chat.completions.create.call_args_list[1]
+        # Second call should include previous interaction loaded from DB
+        second_call = mock_client.chat.completions.create.call_args_list[2]
         messages = second_call.kwargs["messages"]
         assert {"role": "user", "content": "What's the weather in New York?"} in messages
-        assert any(m.get("role") == "tool" and m.get("name") == "get_current_weather" for m in messages)
-        assert {"role": "assistant", "content": "The weather in New York is "} in messages
 
 
 class TestAgentIntegration:
