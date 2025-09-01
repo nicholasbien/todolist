@@ -33,7 +33,7 @@ export default function AgentChatbot({ activeSpace, token }: ChatbotProps) {
   };
 
   useEffect(() => {
-    // scrollToBottom(); // Disabled auto-scroll
+    scrollToBottom();
     if (typeof window !== 'undefined') {
       try {
         const spaceKey = `agent_chat_messages_${activeSpace?._id || 'default'}`;
@@ -193,7 +193,7 @@ export default function AgentChatbot({ activeSpace, token }: ChatbotProps) {
       )}
 
       {/* Messages container */}
-      <div className="mb-4 space-y-4 max-h-[60vh] overflow-y-auto">
+      <div className="mb-4 space-y-4 max-h-[60vh] overflow-y-auto custom-scrollbar">
         {messages.map((msg, idx) => (
           <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
             <div className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
