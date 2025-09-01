@@ -34,6 +34,7 @@ from .schemas import (  # noqa: E402
     TaskUpdateRequest,
     WeatherCurrentRequest,
     WeatherForecastRequest,
+    WebScrapingRequest,
     WebSearchRequest,
 )
 
@@ -727,6 +728,48 @@ async def web_search(request: WebSearchRequest, user_id: str, space_id: Optional
         return {"ok": False, "error": f"Failed to perform web search: {str(e)}"}
 
 
+async def web_scraping(request: WebScrapingRequest, user_id: str, space_id: Optional[str] = None) -> Dict[str, Any]:
+    """
+    Scrape web content using Puppeteer MCP server.
+
+    Args:
+        request: WebScrapingRequest containing URL and optional selector
+        user_id: User ID for the request
+        space_id: Optional space ID
+
+    Returns:
+        Dict with scraped content or error
+    """
+    try:
+        # Import the MCP client manager
+        from mcp_client import mcp_manager
+
+        # Scrape the URL using Puppeteer MCP
+        result = await mcp_manager.scrape_url(url=request.url, selector=request.selector)
+
+        if not result.get("ok"):
+            return result
+
+        # Extract requested content types
+        content = result.get("content", {})
+        extracted = {}
+
+        if request.extract_text:
+            extracted["text"] = content.get("text", "")
+
+        if request.extract_html:
+            extracted["html"] = content.get("html", "")
+
+        # Add metadata
+        extracted["title"] = content.get("title", "")
+        extracted["url"] = result.get("url", request.url)
+
+        return {"ok": True, "content": extracted, "screenshot": result.get("screenshot")}
+
+    except Exception as e:
+        return {"ok": False, "error": f"Failed to scrape URL: {str(e)}"}
+
+
 # Tool registry for easy access
 AVAILABLE_TOOLS: Dict[str, Dict[str, Any]] = {
     "get_current_weather": {
@@ -771,5 +814,10 @@ AVAILABLE_TOOLS: Dict[str, Dict[str, Any]] = {
         "func": web_search,
         "description": "Search the web for current information, news, or specific queries",
         "schema": WebSearchRequest,
+    },
+    "web_scraping": {
+        "func": web_scraping,
+        "description": "Scrape and extract content from any webpage",
+        "schema": WebScrapingRequest,
     },
 }

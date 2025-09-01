@@ -96,6 +96,13 @@ class WebSearchRequest(BaseModel):
     summary: bool = Field(default=True, description="Include AI summary of results")
 
 
+class WebScrapingRequest(BaseModel):
+    url: str = Field(..., description="URL to scrape")
+    selector: Optional[str] = Field(None, description="CSS selector to extract specific content (optional)")
+    extract_text: bool = Field(default=True, description="Extract text content")
+    extract_html: bool = Field(default=False, description="Extract HTML content")
+
+
 # OpenAI function schema generators
 def get_openai_tool_schema(model_class: BaseModel) -> dict:
     """Convert Pydantic model to OpenAI function schema format."""
