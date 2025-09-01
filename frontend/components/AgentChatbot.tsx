@@ -25,6 +25,14 @@ export default function AgentChatbot({ activeSpace, token }: ChatbotProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const chatContainerRef = useRef<HTMLDivElement>(null);
+  const isAtBottomRef = useRef(true);
+
+  const handleScroll = () => {
+    if (!chatContainerRef.current) return;
+    const { scrollTop, scrollHeight, clientHeight } = chatContainerRef.current;
+    isAtBottomRef.current = scrollTop + clientHeight >= scrollHeight - 10;
+  };
 
   const scrollToBottom = () => {
     if (messagesEndRef.current && typeof messagesEndRef.current.scrollIntoView === 'function') {
@@ -33,7 +41,9 @@ export default function AgentChatbot({ activeSpace, token }: ChatbotProps) {
   };
 
   useEffect(() => {
-    scrollToBottom();
+    if (isAtBottomRef.current) {
+      scrollToBottom();
+    }
     if (typeof window !== 'undefined') {
       try {
         const spaceKey = `agent_chat_messages_${activeSpace?._id || 'default'}`;
@@ -193,7 +203,11 @@ export default function AgentChatbot({ activeSpace, token }: ChatbotProps) {
       )}
 
       {/* Messages container */}
-      <div className="mb-4 space-y-4 max-h-[60vh] overflow-y-auto custom-scrollbar">
+      <div
+        ref={chatContainerRef}
+        onScroll={handleScroll}
+        className="mb-4 space-y-4 max-h-[60vh] overflow-y-auto custom-scrollbar"
+      >
         {messages.map((msg, idx) => (
           <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
             <div className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
