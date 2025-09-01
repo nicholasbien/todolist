@@ -152,10 +152,11 @@ const backendUrl = (isProdHost || isCapacitor)
 
 ## Environment Setup
 
-Both frontend and backend require OpenAI API keys:
-- Frontend: `.env.local` with `OPENAI_API_KEY`
-- Backend: `.env` with `OPENAI_API_KEY`
-- Backend also supports `MONGODB_URL` (defaults to `mongodb://localhost:27017`)
+See `docs/ENVIRONMENT_SETUP.md` for complete environment variable documentation.
+
+Quick setup:
+- Backend: Copy `backend/.env.example` to `backend/.env` and fill in your API keys
+- Frontend: Create `frontend/.env.local` with `OPENAI_API_KEY` and `NEXT_PUBLIC_BACKEND_URL`
 
 ## Development Workflow
 
