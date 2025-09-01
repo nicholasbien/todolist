@@ -59,6 +59,18 @@ async def get_chat_history(user_id: str, space_id: Optional[str] = None, limit: 
         raise HTTPException(status_code=500, detail="Failed to get chat history")
 
 
+async def delete_chat_history(user_id: str, space_id: Optional[str] = None) -> None:
+    """Delete chat history for a user and optional space."""
+    try:
+        query = {"user_id": user_id}
+        if space_id is not None:
+            query["space_id"] = space_id
+        await chats_collection.delete_many(query)
+    except Exception as e:
+        logger.error(f"Error deleting chat history: {e}")
+        raise HTTPException(status_code=500, detail="Failed to delete chat history")
+
+
 async def init_chat_indexes() -> None:
     """Create indexes used for chat storage."""
     try:

@@ -93,7 +93,7 @@ export default function AgentChatbot({ activeSpace, token }: ChatbotProps) {
     }
   }, [activeSpace]);
 
-  const handleClear = () => {
+  const handleClear = async () => {
     setMessages([]);
     if (typeof window !== 'undefined') {
       try {
@@ -102,6 +102,24 @@ export default function AgentChatbot({ activeSpace, token }: ChatbotProps) {
       } catch {
         // Ignore storage errors
       }
+    }
+
+    try {
+      const params = new URLSearchParams();
+      if (activeSpace?._id) {
+        params.append('space_id', activeSpace._id);
+      }
+      const clearUrl = Capacitor.isNativePlatform()
+        ? `https://backend-production-e920.up.railway.app/agent/history?${params.toString()}`
+        : `/agent/history?${params.toString()}`;
+
+      const headers: Record<string, string> = {};
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      await fetch(clearUrl, { method: 'DELETE', headers });
+    } catch {
+      // Ignore network errors
     }
   };
 
