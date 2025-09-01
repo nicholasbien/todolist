@@ -1,9 +1,14 @@
 """Main agent module with OpenAI integration and streaming support."""
 
 import json
+import logging
 import os
 import sys
 from typing import Any, AsyncGenerator, Dict, List, Optional
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Add parent directory to path for imports  # noqa: E402
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
@@ -18,6 +23,15 @@ from .schemas import OPENAI_TOOL_SCHEMAS  # noqa: E402
 from .tools import AVAILABLE_TOOLS  # noqa: E402
 
 router = APIRouter(prefix="/agent")
+
+
+# Configure OpenAI client (using defaults)
+def get_openai_client(api_key: str) -> AsyncOpenAI:
+    """Create OpenAI client with default settings."""
+    return AsyncOpenAI(api_key=api_key)
+    # Default timeout: 600s (10 minutes)
+    # Default max_retries: 2
+
 
 # In-memory conversation history keyed by user and space
 conversation_state: Dict[str, List[Dict[str, Any]]] = {}
@@ -50,6 +64,16 @@ recommendations.
 You can call multiple tools in sequence to gather information before providing comprehensive responses.
 Be proactive in using tools to personalize your responses based on the user's data.
 
+FORMATTING GUIDELINES:
+- Use markdown formatting to make responses clear and readable
+- Use **bold** for emphasis on important points
+- Use bullet points (- or *) for lists
+- Use numbered lists (1. 2. 3.) for sequential steps
+- Use `code formatting` for technical terms or commands
+- Use headers (##) to organize longer responses
+- Use tables when presenting comparative data
+- Keep formatting clean and purposeful
+
 Available tools:
 - get_current_weather: current weather for any location
 - get_weather_forecast: multi-day weather forecasts
@@ -70,8 +94,28 @@ For recommendations (books, quotes, etc.), first call list_tasks and read_journa
 - Their activity patterns and preferences
 Then provide tailored suggestions based on this context.
 
-Always use tools when they can help. After all tool calls complete, provide a concise summary
+Always use tools when they can help. After all tool calls complete, provide a concise, well-formatted summary
 addressing the user's request."""
+
+
+def estimate_token_count(messages: List[Dict[str, Any]], tools: Optional[List[Dict[str, Any]]] = None) -> int:
+    """Rough estimate of token count for messages and tools."""
+    # Very rough approximation: ~4 characters per token on average
+    total_chars = 0
+
+    # Count message tokens
+    for msg in messages:
+        if isinstance(msg.get("content"), str):
+            total_chars += len(msg["content"])
+        if msg.get("tool_calls"):
+            total_chars += len(json.dumps(msg["tool_calls"]))
+
+    # Count tool schema tokens (these are sent with every request)
+    if tools:
+        total_chars += len(json.dumps(tools))
+
+    estimated_tokens = total_chars // 4
+    return estimated_tokens
 
 
 def format_sse_message(event: str, data: dict) -> str:
@@ -90,7 +134,7 @@ async def stream_agent_response(
         yield format_sse_message("error", error_data)
         return
 
-    client = AsyncOpenAI(api_key=api_key)
+    client = get_openai_client(api_key)
     tools = [{"type": "function", "function": schema} for schema in OPENAI_TOOL_SCHEMAS.values()]
     ready_data = {"ok": True, "tools": list(OPENAI_TOOL_SCHEMAS.keys()), "space_id": space_id}
     yield format_sse_message("ready", ready_data)
@@ -110,9 +154,27 @@ async def stream_agent_response(
     ]
 
     try:
+        api_call_count = 0
+        total_input_tokens = 0
+        total_output_tokens = 0
+
         while True:
+            api_call_count += 1
+
+            # Log token estimate before API call
+            estimated_tokens = estimate_token_count(messages, tools)
+            logger.info(
+                f"API Call #{api_call_count} - Estimated input tokens: {estimated_tokens}, "
+                f"Message count: {len(messages)}"
+            )
+
             stream = await client.chat.completions.create(
-                model="gpt-4.1", messages=messages, tools=tools, stream=True, temperature=0.7
+                model="gpt-4.1",
+                messages=messages,
+                tools=tools,
+                stream=True,
+                temperature=0.7,
+                stream_options={"include_usage": True},  # Request usage stats in stream
             )
 
             partial_tool_calls: Dict[int, Dict[str, str]] = {}
@@ -120,6 +182,16 @@ async def stream_agent_response(
             tool_calls_made = False
 
             async for chunk in stream:
+                # Check for usage data in stream
+                if hasattr(chunk, "usage") and chunk.usage:
+                    logger.info(
+                        f"API Call #{api_call_count} - Usage: "
+                        f"Input tokens: {chunk.usage.prompt_tokens}, "
+                        f"Output tokens: {chunk.usage.completion_tokens}"
+                    )
+                    total_input_tokens += chunk.usage.prompt_tokens if chunk.usage.prompt_tokens else 0
+                    total_output_tokens += chunk.usage.completion_tokens if chunk.usage.completion_tokens else 0
+
                 choice = chunk.choices[0] if chunk.choices else None
                 if not choice:
                     continue
@@ -171,6 +243,7 @@ async def stream_agent_response(
                     call_id = partial.get("id") or str(index)
                     try:
                         args = json.loads(partial["arguments"] or "{}")
+                        logger.info(f"Executing tool: {tool_name} with args: {args}")
                         if tool_name in AVAILABLE_TOOLS:
                             info = AVAILABLE_TOOLS[tool_name]
                             request = info["schema"](**args)
@@ -196,6 +269,14 @@ async def stream_agent_response(
             if tool_calls_made:
                 messages.append({"role": "assistant", "content": "".join(content_parts)})
 
+            # Log final token summary
+            logger.info(
+                f"Conversation complete - Total API calls: {api_call_count}, "
+                f"Total input tokens: {total_input_tokens}, "
+                f"Total output tokens: {total_output_tokens}, "
+                f"Total tokens: {total_input_tokens + total_output_tokens}"
+            )
+
             yield format_sse_message("done", {"ok": True})
             break
 
@@ -216,7 +297,14 @@ async def stream_agent_response(
         conversation_state[key] = history[-10:]
 
     except Exception as e:
-        yield format_sse_message("error", {"message": str(e)})
+        error_msg = str(e)
+        # Provide more user-friendly message for rate limiting
+        if "429" in error_msg or "rate" in error_msg.lower():
+            error_msg = (
+                "OpenAI API rate limit reached. The system will automatically retry. "
+                "If this persists, please try again in a few moments."
+            )
+        yield format_sse_message("error", {"message": error_msg})
 
 
 @router.get("/stream")

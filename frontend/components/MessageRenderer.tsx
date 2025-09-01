@@ -24,14 +24,39 @@ export const MessageRenderer: React.FC<MessageRendererProps> = ({ content, class
       return `<a href="${url}" target="_blank" rel="noopener noreferrer" class="text-blue-400 hover:text-blue-300 underline break-all">${url}</a>`;
     });
 
-    // Convert **bold** markdown to HTML
+    // Convert headers (##, ###, ####)
+    escapedText = escapedText.replace(/^#### (.+)$/gm, '<h4 class="text-lg font-semibold mt-3 mb-1">$1</h4>');
+    escapedText = escapedText.replace(/^### (.+)$/gm, '<h3 class="text-xl font-semibold mt-3 mb-2">$1</h3>');
+    escapedText = escapedText.replace(/^## (.+)$/gm, '<h2 class="text-2xl font-bold mt-4 mb-2">$1</h2>');
+
+    // Convert **bold** markdown to HTML (must be before single *)
     escapedText = escapedText.replace(/\*\*(.*?)\*\*/g, '<strong class="font-semibold">$1</strong>');
 
-    // Convert *italic* markdown to HTML
-    escapedText = escapedText.replace(/\*(.*?)\*/g, '<em class="italic">$1</em>');
+    // Convert numbered lists (1. 2. 3.)
+    escapedText = escapedText.replace(/^(\d+)\.\s+(.+)$/gm, '<li class="ml-6 list-decimal">$2</li>');
+
+    // Convert bullet lists (- or *)
+    escapedText = escapedText.replace(/^[-*]\s+(.+)$/gm, '<li class="ml-6 list-disc">$2</li>');
+
+    // Wrap consecutive list items in <ul> or <ol>
+    escapedText = escapedText.replace(/(<li class="ml-6 list-disc">.*?<\/li>(\s*<br>)?)+/g, (match) => {
+      return `<ul class="my-2">${match.replace(/<br>/g, '')}</ul>`;
+    });
+    escapedText = escapedText.replace(/(<li class="ml-6 list-decimal">.*?<\/li>(\s*<br>)?)+/g, (match) => {
+      return `<ol class="my-2">${match.replace(/<br>/g, '')}</ol>`;
+    });
+
+    // Convert *italic* markdown to HTML (after lists to avoid conflicts)
+    escapedText = escapedText.replace(/\*([^*]+)\*/g, '<em class="italic">$1</em>');
 
     // Convert `code` markdown to HTML
     escapedText = escapedText.replace(/`([^`]+)`/g, '<code class="bg-gray-700 px-1 py-0.5 rounded text-sm font-mono">$1</code>');
+
+    // Convert code blocks ```
+    escapedText = escapedText.replace(/```([\s\S]*?)```/g, '<pre class="bg-gray-800 p-3 rounded my-2 overflow-x-auto"><code class="text-sm font-mono">$1</code></pre>');
+
+    // Convert horizontal rules (---)
+    escapedText = escapedText.replace(/^---$/gm, '<hr class="my-4 border-gray-600">');
 
     // Convert newlines to <br> tags for proper line breaks
     escapedText = escapedText.replace(/\n/g, '<br>');
