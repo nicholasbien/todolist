@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
 from auth import verify_session  # noqa: E402
-from chats import ChatMessage, get_chat_history, save_chat_message  # noqa: E402
+from chats import ChatMessage, delete_chat_history, get_chat_history, save_chat_message  # noqa: E402
 from fastapi import APIRouter, Depends, Header, HTTPException, Query  # noqa: E402
 from fastapi.responses import StreamingResponse  # noqa: E402
 from openai import AsyncOpenAI  # noqa: E402
@@ -328,3 +328,19 @@ async def agent_stream(
     # Return streaming response
     headers = {"Cache-Control": "no-cache", "Connection": "keep-alive", "X-Accel-Buffering": "no"}  # For nginx
     return StreamingResponse(generate(), media_type="text/event-stream", headers=headers)
+
+
+@router.delete("/history")
+async def clear_history(
+    space_id: Optional[str] = Query(None, description="Space ID"),
+    current_user: dict = Depends(get_current_user),
+):
+    """Clear chat history for the current user and optional space."""
+    user_id = current_user.get("user_id")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="User not authenticated")
+
+    key = f"{user_id}:{space_id}" if space_id else user_id
+    conversation_state.pop(key, None)
+    await delete_chat_history(user_id, space_id)
+    return {"ok": True}
