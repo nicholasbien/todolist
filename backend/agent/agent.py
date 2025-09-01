@@ -6,6 +6,9 @@ import os
 import sys
 from typing import Any, AsyncGenerator, Dict, List, Optional
 
+from mcp import ClientSession, StdioServerParameters
+from mcp.client.stdio import stdio_client
+
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -23,6 +26,40 @@ from .schemas import OPENAI_TOOL_SCHEMAS  # noqa: E402
 from .tools import AVAILABLE_TOOLS  # noqa: E402
 
 router = APIRouter(prefix="/agent")
+
+# Global MCP session storage
+mcp_sessions: Dict[str, ClientSession] = {}
+mcp_contexts: Dict[str, Any] = {}
+
+
+async def connect_to_mcp_server() -> Optional[ClientSession]:
+    """Connect to the MCP server if not already connected."""
+    if "mcp" in mcp_sessions:
+        return mcp_sessions["mcp"]
+
+    try:
+        mcp_server_path = os.path.join(os.path.dirname(__file__), "..", "mcp_server.py")
+        if not os.path.exists(mcp_server_path):
+            logger.error(f"MCP server not found at: {mcp_server_path}")
+            return None
+
+        server = StdioServerParameters(command=sys.executable, args=[mcp_server_path], env=dict(os.environ))
+
+        logger.info(f"Starting MCP server from: {mcp_server_path}")
+        context = stdio_client(server)
+        read, write = await context.__aenter__()
+        mcp_contexts["mcp"] = context
+
+        session = ClientSession(read, write)
+        await session.__aenter__()
+        await session.initialize()
+
+        mcp_sessions["mcp"] = session
+        logger.info("Connected to MCP server successfully")
+        return session
+    except Exception as e:
+        logger.error(f"Failed to connect to MCP server: {e}", exc_info=True)
+        return None
 
 
 # Configure OpenAI client (using defaults)
@@ -59,7 +96,22 @@ async def get_current_user(authorization: str = Header(None)):
 
 # System prompt for the agent
 AGENT_SYSTEM_PROMPT = """You are an AI assistant with access to tools for managing tasks, journals, weather, and
-recommendations.
+web content.
+
+IMPORTANT: When you search the web and find relevant results, you should use fetch_webpage to read the actual
+content from those URLs to provide more detailed information.
+
+Available tools include:
+- web_search: Search the web using Brave API
+- fetch_webpage: Extract full content from any URL (USE THIS after searching!)
+- fetch_json: Get JSON data from APIs
+- extract_links: Extract all links from a webpage
+- Task management, journal, weather, and recommendation tools
+
+WORKFLOW FOR WEB SEARCHES:
+1. Use web_search to find relevant URLs
+2. Use fetch_webpage on the most relevant results to get full content
+3. Provide a comprehensive answer based on the actual content
 
 You can call multiple tools in sequence to gather information before providing comprehensive responses.
 Be proactive in using tools to personalize your responses based on the user's data.
@@ -135,9 +187,36 @@ async def stream_agent_response(
         yield format_sse_message("error", error_data)
         return
 
+    # Connect to MCP server
+    mcp_session = await connect_to_mcp_server()
+    mcp_tools = {}
+
+    if mcp_session:
+        try:
+            tools_response = await mcp_session.list_tools()
+            for tool in tools_response.tools:
+                # Add MCP tools with their schemas
+                mcp_tools[tool.name] = {
+                    "type": "function",
+                    "function": {
+                        "name": tool.name,
+                        "description": tool.description or f"MCP tool: {tool.name}",
+                        "parameters": tool.inputSchema
+                        if hasattr(tool, "inputSchema")
+                        else {"type": "object", "properties": {}, "required": []},
+                    },
+                }
+            logger.info(f"Discovered {len(mcp_tools)} MCP tools")
+        except Exception as e:
+            logger.error(f"Failed to list MCP tools: {e}")
+
     client = get_openai_client(api_key)
+    # Combine native tools with MCP tools
     tools = [{"type": "function", "function": schema} for schema in OPENAI_TOOL_SCHEMAS.values()]
-    ready_data = {"ok": True, "tools": list(OPENAI_TOOL_SCHEMAS.keys()), "space_id": space_id}
+    tools.extend(mcp_tools.values())
+
+    tool_names = list(OPENAI_TOOL_SCHEMAS.keys()) + list(mcp_tools.keys())
+    ready_data = {"ok": True, "tools": tool_names, "space_id": space_id}
     yield format_sse_message("ready", ready_data)
 
     # Load conversation history for this user/space
@@ -158,8 +237,9 @@ async def stream_agent_response(
         api_call_count = 0
         total_input_tokens = 0
         total_output_tokens = 0
+        MAX_AGENT_STEPS = 10  # Maximum number of agent steps (tool calls + responses)
 
-        while True:
+        while api_call_count < MAX_AGENT_STEPS:
             api_call_count += 1
 
             # Log token estimate before API call
@@ -245,7 +325,28 @@ async def stream_agent_response(
                     try:
                         args = json.loads(partial["arguments"] or "{}")
                         logger.info(f"Executing tool: {tool_name} with args: {args}")
-                        if tool_name in AVAILABLE_TOOLS:
+
+                        # Check if it's an MCP tool or native tool
+                        if tool_name in mcp_tools and mcp_session:
+                            # Call MCP tool
+                            mcp_result = await mcp_session.call_tool(tool_name, arguments=args)
+                            if hasattr(mcp_result, "content"):
+                                if isinstance(mcp_result.content, list) and len(mcp_result.content) > 0:
+                                    content = (
+                                        mcp_result.content[0].text
+                                        if hasattr(mcp_result.content[0], "text")
+                                        else str(mcp_result.content[0])
+                                    )
+                                else:
+                                    content = str(mcp_result.content)
+
+                                try:
+                                    result = json.loads(content) if isinstance(content, str) else content
+                                except (json.JSONDecodeError, ValueError):
+                                    result = {"result": content}
+                            else:
+                                result = {"result": str(mcp_result)}
+                        elif tool_name in AVAILABLE_TOOLS:
                             info = AVAILABLE_TOOLS[tool_name]
                             request = info["schema"](**args)
                             result = await info["func"](request=request, user_id=user_id, space_id=space_id)
@@ -280,6 +381,44 @@ async def stream_agent_response(
 
             yield format_sse_message("done", {"ok": True})
             break
+
+        # If we exit the loop due to max steps, force a final response
+        if api_call_count >= MAX_AGENT_STEPS:
+            logger.warning(f"Reached maximum agent steps ({MAX_AGENT_STEPS}), generating final response")
+
+            # Force a final response without tools
+            messages.append(
+                {
+                    "role": "system",
+                    "content": (
+                        "You've reached the maximum number of steps. "
+                        "Please provide a comprehensive final answer based on the information gathered so far."
+                    ),
+                }
+            )
+
+            stream = await client.chat.completions.create(
+                model="gpt-4.1",
+                messages=messages,
+                tools=None,  # No tools for final response
+                stream=True,
+                temperature=0.7,
+                stream_options={"include_usage": True},
+            )
+
+            async for chunk in stream:
+                choice = chunk.choices[0] if chunk.choices else None
+                if choice and choice.delta.content:
+                    token = choice.delta.content
+                    content_parts.append(token)
+                    yield format_sse_message("token", {"token": token})
+
+                # Track usage
+                if chunk.usage:
+                    total_input_tokens += chunk.usage.prompt_tokens or 0
+                    total_output_tokens += chunk.usage.completion_tokens or 0
+
+            yield format_sse_message("done", {"ok": True, "info": f"Reached maximum of {MAX_AGENT_STEPS} agent steps"})
 
         # Update conversation history
         user_entry = ChatMessage(user_id=user_id, space_id=space_id, role="user", content=user_message)
