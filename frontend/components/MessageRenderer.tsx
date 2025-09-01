@@ -58,16 +58,16 @@ export const MessageRenderer: React.FC<MessageRendererProps> = ({ content, class
     escapedText = escapedText.replace(/(?<!^|\n|\*)\*([^*\n]+)\*(?!\*)/g, '<em class="italic">$1</em>');
 
     // Convert code blocks ``` first (must be before inline code) - with horizontal scroll
-    escapedText = escapedText.replace(/```([\s\S]*?)```/g, '<pre class="bg-gray-800 p-3 rounded my-2 overflow-x-auto"><code class="text-sm font-mono">$1</code></pre>');
+    escapedText = escapedText.replace(/```([\s\S]*?)```/g, '<pre class="bg-gray-800 p-3 rounded my-3 overflow-x-auto"><code class="text-sm font-mono">$1</code></pre>');
 
     // Convert `code` markdown to HTML (after code blocks)
     escapedText = escapedText.replace(/`([^`\n]+)`/g, '<code class="bg-gray-700 px-1 py-0.5 rounded text-sm font-mono">$1</code>');
 
     // Convert horizontal rules (---)
-    escapedText = escapedText.replace(/^---$/gm, '<hr class="my-3 border-gray-600">');
+    escapedText = escapedText.replace(/^---$/gm, '<hr class="my-4 border-gray-600">');
 
     // Convert blockquotes (>) - must be before line breaks
-    escapedText = escapedText.replace(/^>\s*(.+)$/gm, '<blockquote class="border-l-4 border-gray-500 pl-4 py-1 my-2 italic text-gray-300">$1</blockquote>');
+    escapedText = escapedText.replace(/^>\s*(.+)$/gm, '<blockquote class="border-l-4 border-gray-500 pl-4 py-2 my-3 italic text-gray-300">$1</blockquote>');
 
     // Convert tables - simple markdown table support
     // First identify table rows with pipes
@@ -79,7 +79,7 @@ export const MessageRenderer: React.FC<MessageRendererProps> = ({ content, class
     escapedText = escapedText.replace(/((^\|.+\|$\n?)+)/gm, (match) => {
       const lines = match.trim().split('\n');
       if (lines.length >= 2) {
-        let tableHtml = '<div class="overflow-x-auto my-2"><table class="border-collapse border border-gray-600">';
+        let tableHtml = '<div class="overflow-x-auto my-3"><table class="border-collapse border border-gray-600">';
 
         lines.forEach((line, index) => {
           const cells = line.split('|').filter(cell => cell.trim());
@@ -107,7 +107,7 @@ export const MessageRenderer: React.FC<MessageRendererProps> = ({ content, class
 
     // Don't convert single newlines to <br> - let block elements handle their own spacing
     // Only convert double newlines to paragraph breaks
-    escapedText = escapedText.replace(/\n\n+/g, '</p><p class="mt-2">')
+    escapedText = escapedText.replace(/\n\n+/g, '</p><p class="mt-3">')
     // Wrap in paragraph tags if not already wrapped
     if (!escapedText.startsWith('<')) {
       escapedText = `<p>${escapedText}</p>`;
