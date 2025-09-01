@@ -27,12 +27,17 @@ export default function AgentChatbot({ activeSpace, token }: ChatbotProps) {
   const [thinkingDots, setThinkingDots] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
-  const isAtBottomRef = useRef(true);
+  const shouldAutoScrollRef = useRef(true);
+
+  const checkIfAtBottom = () => {
+    if (!chatContainerRef.current) return true;
+    const { scrollTop, scrollHeight, clientHeight } = chatContainerRef.current;
+    return scrollTop + clientHeight >= scrollHeight - 50; // 50px threshold for "at bottom"
+  };
 
   const handleScroll = () => {
-    if (!chatContainerRef.current) return;
-    const { scrollTop, scrollHeight, clientHeight } = chatContainerRef.current;
-    isAtBottomRef.current = scrollTop + clientHeight >= scrollHeight - 10;
+    // Update whether we should auto-scroll based on current position
+    shouldAutoScrollRef.current = checkIfAtBottom();
   };
 
   const scrollToBottom = () => {
@@ -42,8 +47,14 @@ export default function AgentChatbot({ activeSpace, token }: ChatbotProps) {
   };
 
   useEffect(() => {
-    if (isAtBottomRef.current) {
-      scrollToBottom();
+    // Only auto-scroll if we were at the bottom before the update
+    if (shouldAutoScrollRef.current) {
+      // Small delay to ensure DOM updates are complete
+      setTimeout(() => {
+        scrollToBottom();
+        // After scrolling, we're at the bottom again
+        shouldAutoScrollRef.current = true;
+      }, 10);
     }
     if (typeof window !== 'undefined') {
       try {
@@ -102,6 +113,9 @@ export default function AgentChatbot({ activeSpace, token }: ChatbotProps) {
     setQuestion('');
     setLoading(true);
     setError('');
+
+    // When user sends a message, they want to see the response, so scroll to bottom
+    shouldAutoScrollRef.current = true;
 
     let assistantResponse = { role: 'assistant', content: '' };
     let assistantMessageAdded = false;
