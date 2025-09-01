@@ -30,11 +30,11 @@ export const MessageRenderer: React.FC<MessageRendererProps> = ({ content, class
       return `<a href="${url}" target="_blank" rel="noopener noreferrer" class="text-blue-400 hover:text-blue-300 underline break-all">${url}</a>`;
     });
 
-    // Convert headers (#, ##, ###, ####) - minimal spacing
-    escapedText = escapedText.replace(/^#### (.+)$/gm, '<h4 class="text-lg font-semibold mt-2 mb-0.5">$1</h4>');
-    escapedText = escapedText.replace(/^### (.+)$/gm, '<h3 class="text-xl font-semibold mt-2 mb-0.5">$1</h3>');
-    escapedText = escapedText.replace(/^## (.+)$/gm, '<h2 class="text-2xl font-bold mt-2.5 mb-0.5">$1</h2>');
-    escapedText = escapedText.replace(/^# (.+)$/gm, '<h1 class="text-3xl font-bold mt-3 mb-1">$1</h1>');
+    // Convert headers (#, ##, ###, ####) - balanced spacing now that <br> is removed
+    escapedText = escapedText.replace(/^#### (.+)$/gm, '<h4 class="text-lg font-semibold mt-3 mb-2">$1</h4>');
+    escapedText = escapedText.replace(/^### (.+)$/gm, '<h3 class="text-xl font-semibold mt-3 mb-2">$1</h3>');
+    escapedText = escapedText.replace(/^## (.+)$/gm, '<h2 class="text-2xl font-bold mt-4 mb-2">$1</h2>');
+    escapedText = escapedText.replace(/^# (.+)$/gm, '<h1 class="text-3xl font-bold mt-4 mb-3">$1</h1>');
 
     // Convert **bold** markdown to HTML (must be before single *)
     escapedText = escapedText.replace(/\*\*(.*?)\*\*/g, '<strong class="font-semibold">$1</strong>');
@@ -45,12 +45,12 @@ export const MessageRenderer: React.FC<MessageRendererProps> = ({ content, class
     // Convert bullet lists (- or *)
     escapedText = escapedText.replace(/^[-*]\s+(.+)$/gm, '<li class="ml-6 list-disc">$1</li>');
 
-    // Wrap consecutive list items in <ul> or <ol> - add top margin for spacing from text above
+    // Wrap consecutive list items in <ul> or <ol> - proper spacing without <br> tags
     escapedText = escapedText.replace(/(<li class="ml-6 list-disc">.*?<\/li>(\s*<br>)?)+/g, (match) => {
-      return `<ul class="mt-1.5 mb-1.5 space-y-0.5">${match.replace(/<br>/g, '')}</ul>`;
+      return `<ul class="my-2 space-y-1">${match.replace(/<br>/g, '')}</ul>`;
     });
     escapedText = escapedText.replace(/(<li class="ml-6 list-decimal">.*?<\/li>(\s*<br>)?)+/g, (match) => {
-      return `<ol class="mt-1.5 mb-1.5 space-y-0.5">${match.replace(/<br>/g, '')}</ol>`;
+      return `<ol class="my-2 space-y-1">${match.replace(/<br>/g, '')}</ol>`;
     });
 
     // Convert *italic* markdown to HTML (more specific to avoid conflicts)
