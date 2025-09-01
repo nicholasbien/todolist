@@ -509,13 +509,22 @@ async def update_task(request: TaskUpdateRequest, user_id: str, space_id: Option
 
 
 async def add_journal_entry(request: JournalAddRequest, user_id: str, space_id: Optional[str] = None) -> Dict[str, Any]:
-    """Create or update a journal entry."""
+    """Append content to a journal entry for the given date."""
     try:
         # Use today's date if not specified
         entry_date = request.date or datetime.now().strftime("%Y-%m-%d")
 
-        # Create JournalEntry object
-        journal_entry = JournalEntry(user_id=user_id, space_id=space_id, date=entry_date, text=request.content)
+        # Fetch existing entry to preserve previous content
+        existing_entry = await collections.journals.find_one(
+            {"user_id": user_id, "space_id": space_id, "date": entry_date}
+        )
+
+        # Combine existing text with new content when present
+        content = request.content
+        if existing_entry and existing_entry.get("text"):
+            content = f"{existing_entry['text']}\n{content}".strip()
+
+        journal_entry = JournalEntry(user_id=user_id, space_id=space_id, date=entry_date, text=content)
 
         # Create journal entry (default to UTC timezone)
         created_entry = await db_create_journal_entry(journal_entry, "UTC")

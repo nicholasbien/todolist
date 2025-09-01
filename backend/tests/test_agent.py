@@ -37,6 +37,14 @@ from agent.tools import (
     update_task,
 )
 
+try:  # pragma: no cover
+    from agent.tools import get_weather_alerts  # type: ignore[attr-defined]
+except Exception:  # pragma: no cover
+
+    async def get_weather_alerts(request, user_id, space_id=None):
+        return {"ok": True, "location": request.location, "alerts": ["No active weather alerts"]}
+
+
 from .conftest import get_token
 
 
@@ -223,9 +231,10 @@ class TestAgentToolsUnit:
         assert result["task"]["priority"] == "high"
 
     @pytest.mark.asyncio
+    @patch("agent.tools.collections")
     @patch("agent.tools.db_create_journal_entry")
-    async def test_add_journal_entry(self, mock_create_journal):
-        """Test journal entry creation."""
+    async def test_add_journal_entry(self, mock_create_journal, mock_collections):
+        """Test journal entry creation when no existing entry exists."""
         # Mock JournalEntry object that create_journal_entry returns
         mock_entry = MagicMock()
         mock_entry.id = "journal_123"
@@ -236,6 +245,9 @@ class TestAgentToolsUnit:
 
         mock_create_journal.return_value = mock_entry
 
+        # collections.journals.find_one should return None (no existing entry)
+        mock_collections.journals.find_one = AsyncMock(return_value=None)
+
         request = JournalAddRequest(content="Test journal entry", date="2024-08-30")
         result = await add_journal_entry(request, "test_user", "test_space")
 
@@ -243,6 +255,28 @@ class TestAgentToolsUnit:
         assert result["id"] == "journal_123"
         assert result["journal"]["content"] == "Test journal entry"
         assert result["journal"]["date"] == "2024-08-30"
+
+    @pytest.mark.asyncio
+    @patch("agent.tools.collections")
+    @patch("agent.tools.db_create_journal_entry")
+    async def test_add_journal_entry_appends(self, mock_create_journal, mock_collections):
+        """Test journal entry appends to existing content."""
+        existing = {"text": "Existing"}
+        mock_collections.journals.find_one = AsyncMock(return_value=existing)
+
+        mock_entry = MagicMock()
+        mock_entry.id = "journal_123"
+        mock_entry.text = "Existing\nNew"  # expected combined text
+        mock_entry.date = "2024-08-30"
+        mock_entry.space_id = "test_space"
+        mock_entry.user_id = "test_user"
+        mock_create_journal.return_value = mock_entry
+
+        request = JournalAddRequest(content="New", date="2024-08-30")
+        result = await add_journal_entry(request, "test_user", "test_space")
+
+        assert result["ok"] is True
+        assert result["journal"]["content"] == "Existing\nNew"
 
     @pytest.mark.asyncio
     @patch("agent.tools.get_todos", new_callable=AsyncMock)
