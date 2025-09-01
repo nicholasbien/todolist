@@ -114,5 +114,9 @@ class Collections:
     def journals(self):
         return db.journals
 
+    @property
+    def chats(self):
+        return db.chats
+
 
 collections = Collections()

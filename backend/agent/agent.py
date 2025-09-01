@@ -9,6 +9,7 @@ from typing import Any, AsyncGenerator, Dict, List, Optional
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
 from auth import verify_session  # noqa: E402
+from chats import ChatMessage, get_chat_history, save_chat_message  # noqa: E402
 from fastapi import APIRouter, Depends, Header, HTTPException, Query  # noqa: E402
 from fastapi.responses import StreamingResponse  # noqa: E402
 from openai import AsyncOpenAI  # noqa: E402
@@ -20,6 +21,7 @@ router = APIRouter(prefix="/agent")
 
 # In-memory conversation history keyed by user and space
 conversation_state: Dict[str, List[Dict[str, Any]]] = {}
+MAX_HISTORY = 10
 
 
 async def get_current_user(authorization: str = Header(None)):
@@ -95,7 +97,11 @@ async def stream_agent_response(
 
     # Load conversation history for this user/space
     key = f"{user_id}:{space_id}" if space_id else user_id
-    history = conversation_state.get(key, [])
+    history = conversation_state.get(key)
+    if history is None:
+        db_history = await get_chat_history(user_id, space_id, limit=MAX_HISTORY)
+        history = [{"role": m.role, "content": m.content} for m in db_history]
+        conversation_state[key] = history
 
     messages: list[dict[str, Any]] = [
         {"role": "system", "content": AGENT_SYSTEM_PROMPT},
@@ -194,6 +200,13 @@ async def stream_agent_response(
             break
 
         # Update conversation history
+        user_entry = ChatMessage(user_id=user_id, space_id=space_id, role="user", content=user_message)
+        assistant_entry = ChatMessage(
+            user_id=user_id, space_id=space_id, role="assistant", content="".join(content_parts)
+        )
+        await save_chat_message(user_entry)
+        await save_chat_message(assistant_entry)
+
         history.extend(
             [
                 {"role": "user", "content": user_message},
