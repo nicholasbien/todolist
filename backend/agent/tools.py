@@ -4,10 +4,9 @@ Replaces the previous Node.js MCP server approach with direct Python functions.
 """
 
 import os
-import random
 import sys
-from datetime import datetime, timedelta
-from typing import Any, Dict, Optional
+from datetime import datetime
+from typing import Any, Dict, List, Optional
 
 import httpx
 
@@ -33,7 +32,6 @@ from .schemas import (  # noqa: E402
     TaskAddRequest,
     TaskListRequest,
     TaskUpdateRequest,
-    WeatherAlertsRequest,
     WeatherCurrentRequest,
     WeatherForecastRequest,
     WebSearchRequest,
@@ -75,6 +73,7 @@ MOCK_WEATHER_DATA = {
     },
 }
 
+# Fallback quotes - not currently used, always fetching from API
 FALLBACK_QUOTES = {
     "productivity": [
         "Focus on being productive instead of busy. — Tim Ferriss",
@@ -97,55 +96,56 @@ FALLBACK_QUOTES = {
 async def get_current_weather(
     request: WeatherCurrentRequest, user_id: str, space_id: Optional[str] = None
 ) -> Dict[str, Any]:
-    """Get current weather for a location."""
+    """Get current weather for a location using OpenWeatherMap API."""
     try:
-        location_key = request.location.lower()
-        weather_data = MOCK_WEATHER_DATA.get(location_key)
+        # Get API key from environment
+        api_key = os.getenv("OPENWEATHER_API_KEY")
+        if not api_key:
+            return {"ok": False, "error": "Weather API not configured. Please set OPENWEATHER_API_KEY in environment."}
 
-        if not weather_data:
-            # Generate random data for unknown locations
-            descriptions = ["Clear", "Partly cloudy", "Cloudy", "Light rain"]
-            weather_data = {
-                "location": request.location,
-                "temperature": random.randint(5, 35),
-                "description": random.choice(descriptions),
-                "humidity": random.randint(40, 80),
-                "wind_speed": random.randint(2, 15),
-                "condition": "clear",
-            }
-        else:
-            weather_data = weather_data.copy()
-            weather_data["location"] = weather_data.get("location", request.location)
+        # Call OpenWeatherMap API
+        base_url = "https://api.openweathermap.org/data/2.5/weather"
+        params = {
+            "q": request.location,
+            "appid": api_key,
+            "units": request.units if request.units != "kelvin" else "standard",
+        }
 
-        # Convert temperature units (handle None/missing values)
-        raw_temp = weather_data.get("temperature")
-        if raw_temp is None:
-            raise ValueError("Temperature data is missing")
-        # Cast to int, handling various input types
-        temp = int(float(str(raw_temp)))
-        if request.units == "imperial":
-            temp = round(temp * 9 / 5 + 32)
-        elif request.units == "kelvin":
-            temp = round(temp + 273.15)
+        async with httpx.AsyncClient(timeout=10) as client:
+            response = await client.get(base_url, params=params)
+            if response.status_code == 404:
+                return {"ok": False, "error": f"Location '{request.location}' not found"}
+            elif response.status_code == 401:
+                return {"ok": False, "error": "Invalid weather API key"}
+            response.raise_for_status()
 
-        weather_data["temperature"] = temp
+        data = response.json()
+
+        # Parse the API response
+        weather_data = {
+            "location": f"{data['name']}, {data['sys']['country']}",
+            "temperature": round(data["main"]["temp"]),
+            "description": data["weather"][0]["description"].capitalize(),
+            "humidity": data["main"]["humidity"],
+            "wind_speed": round(data["wind"]["speed"]),
+            "condition": data["weather"][0]["main"].lower(),
+        }
 
         # Format temperature display
+        temp = weather_data["temperature"]
         unit_symbol = "°F" if request.units == "imperial" else "°C" if request.units == "metric" else "K"
         weather_data["temperature_display"] = f"{temp}{unit_symbol}"
 
-        # Format wind speed display (handle None/missing values)
-        raw_wind_speed = weather_data.get("wind_speed")
-        if raw_wind_speed is None:
-            raise ValueError("Wind speed data is missing")
-        # Cast to int, handling various input types
-        wind_speed = int(float(str(raw_wind_speed)))
+        # Format wind speed display
+        wind_speed = weather_data["wind_speed"]
         if request.units == "imperial":
-            weather_data["wind_speed_display"] = f"{round(wind_speed * 0.621371)} mph"
+            weather_data["wind_speed_display"] = f"{wind_speed} mph"
         else:
-            weather_data["wind_speed_display"] = f"{wind_speed} km/h"
+            weather_data["wind_speed_display"] = f"{wind_speed} m/s"
 
         return {"ok": True, "weather": weather_data}
+    except httpx.HTTPStatusError as e:
+        return {"ok": False, "error": f"Weather API error: {e.response.status_code}"}
     except Exception as e:
         return {"ok": False, "error": f"Failed to get weather for {request.location}: {str(e)}"}
 
@@ -153,63 +153,76 @@ async def get_current_weather(
 async def get_weather_forecast(
     request: WeatherForecastRequest, user_id: str, space_id: Optional[str] = None
 ) -> Dict[str, Any]:
-    """Get multi-day weather forecast."""
+    """Get multi-day weather forecast using OpenWeatherMap API."""
     try:
-        # Get current weather as base
-        current_request = WeatherCurrentRequest(location=request.location, units=request.units)
-        current_result = await get_current_weather(current_request, user_id, space_id)
+        # Get API key from environment
+        api_key = os.getenv("OPENWEATHER_API_KEY")
+        if not api_key:
+            return {"ok": False, "error": "Weather API not configured. Please set OPENWEATHER_API_KEY in environment."}
 
-        if not current_result.get("ok"):
-            return current_result
+        # Call OpenWeatherMap 5-day forecast API (free tier)
+        base_url = "https://api.openweathermap.org/data/2.5/forecast"
+        params = {
+            "q": request.location,
+            "appid": api_key,
+            "units": request.units if request.units != "kelvin" else "standard",
+            "cnt": min(request.days * 8, 40),  # API returns 3-hour intervals, max 40
+        }
 
-        current_weather = current_result["weather"]
-        base_temp = current_weather["temperature"]
+        async with httpx.AsyncClient(timeout=10) as client:
+            response = await client.get(base_url, params=params)
+            if response.status_code == 404:
+                return {"ok": False, "error": f"Location '{request.location}' not found"}
+            elif response.status_code == 401:
+                return {"ok": False, "error": "Invalid weather API key"}
+            response.raise_for_status()
 
-        # Generate forecast data
-        forecast = []
-        for i in range(request.days):
-            date = datetime.now() + timedelta(days=i)
+        data = response.json()
 
-            temp_variation = random.randint(-5, 5)
-            descriptions = ["Sunny", "Partly cloudy", "Cloudy", "Light rain", "Clear"]
-            day_data = {
-                "date": date.strftime("%Y-%m-%d"),
-                "temperature": base_temp + temp_variation,
-                "description": (current_weather["description"] if i == 0 else random.choice(descriptions)),
-                "humidity": random.randint(40, 80),
-                "wind_speed": random.randint(2, 15),
-            }
+        # Parse location
+        location = f"{data['city']['name']}, {data['city']['country']}"
 
-            # Add display formats
-            temp = day_data["temperature"]
+        # Group forecasts by day (take noon forecast for each day)
+        forecast: List[Dict[str, Any]] = []
+        processed_dates = set()
+
+        for item in data["list"]:
+            forecast_date = datetime.fromtimestamp(item["dt"]).strftime("%Y-%m-%d")
+
+            # Skip if we already have this date or exceeded requested days
+            if forecast_date in processed_dates or len(forecast) >= request.days:
+                continue
+
+            processed_dates.add(forecast_date)
+
+            # Parse forecast data
+            temp = round(item["main"]["temp"])
             unit_symbol = "°F" if request.units == "imperial" else "°C" if request.units == "metric" else "K"
-            day_data["temperature_display"] = f"{temp}{unit_symbol}"
 
-            wind_speed = day_data["wind_speed"]
-            if request.units == "imperial":
-                day_data["wind_speed_display"] = f"{round(wind_speed * 0.621371)} mph"
-            else:
-                day_data["wind_speed_display"] = f"{wind_speed} km/h"
+            wind_speed = round(item["wind"]["speed"])
+            wind_unit = "mph" if request.units == "imperial" else "m/s"
+
+            day_data = {
+                "date": forecast_date,
+                "temperature": temp,
+                "temperature_display": f"{temp}{unit_symbol}",
+                "description": item["weather"][0]["description"].capitalize(),
+                "humidity": item["main"]["humidity"],
+                "wind_speed": wind_speed,
+                "wind_speed_display": f"{wind_speed} {wind_unit}",
+            }
 
             forecast.append(day_data)
 
-        result_data = {"location": current_weather["location"], "forecast": forecast}
+        result_data = {"location": location, "forecast": forecast}
         return {"ok": True, "forecast": result_data}
+    except httpx.HTTPStatusError as e:
+        return {"ok": False, "error": f"Weather API error: {e.response.status_code}"}
     except Exception as e:
         return {"ok": False, "error": f"Failed to get forecast for {request.location}: {str(e)}"}
 
 
-async def get_weather_alerts(
-    request: WeatherAlertsRequest, user_id: str, space_id: Optional[str] = None
-) -> Dict[str, Any]:
-    """Check for weather alerts in a location."""
-    try:
-        # Mock alerts - in production would query real weather alerts API
-        alerts = [f"No active weather alerts for {request.location}"]
-
-        return {"ok": True, "location": request.location, "alerts": alerts}
-    except Exception as e:
-        return {"ok": False, "error": f"Failed to get alerts for {request.location}: {str(e)}"}
+# Weather alerts function removed - not needed
 
 
 async def get_book_recommendations(
@@ -356,16 +369,18 @@ async def get_inspirational_quotes(
                             author = data[0].get("a")
                             if quote_text and author:
                                 quotes.append(f"{quote_text} — {author}")
-                                continue
                     else:
                         affirmation = data.get("affirmation")
                         if affirmation:
                             quotes.append(affirmation)
-                            continue
-        except Exception:
-            pass
+        except Exception as e:
+            # Log the error but continue trying to fetch quotes
+            print(f"Error fetching quote: {e}")
+            continue
 
-        quotes.append(random.choice(FALLBACK_QUOTES[request.goal]))
+    # If no quotes were fetched, return an error
+    if not quotes:
+        return {"ok": False, "error": "Unable to fetch quotes from API"}
 
     return {"ok": True, "quotes": quotes}
 
@@ -723,11 +738,6 @@ AVAILABLE_TOOLS: Dict[str, Dict[str, Any]] = {
         "func": get_weather_forecast,
         "description": "Get multi-day weather forecast for a location",
         "schema": WeatherForecastRequest,
-    },
-    "get_weather_alerts": {
-        "func": get_weather_alerts,
-        "description": "Check for weather alerts in a specific location",
-        "schema": WeatherAlertsRequest,
     },
     "get_book_recommendations": {
         "func": get_book_recommendations,
