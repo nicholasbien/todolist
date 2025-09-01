@@ -36,7 +36,7 @@ export const MessageRenderer: React.FC<MessageRendererProps> = ({ content, class
     escapedText = escapedText.replace(/^(\d+)\.\s+(.+)$/gm, '<li class="ml-6 list-decimal">$2</li>');
 
     // Convert bullet lists (- or *)
-    escapedText = escapedText.replace(/^[-*]\s+(.+)$/gm, '<li class="ml-6 list-disc">$2</li>');
+    escapedText = escapedText.replace(/^[-*]\s+(.+)$/gm, '<li class="ml-6 list-disc">$1</li>');
 
     // Wrap consecutive list items in <ul> or <ol>
     escapedText = escapedText.replace(/(<li class="ml-6 list-disc">.*?<\/li>(\s*<br>)?)+/g, (match) => {
@@ -46,8 +46,9 @@ export const MessageRenderer: React.FC<MessageRendererProps> = ({ content, class
       return `<ol class="my-2">${match.replace(/<br>/g, '')}</ol>`;
     });
 
-    // Convert *italic* markdown to HTML (after lists to avoid conflicts)
-    escapedText = escapedText.replace(/\*([^*]+)\*/g, '<em class="italic">$1</em>');
+    // Convert *italic* markdown to HTML (more specific to avoid conflicts)
+    // Match single asterisks that aren't at line start and have non-whitespace content
+    escapedText = escapedText.replace(/(?<!^|\n|\*)\*([^*\n]+)\*(?!\*)/g, '<em class="italic">$1</em>');
 
     // Convert `code` markdown to HTML
     escapedText = escapedText.replace(/`([^`]+)`/g, '<code class="bg-gray-700 px-1 py-0.5 rounded text-sm font-mono">$1</code>');

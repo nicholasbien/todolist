@@ -4,6 +4,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Development Commands
 
+### Quick Start - Run Both Servers
+```bash
+# Terminal 1: Start Backend (FastAPI)
+cd backend && source venv/bin/activate && uvicorn app:app --host 0.0.0.0 --port 8000 --reload
+
+# Terminal 2: Start Frontend (Next.js)
+cd frontend && npm run dev
+```
+- Backend runs on: http://localhost:8000
+- Frontend runs on: http://localhost:3000
+
 ### Frontend (Next.js)
 ```bash
 # Install dependencies
