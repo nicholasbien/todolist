@@ -7,9 +7,6 @@ interface ChatbotProps {
   token?: string;
 }
 
-// Maximum number of messages to retain (matches backend MAX_HISTORY)
-const MAX_MESSAGES = 10;
-
 export default function AgentChatbot({ activeSpace, token }: ChatbotProps) {
   const [question, setQuestion] = useState('');
   const [expandedTools, setExpandedTools] = useState<Set<number>>(new Set());
@@ -76,10 +73,7 @@ export default function AgentChatbot({ activeSpace, token }: ChatbotProps) {
     if (!question.trim()) return;
 
     const userQuestion = question;
-    setMessages((prev) => {
-      const updated = [...prev, { role: 'user', content: userQuestion }];
-      return updated.length > MAX_MESSAGES ? updated.slice(-MAX_MESSAGES) : updated;
-    });
+    setMessages((prev) => [...prev, { role: 'user', content: userQuestion }]);
     setQuestion('');
     setLoading(true);
     setError('');
@@ -110,10 +104,7 @@ export default function AgentChatbot({ activeSpace, token }: ChatbotProps) {
 
         if (!assistantMessageAdded) {
           // First token - add assistant message to the conversation and stop loading
-          setMessages((prev) => {
-            const updated = [...prev, { ...assistantResponse }];
-            return updated.length > MAX_MESSAGES ? updated.slice(-MAX_MESSAGES) : updated;
-          });
+          setMessages((prev) => [...prev, { ...assistantResponse }]);
           setLoading(false);
           assistantMessageAdded = true;
         } else {
@@ -149,10 +140,7 @@ export default function AgentChatbot({ activeSpace, token }: ChatbotProps) {
 
         const toolMessage = `🔧 ${tool}${formatArgs(args)}: ${formatResult(data)}`;
 
-        setMessages((prev) => {
-          const updated = [...prev, { role: 'system', content: toolMessage, toolData: { tool, args, data } }];
-          return updated.length > MAX_MESSAGES ? updated.slice(-MAX_MESSAGES) : updated;
-        });
+        setMessages((prev) => [...prev, { role: 'system', content: toolMessage, toolData: { tool, args, data } }]);
       });
 
       es.addEventListener('done', () => {
@@ -205,7 +193,7 @@ export default function AgentChatbot({ activeSpace, token }: ChatbotProps) {
       )}
 
       {/* Messages container */}
-      <div className="mb-4 space-y-4">
+      <div className="mb-4 space-y-4 max-h-[60vh] overflow-y-auto">
         {messages.map((msg, idx) => (
           <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
             <div className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
