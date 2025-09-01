@@ -258,7 +258,7 @@ export default function JournalComponent({ token, activeSpace }: JournalProps) {
               value={journalText}
               onChange={(e) => setJournalText(e.target.value)}
               placeholder={`Write about your day on ${formatDateForDisplay(selectedDate)}...`}
-              className="w-full h-64 p-4 bg-gray-900 border border-gray-700 text-gray-100 placeholder-gray-500 rounded-xl focus:outline-none focus:ring-2 focus:ring-accent resize-none"
+              className="w-full h-64 p-4 bg-gray-900 border border-gray-700 text-gray-100 placeholder-gray-500 rounded-xl focus:outline-none focus:ring-2 focus:ring-accent resize-none overflow-y-auto custom-scrollbar"
             />
           </div>
 
