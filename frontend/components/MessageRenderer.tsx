@@ -46,11 +46,13 @@ export const MessageRenderer: React.FC<MessageRendererProps> = ({ content, class
     escapedText = escapedText.replace(/^[-*]\s+(.+)$/gm, '<li class="ml-6 list-disc">$1</li>');
 
     // Wrap consecutive list items in <ul> or <ol> - proper spacing without <br> tags
-    escapedText = escapedText.replace(/(<li class="ml-6 list-disc">.*?<\/li>(\s*<br>)?)+/g, (match) => {
-      return `<ul class="my-2 space-y-1">${match.replace(/<br>/g, '')}</ul>`;
+    escapedText = escapedText.replace(/(<li class="ml-6 list-disc">.*?<\/li>\s*)+/g, (match) => {
+      const items = match.replace(/ class=\"ml-6 list-disc\"/g, '').trim();
+      return `<ul class="ml-6 my-2 list-disc space-y-1">${items}</ul>`;
     });
-    escapedText = escapedText.replace(/(<li class="ml-6 list-decimal">.*?<\/li>(\s*<br>)?)+/g, (match) => {
-      return `<ol class="my-2 space-y-1">${match.replace(/<br>/g, '')}</ol>`;
+    escapedText = escapedText.replace(/(<li class="ml-6 list-decimal">.*?<\/li>\s*)+/g, (match) => {
+      const items = match.replace(/ class=\"ml-6 list-decimal\"/g, '').trim();
+      return `<ol class="ml-6 my-2 list-decimal space-y-1">${items}</ol>`;
     });
 
     // Convert *italic* markdown to HTML (more specific to avoid conflicts)
