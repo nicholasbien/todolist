@@ -10,3 +10,4 @@ frontend/coverage/
 frontend/.DS_Store
 frontend/.claude/
 frontend/ios/App/.DS_Store
+mcp-server/node_modules/

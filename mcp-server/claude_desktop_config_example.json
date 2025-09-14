@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "todolist": {
+      "command": "node",
+      "args": ["/Users/your-username/todolist/mcp-server/dist/index.js"],
+      "env": {
+        "TODOLIST_API_URL": "http://localhost:8000",
+        "TODOLIST_AUTH_TOKEN": "your_jwt_token_here",
+        "DEFAULT_SPACE_ID": "your_default_space_id_here"
+      }
+    }
+  }
+}
