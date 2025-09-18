@@ -243,7 +243,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
         handleError(err, 'Error loading todos');
       }
     } finally {
-      if (fetchId === todosFetchIdRef.current && showLoading) {
+      if (fetchId === todosFetchIdRef.current) {
         setLoadingTodos(false);
       }
     }
