@@ -404,7 +404,14 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
         body: JSON.stringify({ name: spaceName })
       });
       if (response.ok) {
-        await fetchSpaces();
+        const createdSpace = await response.json();
+        const spacesData = await fetchSpaces();
+        if (spacesData?.length) {
+          const newActive = spacesData.find((space: any) => space._id === createdSpace._id) || createdSpace;
+          setActiveSpace(newActive);
+        } else {
+          setActiveSpace(createdSpace);
+        }
         setShowAddSpaceModal(false);
         setNewSpaceName('');
       }
@@ -1060,7 +1067,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
               autoFocus
             />
             <div className="flex justify-center space-x-3">
-              <button onClick={handleAddSpace} className="bg-accent hover:bg-accent-light text-foreground px-6 py-2 rounded-lg transition-colors">Add</button>
+              <button onClick={handleAddSpace} className="bg-accent hover:bg-accent-light text-foreground px-6 py-2 rounded-lg transition-colors">Create</button>
               <button onClick={() => { setShowAddSpaceModal(false); setNewSpaceName(''); }} className="bg-gray-800 hover:bg-gray-700 text-gray-300 px-6 py-2 rounded-lg transition-colors">Cancel</button>
             </div>
           </div>
