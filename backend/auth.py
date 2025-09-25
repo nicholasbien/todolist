@@ -216,6 +216,10 @@ Nicholas"""
 async def signup_user(email: str) -> dict:
     """Create or update user with new verification code."""
     try:
+        # Special handling for test account - no email needed
+        if email == "test@example.com":
+            return {"message": "Test account ready - use code 000000 to login"}
+
         # Generate verification code
         code = generate_verification_code()
         code_expires_at = datetime.now() + timedelta(minutes=10)

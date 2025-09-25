@@ -118,27 +118,124 @@ mypy .
 
 ## Testing
 
-### Test Account for Quick Testing
+### Test Account for AI Agents and Automated Testing
 
-The system includes a built-in test account that bypasses email verification for rapid testing:
+The system includes a **built-in test account** that completely bypasses email verification for instant testing:
 
-**Test Credentials:**
-- **Email**: `test@example.com`
-- **Code**: `000000`
+#### IMPORTANT: Agent Testing Protocol
 
-**Usage:**
+**🤖 FOR AI AGENTS: Use this exact flow - DO NOT check email**
+
 ```bash
-# Instant login without email verification
+# Step 1: Direct login (skip signup entirely)
+# This automatically creates the test user if it doesn't exist
+curl -H "Content-Type: application/json" \
+     -d '{"email": "test@example.com", "code": "000000"}' \
+     http://localhost:8000/auth/login
+
+# Step 2: Use the returned token for all subsequent requests
+TOKEN="paste_token_from_above_response"
+
+# Step 3: Test the API immediately
+curl -H "Authorization: Bearer $TOKEN" http://localhost:8000/todos
+```
+
+#### Test Account Details
+- **Email**: `test@example.com`
+- **Code**: `000000` (always this code)
+- **NO EMAIL IS SENT** - the code is hardcoded in the system
+- **NO SIGNUP REQUIRED** - login automatically creates the user
+
+#### Why This Works for Agents
+- ✅ **Zero email dependencies** - no SMTP, no email checking required
+- ✅ **Instant access** - login works immediately without waiting
+- ✅ **No environment setup** - works on any server without configuration
+- ✅ **Deterministic** - same credentials always work the same way
+- ✅ **Isolated testing** - each test gets a clean environment
+
+#### Agent Testing Best Practices
+
+**❌ DON'T DO THIS:**
+```bash
+# Don't call signup first - it's unnecessary
+curl -d '{"email": "test@example.com"}' http://localhost:8000/auth/signup
+# Don't check email - no email is actually sent
+# Don't wait for verification codes
+```
+
+**✅ DO THIS:**
+```bash
+# Go straight to login with the hardcoded test code
 curl -H "Content-Type: application/json" \
      -d '{"email": "test@example.com", "code": "000000"}' \
      http://localhost:8000/auth/login
 ```
 
-This test account:
-- Works on any server without environment configuration
-- Automatically creates the user and default space on first use
-- Bypasses the normal email verification flow
-- Perfect for agent testing, CI/CD, and development
+#### Remote/Production Testing
+```bash
+# Same flow works on production - just change the URL
+curl -H "Content-Type: application/json" \
+     -d '{"email": "test@example.com", "code": "000000"}' \
+     https://backend-production-e920.up.railway.app/auth/login
+```
+
+#### Complete Testing Example
+```bash
+# 1. Login and get token
+RESPONSE=$(curl -s -H "Content-Type: application/json" \
+  -d '{"email": "test@example.com", "code": "000000"}' \
+  http://localhost:8000/auth/login)
+
+# 2. Extract token (adjust based on your JSON parsing tools)
+TOKEN=$(echo $RESPONSE | grep -o '"token":"[^"]*' | cut -d'"' -f4)
+
+# 3. Test API endpoints
+curl -H "Authorization: Bearer $TOKEN" http://localhost:8000/todos
+curl -H "Authorization: Bearer $TOKEN" http://localhost:8000/spaces
+curl -H "Authorization: Bearer $TOKEN" http://localhost:8000/categories
+
+# 4. Add test data
+curl -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+     -d '{"text": "Test todo from agent"}' http://localhost:8000/todos
+```
+
+#### UI Testing Options
+
+**Option 1: ✅ PREFERRED - Direct UI Login**
+**For UI testing, this is the simplest and most reliable approach:**
+
+1. **Navigate to the UI:** `http://localhost:3000` (or production URL)
+2. **Enter email:** `test@example.com`
+3. **Click "Send Code"** *(no email will be sent - this is just UI flow)*
+4. **Enter code:** `000000` *(always use this hardcoded code)*
+5. **Click "Login"** - you're immediately logged in!
+
+**Why this is preferred for UI testing:**
+- ✅ **Simplest flow** - no token extraction or localStorage manipulation
+- ✅ **Tests the actual user experience** - same flow real users follow
+- ✅ **No technical browser console work** required
+- ✅ **Works reliably** - bypasses service worker routing issues
+- ✅ **Zero email dependencies** - completely self-contained
+
+**Option 2: API → UI Bridge**
+**Alternative approach using API login first:**
+
+1. **Get your auth token from API login** (as shown above)
+2. **Open browser and navigate to** `http://localhost:3000` (or production URL)
+3. **Open browser developer console** (F12)
+4. **Set the auth token manually:**
+   ```javascript
+   // Paste this in browser console:
+   localStorage.setItem('auth_token', 'YOUR_TOKEN_FROM_API');
+   // Then refresh the page
+   window.location.reload();
+   ```
+5. **You're now logged into the UI** - can add todos, manage spaces, etc.
+
+**For Production UI Testing:**
+- Same process works on production URLs
+- Use `https://app.todolist.nyc` instead of localhost
+- Same test credentials: `test@example.com` + `000000`
 
 ### Frontend Tests
 ```bash
