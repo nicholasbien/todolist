@@ -69,10 +69,26 @@ npm run build
 
 ## Using with Claude Desktop
 
-Add this to your Claude Desktop MCP settings file:
+### Step 1: Create Configuration Directory
+First, create the Claude Desktop configuration directory if it doesn't exist:
 
-**macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
-**Windows**: `%APPDATA%/Claude/claude_desktop_config.json`
+**macOS**:
+```bash
+mkdir -p "$HOME/Library/Application Support/Claude"
+```
+
+**Windows**:
+```cmd
+mkdir "%APPDATA%\Claude"
+```
+
+### Step 2: Create Configuration File
+Create the MCP configuration file at:
+- **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
+- **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
+
+### Step 3: Add MCP Server Configuration
+Add this JSON configuration to the file:
 
 ```json
 {
@@ -90,7 +106,19 @@ Add this to your Claude Desktop MCP settings file:
 }
 ```
 
-Replace `/path/to/your/todolist/mcp-server/dist/index.js` with the actual path to your compiled MCP server.
+**Important**: Replace the placeholder values:
+- `/path/to/your/todolist/mcp-server/dist/index.js` → Full path to your compiled MCP server
+- `your_jwt_token_here` → Your authentication token from Step 2 above
+- `your_default_space_id_here` → Your default space ID from Step 3 above
+
+### Step 4: Restart Claude Desktop
+Close and reopen Claude Desktop for the changes to take effect.
+
+### Step 5: Verify Installation
+Once Claude Desktop restarts, your todolist MCP server should be available. You can test it by asking Claude to:
+- "Add a todo to learn TypeScript"
+- "List all my todos"
+- "Show me my spaces"
 
 ## Development Mode
 

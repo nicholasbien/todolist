@@ -16,7 +16,6 @@ config();
 
 const API_URL = process.env.TODOLIST_API_URL || 'http://localhost:8000';
 const AUTH_TOKEN = process.env.TODOLIST_AUTH_TOKEN;
-const DEFAULT_SPACE_ID = process.env.DEFAULT_SPACE_ID;
 
 if (!AUTH_TOKEN) {
   console.error('TODOLIST_AUTH_TOKEN environment variable is required');
