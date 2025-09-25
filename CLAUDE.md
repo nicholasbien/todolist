@@ -185,17 +185,17 @@ npm run dev
 ### 2. Create Test User and Get Auth Token
 
 ```bash
-# Sign up test user
-curl -H "Content-Type: application/json" -d '{"email": "test@example.com"}' http://localhost:8000/auth/signup
-
-# Check backend logs for verification code (printed to console)
-# Example: "VERIFICATION CODE for test@example.com: 123456"
-
-# Login with verification code
-curl -H "Content-Type: application/json" -d '{"email": "test@example.com", "code": "123456"}' http://localhost:8000/auth/login
+# Use the built-in test account (no email verification needed)
+curl -H "Content-Type: application/json" -d '{"email": "test@example.com", "code": "000000"}' http://localhost:8000/auth/login
 
 # Save the returned token for testing
 ```
+
+**Note**: The system includes a built-in test account that bypasses email verification:
+- **Email**: `test@example.com`
+- **Code**: `000000`
+
+This account is automatically created on first use and works on any server without environment configuration.
 
 ### 3. Get User's Space ID
 

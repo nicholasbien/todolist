@@ -118,6 +118,28 @@ mypy .
 
 ## Testing
 
+### Test Account for Quick Testing
+
+The system includes a built-in test account that bypasses email verification for rapid testing:
+
+**Test Credentials:**
+- **Email**: `test@example.com`
+- **Code**: `000000`
+
+**Usage:**
+```bash
+# Instant login without email verification
+curl -H "Content-Type: application/json" \
+     -d '{"email": "test@example.com", "code": "000000"}' \
+     http://localhost:8000/auth/login
+```
+
+This test account:
+- Works on any server without environment configuration
+- Automatically creates the user and default space on first use
+- Bypasses the normal email verification flow
+- Perfect for agent testing, CI/CD, and development
+
 ### Frontend Tests
 ```bash
 cd frontend
