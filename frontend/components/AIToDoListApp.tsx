@@ -48,6 +48,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
   const [spaces, setSpaces] = useState([]);
   const [loadingSpaces, setLoadingSpaces] = useState(true);
   const [activeSpace, setActiveSpace] = useState(null);
+  const activeSpaceRef = useRef<any>(null);
   const [showAddSpaceModal, setShowAddSpaceModal] = useState(false);
   const [newSpaceName, setNewSpaceName] = useState('');
   const [showEditSpaceModal, setShowEditSpaceModal] = useState(false);
@@ -58,6 +59,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
   const [spaceMembers, setSpaceMembers] = useState<any[]>([]);
 
   useEffect(() => {
+    activeSpaceRef.current = activeSpace;
     if (typeof window === 'undefined') return;
     if (activeSpace && activeSpace._id) {
       localStorage.setItem('active_space_id', activeSpace._id);
@@ -157,9 +159,10 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
           storedId = localStorage.getItem('active_space_id');
         }
 
-        const currentId = activeSpace?._id || storedId;
+        const currentId = activeSpaceRef.current?._id || storedId;
         const current = sorted.find(s => s._id === currentId) || sorted[0] || null;
-        if (current?._id !== activeSpace?._id) {
+        if (current?._id !== activeSpaceRef.current?._id) {
+          activeSpaceRef.current = current;
           setActiveSpace(current);
         }
         return data;
@@ -171,7 +174,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
       setLoadingSpaces(false);
     }
     return [];
-  }, [authenticatedFetch, activeSpace, handleError]);
+  }, [authenticatedFetch, handleError]);
 
   const fetchMembers = useCallback(async () => {
     const fetchId = ++membersFetchIdRef.current;
