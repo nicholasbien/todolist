@@ -289,6 +289,7 @@ export default function Home() {
   const [showSettingsDropdown, setShowSettingsDropdown] = useState(false);
   const [showContactModal, setShowContactModal] = useState(false);
   const [showEmailSettings, setShowEmailSettings] = useState(false);
+  const [showInsightsModal, setShowInsightsModal] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
   const [exportType, setExportType] = useState<'todos' | 'journals'>('todos');
   const [exportFormat, setExportFormat] = useState<'jsonl' | 'csv'>('jsonl');
@@ -515,6 +516,15 @@ export default function Home() {
                   <button
                     onClick={() => {
                       setShowSettingsDropdown(false);
+                      setShowInsightsModal(true);
+                    }}
+                    className="w-full text-left px-4 py-3 text-gray-300 hover:bg-gray-900 hover:text-gray-100 transition-colors"
+                  >
+                    Insights
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowSettingsDropdown(false);
                       setShowExportModal(true);
                     }}
                     className="w-full text-left px-4 py-3 text-gray-300 hover:bg-gray-900 hover:text-gray-100 transition-colors"
@@ -550,6 +560,8 @@ export default function Home() {
           showEmailSettings={showEmailSettings}
           onShowEmailSettings={() => setShowEmailSettings(true)}
           onCloseEmailSettings={() => setShowEmailSettings(false)}
+          showInsights={showInsightsModal}
+          onCloseInsights={() => setShowInsightsModal(false)}
         />
         {/* Export Modal */}
         {showExportModal && (

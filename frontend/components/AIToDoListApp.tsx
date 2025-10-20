@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import TodoItem from "./TodoItem";
-import TodoChatbot from "./TodoChatbot";
 import AgentChatbot from "./AgentChatbot";
 import { useAuth } from "../context/AuthContext";
 import Link from "next/link";
@@ -16,13 +15,24 @@ interface Props {
   onShowEmailSettings?: () => void;
   showEmailSettings?: boolean;
   onCloseEmailSettings?: () => void;
+  showInsights?: boolean;
+  onCloseInsights?: () => void;
 }
 
 /**
  * AI-Todo main component
  * Backend classifies tasks automatically when creating todos
  */
-export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettings, showEmailSettings, onCloseEmailSettings }: Props) {
+export default function AIToDoListApp({
+  user,
+  token,
+  onLogout,
+  onShowEmailSettings,
+  showEmailSettings,
+  onCloseEmailSettings,
+  showInsights,
+  onCloseInsights,
+}: Props) {
   const { logout, clearAuthExpired, authenticatedFetch } = useAuth();
   const [todos, setTodos] = useState([]);
   const [newTodo, setNewTodo] = useState("");
@@ -103,7 +113,7 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
   const membersFetchIdRef = useRef(0);
 
   // Tab state
-  const [activeTab, setActiveTab] = useState<'tasks' | 'assistant' | 'agent' | 'insights' | 'journal'>('tasks');
+  const [activeTab, setActiveTab] = useState<'tasks' | 'agent' | 'journal'>('tasks');
 
 
   const handleOpenEmailSettings = async () => {
@@ -876,16 +886,6 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
           Tasks
         </button>
         <button
-          onClick={() => setActiveTab('assistant')}
-          className={`flex-1 py-3 px-2 sm:px-6 font-medium text-sm transition-colors ${
-            activeTab === 'assistant'
-              ? 'text-accent border-b-2 border-accent'
-              : 'text-gray-400 hover:text-gray-300'
-          }`}
-        >
-          Assistant
-        </button>
-        <button
           onClick={() => setActiveTab('agent')}
           className={`flex-1 py-3 px-2 sm:px-6 font-medium text-sm transition-colors ${
             activeTab === 'agent'
@@ -894,16 +894,6 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
           }`}
         >
           Agent
-        </button>
-        <button
-          onClick={() => setActiveTab('insights')}
-          className={`flex-1 py-3 px-2 sm:px-6 font-medium text-sm transition-colors ${
-            activeTab === 'insights'
-              ? 'text-accent border-b-2 border-accent'
-              : 'text-gray-400 hover:text-gray-300'
-          }`}
-        >
-          Insights
         </button>
         <button
           onClick={() => setActiveTab('journal')}
@@ -1337,32 +1327,6 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
         </div>
       )}
 
-      {activeTab === 'assistant' && (
-        <div>
-          {/* Header Row with Page Title and Space Dropdown */}
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl font-semibold text-gray-100">Assistant</h2>
-            <SpaceDropdown
-              spaces={spaces}
-              activeSpace={activeSpace}
-              user={user}
-              loadingSpaces={loadingSpaces}
-              onSpaceSelect={setActiveSpace}
-              onCreateSpace={() => setShowAddSpaceModal(true)}
-              onEditSpace={(space) => {
-                setSpaceToEdit(space);
-                setEditSpaceName(space.name);
-                const isCollab = (space.member_ids?.length ?? 0) > 1 ||
-                  (space.pending_emails?.length ?? 0) > 0;
-                setEditSpaceCollaborative(isCollab);
-                setInviteEmails(['']);
-                setShowEditSpaceModal(true);
-              }}
-            />
-          </div>
-          <TodoChatbot token={token} activeSpace={activeSpace} />
-        </div>
-      )}
       {activeTab === 'agent' && (
         <div>
           {/* Header Row with Page Title and Space Dropdown */}
@@ -1389,34 +1353,6 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
           <AgentChatbot activeSpace={activeSpace} token={token} />
         </div>
       )}
-
-      {activeTab === 'insights' && (
-        <div>
-          {/* Header Row with Page Title and Space Dropdown */}
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl font-semibold text-gray-100">Insights</h2>
-            <SpaceDropdown
-              spaces={spaces}
-              activeSpace={activeSpace}
-              user={user}
-              loadingSpaces={loadingSpaces}
-              onSpaceSelect={setActiveSpace}
-              onCreateSpace={() => setShowAddSpaceModal(true)}
-              onEditSpace={(space) => {
-                setSpaceToEdit(space);
-                setEditSpaceName(space.name);
-                const isCollab = (space.member_ids?.length ?? 0) > 1 ||
-                  (space.pending_emails?.length ?? 0) > 0;
-                setEditSpaceCollaborative(isCollab);
-                setInviteEmails(['']);
-                setShowEditSpaceModal(true);
-              }}
-            />
-          </div>
-          <InsightsComponent token={token} activeSpace={activeSpace} />
-        </div>
-      )}
-
       {activeTab === 'journal' && (
         <div>
           {/* Header Row with Page Title and Space Dropdown */}
@@ -1441,6 +1377,49 @@ export default function AIToDoListApp({ user, token, onLogout, onShowEmailSettin
             />
           </div>
           <JournalComponent token={token} activeSpace={activeSpace} />
+        </div>
+      )}
+
+      {/* Insights Modal */}
+      {showInsights && (
+        <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50">
+          <div className="bg-black border border-gray-800 rounded-xl p-6 w-full max-w-4xl max-h-[90vh] shadow-2xl flex flex-col">
+            <div className="flex items-start justify-between mb-6">
+              <div>
+                <h3 className="text-gray-100 text-lg font-bold">Insights</h3>
+                <p className="text-sm text-gray-400">Track your productivity trends across spaces.</p>
+              </div>
+              <button
+                onClick={() => onCloseInsights?.()}
+                className="text-gray-400 hover:text-gray-200"
+                aria-label="Close insights"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="flex items-center justify-between mb-6 gap-4">
+              <SpaceDropdown
+                spaces={spaces}
+                activeSpace={activeSpace}
+                user={user}
+                loadingSpaces={loadingSpaces}
+                onSpaceSelect={setActiveSpace}
+                onCreateSpace={() => setShowAddSpaceModal(true)}
+                onEditSpace={(space) => {
+                  setSpaceToEdit(space);
+                  setEditSpaceName(space.name);
+                  const isCollab = (space.member_ids?.length ?? 0) > 1 ||
+                    (space.pending_emails?.length ?? 0) > 0;
+                  setEditSpaceCollaborative(isCollab);
+                  setInviteEmails(['']);
+                  setShowEditSpaceModal(true);
+                }}
+              />
+            </div>
+            <div className="overflow-y-auto pr-2 -mr-2">
+              <InsightsComponent token={token} activeSpace={activeSpace} />
+            </div>
+          </div>
         </div>
       )}
 
