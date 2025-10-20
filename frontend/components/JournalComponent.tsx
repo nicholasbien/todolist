@@ -225,7 +225,7 @@ export default function JournalComponent({ token, activeSpace }: JournalProps) {
             type="date"
             value={selectedDate}
             onChange={(e) => setSelectedDate(e.target.value)}
-            className="bg-gray-900 border border-gray-700 text-gray-100 px-3 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent"
+            className="bg-gray-900 border border-gray-700 text-gray-100 px-4 h-10 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent text-center min-w-[160px]"
             style={{ colorScheme: 'dark' }}
           />
           <button
