@@ -28,6 +28,12 @@ class TaskAddRequest(BaseModel):
     priority: Literal["low", "medium", "high"] = Field(
         default="medium", description="Task priority: 'low', 'medium', or 'high'"
     )
+    notes: Optional[str] = Field(
+        default=None,
+        description=(
+            "Additional task details or context. Keep the main task title concise and place extended details here."
+        ),
+    )
 
 
 class TaskUpdateRequest(BaseModel):

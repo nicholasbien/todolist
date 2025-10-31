@@ -25,6 +25,8 @@ from agent.schemas import (
 )
 from agent.tools import (
     AVAILABLE_TOOLS,
+    MAX_TASK_TITLE_LENGTH,
+    _prepare_task_title_and_notes,
     add_journal_entry,
     add_task,
     get_book_recommendations,
@@ -143,6 +145,7 @@ class TestAgentToolsUnit:
             "dateAdded": "2024-08-30T10:00:00",
             "space_id": "test_space",
             "user_id": "test_user",
+            "notes": None,
         }
         mock_create_todo.return_value = mock_todo
 
@@ -154,6 +157,45 @@ class TestAgentToolsUnit:
         assert result["task"]["text"] == "Test task"
         assert result["task"]["category"] == "Work"
         assert result["task"]["priority"] == "high"
+        assert result["task"]["notes"] is None
+
+    @pytest.mark.asyncio
+    @patch("agent.tools.db_create_todo", new_callable=AsyncMock)
+    async def test_add_task_long_text_moves_details_to_notes(self, mock_create_todo):
+        """Ensure long task descriptions are shortened with details captured in notes."""
+
+        long_text = (
+            "Prepare quarterly strategy update for leadership including roadmap, dependencies, key metrics, "
+            "and hiring needs overview."
+        )
+
+        expected_title, expected_notes = _prepare_task_title_and_notes(long_text, None)
+
+        mock_todo = MagicMock()
+        mock_todo.dict.return_value = {
+            "_id": "long_task_id",
+            "text": expected_title,
+            "category": "General",
+            "priority": "Medium",
+            "completed": False,
+            "dateAdded": "2024-08-30T10:00:00",
+            "space_id": "test_space",
+            "user_id": "test_user",
+            "notes": expected_notes,
+        }
+        mock_create_todo.return_value = mock_todo
+
+        request = TaskAddRequest(text=long_text)
+        result = await add_task(request, "test_user", "test_space")
+
+        called_todo = mock_create_todo.await_args[0][0]
+        assert called_todo.text == expected_title
+        assert called_todo.notes == expected_notes
+        assert len(expected_title) <= MAX_TASK_TITLE_LENGTH + 1  # Allow for ellipsis
+
+        assert result["ok"] is True
+        assert result["task"]["text"] == expected_title
+        assert result["task"]["notes"] == expected_notes
 
     @pytest.mark.asyncio
     @patch("agent.tools.get_todos")
