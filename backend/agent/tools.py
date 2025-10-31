@@ -6,7 +6,7 @@ Replaces the previous Node.js MCP server approach with direct Python functions.
 import os
 import sys
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import httpx
 
@@ -92,6 +92,9 @@ FALLBACK_QUOTES = {
         "Hard times may have held you down, but they will not last forever.",
     ],
 }
+
+
+MAX_TASK_TITLE_LENGTH = 80
 
 
 async def get_current_weather(
@@ -391,20 +394,67 @@ def _map_priority_to_ui_format(priority: str) -> str:
     return priority.capitalize() if priority else "Medium"
 
 
+def _prepare_task_title_and_notes(text: str, explicit_notes: Optional[str]) -> Tuple[str, Optional[str]]:
+    """Ensure tasks have concise titles with additional context stored in notes."""
+
+    normalized_text = (text or "").strip()
+    provided_notes = explicit_notes.strip() if explicit_notes and explicit_notes.strip() else None
+
+    if not normalized_text:
+        return "", provided_notes
+
+    # Split into non-empty lines while preserving order
+    lines = [line.strip() for line in normalized_text.splitlines() if line.strip()]
+    if not lines:
+        return "", provided_notes
+
+    title_source = lines[0]
+    details_parts: List[str] = []
+
+    if len(lines) > 1:
+        remaining_lines = "\n".join(lines[1:]).strip()
+        if remaining_lines:
+            details_parts.append(remaining_lines)
+
+    if len(title_source) > MAX_TASK_TITLE_LENGTH:
+        truncated = title_source[:MAX_TASK_TITLE_LENGTH].rstrip(" ,.;:-")
+        if len(title_source) > MAX_TASK_TITLE_LENGTH:
+            truncated += "…"
+        title = truncated
+
+        remainder = title_source[MAX_TASK_TITLE_LENGTH:].strip()
+        if remainder:
+            details_parts.insert(0, remainder)
+        else:
+            # Preserve the full original title in notes if truncation removed information
+            details_parts.insert(0, title_source)
+    else:
+        title = title_source
+
+    if provided_notes:
+        details_parts.append(provided_notes)
+
+    notes = "\n\n".join(part for part in details_parts if part)
+    return title, notes or None
+
+
 async def add_task(request: TaskAddRequest, user_id: str, space_id: Optional[str] = None) -> Dict[str, Any]:
     """Add a new task to user's todo list."""
     try:
         # Map priority from agent format to UI format
         ui_priority = _map_priority_to_ui_format(request.priority)
 
+        title, notes = _prepare_task_title_and_notes(request.text, request.notes)
+
         # Create Todo object
         todo = Todo(
-            text=request.text,
+            text=title,
             category=request.category or "General",
             priority=ui_priority,
             user_id=user_id,
             space_id=space_id,
             dateAdded=datetime.utcnow().isoformat(),
+            notes=notes,
         )
 
         created_todo = await db_create_todo(todo)
@@ -424,6 +474,7 @@ async def add_task(request: TaskAddRequest, user_id: str, space_id: Optional[str
                 "dateAdded": created_task_dict.get("dateAdded"),
                 "space_id": created_task_dict.get("space_id"),
                 "user_id": created_task_dict.get("user_id"),
+                "notes": created_task_dict.get("notes"),
             },
         }
     except Exception as e:
