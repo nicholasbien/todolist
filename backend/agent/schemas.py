@@ -103,6 +103,15 @@ class WebScrapingRequest(BaseModel):
     extract_html: bool = Field(default=False, description="Extract HTML content")
 
 
+class SendEmailRequest(BaseModel):
+    text: str = Field(..., min_length=1, description="Plain text content of the email to send to the user")
+    title: Optional[str] = Field(
+        None,
+        min_length=1,
+        description="Optional subject line for the email. If omitted, a default subject is used.",
+    )
+
+
 # OpenAI function schema generators
 def get_openai_tool_schema(model_class: BaseModel) -> dict:
     """Convert Pydantic model to OpenAI function schema format."""
@@ -192,5 +201,14 @@ OPENAI_TOOL_SCHEMAS = {
             "Provides both search results and AI-generated summaries."
         ),
         "parameters": get_openai_tool_schema(WebSearchRequest),
+    },
+    "send_email_to_user": {
+        "name": "send_email_to_user",
+        "description": (
+            "Send an email directly to the current user using the provided plain text content. "
+            "Optionally include a 'title' to set the email subject line. "
+            "Call when the user asks the assistant to email them information or a recap."
+        ),
+        "parameters": get_openai_tool_schema(SendEmailRequest),
     },
 }

@@ -15,6 +15,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
 # Backend imports  # noqa: E402
 from bson import ObjectId  # noqa: E402
+from bson.errors import InvalidId  # noqa: E402
 from db import collections  # noqa: E402
 from journals import JournalEntry  # noqa: E402
 from journals import create_journal_entry as db_create_journal_entry  # noqa: E402,E501
@@ -29,6 +30,7 @@ from .schemas import (  # noqa: E402
     JournalAddRequest,
     JournalReadRequest,
     SearchRequest,
+    SendEmailRequest,
     TaskAddRequest,
     TaskListRequest,
     TaskUpdateRequest,
@@ -737,6 +739,46 @@ async def web_search(request: WebSearchRequest, user_id: str, space_id: Optional
         return {"ok": False, "error": f"Failed to perform web search: {str(e)}"}
 
 
+async def send_email_to_user(request: SendEmailRequest, user_id: str, space_id: Optional[str] = None) -> Dict[str, Any]:
+    """Send an email with the provided text content to the current user."""
+    del space_id  # Space context is not required for direct emails
+
+    message_text = request.text.strip()
+    if not message_text:
+        return {"ok": False, "error": "Email text cannot be empty."}
+
+    subject_override = (request.title or "").strip() if request.title is not None else None
+    if subject_override == "":
+        return {"ok": False, "error": "Email title cannot be empty when provided."}
+
+    try:
+        user_object_id = ObjectId(user_id)
+    except (InvalidId, TypeError):
+        return {"ok": False, "error": "Invalid user identifier."}
+
+    try:
+        from auth import users_collection
+        from email_summary import send_email
+    except ImportError as exc:
+        return {"ok": False, "error": f"Email support unavailable: {exc}"}
+
+    user = await users_collection.find_one({"_id": user_object_id})
+    if not user:
+        return {"ok": False, "error": "User not found."}
+
+    user_email = user.get("email")
+    if not user_email:
+        return {"ok": False, "error": "User email address not available."}
+
+    subject = subject_override or "Message from your AI assistant"
+    success = await send_email(user_email, subject, message_text)
+
+    if success:
+        return {"ok": True, "email": user_email, "subject": subject}
+
+    return {"ok": False, "error": "Failed to send email to the user."}
+
+
 async def web_scraping(request: WebScrapingRequest, user_id: str, space_id: Optional[str] = None) -> Dict[str, Any]:
     """
     Scrape web content using Puppeteer MCP server.
@@ -823,6 +865,11 @@ AVAILABLE_TOOLS: Dict[str, Dict[str, Any]] = {
         "func": web_search,
         "description": "Search the web for current information, news, or specific queries",
         "schema": WebSearchRequest,
+    },
+    "send_email_to_user": {
+        "func": send_email_to_user,
+        "description": "Send an email with custom text content to the current user",
+        "schema": SendEmailRequest,
     },
     "web_scraping": {
         "func": web_scraping,
