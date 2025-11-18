@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import TodoItem from "./TodoItem";
 import AgentChatbot from "./AgentChatbot";
 import { useAuth } from "../context/AuthContext";
@@ -108,6 +108,49 @@ export default function AIToDoListApp({
   const [editCategoryVal, setEditCategoryVal] = useState('General');
   const [editPriorityVal, setEditPriorityVal] = useState('Medium');
   const [editDueDate, setEditDueDate] = useState<string>('');
+  const [editSpaceId, setEditSpaceId] = useState<string | null>(null);
+  const [showEditSpaceDropdown, setShowEditSpaceDropdown] = useState(false);
+
+  const editSpaceLabel = useMemo(() => {
+    if (editSpaceId) {
+      const match = spaces.find((space: any) => space._id === editSpaceId);
+      if (match) {
+        return match.name;
+      }
+      if (todoToEdit?._space) {
+        return todoToEdit._space;
+      }
+      if (todoToEdit?.space?.name) {
+        return todoToEdit.space.name;
+      }
+      return 'Unknown space';
+    }
+
+    if (todoToEdit?._space) {
+      return todoToEdit._space;
+    }
+
+    if (todoToEdit?.space?.name) {
+      return todoToEdit.space.name;
+    }
+
+    if (activeSpace?.name) {
+      return activeSpace.name;
+    }
+
+    return 'No space';
+  }, [editSpaceId, spaces, todoToEdit, activeSpace]);
+
+  useEffect(() => {
+    if (!showEditTodoModal) {
+      setShowEditSpaceDropdown(false);
+    }
+  }, [showEditTodoModal]);
+
+  const handleSelectEditSpace = useCallback((spaceId: string | null) => {
+    setEditSpaceId(spaceId);
+    setShowEditSpaceDropdown(false);
+  }, []);
 
   // Track latest fetch requests to avoid race conditions when switching spaces
   const todosFetchIdRef = useRef(0);
@@ -713,6 +756,8 @@ export default function AIToDoListApp({
     setEditNotes(todo.notes || '');
     setEditCategoryVal(todo.category);
     setEditPriorityVal(todo.priority);
+    setEditSpaceId(todo.space_id ?? activeSpace?._id ?? null);
+    setShowEditSpaceDropdown(false);
 
     // Format date for HTML date input (YYYY-MM-DD)
     let formattedDate = '';
@@ -742,6 +787,7 @@ export default function AIToDoListApp({
         category: editCategoryVal,
         priority: editPriorityVal,
         dueDate: editDueDate || null,
+        space_id: editSpaceId ?? null,
       };
       const response = await authenticatedFetch(`/todos/${todoToEdit._id}`, {
         method: 'PUT',
@@ -754,6 +800,8 @@ export default function AIToDoListApp({
       await fetchTodos(false);
       setShowEditTodoModal(false);
       setTodoToEdit(null);
+      setShowEditSpaceDropdown(false);
+      setEditSpaceId(null);
     } catch (err) {
       handleError(err, 'Error updating todo');
     }
@@ -1278,6 +1326,38 @@ export default function AIToDoListApp({
               placeholder="Notes"
               className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 text-base h-24 resize-none focus:outline-none focus:ring-2 focus:ring-accent"
             />
+            <div className="relative">
+              <label className="block text-sm text-gray-300 mb-2">Space</label>
+              <button
+                type="button"
+                onClick={() => setShowEditSpaceDropdown((open) => !open)}
+                className="w-full flex items-center justify-between p-3 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 text-base focus:outline-none focus:ring-2 focus:ring-accent"
+              >
+                <span>{editSpaceLabel}</span>
+                <span className="text-gray-400 text-sm">▾</span>
+              </button>
+              {showEditSpaceDropdown && (
+                <div className="absolute z-20 mt-2 w-full max-h-48 overflow-y-auto bg-gray-900 border border-gray-700 rounded-lg shadow-lg">
+                  {spaces.map((space: any) => (
+                    <button
+                      key={space._id}
+                      type="button"
+                      onClick={() => handleSelectEditSpace(space._id)}
+                      className={`w-full text-left px-3 py-2 text-gray-100 hover:bg-gray-800 ${editSpaceId === space._id ? 'bg-gray-800' : ''}`}
+                    >
+                      {space.name}
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => handleSelectEditSpace(null)}
+                    className={`w-full text-left px-3 py-2 text-gray-100 hover:bg-gray-800 ${editSpaceId === null ? 'bg-gray-800' : ''}`}
+                  >
+                    No space
+                  </button>
+                </div>
+              )}
+            </div>
             <select
               value={editCategoryVal}
               onChange={(e) => setEditCategoryVal(e.target.value)}
@@ -1322,7 +1402,17 @@ export default function AIToDoListApp({
             </div>
             <div className="flex justify-center space-x-3">
               <button onClick={handleSaveTodoEdit} className="bg-accent hover:bg-accent-light text-foreground px-6 py-2 rounded-lg transition-colors">Save</button>
-              <button onClick={() => setShowEditTodoModal(false)} className="bg-gray-800 hover:bg-gray-700 text-gray-300 px-6 py-2 rounded-lg transition-colors">Cancel</button>
+              <button
+                onClick={() => {
+                  setShowEditTodoModal(false);
+                  setTodoToEdit(null);
+                  setEditSpaceId(null);
+                  setShowEditSpaceDropdown(false);
+                }}
+                className="bg-gray-800 hover:bg-gray-700 text-gray-300 px-6 py-2 rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
             </div>
           </div>
         </div>
