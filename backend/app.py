@@ -384,6 +384,8 @@ async def api_update_todo(todo_id: str, request: Request, current_user: dict = D
             updates["priority"] = body["priority"]
         if "dueDate" in body:
             updates["dueDate"] = body["dueDate"]
+        if "space_id" in body:
+            updates["space_id"] = body["space_id"] or None
 
         if not updates:
             raise HTTPException(status_code=400, detail="No valid fields to update")
