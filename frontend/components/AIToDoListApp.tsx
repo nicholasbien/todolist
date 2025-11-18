@@ -108,6 +108,7 @@ export default function AIToDoListApp({
   const [editCategoryVal, setEditCategoryVal] = useState('General');
   const [editPriorityVal, setEditPriorityVal] = useState('Medium');
   const [editDueDate, setEditDueDate] = useState<string>('');
+  const [editSpaceId, setEditSpaceId] = useState<string>('');
 
   // Track latest fetch requests to avoid race conditions when switching spaces
   const todosFetchIdRef = useRef(0);
@@ -713,6 +714,7 @@ export default function AIToDoListApp({
     setEditNotes(todo.notes || '');
     setEditCategoryVal(todo.category);
     setEditPriorityVal(todo.priority);
+    setEditSpaceId(todo.space_id || '');
 
     // Format date for HTML date input (YYYY-MM-DD)
     let formattedDate = '';
@@ -742,6 +744,7 @@ export default function AIToDoListApp({
         category: editCategoryVal,
         priority: editPriorityVal,
         dueDate: editDueDate || null,
+        space_id: editSpaceId || null,
       };
       const response = await authenticatedFetch(`/todos/${todoToEdit._id}`, {
         method: 'PUT',
@@ -1278,6 +1281,24 @@ export default function AIToDoListApp({
               placeholder="Notes"
               className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 text-base h-24 resize-none focus:outline-none focus:ring-2 focus:ring-accent"
             />
+            <div>
+              <label className="block text-sm text-gray-300 mb-2">Space</label>
+              <select
+                value={editSpaceId}
+                onChange={(e) => setEditSpaceId(e.target.value)}
+                className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 text-base focus:outline-none"
+              >
+                <option value="">Personal (no space)</option>
+                {editSpaceId && !spaces.some((space: any) => space._id === editSpaceId) && (
+                  <option value={editSpaceId}>Current space</option>
+                )}
+                {spaces.map((space: any) => (
+                  <option key={space._id || space.name} value={space._id}>
+                    {space.name || 'Untitled Space'}
+                  </option>
+                ))}
+              </select>
+            </div>
             <select
               value={editCategoryVal}
               onChange={(e) => setEditCategoryVal(e.target.value)}

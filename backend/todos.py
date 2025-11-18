@@ -179,6 +179,7 @@ async def delete_todo(todo_id: str, user_id: str):
             raise HTTPException(status_code=404, detail="Todo not found")
         if todo.get("space_id") and not await user_in_space(user_id, todo["space_id"]):
             raise HTTPException(status_code=403, detail="Not in space")
+
         result = await todos_collection.delete_one(query)
         if result.deleted_count == 1:
             return {"message": "Todo deleted successfully"}
@@ -254,6 +255,18 @@ async def update_todo_fields(todo_id: str, updates: dict, user_id: str):
             raise HTTPException(status_code=404, detail="Todo not found")
         if todo.get("space_id") and not await user_in_space(user_id, todo["space_id"]):
             raise HTTPException(status_code=403, detail="Not in space")
+
+        # If the update includes a space change, ensure the user can access the target space
+        if "space_id" in updates:
+            new_space_id = updates.get("space_id")
+            if new_space_id:
+                try:
+                    if not await user_in_space(user_id, new_space_id):
+                        raise HTTPException(status_code=403, detail="Not in space")
+                except HTTPException as e:
+                    if e.status_code == 404:
+                        raise HTTPException(status_code=403, detail="Not in space")
+                    raise
 
         result = await todos_collection.update_one(query, {"$set": updates})
         if result.matched_count == 1:
