@@ -79,16 +79,11 @@ async def classify_task(text: str, categories: List[str], date_added: str) -> Di
         Priority options: High, Medium, Low.
         """
 
-        # Make synchronous call since OpenAI client handles async internally
-        completion = client.chat.completions.create(
-            model="gpt-4.1-nano",
-            messages=[
-                {
-                    "role": "system",
-                    "content": system_prompt,
-                },
-                {"role": "user", "content": f'Task: "{text}"'},
-            ],
+        # Use Responses API (recommended for all new projects)
+        response = client.responses.create(
+            model="gpt-5-nano",
+            instructions=system_prompt,
+            input=f'Task: "{text}"',
             temperature=0,
         )
 
@@ -96,7 +91,7 @@ async def classify_task(text: str, categories: List[str], date_added: str) -> Di
 
         try:
             # Safely parse JSON instead of using eval
-            content = completion.choices[0].message.content
+            content = response.output_text
             logger.info(f"OpenAI response content: {content}")
             result = json.loads(content)
 
@@ -121,7 +116,7 @@ async def classify_task(text: str, categories: List[str], date_added: str) -> Di
             }
         except json.JSONDecodeError as e:
             logger.error(f"Failed to parse OpenAI response as JSON: {e}")
-            logger.error(f"Response content: {completion.choices[0].message.content}")
+            logger.error(f"Response content: {response.output_text}")
             return default_response
     except Exception as e:
         logger.error(f"OpenAI API error after {time.time() - start_time:.2f} seconds: {str(e)}")

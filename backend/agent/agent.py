@@ -217,25 +217,22 @@ async def stream_agent_response(
         try:
             tools_response = await mcp_session.list_tools()
             for tool in tools_response.tools:
-                # Add MCP tools with their schemas
+                # Add MCP tools in Responses API format (flat structure)
                 mcp_tools[tool.name] = {
                     "type": "function",
-                    "function": {
-                        "name": tool.name,
-                        "description": tool.description or f"MCP tool: {tool.name}",
-                        "parameters": tool.inputSchema
-                        if hasattr(tool, "inputSchema")
-                        else {"type": "object", "properties": {}, "required": []},
-                    },
+                    "name": tool.name,
+                    "description": tool.description or f"MCP tool: {tool.name}",
+                    "parameters": tool.inputSchema
+                    if hasattr(tool, "inputSchema")
+                    else {"type": "object", "properties": {}, "required": []},
                 }
             logger.info(f"Discovered {len(mcp_tools)} MCP tools")
         except Exception as e:
             logger.error(f"Failed to list MCP tools: {e}")
 
     client = get_openai_client(api_key)
-    # Combine native tools with MCP tools
-    tools = [{"type": "function", "function": schema} for schema in OPENAI_TOOL_SCHEMAS.values()]
-    tools.extend(mcp_tools.values())
+    # Combine native tools with MCP tools (both already in Responses API format)
+    tools = list(OPENAI_TOOL_SCHEMAS.values()) + list(mcp_tools.values())
 
     tool_names = list(OPENAI_TOOL_SCHEMAS.keys()) + list(mcp_tools.keys())
     ready_data = {"ok": True, "tools": tool_names, "space_id": space_id}
@@ -249,11 +246,19 @@ async def stream_agent_response(
         history = [{"role": m.role, "content": m.content} for m in db_history]
         conversation_state[key] = history
 
-    messages: list[dict[str, Any]] = [
-        {"role": "system", "content": AGENT_SYSTEM_PROMPT},
-        *history,
-        {"role": "user", "content": user_message},
-    ]
+    # Convert chat format messages to responses format
+    # First message is system (developer instructions), rest are history + new user message
+    developer_instructions = AGENT_SYSTEM_PROMPT
+    input_messages: list[dict[str, Any]] = []
+
+    for msg in history:
+        role = msg["role"]
+        # Map system -> developer, keep user/assistant as-is
+        if role == "system":
+            role = "developer"
+        input_messages.append({"role": role, "content": msg["content"]})
+
+    input_messages.append({"role": "user", "content": user_message})
 
     try:
         api_call_count = 0
@@ -265,85 +270,131 @@ async def stream_agent_response(
             api_call_count += 1
 
             # Log token estimate before API call
-            estimated_tokens = estimate_token_count(messages, tools)
+            estimated_tokens = estimate_token_count(input_messages, tools)
             logger.info(
-                f"API Call #{api_call_count} - Estimated input tokens: {estimated_tokens}, "
-                f"Message count: {len(messages)}"
+                f"API Call #{api_call_count} - Input messages: {len(input_messages)}, "
+                f"Estimated tokens: {estimated_tokens}"
             )
 
-            stream = await client.chat.completions.create(
-                model="gpt-4.1",
-                messages=messages,
-                tools=tools,
-                stream=True,
-                temperature=0.7,
-                stream_options={"include_usage": True},  # Request usage stats in stream
-            )
+            # Make API call
+            try:
+                stream = await client.responses.create(
+                    model="gpt-5.1",
+                    instructions=developer_instructions,
+                    input=input_messages,
+                    tools=tools,
+                    stream=True,
+                    temperature=0.7,
+                )
+            except Exception as api_error:
+                logger.error(f"OpenAI API Error: {type(api_error).__name__}")
+                logger.error(f"Error details: {str(api_error)}")
+                if hasattr(api_error, "response"):
+                    logger.error(f"Response status: {api_error.response.status_code}")
+                    logger.error(f"Response body: {api_error.response.text}")
+                if hasattr(api_error, "body"):
+                    logger.error(f"Error body: {api_error.body}")
+                yield format_sse_message(
+                    "error", {"message": f"API Error: {str(api_error)}", "type": type(api_error).__name__}
+                )
+                return
 
-            partial_tool_calls: Dict[int, Dict[str, str]] = {}
+            partial_tool_calls: Dict[str, Dict[str, str]] = {}  # Key by tool call ID
             content_parts: list[str] = []
-            tool_calls_made = False
+            current_tool_call_id = None
 
-            async for chunk in stream:
-                # Check for usage data in stream
-                if hasattr(chunk, "usage") and chunk.usage:
-                    logger.info(
-                        f"API Call #{api_call_count} - Usage: "
-                        f"Input tokens: {chunk.usage.prompt_tokens}, "
-                        f"Output tokens: {chunk.usage.completion_tokens}"
-                    )
-                    total_input_tokens += chunk.usage.prompt_tokens if chunk.usage.prompt_tokens else 0
-                    total_output_tokens += chunk.usage.completion_tokens if chunk.usage.completion_tokens else 0
+            async for event in stream:
+                event_type = event.type if hasattr(event, "type") else None
 
-                choice = chunk.choices[0] if chunk.choices else None
-                if not choice:
-                    continue
+                # Debug: Log all event types and relevant data
+                if event_type:
+                    logger.info(f"Event: {event_type}")
+                    if "function_call" in event_type or "output_item" in event_type:
+                        # Log actual data
+                        logger.info(f"  Event data: item_id={getattr(event, 'item_id', None)}")
+                        if hasattr(event, "name"):
+                            logger.info(f"  Function name: {event.name}")
+                        if hasattr(event, "function_call"):
+                            logger.info(f"  Function call: {event.function_call}")
+                        if hasattr(event, "item"):
+                            logger.info(f"  Item: {event.item}")
 
-                if choice.delta.content:
-                    token = choice.delta.content
-                    content_parts.append(token)
-                    yield format_sse_message("token", {"token": token})
+                # Handle completed event for usage stats
+                if event_type == "response.completed":
+                    if hasattr(event, "usage") and event.usage:
+                        logger.info(
+                            f"API Call #{api_call_count} - Usage: "
+                            f"Input tokens: {event.usage.input_tokens}, "
+                            f"Output tokens: {event.usage.output_tokens}"
+                        )
+                        total_input_tokens += event.usage.input_tokens if event.usage.input_tokens else 0
+                        total_output_tokens += event.usage.output_tokens if event.usage.output_tokens else 0
 
-                if choice.delta.tool_calls:
-                    tool_calls_made = True
-                    for delta_tool_call in choice.delta.tool_calls:
-                        index = delta_tool_call.index or 0
-                        if index not in partial_tool_calls:
-                            partial_tool_calls[index] = {"id": "", "name": "", "arguments": ""}
+                # Handle text content deltas
+                elif event_type == "response.output_text.delta":
+                    if hasattr(event, "delta"):
+                        token = event.delta
+                        content_parts.append(token)
+                        yield format_sse_message("token", {"token": token})
 
-                        call = partial_tool_calls[index]
-                        if delta_tool_call.id:
-                            call["id"] = delta_tool_call.id
-                        func = delta_tool_call.function
-                        if func and func.name:
-                            call["name"] = func.name
-                        if func and func.arguments:
-                            call["arguments"] += func.arguments
+                # Handle function call arguments streaming
+                elif event_type == "response.function_call_arguments.delta":
+                    if hasattr(event, "item_id"):
+                        current_tool_call_id = event.item_id
+                        if current_tool_call_id not in partial_tool_calls:
+                            partial_tool_calls[current_tool_call_id] = {
+                                "id": current_tool_call_id,
+                                "name": "",
+                                "arguments": "",
+                            }
+                    if hasattr(event, "delta") and current_tool_call_id:
+                        partial_tool_calls[current_tool_call_id]["arguments"] += event.delta
+
+                # Handle function call completion - get the name from output_item.done
+                elif event_type == "response.output_item.done":
+                    if hasattr(event, "item") and hasattr(event.item, "type"):
+                        if event.item.type == "function_call":
+                            # This event has the complete tool call info
+                            call_id = event.item.id
+                            if call_id in partial_tool_calls:
+                                partial_tool_calls[call_id]["name"] = event.item.name
+                                partial_tool_calls[call_id]["arguments"] = event.item.arguments
+                                partial_tool_calls[call_id]["call_id"] = event.item.call_id
 
             if partial_tool_calls:
-                assistant_message: Dict[str, Any] = {
-                    "role": "assistant",
-                    "content": "".join(content_parts),
-                    "tool_calls": [],
-                }
+                logger.info(f"Tool calls detected: {list(partial_tool_calls.keys())}")
 
-                for index, partial in partial_tool_calls.items():
-                    tool_name = partial["name"]
-                    arguments = partial["arguments"] or "{}"
-                    call_id = partial.get("id") or str(index)
-                    assistant_message["tool_calls"].append(
+                # Append assistant's message with function calls to input (like response.output)
+                assistant_output_items = []
+
+                # Add text output if any
+                if content_parts:
+                    assistant_output_items.append(
                         {
-                            "id": call_id,
-                            "type": "function",
-                            "function": {"name": tool_name, "arguments": arguments},
+                            "type": "message",
+                            "role": "assistant",
+                            "content": [{"type": "output_text", "text": "".join(content_parts)}],
                         }
                     )
 
-                messages.append(assistant_message)
+                # Add function call items
+                for call_id, partial in partial_tool_calls.items():
+                    assistant_output_items.append(
+                        {
+                            "type": "function_call",
+                            "call_id": partial.get("call_id", call_id),
+                            "name": partial["name"],
+                            "arguments": partial["arguments"],
+                        }
+                    )
 
-                for index, partial in partial_tool_calls.items():
+                # Append assistant's output to input
+                input_messages.extend(assistant_output_items)
+
+                # Execute tools and collect outputs
+                for call_id, partial in partial_tool_calls.items():
                     tool_name = partial["name"]
-                    call_id = partial.get("id") or str(index)
+                    # call_id is already the key from the dictionary
                     try:
                         args = json.loads(partial["arguments"] or "{}")
                         logger.info(f"Executing tool: {tool_name} with args: {args}")
@@ -378,20 +429,30 @@ async def stream_agent_response(
                         result = {"ok": False, "error": str(e)}
 
                     yield format_sse_message("tool_result", {"tool": tool_name, "args": args, "data": result})
-                    messages.append(
+                    # Use call_id from the event, not the item id
+                    actual_call_id = partial.get("call_id", call_id)
+                    logger.info(f"Adding function_call_output with call_id: {actual_call_id}")
+                    # Append function call output to input (like official example)
+                    input_messages.append(
                         {
-                            "role": "tool",
-                            "tool_call_id": call_id,
-                            "name": tool_name,
-                            "content": json.dumps(result),
+                            "type": "function_call_output",
+                            "call_id": actual_call_id,
+                            "output": json.dumps(result),
                         }
                     )
 
                 continue
 
             # No more tool calls - we have final response
-            if tool_calls_made:
-                messages.append({"role": "assistant", "content": "".join(content_parts)})
+            # Append final assistant message to maintain conversation state
+            if content_parts and not partial_tool_calls:
+                input_messages.append(
+                    {
+                        "type": "message",
+                        "role": "assistant",
+                        "content": [{"type": "output_text", "text": "".join(content_parts)}],
+                    }
+                )
 
             # Log final token summary
             logger.info(
@@ -408,37 +469,48 @@ async def stream_agent_response(
         if api_call_count >= MAX_AGENT_STEPS:
             logger.warning(f"Reached maximum agent steps ({MAX_AGENT_STEPS}), generating final response")
 
-            # Force a final response without tools
-            messages.append(
-                {
-                    "role": "system",
-                    "content": (
-                        "You've reached the maximum number of steps. "
-                        "Please provide a comprehensive final answer based on the information gathered so far."
-                    ),
-                }
+            # Add final instruction to wrap up
+            final_instruction = (
+                "You've reached the maximum number of steps. "
+                "Please provide a comprehensive final answer based on the information gathered so far."
             )
 
-            stream = await client.chat.completions.create(
-                model="gpt-4.1",
-                messages=messages,
-                tools=None,  # No tools for final response
-                stream=True,
-                temperature=0.7,
-                stream_options={"include_usage": True},
-            )
+            try:
+                stream = await client.responses.create(
+                    model="gpt-5.1",
+                    instructions=f"{developer_instructions}\n\n{final_instruction}",
+                    input=input_messages,
+                    tools=None,  # No tools for final response
+                    stream=True,
+                    temperature=0.7,
+                )
+            except Exception as api_error:
+                logger.error(f"OpenAI API Error (final response): {type(api_error).__name__}")
+                logger.error(f"Error details: {str(api_error)}")
+                if hasattr(api_error, "response"):
+                    logger.error(f"Response status: {api_error.response.status_code}")
+                    logger.error(f"Response body: {api_error.response.text}")
+                if hasattr(api_error, "body"):
+                    logger.error(f"Error body: {api_error.body}")
+                yield format_sse_message(
+                    "error", {"message": f"API Error: {str(api_error)}", "type": type(api_error).__name__}
+                )
+                return
 
-            async for chunk in stream:
-                choice = chunk.choices[0] if chunk.choices else None
-                if choice and choice.delta.content:
-                    token = choice.delta.content
-                    content_parts.append(token)
-                    yield format_sse_message("token", {"token": token})
+            async for event in stream:
+                event_type = event.type if hasattr(event, "type") else None
+
+                if event_type == "response.output_text.delta":
+                    if hasattr(event, "delta"):
+                        token = event.delta
+                        content_parts.append(token)
+                        yield format_sse_message("token", {"token": token})
 
                 # Track usage
-                if chunk.usage:
-                    total_input_tokens += chunk.usage.prompt_tokens or 0
-                    total_output_tokens += chunk.usage.completion_tokens or 0
+                elif event_type == "response.completed":
+                    if hasattr(event, "usage") and event.usage:
+                        total_input_tokens += event.usage.input_tokens or 0
+                        total_output_tokens += event.usage.output_tokens or 0
 
             yield format_sse_message("done", {"ok": True, "info": f"Reached maximum of {MAX_AGENT_STEPS} agent steps"})
 

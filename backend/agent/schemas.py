@@ -134,24 +134,29 @@ def get_openai_tool_schema(model_class: BaseModel) -> dict:
     return {"type": "object", "properties": properties, "required": required, "additionalProperties": False}
 
 
-# Tool schema mapping for OpenAI
+# Tool schema mapping for OpenAI Responses API
+# Format: {"type": "function", "name": "...", "description": "...", "parameters": {...}}
 OPENAI_TOOL_SCHEMAS = {
     "get_current_weather": {
+        "type": "function",
         "name": "get_current_weather",
         "description": "Get current weather conditions for a specific location. Call when user asks about current weather, temperature, or 'what's the weather like' in any location.",  # noqa: E501
         "parameters": get_openai_tool_schema(WeatherCurrentRequest),
     },
     "get_weather_forecast": {
+        "type": "function",
         "name": "get_weather_forecast",
         "description": "Get multi-day weather forecast for a location. Call when user asks for weather predictions, forecast, or 'weather this week'.",  # noqa: E501
         "parameters": get_openai_tool_schema(WeatherForecastRequest),
     },
     "get_weather_alerts": {
+        "type": "function",
         "name": "get_weather_alerts",
         "description": "Check for weather alerts in a specific location. Call when user asks about weather warnings, alerts, storms, or weather safety.",  # noqa: E501
         "parameters": get_openai_tool_schema(WeatherAlertsRequest),
     },
     "get_book_recommendations": {
+        "type": "function",
         "name": "get_book_recommendations",
         "description": (
             "Search for book recommendations using SHORT queries, subjects, or authors. "
@@ -162,6 +167,7 @@ OPENAI_TOOL_SCHEMAS = {
         "parameters": get_openai_tool_schema(BookRecommendationRequest),
     },
     "get_inspirational_quotes": {
+        "type": "function",
         "name": "get_inspirational_quotes",
         "description": (
             "Fetch motivational quotes or affirmations tailored to a goal. "
@@ -170,36 +176,43 @@ OPENAI_TOOL_SCHEMAS = {
         "parameters": get_openai_tool_schema(InspirationalQuoteRequest),
     },
     "add_task": {
+        "type": "function",
         "name": "add_task",
         "description": "Add a new task to user's todo list. Call when user wants to add, create, or save a new task, todo, or reminder.",  # noqa: E501
         "parameters": get_openai_tool_schema(TaskAddRequest),
     },
     "list_tasks": {
+        "type": "function",
         "name": "list_tasks",
         "description": "List tasks in the current space. Call when user asks to see, list, show, or view their tasks or todos.",  # noqa: E501
         "parameters": get_openai_tool_schema(TaskListRequest),
     },
     "update_task": {
+        "type": "function",
         "name": "update_task",
         "description": "Update an existing task. Call when user wants to mark task complete, update task text, change priority, or modify existing tasks.",  # noqa: E501
         "parameters": get_openai_tool_schema(TaskUpdateRequest),
     },
     "add_journal_entry": {
+        "type": "function",
         "name": "add_journal_entry",
         "description": "Create or update a journal entry. Call when user wants to add journal entry, diary entry, or save notes for a specific date.",  # noqa: E501
         "parameters": get_openai_tool_schema(JournalAddRequest),
     },
     "read_journal_entry": {
+        "type": "function",
         "name": "read_journal_entry",
         "description": "Read journal entries. Call when user asks about their past journal entries, thoughts, or activities, or when you need context from their journals for personalization.",  # noqa: E501
         "parameters": get_openai_tool_schema(JournalReadRequest),
     },
     "search_content": {
+        "type": "function",
         "name": "search_content",
         "description": "Search through tasks and journal entries. Call when user wants to search through their tasks or journal entries for specific content.",  # noqa: E501
         "parameters": get_openai_tool_schema(SearchRequest),
     },
     "web_search": {
+        "type": "function",
         "name": "web_search",
         "description": (
             "Search the web for current information, news, or specific queries. "
@@ -209,6 +222,7 @@ OPENAI_TOOL_SCHEMAS = {
         "parameters": get_openai_tool_schema(WebSearchRequest),
     },
     "send_email_to_user": {
+        "type": "function",
         "name": "send_email_to_user",
         "description": (
             "Send an email directly to the current user using the provided plain text content. "
