@@ -190,27 +190,44 @@ The Responses API provides semantic streaming events:
 
 ### Streaming Example
 
-**IMPORTANT**: To get token usage in streaming mode, you must set `stream_options={"include_usage": True}`.
+**Token Usage**: Usage stats are automatically included in the final `response.completed` event.
 
 ```python
+# Sync version
+stream = client.responses.create(
+    model="gpt-5.1",
+    input=[{"role": "user", "content": "Hello!"}],
+    stream=True,
+)
+
+for event in stream:
+    if event.type == "response.output_text.delta":
+        print(event.delta, end="", flush=True)
+
+    elif event.type == "response.completed":
+        # Usage data is at event.usage in sync SDK
+        print("\n--- Token Usage ---")
+        print("Input tokens:", event.usage.input_tokens)
+        print("Output tokens:", event.usage.output_tokens)
+        print("Total tokens:", event.usage.total_tokens)
+
+# Async version
 stream = await client.responses.create(
     model="gpt-5.1",
     input=[{"role": "user", "content": "Hello!"}],
     stream=True,
-    stream_options={"include_usage": True},  # Required for usage stats
 )
 
 async for event in stream:
-    event_type = event.type
-
-    if event_type == "response.output_text.delta":
+    if event.type == "response.output_text.delta":
         print(event.delta, end="", flush=True)
 
-    elif event_type == "response.completed":
-        # Usage data available when stream_options is set
-        if hasattr(event, "usage") and event.usage:
-            print(f"\nUsage: {event.usage.total_tokens} tokens")
-            print(f"Input: {event.usage.input_tokens}, Output: {event.usage.output_tokens}")
+    elif event.type == "response.completed":
+        # Usage data is at event.response.usage in async SDK
+        print("\n--- Token Usage ---")
+        print("Input tokens:", event.response.usage.input_tokens)
+        print("Output tokens:", event.response.usage.output_tokens)
+        print("Total tokens:", event.response.usage.total_tokens)
 ```
 
 ### Tool Call Streaming Pattern

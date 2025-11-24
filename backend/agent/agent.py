@@ -284,7 +284,6 @@ async def stream_agent_response(
                     input=input_messages,
                     tools=tools,
                     stream=True,
-                    stream_options={"include_usage": True},
                     temperature=0.7,
                 )
             except Exception as api_error:
@@ -309,15 +308,18 @@ async def stream_agent_response(
 
                 # Handle completed event for usage stats
                 if event_type == "response.completed":
-                    if hasattr(event, "usage") and event.usage:
-                        input_tokens = getattr(event.usage, "input_tokens", 0) or 0
-                        output_tokens = getattr(event.usage, "output_tokens", 0) or 0
-                        total_input_tokens += input_tokens
-                        total_output_tokens += output_tokens
+                    try:
+                        total_input_tokens += event.response.usage.input_tokens
+                        total_output_tokens += event.response.usage.output_tokens
                         logger.info(
                             f"API Call #{api_call_count} - Usage: "
-                            f"Input tokens: {input_tokens}, Output tokens: {output_tokens}"
+                            f"Input: {event.response.usage.input_tokens}, "
+                            f"Output: {event.response.usage.output_tokens}, "
+                            f"Total: {event.response.usage.total_tokens}"
                         )
+                    except Exception as e:
+                        logger.error(f"Error accessing usage data: {e}", exc_info=True)
+                        logger.error(f"Event type: {type(event)}, Event: {event}")
 
                 # Handle text content deltas
                 elif event_type == "response.output_text.delta":
@@ -415,6 +417,7 @@ async def stream_agent_response(
                         else:
                             result = {"ok": False, "error": f"Unknown tool: {tool_name}"}
                     except Exception as e:
+                        logger.error(f"Error executing tool {tool_name}: {e}", exc_info=True)
                         result = {"ok": False, "error": str(e)}
 
                     yield format_sse_message("tool_result", {"tool": tool_name, "args": args, "data": result})
@@ -471,7 +474,6 @@ async def stream_agent_response(
                     input=input_messages,
                     tools=None,  # No tools for final response
                     stream=True,
-                    stream_options={"include_usage": True},
                     temperature=0.7,
                 )
             except Exception as api_error:
@@ -498,11 +500,11 @@ async def stream_agent_response(
 
                 # Track usage
                 elif event_type == "response.completed":
-                    if hasattr(event, "usage") and event.usage:
-                        input_tokens = getattr(event.usage, "input_tokens", 0) or 0
-                        output_tokens = getattr(event.usage, "output_tokens", 0) or 0
-                        total_input_tokens += input_tokens
-                        total_output_tokens += output_tokens
+                    try:
+                        total_input_tokens += event.response.usage.input_tokens
+                        total_output_tokens += event.response.usage.output_tokens
+                    except Exception as e:
+                        logger.error(f"Error accessing usage data in final response: {e}", exc_info=True)
 
             yield format_sse_message("done", {"ok": True, "info": f"Reached maximum of {MAX_AGENT_STEPS} agent steps"})
 
