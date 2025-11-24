@@ -284,6 +284,7 @@ async def stream_agent_response(
                     input=input_messages,
                     tools=tools,
                     stream=True,
+                    stream_options={"include_usage": True},
                     temperature=0.7,
                 )
             except Exception as api_error:
@@ -470,6 +471,7 @@ async def stream_agent_response(
                     input=input_messages,
                     tools=None,  # No tools for final response
                     stream=True,
+                    stream_options={"include_usage": True},
                     temperature=0.7,
                 )
             except Exception as api_error:

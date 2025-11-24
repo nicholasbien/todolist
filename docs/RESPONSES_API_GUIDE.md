@@ -190,11 +190,14 @@ The Responses API provides semantic streaming events:
 
 ### Streaming Example
 
+**IMPORTANT**: To get token usage in streaming mode, you must set `stream_options={"include_usage": True}`.
+
 ```python
 stream = await client.responses.create(
     model="gpt-5.1",
     input=[{"role": "user", "content": "Hello!"}],
     stream=True,
+    stream_options={"include_usage": True},  # Required for usage stats
 )
 
 async for event in stream:
@@ -204,7 +207,10 @@ async for event in stream:
         print(event.delta, end="", flush=True)
 
     elif event_type == "response.completed":
-        print(f"\nUsage: {event.usage.total_tokens} tokens")
+        # Usage data available when stream_options is set
+        if hasattr(event, "usage") and event.usage:
+            print(f"\nUsage: {event.usage.total_tokens} tokens")
+            print(f"Input: {event.usage.input_tokens}, Output: {event.usage.output_tokens}")
 ```
 
 ### Tool Call Streaming Pattern
