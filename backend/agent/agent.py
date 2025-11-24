@@ -306,29 +306,17 @@ async def stream_agent_response(
             async for event in stream:
                 event_type = event.type if hasattr(event, "type") else None
 
-                # Debug: Log all event types and relevant data
-                if event_type:
-                    logger.info(f"Event: {event_type}")
-                    if "function_call" in event_type or "output_item" in event_type:
-                        # Log actual data
-                        logger.info(f"  Event data: item_id={getattr(event, 'item_id', None)}")
-                        if hasattr(event, "name"):
-                            logger.info(f"  Function name: {event.name}")
-                        if hasattr(event, "function_call"):
-                            logger.info(f"  Function call: {event.function_call}")
-                        if hasattr(event, "item"):
-                            logger.info(f"  Item: {event.item}")
-
                 # Handle completed event for usage stats
                 if event_type == "response.completed":
                     if hasattr(event, "usage") and event.usage:
+                        input_tokens = getattr(event.usage, "input_tokens", 0) or 0
+                        output_tokens = getattr(event.usage, "output_tokens", 0) or 0
+                        total_input_tokens += input_tokens
+                        total_output_tokens += output_tokens
                         logger.info(
                             f"API Call #{api_call_count} - Usage: "
-                            f"Input tokens: {event.usage.input_tokens}, "
-                            f"Output tokens: {event.usage.output_tokens}"
+                            f"Input tokens: {input_tokens}, Output tokens: {output_tokens}"
                         )
-                        total_input_tokens += event.usage.input_tokens if event.usage.input_tokens else 0
-                        total_output_tokens += event.usage.output_tokens if event.usage.output_tokens else 0
 
                 # Handle text content deltas
                 elif event_type == "response.output_text.delta":
@@ -362,7 +350,8 @@ async def stream_agent_response(
                                 partial_tool_calls[call_id]["call_id"] = event.item.call_id
 
             if partial_tool_calls:
-                logger.info(f"Tool calls detected: {list(partial_tool_calls.keys())}")
+                tool_names = [p["name"] for p in partial_tool_calls.values() if p.get("name")]
+                logger.info(f"Executing {len(partial_tool_calls)} tools: {', '.join(tool_names)}")
 
                 # Append assistant's message with function calls to input (like response.output)
                 assistant_output_items = []
@@ -397,7 +386,6 @@ async def stream_agent_response(
                     # call_id is already the key from the dictionary
                     try:
                         args = json.loads(partial["arguments"] or "{}")
-                        logger.info(f"Executing tool: {tool_name} with args: {args}")
 
                         # Check if it's an MCP tool or native tool
                         if tool_name in mcp_tools and mcp_session:
@@ -509,8 +497,10 @@ async def stream_agent_response(
                 # Track usage
                 elif event_type == "response.completed":
                     if hasattr(event, "usage") and event.usage:
-                        total_input_tokens += event.usage.input_tokens or 0
-                        total_output_tokens += event.usage.output_tokens or 0
+                        input_tokens = getattr(event.usage, "input_tokens", 0) or 0
+                        output_tokens = getattr(event.usage, "output_tokens", 0) or 0
+                        total_input_tokens += input_tokens
+                        total_output_tokens += output_tokens
 
             yield format_sse_message("done", {"ok": True, "info": f"Reached maximum of {MAX_AGENT_STEPS} agent steps"})
 
