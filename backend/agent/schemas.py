@@ -8,18 +8,42 @@ from pydantic import BaseModel, Field, model_validator
 
 
 class WeatherCurrentRequest(BaseModel):
-    location: str = Field(..., description="City name (e.g., 'Tokyo', 'New York')")
+    location: str = Field(
+        ...,
+        description=(
+            "Location in one of these formats: "
+            "City name (e.g., 'Tokyo'), "
+            "City,CountryCode (e.g., 'Paris,FR'), "
+            "City,StateCode,US (e.g., 'Portland,OR,US' for US cities)"
+        ),
+    )
     units: Literal["metric", "imperial", "kelvin"] = Field(default="imperial", description="Temperature units")
 
 
 class WeatherForecastRequest(BaseModel):
-    location: str = Field(..., description="City name")
+    location: str = Field(
+        ...,
+        description=(
+            "Location in one of these formats: "
+            "City name (e.g., 'Tokyo'), "
+            "City,CountryCode (e.g., 'Paris,FR'), "
+            "City,StateCode,US (e.g., 'Portland,OR,US' for US cities)"
+        ),
+    )
     days: int = Field(default=3, ge=1, le=5, description="Number of forecast days (1-5)")
     units: Literal["metric", "imperial", "kelvin"] = Field(default="imperial", description="Temperature units")
 
 
 class WeatherAlertsRequest(BaseModel):
-    location: str = Field(..., description="City name or coordinates")
+    location: str = Field(
+        ...,
+        description=(
+            "Location in one of these formats: "
+            "City name (e.g., 'Tokyo'), "
+            "City,CountryCode (e.g., 'Paris,FR'), "
+            "City,StateCode,US (e.g., 'Portland,OR,US' for US cities)"
+        ),
+    )
 
 
 class TaskAddRequest(BaseModel):
