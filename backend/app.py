@@ -5,7 +5,7 @@ import os
 from contextlib import asynccontextmanager
 from datetime import datetime
 from io import StringIO
-from typing import Any, List, Optional, Union
+from typing import List, Optional, Union
 
 import httpx
 from agent import agent_router
@@ -33,8 +33,6 @@ from categories import (
     migrate_legacy_categories,
     rename_category,
 )
-from chatbot import answer_question
-from chats import ChatMessage, get_chat_history, save_chat_message
 
 # Import the classification function and todo management
 from classify import classify_task
@@ -48,10 +46,8 @@ from journals import (
     JournalEntry,
     create_journal_entry,
     delete_journal_entry,
-    generate_journal_summary,
     get_journal_entries,
     get_journal_entry_by_date,
-    get_space_journal_entries,
     journals_collection,
 )
 from pydantic import BaseModel
@@ -610,13 +606,6 @@ class ContactRequest(BaseModel):
     message: str
 
 
-class ChatRequest(BaseModel):
-    question: str
-    space_id: str
-    include_tasks: bool = True
-    include_journals: bool = True
-
-
 @app.post("/contact")
 async def api_contact(
     req: ContactRequest,
@@ -639,51 +628,6 @@ async def api_contact(
     except Exception as e:
         logger.error(f"Error sending contact message: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to send contact message")
-
-
-@app.post("/chat")
-async def api_chat(
-    req: ChatRequest,
-    current_user: dict = Depends(get_current_user),
-):
-    """Answer user questions using tasks and journals from the requested space."""
-    try:
-        if not await user_in_space(current_user["user_id"], req.space_id):
-            raise HTTPException(status_code=403, detail="Access denied to space")
-
-        spaces = await get_spaces_for_user(current_user["user_id"])
-        requested_space = next((s for s in spaces if s.id == req.space_id), None)
-        if not requested_space:
-            raise HTTPException(status_code=404, detail="Space not found")
-
-        space_context: dict[str, Any] = {"space": requested_space.name}
-
-        if req.include_tasks:
-            todos = await get_todos(current_user["user_id"], req.space_id)
-            todos_dict = [todo.dict(by_alias=True) if hasattr(todo, "dict") else todo for todo in todos]
-            space_context["todos"] = todos_dict
-
-        if req.include_journals:
-            journals = await get_space_journal_entries(current_user["user_id"], req.space_id)
-            space_context["journals"] = journals
-
-        spaces_data = [space_context]
-
-        history_messages = await get_chat_history(current_user["user_id"], req.space_id, limit=MAX_HISTORY)
-        history = [{"role": m.role, "content": m.content} for m in history_messages]
-        answer = await answer_question(req.question, spaces_data, history)
-
-        await save_chat_message(
-            ChatMessage(user_id=current_user["user_id"], space_id=req.space_id, role="user", content=req.question)
-        )
-        await save_chat_message(
-            ChatMessage(user_id=current_user["user_id"], space_id=req.space_id, role="assistant", content=answer)
-        )
-
-        return {"answer": answer}
-    except Exception as e:
-        logger.error(f"Chatbot error: {e}")
-        raise HTTPException(status_code=500, detail="Failed to generate answer")
 
 
 @app.get("/insights")
@@ -802,30 +746,6 @@ async def api_delete_journal_entry(entry_id: str, current_user: dict = Depends(g
     except Exception as e:
         logger.error(f"Error deleting journal entry: {e}")
         raise HTTPException(status_code=500, detail="Failed to delete journal entry")
-
-
-@app.get("/journals/{entry_id}/ai-summary")
-async def api_generate_journal_summary(entry_id: str, current_user: dict = Depends(get_current_user)):
-    """Generate AI summary for a journal entry."""
-    try:
-        # First, get the entry to ensure user owns it and extract text
-        from bson import ObjectId
-        from journals import journals_collection
-
-        entry = await journals_collection.find_one({"_id": ObjectId(entry_id), "user_id": current_user["user_id"]})
-
-        if not entry:
-            raise HTTPException(status_code=404, detail="Journal entry not found")
-
-        summary = await generate_journal_summary(entry["text"])
-        logger.info(f"AI summary generated for journal entry {entry_id}")
-        return {"summary": summary}
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error generating journal summary: {e}")
-        raise HTTPException(status_code=500, detail="Failed to generate summary")
 
 
 @app.get("/export")

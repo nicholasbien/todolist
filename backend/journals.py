@@ -188,50 +188,6 @@ async def delete_journal_entry(entry_id: str, user_id: str) -> bool:
         raise HTTPException(status_code=500, detail=f"Failed to delete journal entry: {str(e)}")
 
 
-async def generate_journal_summary(entry_text: str) -> str:
-    """Generate AI summary of journal entry using OpenAI."""
-    try:
-        import os
-
-        import openai
-
-        api_key = os.getenv("OPENAI_API_KEY")
-        if not api_key:
-            raise HTTPException(status_code=500, detail="OpenAI API key not configured")
-
-        client = openai.AsyncOpenAI(api_key=api_key)
-
-        prompt = f"""Summarize this journal entry in 2-3 sentences, highlighting key themes and insights:
-
-{entry_text}
-
-Summary:"""
-
-        response = await client.chat.completions.create(
-            model="gpt-4.1-mini",
-            messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        "You are a helpful assistant that creates concise, meaningful summaries of journal entries. "
-                        "Focus on emotional themes, insights, and key events."
-                    ),
-                },
-                {"role": "user", "content": prompt},
-            ],
-            max_tokens=150,
-            temperature=1,
-        )
-
-        summary = response.choices[0].message.content.strip()
-        logger.info("Generated journal summary successfully")
-        return summary
-
-    except Exception as e:
-        logger.error(f"Error generating journal summary: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to generate summary: {str(e)}")
-
-
 # Health check for database connection
 async def health_check() -> dict:
     """Check journal collection health."""

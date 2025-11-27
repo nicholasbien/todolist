@@ -842,34 +842,8 @@ async def web_scraping(request: WebScrapingRequest, user_id: str, space_id: Opti
     Returns:
         Dict with scraped content or error
     """
-    try:
-        # Import the MCP client manager
-        from mcp_client import mcp_manager
-
-        # Scrape the URL using Puppeteer MCP
-        result = await mcp_manager.scrape_url(url=request.url, selector=request.selector)
-
-        if not result.get("ok"):
-            return result
-
-        # Extract requested content types
-        content = result.get("content", {})
-        extracted = {}
-
-        if request.extract_text:
-            extracted["text"] = content.get("text", "")
-
-        if request.extract_html:
-            extracted["html"] = content.get("html", "")
-
-        # Add metadata
-        extracted["title"] = content.get("title", "")
-        extracted["url"] = result.get("url", request.url)
-
-        return {"ok": True, "content": extracted, "screenshot": result.get("screenshot")}
-
-    except Exception as e:
-        return {"ok": False, "error": f"Failed to scrape URL: {str(e)}"}
+    # Stub kept for future MCP integration; currently unused and avoids missing dependency failures
+    return {"ok": False, "error": "Web scraping via MCP is currently disabled"}
 
 
 # Tool registry for easy access

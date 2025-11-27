@@ -102,12 +102,10 @@ Based on `backend/app.py` analysis:
 - `POST /email/update-instructions` - Update email instructions
 - `POST /email/update-spaces` - Update email spaces
 - `POST /contact` - Contact form submission
-- `POST /chat` - AI chat
 - `GET /insights` - Get insights
 - `GET /journals` - Get journal entries
 - `POST /journals` - Create/update journal entry
 - `DELETE /journals/{id}` - Delete journal entry
-- `GET /journals/{id}/ai-summary` - Generate AI summary
 - `GET /export` - Export data
 
 ## Critical Issue: Missing Route Syndrome
