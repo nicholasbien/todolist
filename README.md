@@ -15,7 +15,7 @@ A modern collaborative todo list application with AI-powered task classification
 - **Email verification authentication** with JWT sessions
 - **Space-specific categories** - Each space has its own set of categories
 - **Daily email summaries** with AI-generated insights
-- **Space-aware summaries and chatbot** - Emails and chat responses organize todos by space
+- **Space-aware AI agent** - Intelligent assistant with tool calling for weather, tasks, journals, and recommendations
 - **Customizable email instructions** for personalized summaries
 - **Book recommendations** via Open Library integration
 
