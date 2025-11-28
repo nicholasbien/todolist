@@ -474,7 +474,7 @@ export default function Home() {
         <title>todolist.nyc</title>
       </Head>
       <main className="min-h-screen bg-zinc-950 text-white">
-        <div className="container mx-auto pt-4 max-w-md">
+        <div className="mx-auto pt-4 max-w-md">
           <div className="flex justify-between items-center mb-6 px-4 flex-shrink-0">
             <h1 className="text-2xl font-bold">todolist.nyc</h1>
           <div className="flex items-center space-x-4">

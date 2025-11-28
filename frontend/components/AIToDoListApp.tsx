@@ -936,7 +936,7 @@ export default function AIToDoListApp({
       )}
 
       {/* Tab Navigation - Full Width */}
-      <div className="flex border-b border-gray-800 mb-4 flex-shrink-0">
+      <div className="flex border-b border-gray-800 flex-shrink-0">
         <button
           onClick={() => handleTabChange(0)}
           className={`flex-1 py-3 px-2 sm:px-6 font-medium text-sm transition-colors ${
@@ -994,7 +994,7 @@ export default function AIToDoListApp({
       <SwipeableViews
         index={tabIndex}
         onChangeIndex={handleTabChange}
-        style={{ height: 'calc(100vh - 180px)' }}
+        style={{ height: 'calc(100vh - 140px)' }}
         containerStyle={{ height: '100%' }}
         resistance={true}
         ignoreNativeScroll={false}
@@ -1005,14 +1005,14 @@ export default function AIToDoListApp({
         {/* Tasks Tab */}
         <div
           ref={tasksTabRef}
-          style={{ padding: '0 16px 16px 16px', height: '100%', overflowY: 'auto', touchAction: 'pan-y' }}
+          style={{ padding: '0 16px', height: '100%', overflowY: 'auto', overflowX: 'hidden', touchAction: 'pan-y' }}
           className="custom-scrollbar"
         >
           <PullToRefresh
             onRefresh={handleRefresh}
             pullingContent=""
           >
-            <div>
+            <div className="pt-4">
           {/* Header Row with Page Title */}
           {/* <div className="flex items-center gap-2 mb-6">
             <h2 className="text-xl font-semibold text-gray-100">
@@ -1266,7 +1266,7 @@ export default function AIToDoListApp({
       {loadingTodos && (
         <div className="text-gray-400 mb-2">Loading tasks...</div>
       )}
-      <div className={`space-y-3 ${completedTodos.length === 0 ? 'mb-2' : ''}`}>
+      <div className="space-y-3">
         {uncompletedTodos.map((todo) => (
           <TodoItem
             key={todo._id}
@@ -1286,7 +1286,7 @@ export default function AIToDoListApp({
 
       {/* Show/Hide Completed Toggle Button */}
       {completedTodos.length > 0 && (
-        <div className="mt-6 mb-2 flex justify-center">
+        <div className="mt-6 flex justify-center">
           <button
             onClick={() => setShowCompleted(!showCompleted)}
             className="bg-gray-900 hover:bg-gray-800 text-gray-300 px-4 py-2 rounded-lg transition-colors border border-gray-800"
@@ -1297,7 +1297,7 @@ export default function AIToDoListApp({
       )}
 
       {showCompleted && completedTodos.length > 0 && (
-        <div className="mt-6 space-y-3 mb-2">
+        <div className="mt-6 space-y-3">
           {completedTodos.map((todo) => (
             <TodoItem
               key={todo._id}
@@ -1389,7 +1389,7 @@ export default function AIToDoListApp({
         {/* Agent Tab */}
         <div
           ref={agentTabRef}
-          style={{ padding: '0 16px', height: '100%', display: 'flex', flexDirection: 'column', touchAction: 'pan-y' }}
+          style={{ padding: '16px 16px 0 16px', height: '100%', display: 'flex', flexDirection: 'column', touchAction: 'pan-y' }}
         >
           {/* Header Row with Page Title */}
           {/* <div className="mb-6" style={{ flexShrink: 0 }}>
@@ -1403,7 +1403,7 @@ export default function AIToDoListApp({
         {/* Journal Tab */}
         <div
           ref={journalTabRef}
-          style={{ padding: '0 16px', height: '100%', display: 'flex', flexDirection: 'column', touchAction: 'pan-y' }}
+          style={{ padding: '16px 16px 0 16px', height: '100%', display: 'flex', flexDirection: 'column', touchAction: 'pan-y' }}
         >
           {/* Header Row with Page Title */}
           {/* <div className="mb-6" style={{ flexShrink: 0 }}>

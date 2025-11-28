@@ -1033,14 +1033,41 @@ This investigation covered multiple UI improvements for the todolist.nyc mobile 
 
 ### Recent Improvements (2025-11-27)
 1. **Categories now wrap** instead of scrolling horizontally
-2. **All tabs use consistent scroll behavior** (`calc(100vh - 180px)` fixed viewport)
+2. **All tabs use consistent scroll behavior** (`calc(100vh - 140px)` fixed viewport)
 3. **Space selector moved to header** for global accessibility
 4. **Tab headings removed** for cleaner interface
 5. **Journal date picker centered** without label
+6. **Full-height layout** - content extends to bottom of viewport without extra spacing
+
+### Viewport Height Calculation
+
+**Current Approach**: `calc(100vh - 140px)` for SwipeableViews height
+
+**Breakdown of the 140px offset:**
+```
+Container pt-4:           16px  (top padding)
+Header height:           ~40px  (h1 text-2xl + line height)
+Header mb-6:              24px  (bottom margin)
+Tab navigation:          ~40px  (py-3 buttons + text + border)
+Additional spacing:      ~20px  (buffer for variations)
+                        ------
+Total:                   140px
+```
+
+**Why Hardcoded?**
+- Tried flexbox approach but broke scrolling in Tasks tab
+- `calc()` approach is simpler and more reliable
+- Value accounts for all fixed elements above tabs
+- Consistent across all screen sizes
+
+**If UI Changes Above Tabs:**
+Update the 140px value in `components/AIToDoListApp.tsx:997` to match new layout heights.
+
+**Location**: `/Users/nicholasbien/todolist/frontend/components/AIToDoListApp.tsx:997`
 
 ### Key Decisions Made
 1. Prioritize category display clarity (wrapping over scrolling)
-2. Consistent scroll behavior across all tabs (fixed viewport)
+2. Use `calc(100vh - 140px)` for tab viewport (reliable, simple)
 3. Keep SwipeableViews library for smooth animations
 4. Move space selector to global header (no need to repeat in each tab)
 5. Accept desktop scroll focus limitation (minor UX issue)
