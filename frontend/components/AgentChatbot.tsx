@@ -5,9 +5,10 @@ import { MessageRenderer, PlainTextRenderer } from './MessageRenderer';
 interface ChatbotProps {
   activeSpace: any;
   token?: string;
+  isActive?: boolean;
 }
 
-export default function AgentChatbot({ activeSpace, token }: ChatbotProps) {
+export default function AgentChatbot({ activeSpace, token, isActive = true }: ChatbotProps) {
   const [question, setQuestion] = useState('');
   const [expandedTools, setExpandedTools] = useState<Set<number>>(new Set());
   const [messages, setMessages] = useState<{ role: string; content: string; toolData?: any }[]>(() => {
@@ -48,8 +49,8 @@ export default function AgentChatbot({ activeSpace, token }: ChatbotProps) {
   };
 
   useEffect(() => {
-    // Only auto-scroll if we were at the bottom before the update
-    if (shouldAutoScrollRef.current) {
+    // Only auto-scroll if we were at the bottom before the update AND tab is active
+    if (shouldAutoScrollRef.current && isActive) {
       // Small delay to ensure DOM updates are complete
       setTimeout(() => {
         scrollToBottom();
@@ -65,7 +66,7 @@ export default function AgentChatbot({ activeSpace, token }: ChatbotProps) {
         // Ignore write errors
       }
     }
-  }, [messages, activeSpace]);
+  }, [messages, activeSpace, isActive]);
 
   useEffect(() => {
     let interval: ReturnType<typeof setInterval>;

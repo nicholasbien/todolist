@@ -8,7 +8,7 @@ import JournalComponent from "./JournalComponent";
 import SpaceDropdown from "./SpaceDropdown";
 import { sortSpaces } from "../utils/spaceUtils";
 import PullToRefresh from "react-simple-pull-to-refresh";
-import { useSwipeable } from "react-swipeable";
+import SwipeableViews from "react-swipeable-views-react-18-fix";
 
 interface Props {
   user: any;
@@ -118,6 +118,7 @@ export default function AIToDoListApp({
 
   // Tab state
   const [activeTab, setActiveTab] = useState<'tasks' | 'agent' | 'journal'>('tasks');
+  const [tabIndex, setTabIndex] = useState(0); // 0=tasks, 1=agent, 2=journal
 
 
   const handleOpenEmailSettings = async () => {
@@ -281,22 +282,12 @@ export default function AIToDoListApp({
     ]);
   }, [fetchCategories, fetchTodos, fetchMembers]);
 
-  // Swipe handlers for tab navigation
-  const handleSwipeLeft = useCallback(() => {
-    if (activeTab === 'tasks') setActiveTab('agent');
-    else if (activeTab === 'agent') setActiveTab('journal');
-  }, [activeTab]);
-
-  const handleSwipeRight = useCallback(() => {
-    if (activeTab === 'journal') setActiveTab('agent');
-    else if (activeTab === 'agent') setActiveTab('tasks');
-  }, [activeTab]);
-
-  const swipeHandlers = useSwipeable({
-    onSwipedLeft: handleSwipeLeft,
-    onSwipedRight: handleSwipeRight,
-    trackMouse: true, // Also works with mouse for desktop testing
-  });
+  // Handle tab change (from swipe or button click)
+  const handleTabChange = useCallback((index: number) => {
+    const tabs: ('tasks' | 'agent' | 'journal')[] = ['tasks', 'agent', 'journal'];
+    setTabIndex(index);
+    setActiveTab(tabs[index]);
+  }, []);
 
   // Initial load when token becomes available
   useEffect(() => {
@@ -907,7 +898,7 @@ export default function AIToDoListApp({
       {/* Tab Navigation - Full Width */}
       <div className="flex border-b border-gray-800 mb-4">
         <button
-          onClick={() => setActiveTab('tasks')}
+          onClick={() => handleTabChange(0)}
           className={`flex-1 py-3 px-2 sm:px-6 font-medium text-sm transition-colors ${
             activeTab === 'tasks'
               ? 'text-accent border-b-2 border-accent'
@@ -917,7 +908,7 @@ export default function AIToDoListApp({
           Tasks
         </button>
         <button
-          onClick={() => setActiveTab('agent')}
+          onClick={() => handleTabChange(1)}
           className={`flex-1 py-3 px-2 sm:px-6 font-medium text-sm transition-colors ${
             activeTab === 'agent'
               ? 'text-accent border-b-2 border-accent'
@@ -927,7 +918,7 @@ export default function AIToDoListApp({
           Agent
         </button>
         <button
-          onClick={() => setActiveTab('journal')}
+          onClick={() => handleTabChange(2)}
           className={`flex-1 py-3 px-2 sm:px-6 font-medium text-sm transition-colors ${
             activeTab === 'journal'
               ? 'text-accent border-b-2 border-accent'
@@ -960,8 +951,9 @@ export default function AIToDoListApp({
       )}
 
       {/* Tab Content */}
-      <div {...swipeHandlers}>
-      {activeTab === 'tasks' && (
+      <SwipeableViews index={tabIndex} onChangeIndex={handleTabChange} animateHeight>
+        {/* Tasks Tab */}
+        <div style={{ padding: '0 16px' }}>
         <PullToRefresh
           onRefresh={handleRefresh}
           pullingContent=""
@@ -1362,10 +1354,10 @@ export default function AIToDoListApp({
       )}
           </div>
         </PullToRefresh>
-      )}
+        </div>
 
-      {activeTab === 'agent' && (
-        <div>
+        {/* Agent Tab */}
+        <div style={{ padding: '0 16px' }}>
           {/* Header Row with Page Title and Space Dropdown */}
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-xl font-semibold text-gray-100">Agent</h2>
@@ -1387,11 +1379,11 @@ export default function AIToDoListApp({
               }}
             />
           </div>
-          <AgentChatbot activeSpace={activeSpace} token={token} />
+          <AgentChatbot activeSpace={activeSpace} token={token} isActive={activeTab === 'agent'} />
         </div>
-      )}
-      {activeTab === 'journal' && (
-        <div>
+
+        {/* Journal Tab */}
+        <div style={{ padding: '0 16px' }}>
           {/* Header Row with Page Title and Space Dropdown */}
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-xl font-semibold text-gray-100">Journal</h2>
@@ -1415,8 +1407,7 @@ export default function AIToDoListApp({
           </div>
           <JournalComponent token={token} activeSpace={activeSpace} />
         </div>
-      )}
-      </div>
+      </SwipeableViews>
 
       {/* Insights Modal */}
       {showInsights && (
