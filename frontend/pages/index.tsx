@@ -4,7 +4,6 @@ import { useOffline } from '../context/OfflineContext';
 import dynamic from 'next/dynamic';
 import Head from 'next/head';
 import { apiRequest } from '../utils/api';
-import SpaceDropdown from '../components/SpaceDropdown';
 
 const AIToDoListApp = dynamic(() => import('../components/AIToDoListApp'), {
   ssr: false,
@@ -287,7 +286,6 @@ export default function Home() {
   const [isChecking, setIsChecking] = useState(true);
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(null);
-  const [showSettingsDropdown, setShowSettingsDropdown] = useState(false);
   const [showContactModal, setShowContactModal] = useState(false);
   const [showEmailSettings, setShowEmailSettings] = useState(false);
   const [showInsightsModal, setShowInsightsModal] = useState(false);
@@ -299,12 +297,7 @@ export default function Home() {
   const [exporting, setExporting] = useState(false);
   const [contactMessage, setContactMessage] = useState('');
   const [sendingContact, setSendingContact] = useState(false);
-  const [showOfflineTooltip, setShowOfflineTooltip] = useState(false);
-  const settingsDropdownRef = useRef(null);
   const isOffline = useOffline();
-
-  // Space dropdown state passed from AIToDoListApp
-  const [spaceDropdownProps, setSpaceDropdownProps] = useState<any>(null);
 
   useEffect(() => {
     setIsClient(true);
@@ -328,19 +321,6 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    if (showOfflineTooltip) {
-      const timer = setTimeout(() => setShowOfflineTooltip(false), 3000);
-      return () => clearTimeout(timer);
-    }
-  }, [showOfflineTooltip]);
-
-  useEffect(() => {
-    if (!isOffline) {
-      setShowOfflineTooltip(false);
-    }
-  }, [isOffline]);
-
-  useEffect(() => {
     if (showExportModal && token) {
       const loadSpaces = async () => {
         try {
@@ -359,20 +339,6 @@ export default function Home() {
       loadSpaces();
     }
   }, [showExportModal, token]);
-
-  // Handle click outside settings dropdown
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (settingsDropdownRef.current && !settingsDropdownRef.current.contains(event.target)) {
-        setShowSettingsDropdown(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, []);
 
   const handleLogin = (userData, userToken) => {
     setUser(userData);
@@ -474,91 +440,6 @@ export default function Home() {
         <title>todolist.nyc</title>
       </Head>
       <main className="min-h-screen bg-zinc-950 text-white">
-        <div className="mx-auto pt-4 max-w-md">
-          <div className="flex justify-between items-center mb-6 px-4 flex-shrink-0">
-            <h1 className="text-2xl font-bold">todolist.nyc</h1>
-          <div className="flex items-center space-x-4">
-            {isOffline && (
-              <div className="relative mr-2">
-                <button
-                  onClick={() => setShowOfflineTooltip(true)}
-                  title="Offline"
-                  className="focus:outline-none"
-                >
-                  📴
-                </button>
-                {showOfflineTooltip && (
-                  <div className="absolute left-1/2 -translate-x-1/2 mt-2 w-64 bg-gray-800 text-gray-100 text-xs p-2 rounded-lg shadow-lg z-10">
-                    {"You're offline. Todos will be synced when you're back online."}
-                  </div>
-                )}
-              </div>
-            )}
-            {/* <span className="text-sm text-gray-400">Hello, {user?.first_name || user?.email}</span> */}
-            {spaceDropdownProps && (
-              <SpaceDropdown {...spaceDropdownProps} />
-            )}
-            <div className="relative" ref={settingsDropdownRef}>
-              <button
-                onClick={() => setShowSettingsDropdown(!showSettingsDropdown)}
-                className="text-accent hover:text-accent-light text-lg w-8 h-8 flex items-center justify-center rounded-lg transition-colors"
-                title="Settings"
-              >
-                ⚙️
-              </button>
-
-              {showSettingsDropdown && (
-                <div className="absolute right-0 mt-2 w-48 bg-black border border-gray-800 rounded-lg shadow-2xl z-50">
-                  <button
-                    onClick={() => {
-                      setShowSettingsDropdown(false);
-                      setShowEmailSettings(true);
-                    }}
-                    className="w-full text-left px-4 py-3 text-gray-300 hover:bg-gray-900 hover:text-gray-100 transition-colors rounded-t-lg"
-                  >
-                    Email Settings
-                  </button>
-                  <button
-                    onClick={() => {
-                      setShowSettingsDropdown(false);
-                      setShowInsightsModal(true);
-                    }}
-                    className="w-full text-left px-4 py-3 text-gray-300 hover:bg-gray-900 hover:text-gray-100 transition-colors"
-                  >
-                    Insights
-                  </button>
-                  <button
-                    onClick={() => {
-                      setShowSettingsDropdown(false);
-                      setShowExportModal(true);
-                    }}
-                    className="w-full text-left px-4 py-3 text-gray-300 hover:bg-gray-900 hover:text-gray-100 transition-colors"
-                  >
-                    Export Data
-                  </button>
-                  <button
-                    onClick={() => {
-                      setShowSettingsDropdown(false);
-                      setShowContactModal(true);
-                    }}
-                    className="w-full text-left px-4 py-3 text-gray-300 hover:bg-gray-900 hover:text-gray-100 transition-colors"
-                  >
-                    Contact
-                  </button>
-                  <button
-                    onClick={() => {
-                      setShowSettingsDropdown(false);
-                      handleLogout();
-                    }}
-                    className="w-full text-left px-4 py-3 text-red-400 hover:bg-red-900/20 hover:text-red-300 transition-colors rounded-b-lg"
-                  >
-                    Logout
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
         <AIToDoListApp
           user={user}
           token={token}
@@ -566,8 +447,12 @@ export default function Home() {
           onShowEmailSettings={() => setShowEmailSettings(true)}
           onCloseEmailSettings={() => setShowEmailSettings(false)}
           showInsights={showInsightsModal}
+          onShowInsights={() => setShowInsightsModal(true)}
           onCloseInsights={() => setShowInsightsModal(false)}
-          onSpaceControlReady={setSpaceDropdownProps}
+          onShowExportModal={() => setShowExportModal(true)}
+          onShowContactModal={() => setShowContactModal(true)}
+          onLogout={handleLogout}
+          isOffline={isOffline}
         />
         {/* Export Modal */}
         {showExportModal && (
@@ -661,7 +546,6 @@ export default function Home() {
             </div>
           </div>
         )}
-      </div>
     </main>
   </>
   );

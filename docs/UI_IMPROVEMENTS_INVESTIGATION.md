@@ -1039,39 +1039,61 @@ This investigation covered multiple UI improvements for the todolist.nyc mobile 
 5. **Journal date picker centered** without label
 6. **Full-height layout** - content extends to bottom of viewport without extra spacing
 
-### Viewport Height Calculation
+### Viewport Height Architecture (Flexbox Approach)
 
-**Current Approach**: `calc(100vh - 140px)` for SwipeableViews height
+**Current Approach**: Pure flexbox layout, no hardcoded calculations needed
 
-**Breakdown of the 140px offset:**
+**Component Structure:**
+```tsx
+// AIToDoListApp.tsx
+<div className="h-screen flex flex-col max-w-md mx-auto">
+  {/* Header */}
+  <div className="flex-shrink-0 pt-4 px-4">
+    {/* Logo, space dropdown, settings */}
+  </div>
+
+  {/* Error message (if any) */}
+  <div className="flex-shrink-0">...</div>
+
+  {/* Tab Navigation */}
+  <div className="flex-shrink-0">...</div>
+
+  {/* Tab Content - fills remaining space */}
+  <div className="flex-1 min-h-0">
+    <SwipeableViews style={{ height: '100%' }}>
+      {/* Tasks, Agent, Journal tabs */}
+    </SwipeableViews>
+  </div>
+</div>
 ```
-Container pt-4:           16px  (top padding)
-Header height:           ~40px  (h1 text-2xl + line height)
-Header mb-6:              24px  (bottom margin)
-Tab navigation:          ~40px  (py-3 buttons + text + border)
-Additional spacing:      ~20px  (buffer for variations)
-                        ------
-Total:                   140px
-```
 
-**Why Hardcoded?**
-- Tried flexbox approach but broke scrolling in Tasks tab
-- `calc()` approach is simpler and more reliable
-- Value accounts for all fixed elements above tabs
-- Consistent across all screen sizes
+**Why This Works:**
+- `h-screen` sets container to 100vh
+- `flex flex-col` creates vertical flex layout
+- Header, tabs: `flex-shrink-0` (fixed height based on content)
+- Tab content: `flex-1 min-h-0` (fills remaining space)
+- SwipeableViews: `height: 100%` (fills parent container)
+- No manual calculations needed - flexbox handles everything
 
-**If UI Changes Above Tabs:**
-Update the 140px value in `components/AIToDoListApp.tsx:997` to match new layout heights.
+**Architecture Benefits:**
+1. **Self-contained**: AIToDoListApp includes header (no split between index.tsx and component)
+2. **Automatic**: Height adjusts if header content changes
+3. **Reliable**: Scrolling works perfectly in all tabs
+4. **Simple**: No hardcoded pixel values to maintain
 
-**Location**: `/Users/nicholasbien/todolist/frontend/components/AIToDoListApp.tsx:997`
+**Migration from index.tsx:**
+- Moved header (logo, space dropdown, settings) into AIToDoListApp
+- Simplified index.tsx to only handle authentication and modals
+- Cleaner separation of concerns
 
 ### Key Decisions Made
 1. Prioritize category display clarity (wrapping over scrolling)
-2. Use `calc(100vh - 140px)` for tab viewport (reliable, simple)
-3. Keep SwipeableViews library for smooth animations
-4. Move space selector to global header (no need to repeat in each tab)
-5. Accept desktop scroll focus limitation (minor UX issue)
-6. Defer sticky headers until layout can be restructured (major effort)
+2. Use flexbox for viewport layout (automatic, no hardcoded heights)
+3. Consolidate header into AIToDoListApp (cleaner architecture)
+4. Keep SwipeableViews library for smooth animations
+5. Move space selector to global header (no need to repeat in each tab)
+6. Accept desktop scroll focus limitation (minor UX issue)
+7. Defer sticky headers until layout can be restructured (major effort)
 
 ### Potential Next Steps
 - **Consider re-enabling swipe gestures** now that categories wrap (no more conflict)

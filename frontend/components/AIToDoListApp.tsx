@@ -18,8 +18,11 @@ interface Props {
   showEmailSettings?: boolean;
   onCloseEmailSettings?: () => void;
   showInsights?: boolean;
+  onShowInsights?: () => void;
   onCloseInsights?: () => void;
-  onSpaceControlReady?: (props: any) => void;
+  onShowExportModal?: () => void;
+  onShowContactModal?: () => void;
+  isOffline?: boolean;
 }
 
 /**
@@ -34,8 +37,11 @@ export default function AIToDoListApp({
   showEmailSettings,
   onCloseEmailSettings,
   showInsights,
+  onShowInsights,
   onCloseInsights,
-  onSpaceControlReady,
+  onShowExportModal,
+  onShowContactModal,
+  isOffline,
 }: Props) {
   const { logout, clearAuthExpired, authenticatedFetch } = useAuth();
   const [todos, setTodos] = useState([]);
@@ -71,6 +77,9 @@ export default function AIToDoListApp({
   const [inviteEmails, setInviteEmails] = useState<string[]>(['']);
   const [spaceToEdit, setSpaceToEdit] = useState<any>(null);
   const [spaceMembers, setSpaceMembers] = useState<any[]>([]);
+  const [showSettingsDropdown, setShowSettingsDropdown] = useState(false);
+  const [showOfflineTooltip, setShowOfflineTooltip] = useState(false);
+  const settingsDropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     activeSpaceRef.current = activeSpace;
@@ -81,29 +90,6 @@ export default function AIToDoListApp({
       localStorage.removeItem('active_space_id');
     }
   }, [activeSpace]);
-
-  // Pass space dropdown props to parent (index.tsx)
-  useEffect(() => {
-    if (onSpaceControlReady) {
-      onSpaceControlReady({
-        spaces,
-        activeSpace,
-        user,
-        loadingSpaces,
-        onSpaceSelect: setActiveSpace,
-        onCreateSpace: () => setShowAddSpaceModal(true),
-        onEditSpace: (space: any) => {
-          setSpaceToEdit(space);
-          setEditSpaceName(space.name);
-          const isCollab = (space.member_ids?.length ?? 0) > 1 ||
-            (space.pending_emails?.length ?? 0) > 0;
-          setEditSpaceCollaborative(isCollab);
-          setInviteEmails(['']);
-          setShowEditSpaceModal(true);
-        },
-      });
-    }
-  }, [spaces, activeSpace, user, loadingSpaces, onSpaceControlReady]);
 
   const handleError = useCallback(
     (err: any, prefix?: string) => {
@@ -432,6 +418,28 @@ export default function AIToDoListApp({
   const handleUpdate = () => {
     window.location.reload();
   };
+
+  // Close settings dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (settingsDropdownRef.current && !settingsDropdownRef.current.contains(event.target as Node)) {
+        setShowSettingsDropdown(false);
+      }
+    };
+
+    if (showSettingsDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [showSettingsDropdown]);
+
+  // Close offline tooltip after delay
+  useEffect(() => {
+    if (showOfflineTooltip) {
+      const timer = setTimeout(() => setShowOfflineTooltip(false), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [showOfflineTooltip]);
 
   // Function to check if text is a URL
   const isUrl = (text) => {
@@ -927,10 +935,110 @@ export default function AIToDoListApp({
 
 
   return (
-    <div>
+    <div className="h-screen flex flex-col max-w-md mx-auto">
+      {/* Header */}
+      <div className="flex-shrink-0 pt-4 px-4">
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-2xl font-bold">todolist.nyc</h1>
+          <div className="flex items-center space-x-4">
+            {isOffline && (
+              <div className="relative mr-2">
+                <button
+                  onClick={() => setShowOfflineTooltip(true)}
+                  title="Offline"
+                  className="focus:outline-none"
+                >
+                  📴
+                </button>
+                {showOfflineTooltip && (
+                  <div className="absolute left-1/2 -translate-x-1/2 mt-2 w-64 bg-gray-800 text-gray-100 text-xs p-2 rounded-lg shadow-lg z-10">
+                    {"You're offline. Todos will be synced when you're back online."}
+                  </div>
+                )}
+              </div>
+            )}
+            <SpaceDropdown
+              spaces={spaces}
+              activeSpace={activeSpace}
+              user={user}
+              loadingSpaces={loadingSpaces}
+              onSpaceSelect={setActiveSpace}
+              onCreateSpace={() => setShowAddSpaceModal(true)}
+              onEditSpace={(space: any) => {
+                setSpaceToEdit(space);
+                setEditSpaceName(space.name);
+                const isCollab = (space.member_ids?.length ?? 0) > 1 ||
+                  (space.pending_emails?.length ?? 0) > 0;
+                setEditSpaceCollaborative(isCollab);
+                setInviteEmails(['']);
+                setShowEditSpaceModal(true);
+              }}
+            />
+            <div className="relative" ref={settingsDropdownRef}>
+              <button
+                onClick={() => setShowSettingsDropdown(!showSettingsDropdown)}
+                className="text-accent hover:text-accent-light text-lg w-8 h-8 flex items-center justify-center rounded-lg transition-colors"
+                title="Settings"
+              >
+                ⚙️
+              </button>
+
+              {showSettingsDropdown && (
+                <div className="absolute right-0 mt-2 w-48 bg-black border border-gray-800 rounded-lg shadow-2xl z-50">
+                  <button
+                    onClick={() => {
+                      setShowSettingsDropdown(false);
+                      onShowEmailSettings?.();
+                    }}
+                    className="w-full text-left px-4 py-3 text-gray-300 hover:bg-gray-900 hover:text-gray-100 transition-colors rounded-t-lg"
+                  >
+                    Email Settings
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowSettingsDropdown(false);
+                      onShowInsights?.();
+                    }}
+                    className="w-full text-left px-4 py-3 text-gray-300 hover:bg-gray-900 hover:text-gray-100 transition-colors"
+                  >
+                    Insights
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowSettingsDropdown(false);
+                      onShowExportModal?.();
+                    }}
+                    className="w-full text-left px-4 py-3 text-gray-300 hover:bg-gray-900 hover:text-gray-100 transition-colors"
+                  >
+                    Export Data
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowSettingsDropdown(false);
+                      onShowContactModal?.();
+                    }}
+                    className="w-full text-left px-4 py-3 text-gray-300 hover:bg-gray-900 hover:text-gray-100 transition-colors"
+                  >
+                    Contact
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowSettingsDropdown(false);
+                      onLogout?.();
+                    }}
+                    className="w-full text-left px-4 py-3 text-red-400 hover:bg-red-900/20 hover:text-red-300 transition-colors rounded-b-lg"
+                  >
+                    Logout
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
 
       {error && (
-        <div className="bg-red-900/20 border border-red-800 text-red-300 px-4 py-3 rounded-xl mb-4 flex-shrink-0">
+        <div className="bg-red-900/20 border border-red-800 text-red-300 px-4 py-3 rounded-xl mb-4 mx-4 flex-shrink-0">
           {error}
         </div>
       )}
@@ -991,17 +1099,18 @@ export default function AIToDoListApp({
       )}
 
       {/* Tab Content */}
-      <SwipeableViews
-        index={tabIndex}
-        onChangeIndex={handleTabChange}
-        style={{ height: 'calc(100vh - 140px)' }}
-        containerStyle={{ height: '100%' }}
-        resistance={true}
-        ignoreNativeScroll={false}
-        threshold={10}
-        disabled={false}
-        enableMouseEvents={false}
-      >
+      <div className="flex-1 min-h-0">
+        <SwipeableViews
+          index={tabIndex}
+          onChangeIndex={handleTabChange}
+          style={{ height: '100%' }}
+          containerStyle={{ height: '100%' }}
+          resistance={true}
+          ignoreNativeScroll={false}
+          threshold={10}
+          disabled={false}
+          enableMouseEvents={false}
+        >
         {/* Tasks Tab */}
         <div
           ref={tasksTabRef}
@@ -1286,7 +1395,7 @@ export default function AIToDoListApp({
 
       {/* Show/Hide Completed Toggle Button */}
       {completedTodos.length > 0 && (
-        <div className="mt-6 flex justify-center">
+        <div className="mt-6 mb-4 flex justify-center">
           <button
             onClick={() => setShowCompleted(!showCompleted)}
             className="bg-gray-900 hover:bg-gray-800 text-gray-300 px-4 py-2 rounded-lg transition-colors border border-gray-800"
@@ -1297,7 +1406,7 @@ export default function AIToDoListApp({
       )}
 
       {showCompleted && completedTodos.length > 0 && (
-        <div className="mt-6 space-y-3">
+        <div className="mt-6 mb-4 space-y-3">
           {completedTodos.map((todo) => (
             <TodoItem
               key={todo._id}
@@ -1414,6 +1523,7 @@ export default function AIToDoListApp({
           </div>
         </div>
       </SwipeableViews>
+      </div>
 
       {/* Insights Modal */}
       {showInsights && (
