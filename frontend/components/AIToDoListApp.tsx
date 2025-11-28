@@ -6,6 +6,7 @@ import Link from "next/link";
 import InsightsComponent from "./InsightsComponent";
 import JournalComponent from "./JournalComponent";
 import SpaceDropdown from "./SpaceDropdown";
+import { NoSwipeZone } from "./NoSwipeZone";
 import { sortSpaces } from "../utils/spaceUtils";
 import PullToRefresh from "react-simple-pull-to-refresh";
 import SwipeableViews from "react-swipeable-views-react-18-fix";
@@ -130,7 +131,6 @@ export default function AIToDoListApp({
   // Tab state
   const [activeTab, setActiveTab] = useState<'tasks' | 'agent' | 'journal'>('tasks');
   const [tabIndex, setTabIndex] = useState(0); // 0=tasks, 1=agent, 2=journal
-  const isChangingTabRef = useRef(false);
   const tasksTabRef = useRef<HTMLDivElement>(null);
   const agentTabRef = useRef<HTMLDivElement>(null);
   const journalTabRef = useRef<HTMLDivElement>(null);
@@ -297,22 +297,11 @@ export default function AIToDoListApp({
     ]);
   }, [fetchCategories, fetchTodos, fetchMembers]);
 
-  // Handle tab change (from swipe or button click)
+  // Handle tab change (from button click only - swiping is disabled)
   const handleTabChange = useCallback((index: number) => {
-    // Ignore calls while we're already changing tabs (prevents SwipeableViews double-firing)
-    if (isChangingTabRef.current) {
-      return;
-    }
-
-    isChangingTabRef.current = true;
     const tabs: ('tasks' | 'agent' | 'journal')[] = ['tasks', 'agent', 'journal'];
     setTabIndex(index);
     setActiveTab(tabs[index]);
-
-    // Reset flag after a short delay
-    setTimeout(() => {
-      isChangingTabRef.current = false;
-    }, 100);
   }, []);
 
   // Initial load when token becomes available
@@ -1043,7 +1032,27 @@ export default function AIToDoListApp({
         </div>
       )}
 
-      {/* Tab Navigation - Full Width */}
+      {showUpdatePrompt && (
+        <div className="bg-accent/20 border border-accent-dark text-accent-light px-4 py-3 rounded-xl mb-4 flex justify-between items-center flex-shrink-0">
+          <span>🔄 A new version is available!</span>
+          <div className="space-x-2">
+            <button
+              onClick={handleUpdate}
+              className="bg-accent text-foreground px-3 py-1 rounded-lg text-sm hover:bg-accent-light transition-colors"
+            >
+              Update Now
+            </button>
+            <button
+              onClick={() => setShowUpdatePrompt(false)}
+              className="bg-gray-800 text-gray-300 px-3 py-1 rounded-lg text-sm hover:bg-gray-700 transition-colors"
+            >
+              Later
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Tab Navigation */}
       <div className="flex border-b border-gray-800 flex-shrink-0">
         <button
           onClick={() => handleTabChange(0)}
@@ -1076,27 +1085,6 @@ export default function AIToDoListApp({
           Journal
         </button>
       </div>
-
-
-      {showUpdatePrompt && (
-        <div className="bg-accent/20 border border-accent-dark text-accent-light px-4 py-3 rounded-xl mb-4 flex justify-between items-center flex-shrink-0">
-          <span>🔄 A new version is available!</span>
-          <div className="space-x-2">
-            <button
-              onClick={handleUpdate}
-              className="bg-accent text-foreground px-3 py-1 rounded-lg text-sm hover:bg-accent-light transition-colors"
-            >
-              Update Now
-            </button>
-            <button
-              onClick={() => setShowUpdatePrompt(false)}
-              className="bg-gray-800 text-gray-300 px-3 py-1 rounded-lg text-sm hover:bg-gray-700 transition-colors"
-            >
-              Later
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* Tab Content */}
       <div className="flex-1 min-h-0">
@@ -1140,15 +1128,16 @@ export default function AIToDoListApp({
             )}
           </div> */}
 
-          {/* Categories - Wrapping pills */}
+          {/* Categories - Horizontal scroll */}
           <div className="mb-6">
             {loadingCategories && (
               <div className="text-gray-400 mb-2">Loading categories...</div>
             )}
-            <div className="flex flex-wrap gap-2 pb-2">
+            <NoSwipeZone>
+              <div className="flex gap-2 pb-2 custom-scrollbar">
               <button
                 onClick={() => setActiveCat('All')}
-                className={`px-4 py-2 rounded-xl text-base transition-colors ${
+                className={`px-4 py-2 rounded-xl text-base transition-colors flex-shrink-0 ${
                   activeCat === 'All'
                     ? 'bg-accent text-foreground shadow-lg'
                     : 'bg-gray-900 text-gray-300 hover:bg-gray-800 border border-gray-800'
@@ -1170,7 +1159,7 @@ export default function AIToDoListApp({
                 <button
                   key={catName}
                   onClick={() => setActiveCat(catName)}
-                  className={`px-4 py-2 rounded-xl text-base transition-colors ${
+                  className={`px-4 py-2 rounded-xl text-base transition-colors flex-shrink-0 ${
                     catName === activeCat
                       ? 'bg-accent text-foreground shadow-lg'
                       : 'bg-gray-900 text-gray-300 hover:bg-gray-800 border border-gray-800'
@@ -1187,6 +1176,7 @@ export default function AIToDoListApp({
                 +
               </button>
             </div>
+            </NoSwipeZone>
           </div>
       {/* Add new todo */}
       <div className="mb-6">
