@@ -7,6 +7,7 @@ import InsightsComponent from "./InsightsComponent";
 import JournalComponent from "./JournalComponent";
 import SpaceDropdown from "./SpaceDropdown";
 import { sortSpaces } from "../utils/spaceUtils";
+import PullToRefresh from "react-simple-pull-to-refresh";
 
 interface Props {
   user: any;
@@ -269,6 +270,15 @@ export default function AIToDoListApp({
     fetchMembers();
   }, [fetchCategories, fetchTodos, fetchMembers]);
 
+  // Pull-to-refresh handler
+  const handleRefresh = useCallback(async () => {
+    await Promise.all([
+      fetchCategories(),
+      fetchTodos(false),
+      fetchMembers(),
+      new Promise(resolve => setTimeout(resolve, 500))
+    ]);
+  }, [fetchCategories, fetchTodos, fetchMembers]);
 
   // Initial load when token becomes available
   useEffect(() => {
@@ -933,7 +943,11 @@ export default function AIToDoListApp({
 
       {/* Tab Content */}
       {activeTab === 'tasks' && (
-        <div>
+        <PullToRefresh
+          onRefresh={handleRefresh}
+          pullingContent=""
+        >
+          <div>
           {/* Header Row with Page Title and Space Dropdown */}
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-2">
@@ -1327,7 +1341,8 @@ export default function AIToDoListApp({
           </div>
         </div>
       )}
-        </div>
+          </div>
+        </PullToRefresh>
       )}
 
       {activeTab === 'agent' && (
