@@ -8,6 +8,7 @@ import JournalComponent from "./JournalComponent";
 import SpaceDropdown from "./SpaceDropdown";
 import { sortSpaces } from "../utils/spaceUtils";
 import PullToRefresh from "react-simple-pull-to-refresh";
+import { useSwipeable } from "react-swipeable";
 
 interface Props {
   user: any;
@@ -279,6 +280,23 @@ export default function AIToDoListApp({
       new Promise(resolve => setTimeout(resolve, 500))
     ]);
   }, [fetchCategories, fetchTodos, fetchMembers]);
+
+  // Swipe handlers for tab navigation
+  const handleSwipeLeft = useCallback(() => {
+    if (activeTab === 'tasks') setActiveTab('agent');
+    else if (activeTab === 'agent') setActiveTab('journal');
+  }, [activeTab]);
+
+  const handleSwipeRight = useCallback(() => {
+    if (activeTab === 'journal') setActiveTab('agent');
+    else if (activeTab === 'agent') setActiveTab('tasks');
+  }, [activeTab]);
+
+  const swipeHandlers = useSwipeable({
+    onSwipedLeft: handleSwipeLeft,
+    onSwipedRight: handleSwipeRight,
+    trackMouse: true, // Also works with mouse for desktop testing
+  });
 
   // Initial load when token becomes available
   useEffect(() => {
@@ -942,6 +960,7 @@ export default function AIToDoListApp({
       )}
 
       {/* Tab Content */}
+      <div {...swipeHandlers}>
       {activeTab === 'tasks' && (
         <PullToRefresh
           onRefresh={handleRefresh}
@@ -1397,6 +1416,7 @@ export default function AIToDoListApp({
           <JournalComponent token={token} activeSpace={activeSpace} />
         </div>
       )}
+      </div>
 
       {/* Insights Modal */}
       {showInsights && (
