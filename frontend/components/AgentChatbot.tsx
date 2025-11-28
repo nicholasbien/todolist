@@ -43,8 +43,8 @@ export default function AgentChatbot({ activeSpace, token, isActive = true }: Ch
   };
 
   const scrollToBottom = () => {
-    if (messagesEndRef.current && typeof messagesEndRef.current.scrollIntoView === 'function') {
-      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
     }
   };
 
@@ -237,10 +237,10 @@ export default function AgentChatbot({ activeSpace, token, isActive = true }: Ch
   };
 
   return (
-    <div className="flex flex-col">
+    <div className="flex flex-col h-full">
       {/* Clear button at top */}
       {messages.length > 0 && (
-        <div className="mb-2 flex justify-end">
+        <div className="mb-2 flex justify-end flex-shrink-0">
           <button
             onClick={handleClear}
             disabled={loading}
@@ -255,7 +255,7 @@ export default function AgentChatbot({ activeSpace, token, isActive = true }: Ch
       <div
         ref={chatContainerRef}
         onScroll={handleScroll}
-        className="mb-4 space-y-4 max-h-[60vh] overflow-y-auto custom-scrollbar"
+        className="flex-1 mb-4 space-y-4 overflow-y-auto custom-scrollbar"
       >
         {messages.map((msg, idx) => (
           <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
@@ -313,16 +313,16 @@ export default function AgentChatbot({ activeSpace, token, isActive = true }: Ch
       </div>
 
       {error && (
-        <div className="mb-2 p-2 bg-red-900/20 border border-red-800 rounded-lg">
+        <div className="mb-2 p-2 bg-red-900/20 border border-red-800 rounded-lg flex-shrink-0">
           <p className="text-red-300 text-sm">{error}</p>
         </div>
       )}
 
       {/* Input area */}
-      <div className="flex gap-2">
-        <textarea
-          className="flex-1 bg-gray-900 border border-gray-700 text-gray-100 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-accent resize-none"
-          rows={2}
+      <div className="flex gap-2 flex-shrink-0 items-center mb-2">
+        <input
+          type="text"
+          className="flex-1 bg-gray-900 border border-gray-700 text-gray-100 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-accent"
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
           onKeyPress={handleKeyPress}
@@ -332,7 +332,7 @@ export default function AgentChatbot({ activeSpace, token, isActive = true }: Ch
         <button
           onClick={handleAsk}
           disabled={loading || !question.trim() }
-          className="bg-accent text-foreground px-6 py-2 rounded-lg hover:bg-accent-light disabled:bg-accent-dark disabled:cursor-not-allowed transition-colors self-end"
+          className="bg-accent text-foreground px-6 py-3 rounded-lg hover:bg-accent-light disabled:bg-accent-dark disabled:cursor-not-allowed transition-colors"
         >
           Send
         </button>

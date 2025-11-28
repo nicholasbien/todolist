@@ -119,6 +119,10 @@ export default function AIToDoListApp({
   // Tab state
   const [activeTab, setActiveTab] = useState<'tasks' | 'agent' | 'journal'>('tasks');
   const [tabIndex, setTabIndex] = useState(0); // 0=tasks, 1=agent, 2=journal
+  const isChangingTabRef = useRef(false);
+  const tasksTabRef = useRef<HTMLDivElement>(null);
+  const agentTabRef = useRef<HTMLDivElement>(null);
+  const journalTabRef = useRef<HTMLDivElement>(null);
 
 
   const handleOpenEmailSettings = async () => {
@@ -284,9 +288,20 @@ export default function AIToDoListApp({
 
   // Handle tab change (from swipe or button click)
   const handleTabChange = useCallback((index: number) => {
+    // Ignore calls while we're already changing tabs (prevents SwipeableViews double-firing)
+    if (isChangingTabRef.current) {
+      return;
+    }
+
+    isChangingTabRef.current = true;
     const tabs: ('tasks' | 'agent' | 'journal')[] = ['tasks', 'agent', 'journal'];
     setTabIndex(index);
     setActiveTab(tabs[index]);
+
+    // Reset flag after a short delay
+    setTimeout(() => {
+      isChangingTabRef.current = false;
+    }, 100);
   }, []);
 
   // Initial load when token becomes available
@@ -890,13 +905,13 @@ export default function AIToDoListApp({
     <div>
 
       {error && (
-        <div className="bg-red-900/20 border border-red-800 text-red-300 px-4 py-3 rounded-xl mb-4">
+        <div className="bg-red-900/20 border border-red-800 text-red-300 px-4 py-3 rounded-xl mb-4 flex-shrink-0">
           {error}
         </div>
       )}
 
       {/* Tab Navigation - Full Width */}
-      <div className="flex border-b border-gray-800 mb-4">
+      <div className="flex border-b border-gray-800 mb-4 flex-shrink-0">
         <button
           onClick={() => handleTabChange(0)}
           className={`flex-1 py-3 px-2 sm:px-6 font-medium text-sm transition-colors ${
@@ -931,7 +946,7 @@ export default function AIToDoListApp({
 
 
       {showUpdatePrompt && (
-        <div className="bg-accent/20 border border-accent-dark text-accent-light px-4 py-3 rounded-xl mb-4 flex justify-between items-center">
+        <div className="bg-accent/20 border border-accent-dark text-accent-light px-4 py-3 rounded-xl mb-4 flex justify-between items-center flex-shrink-0">
           <span>🔄 A new version is available!</span>
           <div className="space-x-2">
             <button
@@ -951,9 +966,22 @@ export default function AIToDoListApp({
       )}
 
       {/* Tab Content */}
-      <SwipeableViews index={tabIndex} onChangeIndex={handleTabChange} animateHeight>
+      <SwipeableViews
+        index={tabIndex}
+        onChangeIndex={handleTabChange}
+        style={activeTab === 'tasks' ? {} : { height: 'calc(100vh - 180px)' }}
+        containerStyle={activeTab === 'tasks' ? {} : { height: '100%' }}
+        resistance={true}
+        ignoreNativeScroll={false}
+        threshold={10}
+        disabled={false}
+        enableMouseEvents={false}
+      >
         {/* Tasks Tab */}
-        <div style={{ padding: '0 16px' }}>
+        <div
+          ref={tasksTabRef}
+          style={{ padding: '0 16px 16px 16px', touchAction: 'pan-y' }}
+        >
         <PullToRefresh
           onRefresh={handleRefresh}
           pullingContent=""
@@ -1236,7 +1264,7 @@ export default function AIToDoListApp({
       {loadingTodos && (
         <div className="text-gray-400 mb-2">Loading tasks...</div>
       )}
-      <div className="space-y-3">
+      <div className={`space-y-3 ${completedTodos.length === 0 ? 'mb-2' : ''}`}>
         {uncompletedTodos.map((todo) => (
           <TodoItem
             key={todo._id}
@@ -1256,7 +1284,7 @@ export default function AIToDoListApp({
 
       {/* Show/Hide Completed Toggle Button */}
       {completedTodos.length > 0 && (
-        <div className="mt-6 flex justify-center">
+        <div className="mt-6 mb-2 flex justify-center">
           <button
             onClick={() => setShowCompleted(!showCompleted)}
             className="bg-gray-900 hover:bg-gray-800 text-gray-300 px-4 py-2 rounded-lg transition-colors border border-gray-800"
@@ -1267,7 +1295,7 @@ export default function AIToDoListApp({
       )}
 
       {showCompleted && completedTodos.length > 0 && (
-        <div className="mt-6 space-y-3">
+        <div className="mt-6 space-y-3 mb-2">
           {completedTodos.map((todo) => (
             <TodoItem
               key={todo._id}
@@ -1357,9 +1385,12 @@ export default function AIToDoListApp({
         </div>
 
         {/* Agent Tab */}
-        <div style={{ padding: '0 16px' }}>
+        <div
+          ref={agentTabRef}
+          style={{ padding: '0 16px', height: '100%', display: 'flex', flexDirection: 'column', touchAction: 'pan-y' }}
+        >
           {/* Header Row with Page Title and Space Dropdown */}
-          <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center justify-between mb-6" style={{ flexShrink: 0 }}>
             <h2 className="text-xl font-semibold text-gray-100">Agent</h2>
             <SpaceDropdown
               spaces={spaces}
@@ -1379,13 +1410,18 @@ export default function AIToDoListApp({
               }}
             />
           </div>
-          <AgentChatbot activeSpace={activeSpace} token={token} isActive={activeTab === 'agent'} />
+          <div style={{ flex: 1, minHeight: 0 }}>
+            <AgentChatbot activeSpace={activeSpace} token={token} isActive={activeTab === 'agent'} />
+          </div>
         </div>
 
         {/* Journal Tab */}
-        <div style={{ padding: '0 16px' }}>
+        <div
+          ref={journalTabRef}
+          style={{ padding: '0 16px', height: '100%', display: 'flex', flexDirection: 'column', touchAction: 'pan-y' }}
+        >
           {/* Header Row with Page Title and Space Dropdown */}
-          <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center justify-between mb-6" style={{ flexShrink: 0 }}>
             <h2 className="text-xl font-semibold text-gray-100">Journal</h2>
             <SpaceDropdown
               spaces={spaces}
@@ -1405,7 +1441,9 @@ export default function AIToDoListApp({
               }}
             />
           </div>
-          <JournalComponent token={token} activeSpace={activeSpace} />
+          <div style={{ flex: 1, minHeight: 0 }}>
+            <JournalComponent token={token} activeSpace={activeSpace} />
+          </div>
         </div>
       </SwipeableViews>
 
