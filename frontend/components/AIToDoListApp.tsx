@@ -994,8 +994,8 @@ export default function AIToDoListApp({
       <SwipeableViews
         index={tabIndex}
         onChangeIndex={handleTabChange}
-        style={activeTab === 'tasks' ? {} : { height: 'calc(100vh - 180px)' }}
-        containerStyle={activeTab === 'tasks' ? {} : { height: '100%' }}
+        style={{ height: 'calc(100vh - 180px)' }}
+        containerStyle={{ height: '100%' }}
         resistance={true}
         ignoreNativeScroll={false}
         threshold={10}
@@ -1005,13 +1005,14 @@ export default function AIToDoListApp({
         {/* Tasks Tab */}
         <div
           ref={tasksTabRef}
-          style={{ padding: '0 16px 16px 16px', touchAction: 'pan-y' }}
+          style={{ padding: '0 16px 16px 16px', height: '100%', overflowY: 'auto', touchAction: 'pan-y' }}
+          className="custom-scrollbar"
         >
-        <PullToRefresh
-          onRefresh={handleRefresh}
-          pullingContent=""
-        >
-          <div>
+          <PullToRefresh
+            onRefresh={handleRefresh}
+            pullingContent=""
+          >
+            <div>
           {/* Header Row with Page Title */}
           {/* <div className="flex items-center gap-2 mb-6">
             <h2 className="text-xl font-semibold text-gray-100">
@@ -1078,8 +1079,6 @@ export default function AIToDoListApp({
               </button>
             </div>
           </div>
-
-
       {/* Add new todo */}
       <div className="mb-6">
         <div className="flex gap-2">
@@ -1383,8 +1382,8 @@ export default function AIToDoListApp({
           </div>
         </div>
       )}
-          </div>
-        </PullToRefresh>
+            </div>
+          </PullToRefresh>
         </div>
 
         {/* Agent Tab */}
