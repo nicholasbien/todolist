@@ -208,9 +208,8 @@ export default function JournalComponent({ token, activeSpace }: JournalProps) {
       )}
 
       {/* Date Picker */}
-      <div className="flex items-center space-x-4 mb-4 flex-shrink-0">
+      <div className="flex flex-col items-center space-y-2 mb-4 flex-shrink-0">
         <div className="flex items-center space-x-2">
-          <label htmlFor="journal-date" className="text-sm text-gray-400">Date:</label>
           <button
             type="button"
             onClick={() => adjustDate(-1)}
@@ -236,8 +235,6 @@ export default function JournalComponent({ token, activeSpace }: JournalProps) {
             &gt;
           </button>
         </div>
-
-        <div className="flex-1"></div>
 
         <div className="text-sm text-gray-400">
           {getSaveStatus()}

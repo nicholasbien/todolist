@@ -4,6 +4,7 @@ import { useOffline } from '../context/OfflineContext';
 import dynamic from 'next/dynamic';
 import Head from 'next/head';
 import { apiRequest } from '../utils/api';
+import SpaceDropdown from '../components/SpaceDropdown';
 
 const AIToDoListApp = dynamic(() => import('../components/AIToDoListApp'), {
   ssr: false,
@@ -302,6 +303,9 @@ export default function Home() {
   const settingsDropdownRef = useRef(null);
   const isOffline = useOffline();
 
+  // Space dropdown state passed from AIToDoListApp
+  const [spaceDropdownProps, setSpaceDropdownProps] = useState<any>(null);
+
   useEffect(() => {
     setIsClient(true);
 
@@ -474,25 +478,26 @@ export default function Home() {
           <div className="flex justify-between items-center mb-6 px-4 flex-shrink-0">
             <h1 className="text-2xl font-bold">todolist.nyc</h1>
           <div className="flex items-center space-x-4">
-            <div className="flex items-center">
-              {isOffline && (
-                <div className="relative mr-2">
-                  <button
-                    onClick={() => setShowOfflineTooltip(true)}
-                    title="Offline"
-                    className="focus:outline-none"
-                  >
-                    📴
-                  </button>
-                  {showOfflineTooltip && (
-                    <div className="absolute left-1/2 -translate-x-1/2 mt-2 w-64 bg-gray-800 text-gray-100 text-xs p-2 rounded-lg shadow-lg z-10">
-                      {"You're offline. Todos will be synced when you're back online."}
-                    </div>
-                  )}
-                </div>
-              )}
-              <span className="text-sm text-gray-400">Hello, {user?.first_name || user?.email}</span>
-            </div>
+            {isOffline && (
+              <div className="relative mr-2">
+                <button
+                  onClick={() => setShowOfflineTooltip(true)}
+                  title="Offline"
+                  className="focus:outline-none"
+                >
+                  📴
+                </button>
+                {showOfflineTooltip && (
+                  <div className="absolute left-1/2 -translate-x-1/2 mt-2 w-64 bg-gray-800 text-gray-100 text-xs p-2 rounded-lg shadow-lg z-10">
+                    {"You're offline. Todos will be synced when you're back online."}
+                  </div>
+                )}
+              </div>
+            )}
+            {/* <span className="text-sm text-gray-400">Hello, {user?.first_name || user?.email}</span> */}
+            {spaceDropdownProps && (
+              <SpaceDropdown {...spaceDropdownProps} />
+            )}
             <div className="relative" ref={settingsDropdownRef}>
               <button
                 onClick={() => setShowSettingsDropdown(!showSettingsDropdown)}
@@ -562,6 +567,7 @@ export default function Home() {
           onCloseEmailSettings={() => setShowEmailSettings(false)}
           showInsights={showInsightsModal}
           onCloseInsights={() => setShowInsightsModal(false)}
+          onSpaceControlReady={setSpaceDropdownProps}
         />
         {/* Export Modal */}
         {showExportModal && (

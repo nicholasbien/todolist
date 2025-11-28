@@ -19,6 +19,7 @@ interface Props {
   onCloseEmailSettings?: () => void;
   showInsights?: boolean;
   onCloseInsights?: () => void;
+  onSpaceControlReady?: (props: any) => void;
 }
 
 /**
@@ -34,6 +35,7 @@ export default function AIToDoListApp({
   onCloseEmailSettings,
   showInsights,
   onCloseInsights,
+  onSpaceControlReady,
 }: Props) {
   const { logout, clearAuthExpired, authenticatedFetch } = useAuth();
   const [todos, setTodos] = useState([]);
@@ -79,6 +81,29 @@ export default function AIToDoListApp({
       localStorage.removeItem('active_space_id');
     }
   }, [activeSpace]);
+
+  // Pass space dropdown props to parent (index.tsx)
+  useEffect(() => {
+    if (onSpaceControlReady) {
+      onSpaceControlReady({
+        spaces,
+        activeSpace,
+        user,
+        loadingSpaces,
+        onSpaceSelect: setActiveSpace,
+        onCreateSpace: () => setShowAddSpaceModal(true),
+        onEditSpace: (space: any) => {
+          setSpaceToEdit(space);
+          setEditSpaceName(space.name);
+          const isCollab = (space.member_ids?.length ?? 0) > 1 ||
+            (space.pending_emails?.length ?? 0) > 0;
+          setEditSpaceCollaborative(isCollab);
+          setInviteEmails(['']);
+          setShowEditSpaceModal(true);
+        },
+      });
+    }
+  }, [spaces, activeSpace, user, loadingSpaces, onSpaceControlReady]);
 
   const handleError = useCallback(
     (err: any, prefix?: string) => {
@@ -987,55 +1012,33 @@ export default function AIToDoListApp({
           pullingContent=""
         >
           <div>
-          {/* Header Row with Page Title and Space Dropdown */}
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-2">
-              <h2 className="text-xl font-semibold text-gray-100">
-                {activeCat === 'All' ? 'Tasks' : `Tasks: ${activeCat}`}
-              </h2>
-              {activeCat !== "All" && (
-                <button
-                  onClick={() => {
-                    setEditCatName(activeCat);
-                    setShowEditCategoryModal(true);
-                  }}
-                  className="text-gray-400 hover:text-gray-200 text-sm border border-gray-700 px-2 py-1 rounded-lg hover:border-gray-600 transition-colors"
-                >
-                  Edit
-                </button>
-              )}
-            </div>
-            <SpaceDropdown
-              spaces={spaces}
-              activeSpace={activeSpace}
-              user={user}
-              loadingSpaces={loadingSpaces}
-              onSpaceSelect={setActiveSpace}
-              onCreateSpace={() => setShowAddSpaceModal(true)}
-              onEditSpace={(space) => {
-                setSpaceToEdit(space);
-                setEditSpaceName(space.name);
-                const isCollab = (space.member_ids?.length ?? 0) > 1 ||
-                  (space.pending_emails?.length ?? 0) > 0;
-                setEditSpaceCollaborative(isCollab);
-                setInviteEmails(['']);
-                setShowEditSpaceModal(true);
-              }}
-            />
-          </div>
+          {/* Header Row with Page Title */}
+          {/* <div className="flex items-center gap-2 mb-6">
+            <h2 className="text-xl font-semibold text-gray-100">
+              {activeCat === 'All' ? 'Tasks' : `Tasks: ${activeCat}`}
+            </h2>
+            {activeCat !== "All" && (
+              <button
+                onClick={() => {
+                  setEditCatName(activeCat);
+                  setShowEditCategoryModal(true);
+                }}
+                className="text-gray-400 hover:text-gray-200 text-sm border border-gray-700 px-2 py-1 rounded-lg hover:border-gray-600 transition-colors"
+              >
+                Edit
+              </button>
+            )}
+          </div> */}
 
-          {/* Categories - Horizontal wrapping pills */}
+          {/* Categories - Wrapping pills */}
           <div className="mb-6">
             {loadingCategories && (
               <div className="text-gray-400 mb-2">Loading categories...</div>
             )}
-            <div
-              className="flex gap-2 overflow-x-auto whitespace-nowrap scroll-smooth pb-2"
-              style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-            >
+            <div className="flex flex-wrap gap-2 pb-2">
               <button
                 onClick={() => setActiveCat('All')}
-                className={`px-4 py-2 rounded-xl text-base transition-colors flex-shrink-0 ${
+                className={`px-4 py-2 rounded-xl text-base transition-colors ${
                   activeCat === 'All'
                     ? 'bg-accent text-foreground shadow-lg'
                     : 'bg-gray-900 text-gray-300 hover:bg-gray-800 border border-gray-800'
@@ -1057,7 +1060,7 @@ export default function AIToDoListApp({
                 <button
                   key={catName}
                   onClick={() => setActiveCat(catName)}
-                  className={`px-4 py-2 rounded-xl text-base transition-colors flex-shrink-0 ${
+                  className={`px-4 py-2 rounded-xl text-base transition-colors ${
                     catName === activeCat
                       ? 'bg-accent text-foreground shadow-lg'
                       : 'bg-gray-900 text-gray-300 hover:bg-gray-800 border border-gray-800'
@@ -1389,27 +1392,10 @@ export default function AIToDoListApp({
           ref={agentTabRef}
           style={{ padding: '0 16px', height: '100%', display: 'flex', flexDirection: 'column', touchAction: 'pan-y' }}
         >
-          {/* Header Row with Page Title and Space Dropdown */}
-          <div className="flex items-center justify-between mb-6" style={{ flexShrink: 0 }}>
+          {/* Header Row with Page Title */}
+          {/* <div className="mb-6" style={{ flexShrink: 0 }}>
             <h2 className="text-xl font-semibold text-gray-100">Agent</h2>
-            <SpaceDropdown
-              spaces={spaces}
-              activeSpace={activeSpace}
-              user={user}
-              loadingSpaces={loadingSpaces}
-              onSpaceSelect={setActiveSpace}
-              onCreateSpace={() => setShowAddSpaceModal(true)}
-              onEditSpace={(space) => {
-                setSpaceToEdit(space);
-                setEditSpaceName(space.name);
-                const isCollab = (space.member_ids?.length ?? 0) > 1 ||
-                  (space.pending_emails?.length ?? 0) > 0;
-                setEditSpaceCollaborative(isCollab);
-                setInviteEmails(['']);
-                setShowEditSpaceModal(true);
-              }}
-            />
-          </div>
+          </div> */}
           <div style={{ flex: 1, minHeight: 0 }}>
             <AgentChatbot activeSpace={activeSpace} token={token} isActive={activeTab === 'agent'} />
           </div>
@@ -1420,27 +1406,10 @@ export default function AIToDoListApp({
           ref={journalTabRef}
           style={{ padding: '0 16px', height: '100%', display: 'flex', flexDirection: 'column', touchAction: 'pan-y' }}
         >
-          {/* Header Row with Page Title and Space Dropdown */}
-          <div className="flex items-center justify-between mb-6" style={{ flexShrink: 0 }}>
+          {/* Header Row with Page Title */}
+          {/* <div className="mb-6" style={{ flexShrink: 0 }}>
             <h2 className="text-xl font-semibold text-gray-100">Journal</h2>
-            <SpaceDropdown
-              spaces={spaces}
-              activeSpace={activeSpace}
-              user={user}
-              loadingSpaces={loadingSpaces}
-              onSpaceSelect={setActiveSpace}
-              onCreateSpace={() => setShowAddSpaceModal(true)}
-              onEditSpace={(space) => {
-                setSpaceToEdit(space);
-                setEditSpaceName(space.name);
-                const isCollab = (space.member_ids?.length ?? 0) > 1 ||
-                  (space.pending_emails?.length ?? 0) > 0;
-                setEditSpaceCollaborative(isCollab);
-                setInviteEmails(['']);
-                setShowEditSpaceModal(true);
-              }}
-            />
-          </div>
+          </div> */}
           <div style={{ flex: 1, minHeight: 0 }}>
             <JournalComponent token={token} activeSpace={activeSpace} />
           </div>
