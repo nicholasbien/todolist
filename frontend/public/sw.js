@@ -1,7 +1,7 @@
 // IMPORTANT: Always increment these versions when modifying this service worker file
 // This forces browsers to download and use the updated service worker
-const STATIC_CACHE = 'todo-static-v105';
-const API_CACHE = 'todo-api-v105';
+const STATIC_CACHE = 'todo-static-v106';
+const API_CACHE = 'todo-api-v106';
 
 const GLOBAL_DB_NAME = 'TodoGlobalDB';
 const USER_DB_PREFIX = 'TodoUserDB_';
@@ -627,7 +627,6 @@ async function handleApiRequest(request) {
       const apiPath = url.pathname.startsWith('/') ? url.pathname.slice(1) : url.pathname;
       const queryString = url.search;
 
-
       // Use production backend for deployed domains and Capacitor
       const backendUrl = (isProdHost || isCapacitor)
         ? CONFIG.PRODUCTION_BACKEND
@@ -1244,6 +1243,11 @@ async function syncQueue() {
   const isCapacitor = self.location?.protocol === 'file:';
   const isProdHost = self.location?.hostname?.endsWith(CONFIG.PRODUCTION_DOMAIN);
 
+  // Helper to get backend URL
+  const getBackendUrl = () => {
+    return (isProdHost || isCapacitor) ? CONFIG.PRODUCTION_BACKEND : CONFIG.LOCAL_BACKEND;
+  };
+
   try {
     const queue = await readQueue(authData.userId);
     const headers = await getAuthHeaders();
@@ -1259,7 +1263,7 @@ async function syncQueue() {
         case 'CREATE':
           if (op.data._id.startsWith('offline_')) {
             const { _id: offlineId, ...payload } = op.data;
-            const todoSyncUrl = `${isCapacitor ? CONFIG.PRODUCTION_BACKEND : (isProdHost ? CONFIG.PRODUCTION_BACKEND : CONFIG.LOCAL_BACKEND)}/todos`;
+            const todoSyncUrl = `${getBackendUrl()}/todos`;
             res = await fetch(todoSyncUrl, {
               method: 'POST',
               headers,
@@ -1354,7 +1358,7 @@ async function syncQueue() {
           }
           break;
         case 'CREATE_CATEGORY':
-          const categorySyncUrl = `${isCapacitor ? CONFIG.PRODUCTION_BACKEND : (isProdHost ? CONFIG.PRODUCTION_BACKEND : CONFIG.LOCAL_BACKEND)}/categories`;
+          const categorySyncUrl = `${getBackendUrl()}/categories`;
           res = await fetch(categorySyncUrl, {
             method: 'POST',
             headers,
@@ -1394,7 +1398,7 @@ async function syncQueue() {
         case 'CREATE_JOURNAL':
           if (op.data._id.startsWith('offline_journal_')) {
             const { _id: offlineId, ...payload } = op.data;
-            const createJournalUrl = `${isCapacitor ? CONFIG.PRODUCTION_BACKEND : (isProdHost ? CONFIG.PRODUCTION_BACKEND : CONFIG.LOCAL_BACKEND)}/journals`;
+            const createJournalUrl = `${getBackendUrl()}/journals`;
             res = await fetch(createJournalUrl, {
               method: 'POST',
               headers,
@@ -1421,7 +1425,7 @@ async function syncQueue() {
             }
           } else {
             // Handle both offline-generated and regular journal updates
-            const createJournalUrl2 = `${isCapacitor ? CONFIG.PRODUCTION_BACKEND : (isProdHost ? CONFIG.PRODUCTION_BACKEND : CONFIG.LOCAL_BACKEND)}/journals`;
+            const createJournalUrl2 = `${getBackendUrl()}/journals`;
             res = await fetch(createJournalUrl2, {
               method: 'POST',
               headers,
@@ -1439,7 +1443,7 @@ async function syncQueue() {
           console.log(`🔄 Processing UPDATE_JOURNAL for ${op.data.date}, ID: ${_id}`);
           console.log(`📝 UPDATE_JOURNAL payload:`, updatePayload);
           // Use the proper API routing for sync requests
-          const updateJournalUrl = `${isCapacitor ? CONFIG.PRODUCTION_BACKEND : (isProdHost ? CONFIG.PRODUCTION_BACKEND : CONFIG.LOCAL_BACKEND)}/journals`;
+          const updateJournalUrl = `${getBackendUrl()}/journals`;
           res = await fetch(updateJournalUrl, {
             method: 'POST',
             headers,
@@ -1468,7 +1472,7 @@ async function syncQueue() {
           }
 
           if (!deleteJournalId.startsWith('offline_journal_')) {
-            const deleteJournalUrl = `${isCapacitor ? CONFIG.PRODUCTION_BACKEND : (isProdHost ? CONFIG.PRODUCTION_BACKEND : CONFIG.LOCAL_BACKEND)}/journals/${deleteJournalId}`;
+            const deleteJournalUrl = `${getBackendUrl()}/journals/${deleteJournalId}`;
             res = await fetch(deleteJournalUrl, {
               method: 'DELETE',
               headers
