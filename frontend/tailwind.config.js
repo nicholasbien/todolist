@@ -20,9 +20,9 @@ module.exports = {
       fontFamily: {
         serif: ['Georgia', 'Times New Roman', 'serif'],
       },
-      // Fix iOS safe area issues - use dynamic viewport height for Capacitor
+      // Dynamic viewport height for Capacitor, fallback to 100vh for PWA
       height: {
-        screen: ['100vh', '100dvh'], // Fallback to 100vh for PWA, prefer 100dvh for Capacitor
+        screen: ['100vh', '100dvh'],
       },
       minHeight: {
         screen: ['100vh', '100dvh'],

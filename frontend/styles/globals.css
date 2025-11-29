@@ -13,17 +13,16 @@ body {
 
 #__next {
   min-height: 100vh;
-  min-height: 100dvh;
+  min-height: 100dvh; /* Use dynamic viewport for Capacitor */
   width: 100%;
   display: flex;
   flex-direction: column;
 }
 
-/* Fix gap at bottom in PWA mode (standalone) - content goes behind status bar */
+/* PWA fix: content extends behind status bar, so use full viewport */
 @media (display-mode: standalone) {
   #__next {
-    min-height: 100vh; /* Override 100dvh for PWA to account for status bar overlay */
-    padding-bottom: env(safe-area-inset-bottom);
+    min-height: 100vh;
   }
 }
 
