@@ -406,7 +406,7 @@ class TestAgentToolsUnit:
         # Mock MongoDB response
         mock_journal = {
             "_id": "journal123",
-            "content": "Today was a productive day",
+            "text": "Today was a productive day",  # Database uses 'text' field
             "date": "2025-08-31",
             "space_id": "space123",
         }
@@ -424,10 +424,10 @@ class TestAgentToolsUnit:
     @patch("agent.tools.collections")
     async def test_read_journal_entry_recent_entries(self, mock_collections):
         """Test reading recent journal entries."""
-        # Mock MongoDB response
+        # Mock MongoDB response (database uses 'text' field)
         mock_journals = [
-            {"_id": "journal1", "content": "Recent entry 1", "date": "2025-08-31", "space_id": "space123"},
-            {"_id": "journal2", "content": "Recent entry 2", "date": "2025-08-30", "space_id": "space123"},
+            {"_id": "journal1", "text": "Recent entry 1", "date": "2025-08-31", "space_id": "space123"},
+            {"_id": "journal2", "text": "Recent entry 2", "date": "2025-08-30", "space_id": "space123"},
         ]
 
         # Mock the chained calls properly for motor (Motor returns cursors from find, not async methods)
@@ -764,7 +764,7 @@ class TestAgentSchemas:
         # Valid request
         request = TaskAddRequest(text="Test task")
         assert request.text == "Test task"
-        assert request.priority == "med"  # default
+        assert request.priority == "medium"  # default
 
         # Invalid priority
         with pytest.raises(Exception):
@@ -809,15 +809,14 @@ class TestAgentSystemPrompt:
         assert "get_current_weather" in AGENT_SYSTEM_PROMPT
         assert "add_task" in AGENT_SYSTEM_PROMPT
         assert "get_inspirational_quotes" in AGENT_SYSTEM_PROMPT
-        assert "IMMEDIATELY call" in AGENT_SYSTEM_PROMPT
-        assert "human-readable summary" in AGENT_SYSTEM_PROMPT
+        assert "CRITICAL" in AGENT_SYSTEM_PROMPT
+        assert "MUST ALWAYS" in AGENT_SYSTEM_PROMPT
 
     def test_available_tools_registry(self):
         """Test tool registry completeness."""
         expected_tools = {
             "get_current_weather",
             "get_weather_forecast",
-            "get_weather_alerts",
             "add_task",
             "list_tasks",
             "update_task",
@@ -826,6 +825,9 @@ class TestAgentSystemPrompt:
             "search_content",
             "get_book_recommendations",
             "get_inspirational_quotes",
+            "web_search",
+            "web_scraping",
+            "send_email_to_user",
         }
 
         assert set(AVAILABLE_TOOLS.keys()) == expected_tools

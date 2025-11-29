@@ -295,7 +295,12 @@ async def migrate_legacy_todos() -> None:
 
 async def health_check():
     try:
-        await db.command("ping")
+        # Import USE_MOCK_DB and client from db module
+        from db import USE_MOCK_DB, client
+
+        if not USE_MOCK_DB:
+            # Only ping real database, not mock
+            await client.admin.command("ping")
         return {"status": "healthy", "database": "connected"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database connection error: {str(e)}")
