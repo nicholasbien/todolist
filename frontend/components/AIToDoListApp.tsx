@@ -946,11 +946,16 @@ export default function AIToDoListApp({
       {/* Header */}
       <div className="flex-shrink-0 pt-6 pl-4 pr-2">
         <div
-          className="flex justify-between items-center mb-1 cursor-pointer active:opacity-70"
+          className="flex justify-between items-center mb-1"
           onClick={handleScrollToTop}
         >
-          <h1 className="text-xl font-bold mr-4">todolist.nyc</h1>
-          <div className="flex items-center space-x-1">
+          <h1 className="text-xl font-bold mr-4">
+            todolist.nyc
+          </h1>
+          <div
+            className="flex items-center space-x-1"
+            onClick={(e) => e.stopPropagation()}
+          >
             {isOffline && (
               <div className="relative">
                 <button
