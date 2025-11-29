@@ -405,7 +405,24 @@ export default function AIToDoListApp({
 
   // Function to handle app update
   const handleUpdate = () => {
-    window.location.reload();
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistration().then((reg) => {
+        if (reg && reg.waiting) {
+          // Send SKIP_WAITING message to the waiting service worker
+          reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+
+          // Listen for the new service worker to take control, then reload
+          navigator.serviceWorker.addEventListener('controllerchange', () => {
+            window.location.reload();
+          }, { once: true });
+        } else {
+          // Fallback if no waiting worker
+          window.location.reload();
+        }
+      });
+    } else {
+      window.location.reload();
+    }
   };
 
   // Close settings dropdown when clicking outside
@@ -1033,22 +1050,14 @@ export default function AIToDoListApp({
       )}
 
       {showUpdatePrompt && (
-        <div className="bg-accent/20 border border-accent-dark text-accent-light px-4 py-3 rounded-xl mb-4 flex justify-between items-center flex-shrink-0">
+        <div className="bg-accent/20 border border-accent-dark text-accent-light px-4 py-3 rounded-xl mb-4 mx-4 flex justify-between items-center flex-shrink-0">
           <span>🔄 A new version is available!</span>
-          <div className="space-x-2">
-            <button
-              onClick={handleUpdate}
-              className="bg-accent text-foreground px-3 py-1 rounded-lg text-sm hover:bg-accent-light transition-colors"
-            >
-              Update Now
-            </button>
-            <button
-              onClick={() => setShowUpdatePrompt(false)}
-              className="bg-gray-800 text-gray-300 px-3 py-1 rounded-lg text-sm hover:bg-gray-700 transition-colors"
-            >
-              Later
-            </button>
-          </div>
+          <button
+            onClick={handleUpdate}
+            className="bg-accent text-foreground px-3 py-1 rounded-lg text-sm hover:bg-accent-light transition-colors"
+          >
+            Reload
+          </button>
         </div>
       )}
 

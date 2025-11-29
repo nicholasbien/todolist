@@ -1,7 +1,7 @@
 // IMPORTANT: Always increment these versions when modifying this service worker file
 // This forces browsers to download and use the updated service worker
-const STATIC_CACHE = 'todo-static-v106';
-const API_CACHE = 'todo-api-v106';
+const STATIC_CACHE = 'todo-static-v107';
+const API_CACHE = 'todo-api-v107';
 
 const GLOBAL_DB_NAME = 'TodoGlobalDB';
 const USER_DB_PREFIX = 'TodoUserDB_';
@@ -1518,6 +1518,9 @@ self.addEventListener('message', (event) => {
   }
   if (event.data && event.data.type === 'SET_AUTH') {
     putAuth(event.data.token, event.data.userId);
+  }
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
   }
 });
 
