@@ -6,9 +6,7 @@ import Link from "next/link";
 import InsightsComponent from "./InsightsComponent";
 import JournalComponent from "./JournalComponent";
 import SpaceDropdown from "./SpaceDropdown";
-import { NoSwipeZone } from "./NoSwipeZone";
 import { sortSpaces } from "../utils/spaceUtils";
-import PullToRefresh from "react-simple-pull-to-refresh";
 import SwipeableViews from "react-swipeable-views-react-18-fix";
 
 interface Props {
@@ -285,16 +283,6 @@ export default function AIToDoListApp({
     fetchCategories();
     fetchTodos();
     fetchMembers();
-  }, [fetchCategories, fetchTodos, fetchMembers]);
-
-  // Pull-to-refresh handler
-  const handleRefresh = useCallback(async () => {
-    await Promise.all([
-      fetchCategories(),
-      fetchTodos(false),
-      fetchMembers(),
-      new Promise(resolve => setTimeout(resolve, 500))
-    ]);
   }, [fetchCategories, fetchTodos, fetchMembers]);
 
   // Handle tab change (from button click only - swiping is disabled)
@@ -1111,42 +1099,19 @@ export default function AIToDoListApp({
         {/* Tasks Tab */}
         <div
           ref={tasksTabRef}
-          style={{ padding: '0 16px', height: '100%', overflowY: 'auto', overflowX: 'hidden', touchAction: 'pan-y' }}
+          style={{ height: '100%', overflowY: 'auto', overflowX: 'hidden', touchAction: 'pan-y' }}
           className="custom-scrollbar"
         >
-          <PullToRefresh
-            onRefresh={handleRefresh}
-            pullingContent=""
-          >
-            <div className="pt-4">
-          {/* Header Row with Page Title */}
-          {/* <div className="flex items-center gap-2 mb-6">
-            <h2 className="text-xl font-semibold text-gray-100">
-              {activeCat === 'All' ? 'Tasks' : `Tasks: ${activeCat}`}
-            </h2>
-            {activeCat !== "All" && (
-              <button
-                onClick={() => {
-                  setEditCatName(activeCat);
-                  setShowEditCategoryModal(true);
-                }}
-                className="text-gray-400 hover:text-gray-200 text-sm border border-gray-700 px-2 py-1 rounded-lg hover:border-gray-600 transition-colors"
-              >
-                Edit
-              </button>
-            )}
-          </div> */}
-
-          {/* Categories - Horizontal scroll */}
-          <div className="mb-6">
+            <div>
+          {/* Categories - Horizontal scroll (full width) */}
+          <div className="mb-6 pt-4">
             {loadingCategories && (
-              <div className="text-gray-400 mb-2">Loading categories...</div>
+              <div className="text-gray-400 mb-2 px-4">Loading categories...</div>
             )}
-            <NoSwipeZone>
-              <div className="flex gap-2 pb-2 custom-scrollbar">
+              <div className="flex gap-2 pb-2 overflow-x-auto custom-scrollbar">
               <button
                 onClick={() => setActiveCat('All')}
-                className={`px-4 py-2 rounded-xl text-base transition-colors flex-shrink-0 ${
+                className={`px-4 py-2 rounded-xl text-base transition-colors flex-shrink-0 ml-2 ${
                   activeCat === 'All'
                     ? 'bg-accent text-foreground shadow-lg'
                     : 'bg-gray-900 text-gray-300 hover:bg-gray-800 border border-gray-800'
@@ -1180,13 +1145,15 @@ export default function AIToDoListApp({
               })}
               <button
                 onClick={() => setShowAddCategoryModal(true)}
-                className="px-4 py-2 rounded-xl text-base bg-gray-900 text-gray-300 hover:bg-gray-800 border border-gray-800 transition-colors flex-shrink-0"
+                className="px-4 py-2 rounded-xl text-base bg-gray-900 text-gray-300 hover:bg-gray-800 border border-gray-800 transition-colors flex-shrink-0 mr-2"
               >
                 +
               </button>
             </div>
-            </NoSwipeZone>
           </div>
+
+          {/* Rest of content with padding */}
+          <div className="px-2">
       {/* Add new todo */}
       <div className="mb-6">
         <div className="flex gap-2">
@@ -1490,8 +1457,8 @@ export default function AIToDoListApp({
           </div>
         </div>
       )}
+          </div>
             </div>
-          </PullToRefresh>
         </div>
 
         {/* Agent Tab */}
