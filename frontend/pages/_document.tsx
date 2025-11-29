@@ -17,7 +17,7 @@ export default function Document() {
         <meta name="theme-color" content="#000000" />
         <meta
           name="viewport"
-          content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"
+          content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
         />
 
         <link rel="apple-touch-icon" href="/icon-192x192.png" />

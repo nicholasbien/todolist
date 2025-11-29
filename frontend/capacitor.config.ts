@@ -30,9 +30,9 @@ const config: CapacitorConfig = {
     }
   },
   ios: {
-    contentInset: 'always',
+    contentInset: 'never',
     allowsLinkPreview: false,
-    scrollEnabled: true,
+    scrollEnabled: false,
     backgroundColor: '#000000',
     // Required when Info.plist includes WKAppBoundDomains
     limitsNavigationsToAppBoundDomains: true

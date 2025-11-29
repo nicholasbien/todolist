@@ -6,6 +6,16 @@ html,
 body {
   @apply bg-background text-foreground font-serif;
   overflow-x: hidden;
+  height: 100%;
+  width: 100%;
+  position: fixed;
+  /* Prevent bounce scrolling on iOS */
+  overscroll-behavior-y: none;
+}
+
+#__next {
+  height: 100%;
+  width: 100%;
 }
 
 @keyframes fade-in {

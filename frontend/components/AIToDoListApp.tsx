@@ -292,6 +292,19 @@ export default function AIToDoListApp({
     setActiveTab(tabs[index]);
   }, []);
 
+  // Scroll to top when clicking header
+  const handleScrollToTop = useCallback(() => {
+    const refMap = {
+      tasks: tasksTabRef,
+      agent: agentTabRef,
+      journal: journalTabRef
+    };
+    const ref = refMap[activeTab];
+    if (ref?.current) {
+      ref.current.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }, [activeTab]);
+
   // Initial load when token becomes available
   useEffect(() => {
     if (token && user) {
@@ -932,7 +945,10 @@ export default function AIToDoListApp({
     <div className="h-screen flex flex-col max-w-md mx-auto">
       {/* Header */}
       <div className="flex-shrink-0 pt-3 pl-4 pr-2">
-        <div className="flex justify-between items-center mb-1">
+        <div
+          className="flex justify-between items-center mb-1 cursor-pointer active:opacity-70"
+          onClick={handleScrollToTop}
+        >
           <h1 className="text-xl font-bold mr-4">todolist.nyc</h1>
           <div className="flex items-center space-x-1">
             {isOffline && (
@@ -1099,7 +1115,7 @@ export default function AIToDoListApp({
         {/* Tasks Tab */}
         <div
           ref={tasksTabRef}
-          style={{ height: '100%', overflowY: 'auto', overflowX: 'hidden', touchAction: 'pan-y' }}
+          style={{ height: '100%', overflowY: 'auto', overflowX: 'hidden', touchAction: 'pan-y', WebkitOverflowScrolling: 'touch' }}
           className="custom-scrollbar"
         >
             <div>
