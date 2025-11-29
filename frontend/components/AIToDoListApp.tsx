@@ -931,16 +931,16 @@ export default function AIToDoListApp({
   return (
     <div className="h-screen flex flex-col max-w-md mx-auto">
       {/* Header */}
-      <div className="flex-shrink-0 pt-4 px-4">
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-bold">todolist.nyc</h1>
-          <div className="flex items-center space-x-4">
+      <div className="flex-shrink-0 pt-3 pl-4 pr-2">
+        <div className="flex justify-between items-center mb-1">
+          <h1 className="text-xl font-bold mr-4">todolist.nyc</h1>
+          <div className="flex items-center space-x-1">
             {isOffline && (
-              <div className="relative mr-2">
+              <div className="relative">
                 <button
                   onClick={() => setShowOfflineTooltip(true)}
                   title="Offline"
-                  className="focus:outline-none"
+                  className="focus:outline-none text-base px-2 py-1"
                 >
                   📴
                 </button>
@@ -971,7 +971,7 @@ export default function AIToDoListApp({
             <div className="relative" ref={settingsDropdownRef}>
               <button
                 onClick={() => setShowSettingsDropdown(!showSettingsDropdown)}
-                className="text-accent hover:text-accent-light text-lg w-8 h-8 flex items-center justify-center rounded-lg transition-colors"
+                className="text-accent hover:text-accent-light text-base px-2 py-1 flex items-center justify-center rounded-lg hover:bg-gray-900 transition-colors"
                 title="Settings"
               >
                 ⚙️
