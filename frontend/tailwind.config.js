@@ -20,6 +20,20 @@ module.exports = {
       fontFamily: {
         serif: ['Georgia', 'Times New Roman', 'serif'],
       },
+      // Fix iOS safe area issues - use dynamic viewport height
+      height: {
+        screen: ['100vh', '100dvh'], // Fallback to 100vh, prefer 100dvh
+      },
+      minHeight: {
+        screen: ['100vh', '100dvh'],
+      },
+      // Safe area spacing utilities
+      spacing: {
+        'safe-top': 'env(safe-area-inset-top)',
+        'safe-bottom': 'env(safe-area-inset-bottom)',
+        'safe-left': 'env(safe-area-inset-left)',
+        'safe-right': 'env(safe-area-inset-right)',
+      },
     },
   },
   plugins: [],

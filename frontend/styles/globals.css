@@ -6,16 +6,17 @@ html,
 body {
   @apply bg-background text-foreground font-serif;
   overflow-x: hidden;
-  height: 100%;
-  width: 100%;
-  position: fixed;
   /* Prevent bounce scrolling on iOS */
   overscroll-behavior-y: none;
+  /* Don't use position: fixed or height: 100% on body - causes iOS issues */
 }
 
 #__next {
-  height: 100%;
+  min-height: 100vh;
+  min-height: 100dvh; /* Dynamic viewport height for iOS */
   width: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 @keyframes fade-in {

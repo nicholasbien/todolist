@@ -30,9 +30,9 @@ const config: CapacitorConfig = {
     }
   },
   ios: {
-    contentInset: 'never',
+    contentInset: 'always', // Automatically adds safe area padding
     allowsLinkPreview: false,
-    scrollEnabled: false,
+    scrollEnabled: false, // Disable WebView scrolling, let content handle it
     backgroundColor: '#000000',
     // Required when Info.plist includes WKAppBoundDomains
     limitsNavigationsToAppBoundDomains: true
