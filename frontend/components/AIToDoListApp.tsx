@@ -944,7 +944,7 @@ export default function AIToDoListApp({
   return (
     <div className="h-screen flex flex-col max-w-md mx-auto">
       {/* Header */}
-      <div className="flex-shrink-0 pt-3 pl-4 pr-2">
+      <div className="flex-shrink-0 pt-6 pl-4 pr-2">
         <div
           className="flex justify-between items-center mb-1 cursor-pointer active:opacity-70"
           onClick={handleScrollToTop}
