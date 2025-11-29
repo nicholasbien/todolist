@@ -1096,7 +1096,7 @@ export default function AIToDoListApp({
           resistance={true}
           ignoreNativeScroll={false}
           threshold={10}
-          disabled={false}
+          disabled={true}
           enableMouseEvents={false}
         >
         {/* Tasks Tab */}

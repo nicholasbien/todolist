@@ -46,4 +46,5 @@ body {
   white-space: nowrap;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior-x: contain; /* prevent scroll from leaking to parent */
+  touch-action: pan-x; /* only allow horizontal panning */
 }

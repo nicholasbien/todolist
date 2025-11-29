@@ -242,6 +242,176 @@ After multiple failed attempts to fix the conflict, we decided to disable swipin
 
 ---
 
+### Additional Attempts (2025-11-28): NoSwipeZone Component & Research-Based Solutions
+
+After the initial solution of disabling swiping, we attempted to re-enable swipe gestures while preserving category scrolling.
+
+#### Attempt 4: NoSwipeZone Component with Manual Touch Handling
+
+Created a custom `NoSwipeZone` component to manually handle horizontal scrolling:
+
+**File**: `/Users/nicholasbien/todolist/frontend/components/NoSwipeZone.tsx`
+
+```tsx
+export const NoSwipeZone: React.FC<React.PropsWithChildren> = ({ children }) => {
+  const startX = useRef<number>(0);
+  const scrollLeft = useRef<number>(0);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    const target = e.currentTarget as HTMLElement;
+    startX.current = e.touches[0].pageX;
+    scrollLeft.current = target.scrollLeft;
+    e.stopPropagation();
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    const target = e.currentTarget as HTMLElement;
+    const x = e.touches[0].pageX;
+    const walk = startX.current - x;
+    target.scrollLeft = scrollLeft.current + walk;
+
+    // Prevent SwipeableViews from handling this touch
+    e.stopPropagation();
+    e.preventDefault();
+  };
+
+  return (
+    <div
+      className="no-swipe-zone"
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+    >
+      {children}
+    </div>
+  );
+};
+```
+
+**Result**: ❌ PARTIAL - Still caused tab swipes occasionally
+
+---
+
+#### Attempt 5: Direction Detection in NoSwipeZone
+
+Enhanced NoSwipeZone to detect scroll direction before intercepting:
+
+```tsx
+const handleTouchMove = (e: React.TouchEvent) => {
+  const x = e.touches[0].pageX;
+  const y = e.touches[0].pageY;
+
+  const deltaX = Math.abs(x - startX.current);
+  const deltaY = Math.abs(y - startY.current);
+
+  // Only intercept if horizontal movement > vertical
+  if (!isDragging.current && (deltaX > 5 || deltaY > 5)) {
+    isDragging.current = deltaX > deltaY;
+  }
+
+  if (isDragging.current) {
+    // Manual scroll handling + preventDefault
+  }
+};
+```
+
+**Result**: ❌ PARTIAL - Better but still conflicted with SwipeableViews
+
+**User Feedback**: "i still see some scrolling between views in addition to the scrolling through categories"
+
+---
+
+#### Attempt 6: Research-Based Solution
+
+Researched official solutions from react-swipeable-views documentation and GitHub issues.
+
+**Recommended Configuration**:
+```tsx
+<SwipeableViews
+  ignoreNativeScroll={true}  // KEY: Let SwipeableViews detect scrollable elements
+  threshold={20}             // Higher = requires faster swipe
+  hysteresis={0.7}           // Higher = requires longer swipe distance
+  // ...
+>
+```
+
+**CSS Addition**:
+```css
+.no-swipe-zone {
+  touch-action: pan-x;  /* Only allow horizontal panning */
+  /* ... */
+}
+```
+
+**Theory**:
+- `ignoreNativeScroll={true}` makes SwipeableViews traverse DOM tree to detect scrollable ancestors
+- `touch-action: pan-x` tells browser to only allow horizontal panning in that element
+- Together, they should let category scroll work without triggering tab swipes
+
+**Simplified NoSwipeZone**:
+```tsx
+export const NoSwipeZone: React.FC<React.PropsWithChildren> = ({ children }) => {
+  return <div className="no-swipe-zone">{children}</div>;
+};
+```
+
+**Result**: ❌ FAILED COMPLETELY
+
+**User Feedback**: "nope that doesn't work at all"
+
+**Why it Failed**:
+- Despite being the "correct" solution per documentation, it didn't work in practice
+- Likely due to complex DOM structure with SwipeableViews + PullToRefresh + multiple scroll contexts
+- The library's native scroll detection may not work reliably in all scenarios
+- Browser touch handling variations on mobile devices
+
+---
+
+#### Final Resolution: Disable Swiping (Permanent)
+
+After exhausting all approaches including:
+1. CSS touch-action
+2. Event stopPropagation
+3. Manual touch handling
+4. Direction detection
+5. Official library configuration
+
+**Decision**: Keep swiping disabled permanently
+
+```tsx
+<SwipeableViews
+  disabled={true}  // Swiping disabled
+  ignoreNativeScroll={false}
+  threshold={10}
+  // ...
+>
+```
+
+**Rationale**:
+- Category scrolling is **core functionality** - users must access all categories
+- Tab swiping is **nice-to-have** - buttons work perfectly fine
+- Every solution attempted caused issues or didn't work
+- Diminishing returns on continued attempts
+- Clean, simple solution that works reliably
+
+**Current State**:
+- ✅ Categories scroll horizontally without conflicts
+- ✅ Tab buttons provide clear navigation
+- ✅ SwipeableViews still provides smooth animations for tab transitions
+- ✅ No accidental tab switches
+- ❌ No swipe gesture navigation (acceptable trade-off)
+
+---
+
+### Lessons from NoSwipeZone Attempts
+
+1. **Documentation ≠ Reality**: Solutions that work "in theory" may fail in complex real-world scenarios
+2. **Library Limitations**: Third-party libraries may not handle edge cases well
+3. **Diminishing Returns**: After 3-4 failed attempts, reassess if the feature is worth it
+4. **Core vs Nice-to-Have**: Always prioritize essential functionality over convenience features
+5. **Simple Solutions Win**: Sometimes the "boring" solution (disable swiping) is the best one
+
+---
+
 ## Sticky Header Investigation
 
 ### Goal
@@ -675,9 +845,11 @@ useEffect(() => {
    - Accepted limitation for now
 
 3. **Swipe Gestures**:
-   - Disabled due to previous category scroll conflict
-   - Lost mobile-friendly navigation method
-   - Could revisit if needed (categories now wrap instead of scroll)
+   - Permanently disabled due to category horizontal scroll conflict
+   - Multiple solutions attempted (see "Additional Attempts" section above)
+   - All approaches failed or caused partial conflicts
+   - Tab buttons provide reliable navigation alternative
+   - Acceptable trade-off: core functionality (category scroll) over nice-to-have (swipe navigation)
 
 ### Current Configuration
 
@@ -686,12 +858,12 @@ useEffect(() => {
 <SwipeableViews
   index={tabIndex}
   onChangeIndex={handleTabChange}
-  style={{ height: 'calc(100vh - 180px)' }}  // All tabs fixed height
+  style={{ height: '100%' }}  // Flexbox handles height automatically
   containerStyle={{ height: '100%' }}
   resistance={true}
   ignoreNativeScroll={false}
   threshold={10}
-  disabled={false}  // Could re-enable now that categories wrap
+  disabled={true}  // DISABLED: Prevents conflict with category horizontal scroll
   enableMouseEvents={false}
 >
 ```
@@ -956,6 +1128,14 @@ useEffect(() => {
    - ✅ Added `react-simple-pull-to-refresh` dependency
    - ✅ Added `react-swipeable-views-react-18-fix` dependency
 
+3. **`/Users/nicholasbien/todolist/frontend/components/NoSwipeZone.tsx`**:
+   - ✅ Created component to wrap horizontally scrollable categories
+   - ✅ Simplified to basic wrapper (manual touch handling removed after failed attempts)
+
+4. **`/Users/nicholasbien/todolist/frontend/styles/globals.css`**:
+   - ✅ Added `.no-swipe-zone` styles with `touch-action: pan-x`
+   - ✅ Horizontal scrolling styles for category list
+
 ### Modified and Reverted (Sticky Header Attempts)
 
 1. **`/Users/nicholasbien/todolist/frontend/pages/index.tsx`**:
@@ -1025,7 +1205,10 @@ This investigation covered multiple UI improvements for the todolist.nyc mobile 
 
 ### Failures ❌
 1. **Sticky Headers**: Multiple approaches tried, all failed (documented extensively)
-2. **Swipe Gestures**: Initially disabled due to category scroll conflict (could revisit now)
+2. **Swipe Gestures**: Permanently disabled after exhaustive attempts to fix category scroll conflict
+   - Attempted 6 different solutions (CSS, event handling, library config, research-based approaches)
+   - All solutions either failed completely or caused partial conflicts
+   - Final decision: Disable swiping to preserve category scrolling (core functionality)
 
 ### Known Issues ⚠️
 1. **Desktop Scroll Focus**: Users must click within tab before scrolling (browser behavior)
