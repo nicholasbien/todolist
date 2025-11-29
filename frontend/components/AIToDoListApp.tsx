@@ -1125,7 +1125,7 @@ export default function AIToDoListApp({
         >
             <div>
           {/* Categories - Horizontal scroll (full width) */}
-          <div className="mb-6 pt-4">
+          <div className="mb-3 pt-4">
             {loadingCategories && (
               <div className="text-gray-400 mb-2 px-4">Loading categories...</div>
             )}
@@ -1176,7 +1176,7 @@ export default function AIToDoListApp({
           {/* Rest of content with padding */}
           <div className="px-2">
       {/* Add new todo */}
-      <div className="mb-6">
+      <div className="mb-5">
         <div className="flex gap-2">
           <input
             type="text"
