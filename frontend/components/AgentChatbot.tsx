@@ -319,7 +319,7 @@ export default function AgentChatbot({ activeSpace, token, isActive = true }: Ch
       )}
 
       {/* Input area */}
-      <div className="flex gap-2 flex-shrink-0 items-center mb-2">
+      <div className="flex gap-2 flex-shrink-0 items-center mb-4">
         <input
           type="text"
           className="flex-1 bg-gray-900 border border-gray-700 text-gray-100 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-accent"

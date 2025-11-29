@@ -260,7 +260,7 @@ export default function JournalComponent({ token, activeSpace }: JournalProps) {
 
           {/* Save button and meta info at bottom */}
           <div className="flex-shrink-0">
-            <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center justify-between mb-4">
               {/* Entry Meta Info */}
               {currentEntry && (
                 <div className="text-xs text-gray-500 space-y-1">
