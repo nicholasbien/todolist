@@ -79,7 +79,9 @@ export default function SpaceDropdown({
         onClick={() => setIsOpen(!isOpen)}
         className="flex items-center gap-1 px-2 py-1 hover:bg-gray-900 rounded-lg text-gray-100 text-sm transition-colors"
       >
-        <span className="text-base">🏠</span>
+        <span className="text-base">
+          {activeSpace?.is_default ? '🏠' : activeSpace && isCollaborativeSpace(activeSpace) ? '👥' : '📁'}
+        </span>
         <span className="font-medium text-sm">
           {loadingSpaces ? 'Loading...' : activeSpace?.name || 'No Space'}
         </span>
