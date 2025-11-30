@@ -1,7 +1,7 @@
 // IMPORTANT: Always increment these versions when modifying this service worker file
 // This forces browsers to download and use the updated service worker
-const STATIC_CACHE = 'todo-static-v110';
-const API_CACHE = 'todo-api-v110';
+const STATIC_CACHE = 'todo-static-v111';
+const API_CACHE = 'todo-api-v111';
 
 const GLOBAL_DB_NAME = 'TodoGlobalDB';
 const USER_DB_PREFIX = 'TodoUserDB_';
@@ -672,9 +672,10 @@ async function handleApiRequest(request) {
 
           // Check if sync is in progress or there are pending todo operations
           const queue = await readQueue(authData.userId);
+          // Simple conservative check: block for ANY pending todo operation
+          // This prevents race conditions regardless of space_id matching
           const hasPendingTodos = queue.some(op =>
-            (op.type === 'CREATE' || op.type === 'UPDATE' || op.type === 'DELETE') &&
-            (op.data.space_id === spaceId || (!spaceId && !op.data.space_id))
+            op.type === 'CREATE' || op.type === 'UPDATE' || op.type === 'DELETE'
           );
 
           if (syncInProgress || hasPendingTodos) {

@@ -300,7 +300,7 @@ describe('Online Transition Race Condition', () => {
     // NOT empty array from server
   });
 
-  test('Pending operations in different spaces do not block caching', async () => {
+  test('Pending operations block caching for all spaces (conservative approach)', async () => {
     const sw = require('../public/sw.js');
 
     const testUserId = 'user999';
@@ -334,12 +334,17 @@ describe('Online Transition Race Condition', () => {
       headers: { 'Authorization': 'Bearer token999' }
     });
 
-    await sw.handleApiRequest(request);
+    const response = await sw.handleApiRequest(request);
 
-    // KEY TEST: Server data for spaceB SHOULD be cached
-    // Pending operations in spaceA should not block caching for spaceB
+    // KEY TEST: With conservative approach (Option A), ANY pending operation blocks ALL caching
+    // This prevents data loss at the cost of being slightly over-protective
+    // Response should be IndexedDB data (empty for spaceB), not server data
+    expect(response.status).toBe(200);
+    const responseTodos = await response.json();
+    expect(responseTodos.length).toBe(0); // spaceB has no todos in IndexedDB
+
+    // Verify spaceB IndexedDB is still empty (server data was blocked)
     const todosSpaceB = await sw.getTodos(testUserId, spaceB);
-    expect(todosSpaceB.length).toBe(1);
-    expect(todosSpaceB[0].text).toBe('Space B todo');
+    expect(todosSpaceB.length).toBe(0); // Not cached due to pending spaceA operation
   });
 });
