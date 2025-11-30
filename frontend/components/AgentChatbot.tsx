@@ -278,6 +278,54 @@ export default function AgentChatbot({ activeSpace, token, isActive = true }: Ch
         onScroll={handleScroll}
         className="flex-1 mb-4 space-y-4 overflow-y-auto custom-scrollbar"
       >
+        {/* Blank state when no messages */}
+        {messages.length === 0 && !loading && (
+          <div className="flex items-center justify-center min-h-full py-8">
+            <div className="max-w-md text-center space-y-4 px-6">
+              <p className="text-gray-300 text-base leading-relaxed">
+                Hi, I'm your personal agent
+              </p>
+              <p className="text-gray-400 text-sm leading-relaxed">
+                Ask me anything! I can help you manage your tasks, check the weather, find information, and more.
+              </p>
+
+              <div className="text-left space-y-4 mt-4">
+                <div>
+                  <h4 className="text-sm font-semibold text-gray-200 mb-2">Task Management</h4>
+                  <ul className="text-xs text-gray-400 space-y-1 ml-4">
+                    <li>• Add, update, and search your tasks</li>
+                    <li>• Get task recommendations and suggestions</li>
+                  </ul>
+                </div>
+
+                <div>
+                  <h4 className="text-sm font-semibold text-gray-200 mb-2">Journal Access</h4>
+                  <ul className="text-xs text-gray-400 space-y-1 ml-4">
+                    <li>• Add journal entries</li>
+                    <li>• Search through your past reflections</li>
+                  </ul>
+                </div>
+
+                <div>
+                  <h4 className="text-sm font-semibold text-gray-200 mb-2">Information & Resources</h4>
+                  <ul className="text-xs text-gray-400 space-y-1 ml-4">
+                    <li>• Search the web for current information</li>
+                    <li>• Check current weather and forecasts</li>
+                    <li>• Get book recommendations</li>
+                    <li>• Find inspirational quotes</li>
+                  </ul>
+                </div>
+              </div>
+
+              <div className="mt-4 pt-4 border-t border-gray-800">
+                <p className="text-xs text-gray-500 italic">
+                  Try: "What should I get done today?", "Summarize my latest journals", or "What's the weather in NYC?"
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {messages.map((msg, idx) => (
           <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
             <div className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
