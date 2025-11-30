@@ -91,18 +91,33 @@ conversation_state: Dict[str, List[Dict[str, Any]]] = {}
 MAX_HISTORY = 10
 
 
-async def get_current_user(authorization: str = Header(None)):
-    """Extract user from Authorization header."""
-    if not authorization:
-        raise HTTPException(status_code=401, detail="Authorization header required")
+async def get_current_user(authorization: str = Header(None), token_param: Optional[str] = Query(None, alias="token")):
+    """Extract user from Authorization header or token query parameter.
 
-    # Expect format: "Bearer <token>"
-    try:
-        scheme, token = authorization.split()
-        if scheme.lower() != "bearer":
-            raise HTTPException(status_code=401, detail="Invalid authentication scheme")
-    except ValueError:
-        raise HTTPException(status_code=401, detail="Invalid authorization header format")
+    EventSource doesn't support custom headers, so we need to accept token via query param
+    as a fallback for Capacitor/native apps.
+    """
+    token = None
+
+    # First try Authorization header (preferred)
+    if authorization:
+        try:
+            scheme, token = authorization.split()
+            if scheme.lower() != "bearer":
+                raise HTTPException(status_code=401, detail="Invalid authentication scheme")
+        except ValueError:
+            raise HTTPException(status_code=401, detail="Invalid authorization header format")
+
+    # Fallback to query parameter (for EventSource compatibility)
+    elif token_param:
+        token = token_param
+
+    # No authentication provided
+    if not token:
+        raise HTTPException(
+            status_code=401,
+            detail="Authentication required: provide Bearer token in Authorization header or token query parameter",  # noqa: E501
+        )
 
     # Verify the session token
     user_info = await verify_session(token)

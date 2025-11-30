@@ -685,6 +685,35 @@ class TestAgentIntegration:
         assert response.headers["content-type"] == "text/event-stream; charset=utf-8"
 
     @pytest.mark.asyncio
+    async def test_agent_endpoint_with_query_param_token(self, client, test_email):
+        """Test agent endpoint with token in query parameter (for EventSource/Capacitor compatibility)."""
+        # Get valid token
+        token = await get_token(client, test_email)
+
+        # Mock OpenAI to avoid real API calls
+        with patch("agent.agent.AsyncOpenAI") as mock_openai_class:
+            mock_client = AsyncMock()
+            mock_openai_class.return_value = mock_client
+
+            # Mock simple text response (no tools)
+            mock_chunk = MagicMock()
+            mock_chunk.choices = [MagicMock()]
+            mock_chunk.choices[0].delta.content = "Hello, how can I help?"
+            mock_chunk.choices[0].delta.tool_calls = None
+            mock_chunk.choices[0].finish_reason = "stop"
+
+            mock_stream = AsyncMock()
+            mock_stream.__aiter__.return_value = [mock_chunk]
+            mock_client.chat.completions.create.return_value = mock_stream
+
+            with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
+                # EventSource can't set custom headers, so token must be in query param
+                response = await client.get(f"/agent/stream?q=hello&token={token}")
+
+        assert response.status_code == 200
+        assert response.headers["content-type"] == "text/event-stream; charset=utf-8"
+
+    @pytest.mark.asyncio
     async def test_agent_clear_history(self, client, test_email):
         """Test clearing chat history endpoint."""
         token = await get_token(client, test_email)
