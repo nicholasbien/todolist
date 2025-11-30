@@ -35,7 +35,7 @@ export const MessageRenderer: React.FC<MessageRendererProps> = ({ content, class
           ol: ({ node, ...props }) => <ol {...props} className="ml-6 my-2 list-decimal space-y-1" />,
           li: ({ node, ...props }) => <li {...props} className="ml-0" />,
           // Code
-          code: ({ node, inline, ...props }) =>
+          code: ({ node, inline, ...props }: any) =>
             inline ? (
               <code {...props} className="bg-gray-700 px-1 py-0.5 rounded text-sm font-mono" />
             ) : (

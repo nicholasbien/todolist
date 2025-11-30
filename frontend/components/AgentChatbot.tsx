@@ -283,7 +283,7 @@ export default function AgentChatbot({ activeSpace, token, isActive = true }: Ch
           <div className="flex items-center justify-center min-h-full py-8">
             <div className="max-w-md text-center space-y-4 px-6">
               <p className="text-gray-300 text-base leading-relaxed">
-                Hi, I'm your personal agent
+                Hi, I&apos;m your personal agent
               </p>
               <p className="text-gray-400 text-sm leading-relaxed">
                 Ask me anything! I can help you manage your tasks, check the weather, find information, and more.
@@ -319,7 +319,7 @@ export default function AgentChatbot({ activeSpace, token, isActive = true }: Ch
 
               <div className="mt-4 pt-4 border-t border-gray-800">
                 <p className="text-xs text-gray-500 italic">
-                  Try: "What should I get done today?", "Summarize my latest journals", or "What's the weather in NYC?"
+                  Try: &quot;What should I get done today?&quot;, &quot;Summarize my latest journals&quot;, or &quot;What&apos;s the weather in NYC?&quot;
                 </p>
               </div>
             </div>
