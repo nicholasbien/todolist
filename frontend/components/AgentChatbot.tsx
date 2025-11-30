@@ -236,6 +236,27 @@ export default function AgentChatbot({ activeSpace, token, isActive = true }: Ch
     }
   };
 
+  // Remove sensitive database IDs and user info from tool data before displaying
+  const sanitizeToolData = (data: any): any => {
+    if (data === null || data === undefined) return data;
+    if (typeof data !== 'object') return data;
+
+    if (Array.isArray(data)) {
+      return data.map(item => sanitizeToolData(item));
+    }
+
+    const sanitized: any = {};
+    for (const [key, value] of Object.entries(data)) {
+      // Skip sensitive ID fields and user identifiers
+      const sensitiveFields = ['_id', 'id', 'user_id', 'space_id', 'owner_id', 'member_ids', 'pending_emails'];
+      if (sensitiveFields.includes(key)) {
+        continue;
+      }
+      sanitized[key] = sanitizeToolData(value);
+    }
+    return sanitized;
+  };
+
   return (
     <div className="flex flex-col h-full">
       {/* Clear button at top */}
@@ -287,13 +308,13 @@ export default function AgentChatbot({ activeSpace, token, isActive = true }: Ch
                   <div className="mb-1">
                     <span className="text-blue-300 font-medium">Input:</span>
                     <pre className="mt-1 bg-blue-950/50 p-2 rounded text-blue-100 overflow-x-auto">
-                      {JSON.stringify(msg.toolData.args, null, 2)}
+                      {JSON.stringify(sanitizeToolData(msg.toolData.args), null, 2)}
                     </pre>
                   </div>
                   <div>
                     <span className="text-blue-300 font-medium">Output:</span>
                     <pre className="mt-1 bg-blue-950/50 p-2 rounded text-blue-100 overflow-x-auto">
-                      {JSON.stringify(msg.toolData.data, null, 2)}
+                      {JSON.stringify(sanitizeToolData(msg.toolData.data), null, 2)}
                     </pre>
                   </div>
                 </div>

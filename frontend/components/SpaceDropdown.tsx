@@ -97,28 +97,28 @@ export default function SpaceDropdown({
       {isOpen && (
         <div className="absolute right-0 mt-2 w-64 bg-black border border-gray-800 rounded-xl shadow-2xl z-50 max-h-80 overflow-y-auto">
           {/* Current spaces */}
-          <div className="py-2">
-            {sortedSpaces.map(space => (
+          <div>
+            {sortedSpaces.map((space, index) => (
               <div
                 key={space._id}
                 className={`group flex items-center justify-between px-4 py-3 hover:bg-gray-900 transition-colors ${
                   activeSpace?._id === space._id ? 'bg-gray-900 border-l-2 border-accent' : ''
-                }`}
+                } ${index === 0 ? 'rounded-t-xl' : ''}`}
               >
                 {/* Clickable area for space selection */}
                 <div
-                  className="flex items-center gap-3 min-w-0 flex-1 cursor-pointer"
+                  className="flex items-center gap-2 min-w-0 flex-1 cursor-pointer"
                   onClick={() => handleSpaceClick(space)}
                 >
-                  <span className="text-lg flex-shrink-0">
+                  <span className="text-sm flex-shrink-0">
                     {space.is_default ? '🏠' : isCollaborativeSpace(space) ? '👥' : '📁'}
                   </span>
                   <div className="min-w-0 flex-1">
-                    <div className="font-medium text-gray-100 truncate">
+                    <div className="truncate">
                       {space.name}
                     </div>
                     {isCollaborativeSpace(space) && (
-                      <div className="text-xs text-gray-400">
+                      <div className="text-xs text-gray-400 leading-none">
                         {space.member_ids?.length || 0} member{(space.member_ids?.length || 0) !== 1 ? 's' : ''}
                         {(space.pending_emails?.length ?? 0) > 0 &&
                           `, ${space.pending_emails?.length} pending`
@@ -148,13 +148,13 @@ export default function SpaceDropdown({
           <div className="border-t border-gray-800"></div>
 
           {/* New space option */}
-          <div className="py-2">
+          <div>
             <button
               onClick={handleCreateClick}
-              className="flex items-center gap-3 px-4 py-3 w-full text-left hover:bg-gray-900 text-gray-300 hover:text-gray-100 transition-colors"
+              className="flex items-center gap-2 px-4 py-3 w-full text-left hover:bg-gray-900 text-gray-300 hover:text-gray-100 transition-colors rounded-b-xl"
             >
-              <span className="text-lg">➕</span>
-              <span className="font-medium">New Space...</span>
+              <span className="text-sm">➕</span>
+              <span>New Space...</span>
             </button>
           </div>
         </div>
