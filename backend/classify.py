@@ -24,7 +24,9 @@ if not api_key:
     raise ValueError("OPENAI_API_KEY not found in environment variables!")
 
 # Initialize OpenAI client with timeout
-client = OpenAI(api_key=api_key, timeout=10.0, max_retries=0)  # 10 second timeout
+# 3 second timeout - must be less than frontend timeout (5s) to prevent duplicate todos
+# If classification times out, we fall back to default classification (General/Medium)
+client = OpenAI(api_key=api_key, timeout=3.0, max_retries=0)
 
 
 async def classify_task(text: str, categories: List[str], date_added: str) -> Dict[str, Any]:
@@ -119,7 +121,17 @@ async def classify_task(text: str, categories: List[str], date_added: str) -> Di
             logger.error(f"Response content: {response.output_text}")
             return default_response
     except Exception as e:
-        logger.error(f"OpenAI API error after {time.time() - start_time:.2f} seconds: {str(e)}")
+        elapsed = time.time() - start_time
+        logger.error(f"OpenAI API error after {elapsed:.2f} seconds: {str(e)}")
+
+        # Check if this was a timeout
+        if "timeout" in str(e).lower() or elapsed >= 2.9:  # Near 3s timeout
+            logger.warning(
+                f"Classification timed out for '{text[:30]}...' after {elapsed:.2f}s, "
+                "using default classification (General/Medium) with manual date parsing"
+            )
+
+        # Fall back to default classification with manual date parsing
         fallback_due, _ = manual_parse_due_date(text, date_added)
         resp = default_response.copy()
         resp["dueDate"] = fallback_due
