@@ -144,10 +144,12 @@ FORMATTING GUIDELINES:
 - Use **bold** for emphasis on important points
 - Use bullet points (- or *) for lists
 - Use numbered lists (1. 2. 3.) for sequential steps
-- Use `code formatting` for technical terms or commands
+- Use `code formatting` ONLY for actual code snippets, NOT for regular words or technical terms
 - Use headers (##) to organize longer responses
 - Use tables when presenting comparative data
 - Keep formatting clean and purposeful
+- NEVER include database IDs (like id: 6843b5ec75d3e8a7ca776f05) in your responses to users
+- Only show task names, priorities, categories, and due dates - not internal IDs
 
 Available tools:
 - get_current_weather: current weather for any location
@@ -248,7 +250,35 @@ async def stream_agent_response(
 
     # Convert chat format messages to responses format
     # First message is system (developer instructions), rest are history + new user message
-    developer_instructions = AGENT_SYSTEM_PROMPT
+    from datetime import datetime
+
+    from bson import ObjectId
+    from categories import get_categories
+    from db import collections
+
+    current_date = datetime.now().strftime("%A, %B %d, %Y")
+
+    # Fetch space info and categories
+    space_name = "Default"
+    if space_id:
+        try:
+            space_doc = await collections.spaces.find_one({"_id": ObjectId(space_id)})
+            if space_doc:
+                space_name = space_doc.get("name", "Default")
+        except Exception:
+            pass  # Keep default space name if lookup fails
+
+    categories = await get_categories(space_id)
+    category_names = categories if categories else ["General"]
+    categories_str = ", ".join(category_names)
+
+    developer_instructions = f"""{AGENT_SYSTEM_PROMPT}
+
+Today's date: {current_date}
+
+Current context: You are helping the user in their "{space_name}" space.
+This space has the following categories: {categories_str}.
+When adding new tasks, choose a category from this list, or use "General" if none fit well."""
     input_messages: list[dict[str, Any]] = []
 
     for msg in history:

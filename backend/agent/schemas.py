@@ -48,7 +48,13 @@ class WeatherAlertsRequest(BaseModel):
 
 class TaskAddRequest(BaseModel):
     text: str = Field(..., min_length=1, description="Task description")
-    category: Optional[str] = Field(None, description="Task category (optional)")
+    category: str = Field(
+        ...,
+        description=(
+            "Task category. Choose from user's existing categories (listed in system context), "
+            "or use 'General' if none fit well."
+        ),
+    )
     priority: Literal["low", "medium", "high"] = Field(
         default="medium", description="Task priority: 'low', 'medium', or 'high'"
     )
@@ -202,7 +208,7 @@ OPENAI_TOOL_SCHEMAS = {
     "add_task": {
         "type": "function",
         "name": "add_task",
-        "description": "Add a new task to user's todo list. Call when user wants to add, create, or save a new task, todo, or reminder.",  # noqa: E501
+        "description": "Add a new task to user's todo list. Choose a category from the user's existing categories (provided in system context), or use 'General' if none fit well. Call when user wants to add, create, or save a new task, todo, or reminder.",  # noqa: E501
         "parameters": get_openai_tool_schema(TaskAddRequest),
     },
     "list_tasks": {

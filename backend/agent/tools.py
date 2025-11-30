@@ -451,7 +451,7 @@ async def add_task(request: TaskAddRequest, user_id: str, space_id: Optional[str
         # Create Todo object
         todo = Todo(
             text=title,
-            category=request.category or "General",
+            category=request.category,
             priority=ui_priority,
             user_id=user_id,
             space_id=space_id,

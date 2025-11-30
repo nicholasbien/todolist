@@ -837,6 +837,59 @@ class TestAgentSystemPrompt:
             assert "schema" in tool_info
             assert callable(tool_info["func"])
 
+    @pytest.mark.asyncio
+    @patch("categories.get_categories", new_callable=AsyncMock)
+    @patch("db.collections")
+    async def test_agent_context_includes_date_space_categories(self, mock_collections, mock_get_categories):
+        """Test that agent context includes current date, space name, and categories."""
+        from datetime import datetime
+
+        # Mock space lookup
+        mock_space_doc = {"_id": "space123", "name": "Work"}
+        mock_collections.spaces.find_one = AsyncMock(return_value=mock_space_doc)
+
+        # Mock categories
+        mock_get_categories.return_value = ["Work", "Personal", "Health"]
+
+        # Mock OpenAI to capture the developer instructions
+        captured_instructions = None
+
+        async def mock_create(**kwargs):
+            nonlocal captured_instructions
+            # Capture the instructions parameter
+            captured_instructions = kwargs.get("instructions")
+
+            # Return a mock stream
+            mock_event = MagicMock()
+            mock_event.type = "response.output_text.done"
+            mock_stream = AsyncMock()
+            mock_stream.__aiter__.return_value = [mock_event]
+            return mock_stream
+
+        with patch("agent.agent.AsyncOpenAI") as mock_openai_class:
+            mock_client = AsyncMock()
+            mock_client.responses.create = mock_create
+            mock_openai_class.return_value = mock_client
+
+            with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
+                stream = stream_agent_response("test query", "user123", "space123")
+                async for _ in stream:
+                    pass
+
+        # Verify instructions were captured
+        assert captured_instructions is not None
+
+        # Verify date is included
+        current_date = datetime.now().strftime("%A, %B %d, %Y")
+        assert f"Today's date: {current_date}" in captured_instructions
+
+        # Verify space context is included (defaults to "Default" when no space_id lookup succeeds)
+        assert 'in their "Default" space' in captured_instructions or 'in their "Work" space' in captured_instructions
+
+        # Verify categories are included
+        assert "Work, Personal, Health" in captured_instructions
+        assert 'choose a category from this list, or use "General"' in captured_instructions
+
 
 class TestAgentErrorHandling:
     """Test error handling in agent tools."""
