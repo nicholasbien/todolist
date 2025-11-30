@@ -1519,7 +1519,9 @@ export default function AIToDoListApp({
             <div className="flex items-start justify-between mb-6">
               <div>
                 <h3 className="text-gray-100 text-lg font-bold">Insights</h3>
-                <p className="text-sm text-gray-400">Track your productivity trends across spaces.</p>
+                <p className="text-sm text-gray-400">
+                  {activeSpace?.name ? `${activeSpace.name} - ` : ''}Track your productivity trends.
+                </p>
               </div>
               <button
                 onClick={() => onCloseInsights?.()}
@@ -1528,25 +1530,6 @@ export default function AIToDoListApp({
               >
                 ✕
               </button>
-            </div>
-            <div className="flex items-center justify-between mb-6 gap-4">
-              <SpaceDropdown
-                spaces={spaces}
-                activeSpace={activeSpace}
-                user={user}
-                loadingSpaces={loadingSpaces}
-                onSpaceSelect={setActiveSpace}
-                onCreateSpace={() => setShowAddSpaceModal(true)}
-                onEditSpace={(space) => {
-                  setSpaceToEdit(space);
-                  setEditSpaceName(space.name);
-                  const isCollab = (space.member_ids?.length ?? 0) > 1 ||
-                    (space.pending_emails?.length ?? 0) > 0;
-                  setEditSpaceCollaborative(isCollab);
-                  setInviteEmails(['']);
-                  setShowEditSpaceModal(true);
-                }}
-              />
             </div>
             <div className="overflow-y-auto pr-2 -mr-2">
               <InsightsComponent token={token} activeSpace={activeSpace} />

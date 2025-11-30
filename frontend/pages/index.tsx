@@ -518,7 +518,7 @@ export default function Home() {
         {showContactModal && (
           <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50">
             <div className="bg-black border border-gray-800 p-6 rounded-xl w-96 space-y-4 shadow-2xl">
-              <h3 className="text-gray-100 text-lg font-bold mb-2">Contact Us</h3>
+              <h3 className="text-gray-100 text-lg font-bold mb-2">Contact</h3>
               <textarea
                 value={contactMessage}
                 onChange={(e) => setContactMessage(e.target.value)}
