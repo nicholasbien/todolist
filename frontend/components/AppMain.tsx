@@ -20,11 +20,20 @@ export default function AppMain() {
     <main className="min-h-screen bg-background text-foreground">
       {!isAuthenticated && authExpired && (
         <div className="max-w-md mx-auto p-4">
-          <div className="bg-red-900/20 border border-red-800 text-red-300 px-4 py-3 rounded-xl mb-4">
-            Session expired.{' '}
-            <Link href="/" onClick={clearAuthExpired} className="underline text-accent">
-              Sign in again
-            </Link>
+          <div className="bg-red-900/20 border border-red-800 text-red-300 px-4 py-3 rounded-xl mb-4 flex justify-between items-start">
+            <span className="flex-1">
+              Session expired.{' '}
+              <Link href="/" onClick={clearAuthExpired} className="underline text-accent">
+                Sign in again
+              </Link>
+            </span>
+            <button
+              onClick={clearAuthExpired}
+              className="text-red-300 hover:text-red-100 ml-2 flex-shrink-0 text-lg leading-none"
+              aria-label="Close error message"
+            >
+              ×
+            </button>
           </div>
         </div>
       )}

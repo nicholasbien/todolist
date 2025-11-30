@@ -1064,8 +1064,15 @@ export default function AIToDoListApp({
       </div>
 
       {error && (
-        <div className="bg-red-900/20 border border-red-800 text-red-300 px-4 py-3 rounded-xl mb-4 mx-4 flex-shrink-0">
-          {error}
+        <div className="bg-red-900/20 border border-red-800 text-red-300 px-4 py-3 rounded-xl mb-4 mx-4 flex-shrink-0 flex justify-between items-start">
+          <span className="flex-1">{error}</span>
+          <button
+            onClick={() => setError('')}
+            className="text-red-300 hover:text-red-100 ml-2 flex-shrink-0 text-lg leading-none"
+            aria-label="Close error message"
+          >
+            ×
+          </button>
         </div>
       )}
 
@@ -1427,7 +1434,7 @@ export default function AIToDoListApp({
       {showEditTodoModal && (
         <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50">
           <div className="bg-black border border-gray-800 p-6 rounded-xl w-80 space-y-4 shadow-2xl">
-            <h3 className="text-gray-100 text-lg font-bold mb-2">Edit Todo</h3>
+            <h3 className="text-gray-100 text-lg font-bold mb-2">Edit Task</h3>
             <input
               type="text"
               value={editText}

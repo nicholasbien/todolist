@@ -412,8 +412,15 @@ export default function AgentChatbot({ activeSpace, token, isActive = true }: Ch
       </div>
 
       {error && (
-        <div className="mb-2 p-2 bg-red-900/20 border border-red-800 rounded-lg flex-shrink-0">
-          <p className="text-red-300 text-sm">{error}</p>
+        <div className="mb-2 p-2 bg-red-900/20 border border-red-800 rounded-lg flex-shrink-0 flex justify-between items-start">
+          <p className="text-red-300 text-sm flex-1">{error}</p>
+          <button
+            onClick={() => setError('')}
+            className="text-red-300 hover:text-red-100 ml-2 flex-shrink-0 text-lg leading-none"
+            aria-label="Close error message"
+          >
+            ×
+          </button>
         </div>
       )}
 

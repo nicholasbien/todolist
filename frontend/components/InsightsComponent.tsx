@@ -97,7 +97,14 @@ export default function InsightsComponent({ token, activeSpace }: InsightsProps)
 
   if (error) {
     return (
-      <div className="text-center py-12">
+      <div className="text-center py-12 relative">
+        <button
+          onClick={() => setError('')}
+          className="absolute top-0 right-0 text-red-400 hover:text-red-200 text-2xl leading-none"
+          aria-label="Close error message"
+        >
+          ×
+        </button>
         <div className="text-red-400 mb-4 text-4xl">⚠️</div>
         <p className="text-red-400">{error}</p>
         <button

@@ -77,8 +77,15 @@ export default function AuthForm() {
         </div>
 
         {error && (
-          <div className="mb-4 p-3 bg-red-900/20 border border-red-800 rounded-lg">
-            <p className="text-red-300 text-sm">{error}</p>
+          <div className="mb-4 p-3 bg-red-900/20 border border-red-800 rounded-lg flex justify-between items-start">
+            <p className="text-red-300 text-sm flex-1">{error}</p>
+            <button
+              onClick={() => setError('')}
+              className="text-red-300 hover:text-red-100 ml-2 flex-shrink-0 text-lg leading-none"
+              aria-label="Close error message"
+            >
+              ×
+            </button>
           </div>
         )}
 

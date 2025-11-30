@@ -202,8 +202,15 @@ export default function JournalComponent({ token, activeSpace }: JournalProps) {
   return (
     <div className="flex flex-col h-full">
       {error && (
-        <div className="bg-red-900/20 border border-red-800 text-red-300 px-4 py-3 rounded-xl mb-4 flex-shrink-0">
-          {error}
+        <div className="bg-red-900/20 border border-red-800 text-red-300 px-4 py-3 rounded-xl mb-4 flex-shrink-0 flex justify-between items-start">
+          <span className="flex-1">{error}</span>
+          <button
+            onClick={() => setError('')}
+            className="text-red-300 hover:text-red-100 ml-2 flex-shrink-0 text-lg leading-none"
+            aria-label="Close error message"
+          >
+            ×
+          </button>
         </div>
       )}
 
