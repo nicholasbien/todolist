@@ -72,7 +72,7 @@ export default function TodoItem({
           : "bg-gray-900 text-gray-100 border-gray-800"
       } shadow-lg`}
     >
-      <div className="flex justify-between items-start">
+      <div className="flex justify-between items-center">
         <div className="flex-1">
           <p className={`text-base transition-all duration-200 ${
             isDeleting ? "opacity-50" : ""
