@@ -22,16 +22,21 @@ export default function AuthForm() {
     setError('');
     setMessage('');
 
-    const result = await signup(email);
+    try {
+      const result = await signup(email);
 
-    if (result.success) {
-      setStep('code');
-      setMessage('Verification code sent! Check the server console for your code.');
-    } else {
-      setError(result.error);
+      if (result.success) {
+        setStep('code');
+        setMessage('Verification code sent! Check the server console for your code.');
+      } else {
+        setError(result.error || 'Signup failed');
+      }
+    } catch (err) {
+      console.error('Signup error:', err);
+      setError('An error occurred during signup. Please try again.');
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   };
 
   const handleCodeSubmit = async (e: React.FormEvent<HTMLFormElement>) => {

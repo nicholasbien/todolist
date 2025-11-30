@@ -145,23 +145,20 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
   const signup = async (email: string): Promise<{ success: boolean; message?: string; error?: string }> => {
     try {
-      console.log('🚀 Starting signup for:', email);
-      alert(`Starting signup for: ${email}`);
       const response = await apiRequest('auth/signup', {
         method: 'POST',
         body: JSON.stringify({ email })
       });
-      console.log('📡 Signup response:', response.status, response.statusText);
 
       const data = await response.json();
 
       if (response.ok) {
         return { success: true, message: data.message };
       } else {
-        return { success: false, error: data.detail || 'Signup failed' };
+        return { success: false, error: data?.detail || 'Signup failed' };
       }
     } catch (error) {
-      console.log('❌ Signup network error:', error);
+      console.error('Signup error:', error);
       return { success: false, error: 'Network error during signup' };
     }
   };
