@@ -290,6 +290,7 @@ export default function Home() {
   const [showEmailSettings, setShowEmailSettings] = useState(false);
   const [showInsightsModal, setShowInsightsModal] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
+  const [showAccountSettings, setShowAccountSettings] = useState(false);
   const [exportType, setExportType] = useState<'todos' | 'journals'>('todos');
   const [exportFormat, setExportFormat] = useState<'jsonl' | 'csv'>('jsonl');
   const [exportSpaces, setExportSpaces] = useState<Space[]>([]);
@@ -297,6 +298,11 @@ export default function Home() {
   const [exporting, setExporting] = useState(false);
   const [contactMessage, setContactMessage] = useState('');
   const [sendingContact, setSendingContact] = useState(false);
+  const [accountName, setAccountName] = useState('');
+  const [updatingName, setUpdatingName] = useState(false);
+  const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
+  const [deleteConfirmation, setDeleteConfirmation] = useState('');
+  const [deletingAccount, setDeletingAccount] = useState(false);
   const isOffline = useOffline();
 
   useEffect(() => {
@@ -410,6 +416,68 @@ export default function Home() {
     }
   };
 
+  const handleUpdateName = async () => {
+    if (!accountName.trim()) return;
+
+    try {
+      setUpdatingName(true);
+      const response = await fetch('/auth/update-name', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ first_name: accountName.trim() })
+      });
+
+      if (!response.ok) throw new Error('Failed to update name');
+
+      const result = await response.json();
+      // Update user state with new name
+      setUser((prev: any) => ({ ...prev, first_name: accountName.trim() }));
+      alert('Name updated successfully!');
+    } catch (err) {
+      console.error('Update name error:', err);
+      alert('Failed to update name. Please try again.');
+    } finally {
+      setUpdatingName(false);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    // First click - show confirmation step
+    if (!showDeleteConfirmation) {
+      setShowDeleteConfirmation(true);
+      return;
+    }
+
+    // Second click - verify DELETE was typed and proceed with deletion
+    if (deleteConfirmation !== 'DELETE') {
+      alert('Please type DELETE to confirm account deletion');
+      return;
+    }
+
+    try {
+      setDeletingAccount(true);
+      const response = await fetch('/auth/me', {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) throw new Error('Failed to delete account');
+
+      // Account deleted successfully, log out
+      alert('Account deleted successfully.');
+      handleLogout();
+    } catch (err) {
+      console.error('Delete account error:', err);
+      alert('Failed to delete account. Please try again.');
+      setDeletingAccount(false);
+    }
+  };
+
   if (!isClient || isChecking) {
     return (
       <>
@@ -451,6 +519,12 @@ export default function Home() {
           onCloseInsights={() => setShowInsightsModal(false)}
           onShowExportModal={() => setShowExportModal(true)}
           onShowContactModal={() => setShowContactModal(true)}
+          onShowAccountSettings={() => {
+            setAccountName(user?.first_name || '');
+            setShowDeleteConfirmation(false);
+            setDeleteConfirmation('');
+            setShowAccountSettings(true);
+          }}
           onLogout={handleLogout}
           isOffline={isOffline}
         />
@@ -541,6 +615,102 @@ export default function Home() {
                   className="bg-gray-800 hover:bg-gray-700 text-gray-300 px-6 py-2 rounded-lg transition-colors"
                 >
                   Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Account Settings Modal */}
+        {showAccountSettings && (
+          <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4">
+            <div className="bg-black border border-gray-800 p-6 rounded-xl w-full max-w-md space-y-6 shadow-2xl">
+              <h3 className="text-gray-100 text-lg font-bold">Account Settings</h3>
+
+              {/* Email Display */}
+              <div>
+                <label className="block text-sm text-gray-400 mb-2">Email</label>
+                <div className="p-3 rounded-lg bg-gray-900 border border-gray-700 text-gray-500">
+                  {user?.email}
+                </div>
+              </div>
+
+              {/* Name Update */}
+              <div>
+                <label className="block text-sm text-gray-400 mb-2">Name</label>
+                <input
+                  type="text"
+                  value={accountName}
+                  onChange={(e) => setAccountName(e.target.value)}
+                  placeholder="Enter your name"
+                  className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-accent"
+                />
+                <button
+                  onClick={handleUpdateName}
+                  disabled={updatingName || !accountName.trim() || accountName === user?.first_name}
+                  className="mt-2 bg-accent hover:bg-accent-light disabled:bg-accent-dark disabled:text-gray-400 text-white px-4 py-2 rounded-lg transition-colors text-sm"
+                >
+                  {updatingName ? 'Updating...' : 'Update Name'}
+                </button>
+              </div>
+
+              {/* Delete Account Section */}
+              <div className="pt-4 border-t border-gray-800">
+                {!showDeleteConfirmation ? (
+                  <button
+                    onClick={handleDeleteAccount}
+                    className="w-full bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg transition-colors font-semibold"
+                  >
+                    Delete Account
+                  </button>
+                ) : (
+                  <>
+                    <p className="text-sm text-gray-400 mb-3">
+                      Are you sure? This will delete your account and all associated data. <strong className="text-red-400">This action cannot be undone.</strong>
+                    </p>
+                    <label className="block text-sm text-gray-400 mb-2">
+                      Type <span className="font-mono text-red-400">DELETE</span> to confirm:
+                    </label>
+                    <input
+                      type="text"
+                      value={deleteConfirmation}
+                      onChange={(e) => setDeleteConfirmation(e.target.value)}
+                      placeholder="DELETE"
+                      className="w-full p-3 rounded-lg bg-gray-900 border border-red-800 text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-red-500 mb-3"
+                    />
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => {
+                          setShowDeleteConfirmation(false);
+                          setDeleteConfirmation('');
+                        }}
+                        className="flex-1 bg-gray-800 hover:bg-gray-700 text-gray-300 px-4 py-2 rounded-lg transition-colors"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={handleDeleteAccount}
+                        disabled={deletingAccount || deleteConfirmation !== 'DELETE'}
+                        className="flex-1 bg-red-600 hover:bg-red-700 disabled:bg-red-900 disabled:text-gray-500 text-white px-4 py-2 rounded-lg transition-colors font-semibold"
+                      >
+                        {deletingAccount ? 'Deleting...' : 'Confirm Delete'}
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {/* Close Button */}
+              <div className="flex justify-end pt-2">
+                <button
+                  onClick={() => {
+                    setShowAccountSettings(false);
+                    setShowDeleteConfirmation(false);
+                    setDeleteConfirmation('');
+                  }}
+                  className="bg-gray-800 hover:bg-gray-700 text-gray-300 px-6 py-2 rounded-lg transition-colors"
+                >
+                  Close
                 </button>
               </div>
             </div>

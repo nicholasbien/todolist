@@ -21,6 +21,7 @@ interface Props {
   onCloseInsights?: () => void;
   onShowExportModal?: () => void;
   onShowContactModal?: () => void;
+  onShowAccountSettings?: () => void;
   isOffline?: boolean;
 }
 
@@ -40,6 +41,7 @@ export default function AIToDoListApp({
   onCloseInsights,
   onShowExportModal,
   onShowContactModal,
+  onShowAccountSettings,
   isOffline,
 }: Props) {
   const { logout, clearAuthExpired, authenticatedFetch } = useAuth();
@@ -1003,9 +1005,18 @@ export default function AIToDoListApp({
                   <button
                     onClick={() => {
                       setShowSettingsDropdown(false);
-                      onShowEmailSettings?.();
+                      onShowAccountSettings?.();
                     }}
                     className="w-full text-left px-4 py-3 text-gray-300 hover:bg-gray-900 hover:text-gray-100 transition-colors rounded-t-lg"
+                  >
+                    Account
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowSettingsDropdown(false);
+                      onShowEmailSettings?.();
+                    }}
+                    className="w-full text-left px-4 py-3 text-gray-300 hover:bg-gray-900 hover:text-gray-100 transition-colors"
                   >
                     Email Settings
                   </button>

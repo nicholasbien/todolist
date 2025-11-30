@@ -447,6 +447,95 @@ async def update_user_name(user_id: str, first_name: str) -> dict:
         raise HTTPException(status_code=500, detail=f"Failed to update name: {str(e)}")
 
 
+async def delete_user_account(user_id: str) -> dict:
+    """Delete user account and all associated data.
+
+    This will permanently delete:
+    - All todos owned by the user
+    - All journals owned by the user
+    - All categories in user's spaces
+    - All spaces owned by the user
+    - User's membership from shared spaces
+    - All sessions for the user
+    - The user account itself
+    """
+    try:
+        # Import collections
+        from db import collections
+        from spaces import spaces_collection
+
+        user_object_id = ObjectId(user_id)
+
+        # Verify user exists
+        user = await users_collection.find_one({"_id": user_object_id})
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        user_email = user.get("email", "unknown")
+        logger.info(f"Starting account deletion for user: {user_email} ({user_id})")
+
+        # 1. Delete all todos owned by this user
+        todos_result = await collections.todos.delete_many({"user_id": user_id})
+        logger.info(f"Deleted {todos_result.deleted_count} todos for user {user_email}")
+
+        # 2. Delete all journals owned by this user
+        journals_result = await collections.journals.delete_many({"user_id": user_object_id})
+        logger.info(f"Deleted {journals_result.deleted_count} journals for user {user_email}")
+
+        # 3. Get all spaces owned by this user to delete their categories
+        owned_spaces = await spaces_collection.find({"owner_id": user_id}).to_list(length=None)
+        space_ids = [str(space["_id"]) for space in owned_spaces]
+
+        # Delete categories for all spaces owned by this user
+        if space_ids:
+            categories_result = await collections.categories.delete_many({"space_id": {"$in": space_ids}})
+            logger.info(f"Deleted {categories_result.deleted_count} categories for user {user_email}")
+
+        # 4. Delete all spaces owned by this user
+        spaces_result = await spaces_collection.delete_many({"owner_id": user_id})
+        logger.info(f"Deleted {spaces_result.deleted_count} spaces owned by user {user_email}")
+
+        # 5. Remove user from member_ids of any shared spaces
+        shared_spaces_result = await spaces_collection.update_many(
+            {"member_ids": user_id}, {"$pull": {"member_ids": user_id}}
+        )
+        logger.info(f"Removed user {user_email} from {shared_spaces_result.modified_count} shared spaces")
+
+        # 6. Remove user email from pending_emails of any spaces
+        pending_spaces_result = await spaces_collection.update_many(
+            {"pending_emails": user_email}, {"$pull": {"pending_emails": user_email}}
+        )
+        logger.info(f"Removed user {user_email} from {pending_spaces_result.modified_count} pending invites")
+
+        # 7. Delete all sessions for this user
+        sessions_result = await sessions_collection.delete_many({"user_id": user_object_id})
+        logger.info(f"Deleted {sessions_result.deleted_count} sessions for user {user_email}")
+
+        # 8. Finally, delete the user account itself
+        user_result = await users_collection.delete_one({"_id": user_object_id})
+        if user_result.deleted_count == 0:
+            raise HTTPException(status_code=500, detail="Failed to delete user account")
+
+        logger.info(f"Successfully deleted user account: {user_email} ({user_id})")
+
+        return {
+            "message": "Account deleted successfully",
+            "deleted": {
+                "todos": todos_result.deleted_count,
+                "journals": journals_result.deleted_count,
+                "categories": categories_result.deleted_count if space_ids else 0,
+                "spaces": spaces_result.deleted_count,
+                "sessions": sessions_result.deleted_count,
+            },
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error in delete_user_account: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to delete account: {str(e)}")
+
+
 async def ensure_user_has_default_space(user_id: str) -> None:
     """Ensure the user has a default space, creating one if needed."""
     try:

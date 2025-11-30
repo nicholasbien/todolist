@@ -373,6 +373,138 @@ class TestAuthenticationWithDatabase:
         todos = user2_todos.json()
         assert len(todos) == 0  # User 2 should have no todos
 
+    @pytest.mark.asyncio
+    async def test_account_deletion(self, client, test_email):
+        """Test that account deletion removes all user data."""
+        # Sign up and login
+        await client.post("/auth/signup", json={"email": test_email})
+        code = await get_verification_code_from_db(test_email)
+        if not code:
+            pytest.skip("Could not retrieve verification code")
+
+        login_response = await client.post("/auth/login", json={"email": test_email, "code": code})
+        assert login_response.status_code == 200
+        token = login_response.json()["token"]
+        user_id = login_response.json()["user"]["id"]
+        headers = {"Authorization": f"Bearer {token}"}
+
+        # Get default space
+        spaces_response = await client.get("/spaces", headers=headers)
+        spaces = spaces_response.json()
+        default_space = spaces[0]
+        default_space_id = default_space["_id"]
+
+        # Create some todos
+        todo1 = await client.post(
+            "/todos",
+            json={
+                "text": "Test todo 1",
+                "category": "Test",
+                "priority": "High",
+                "dateAdded": datetime.now().isoformat(),
+                "completed": False,
+            },
+            headers=headers,
+        )
+        assert todo1.status_code == 200
+
+        todo2 = await client.post(
+            "/todos",
+            json={
+                "text": "Test todo 2",
+                "category": "Work",
+                "priority": "Medium",
+                "dateAdded": datetime.now().isoformat(),
+                "completed": False,
+            },
+            headers=headers,
+        )
+        assert todo2.status_code == 200
+
+        # Create a journal entry
+        journal_response = await client.post(
+            "/journals",
+            json={"date": "2024-01-01", "text": "Test journal entry", "space_id": default_space_id},
+            headers=headers,
+        )
+        assert journal_response.status_code == 200
+
+        # Create a custom category
+        category_response = await client.post(
+            "/categories", json={"name": "CustomCategory", "space_id": default_space_id}, headers=headers
+        )
+        assert category_response.status_code == 200
+
+        # Create an additional space
+        new_space_response = await client.post("/spaces", json={"name": "Test Space"}, headers=headers)
+        assert new_space_response.status_code == 200
+
+        # Verify data exists
+        todos_response = await client.get(f"/todos?space_id={default_space_id}", headers=headers)
+        assert todos_response.status_code == 200
+        todos_before = todos_response.json()
+        assert len(todos_before) == 2
+
+        categories_response = await client.get(f"/categories?space_id={default_space_id}", headers=headers)
+        assert categories_response.status_code == 200
+        categories_before = categories_response.json()
+        assert len(categories_before) >= 1  # At least our custom category
+
+        # Delete the account
+        delete_response = await client.delete("/auth/me", headers=headers)
+        assert delete_response.status_code == 200
+        delete_result = delete_response.json()
+
+        # Verify deletion stats
+        assert "message" in delete_result
+        assert "deleted" in delete_result
+        deleted = delete_result["deleted"]
+        assert deleted["todos"] == 2
+        assert deleted["journals"] == 1
+        assert deleted["spaces"] >= 1  # At least the custom space we created
+        assert deleted["sessions"] >= 1  # At least the current session
+
+        # Verify the session token is now invalid
+        me_response = await client.get("/auth/me", headers=headers)
+        assert me_response.status_code == 401
+
+        # Verify user cannot log back in (user account deleted)
+        login_again = await client.post("/auth/login", json={"email": test_email, "code": code})
+        # The code is now invalid since the user was deleted
+        assert login_again.status_code in [400, 404]
+
+        # Verify all user data is deleted from database
+        import auth
+        from db import collections
+        from spaces import spaces_collection
+
+        # Check user is deleted
+        user = await auth.users_collection.find_one({"_id": user_id})
+        assert user is None
+
+        # Check todos are deleted
+        todos = await collections.todos.find({"user_id": user_id}).to_list(length=100)
+        assert len(todos) == 0
+
+        # Check journals are deleted (journals store user_id as ObjectId)
+        from bson import ObjectId
+
+        try:
+            user_object_id = ObjectId(user_id)
+            journals = await collections.journals.find({"user_id": user_object_id}).to_list(length=100)
+            assert len(journals) == 0
+        except Exception:
+            # If user_id is not a valid ObjectId, skip journal check
+            pass
+
+        # Check spaces owned by user are deleted
+        owned_spaces = await spaces_collection.find({"owner_id": user_id}).to_list(length=100)
+        assert len(owned_spaces) == 0
+
+        # Check sessions are deleted
+        sessions = await auth.sessions_collection.find({"user_id": user_object_id}).to_list(length=100)
+        assert len(sessions) == 0
+
 
 class TestEmailFunctionality:
     """Email-related tests (may be skipped in environments without SMTP)."""

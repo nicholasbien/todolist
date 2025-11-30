@@ -13,6 +13,7 @@ from auth import (
     LoginRequest,
     SignupRequest,
     UpdateNameRequest,
+    delete_user_account,
     login_user,
     logout_user,
     signup_user,
@@ -254,6 +255,13 @@ async def api_update_name(request: UpdateNameRequest, current_user: dict = Depen
     """Update user's first name."""
     logger.info(f"Update name request for user: {current_user['email']}, name: {request.first_name}")
     return await update_user_name(current_user["user_id"], request.first_name)
+
+
+@app.delete("/auth/me")
+async def api_delete_account(current_user: dict = Depends(get_current_user)):
+    """Delete user account and all associated data."""
+    logger.info(f"Account deletion request for user: {current_user['email']}")
+    return await delete_user_account(current_user["user_id"])
 
 
 # Add todo management endpoints
