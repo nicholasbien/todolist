@@ -83,6 +83,7 @@ export default function TodoItem({
                 target="_blank"
                 rel="noopener noreferrer"
                 className="underline"
+                onClick={(e) => e.stopPropagation()}
               >
                 {todo.text}
               </a>
