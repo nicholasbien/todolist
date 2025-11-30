@@ -232,6 +232,7 @@ export default function JournalComponent({ token, activeSpace }: JournalProps) {
             onChange={(e) => setSelectedDate(e.target.value)}
             className="bg-gray-900 border border-gray-700 text-gray-100 px-4 h-10 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent text-center min-w-[160px]"
             style={{ colorScheme: 'dark' }}
+            aria-label="Select journal date"
           />
           <button
             type="button"
@@ -262,6 +263,7 @@ export default function JournalComponent({ token, activeSpace }: JournalProps) {
               onChange={(e) => setJournalText(e.target.value)}
               placeholder={`Write about your day on ${formatDateForDisplay(selectedDate)}...`}
               className="w-full h-full p-4 bg-gray-900 border border-gray-700 text-gray-100 placeholder-gray-500 rounded-xl focus:outline-none focus:ring-2 focus:ring-accent resize-none overflow-y-auto custom-scrollbar"
+              aria-label="Journal entry"
             />
           </div>
 
@@ -270,7 +272,7 @@ export default function JournalComponent({ token, activeSpace }: JournalProps) {
             <div className="flex items-center justify-between mb-4">
               {/* Entry Meta Info */}
               {currentEntry && (
-                <div className="text-xs text-gray-500 space-y-1">
+                <div className="text-sm text-gray-500 space-y-1">
                   <div>Created: {new Date(currentEntry.created_at).toLocaleString()}</div>
                   {currentEntry.updated_at !== currentEntry.created_at && (
                     <div>Updated: {new Date(currentEntry.updated_at).toLocaleString()}</div>

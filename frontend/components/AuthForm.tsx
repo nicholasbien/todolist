@@ -165,7 +165,7 @@ export default function AuthForm() {
         )}
 
         <div className="mt-8 pt-6 border-t border-muted">
-          <p className="text-xs text-muted text-center">
+          <p className="text-sm text-muted text-center">
             {step === 'email'
               ? 'New users will be automatically registered'
               : 'Check the server console for your verification code'

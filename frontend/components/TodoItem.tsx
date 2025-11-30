@@ -98,18 +98,20 @@ export default function TodoItem({
             <button
               onClick={(e) => { e.stopPropagation(); handleCompleteClick(e); }}
               disabled={isCompleting}
-              className={`text-lg w-8 h-8 flex items-center justify-center rounded-lg transition-all duration-200 ${
+              className={`text-lg w-11 h-11 flex items-center justify-center rounded-lg transition-all duration-200 ${
                 isCompleting
                   ? "text-green-200 bg-green-900/40 scale-110"
                   : "text-green-400 hover:text-green-300 hover:bg-green-900/20"
               }`}
+              aria-label="Mark task as complete"
             >
               ✓
             </button>
           ) : (
             <button
               onClick={(e) => { e.stopPropagation(); handleCompleteClick(e); }}
-              className="text-yellow-400 hover:text-yellow-300 hover:bg-yellow-900/20 text-lg w-8 h-8 flex items-center justify-center rounded-lg transition-colors"
+              className="text-yellow-400 hover:text-yellow-300 hover:bg-yellow-900/20 text-lg w-11 h-11 flex items-center justify-center rounded-lg transition-colors"
+              aria-label="Mark task as incomplete"
             >
               ↻
             </button>
@@ -117,24 +119,25 @@ export default function TodoItem({
           <button
             onClick={(e) => { e.stopPropagation(); handleDeleteClick(e); }}
             disabled={isDeleting}
-            className={`text-lg w-8 h-8 flex items-center justify-center rounded-lg transition-all duration-200 ${
+            className={`text-lg w-11 h-11 flex items-center justify-center rounded-lg transition-all duration-200 ${
               isDeleting
                 ? "text-red-200 bg-red-900/40 scale-110"
                 : "text-red-400 hover:text-red-300 hover:bg-red-900/20"
             }`}
+            aria-label="Delete task"
           >
             ×
           </button>
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2 mt-2 text-xs">
+      <div className="flex flex-wrap items-center gap-2 mt-2 text-sm">
         {editingCategory === todo._id ? (
           <select
             value={todo.category}
             onChange={(e) => handleUpdateCategory(todo._id, e.target.value)}
             onBlur={() => setEditingCategory(null)}
-            className="px-3 py-1.5 rounded-lg bg-black text-white border border-gray-700 text-xs focus:border-accent focus:outline-none"
+            className="px-3 py-1.5 rounded-lg bg-black text-white border border-gray-700 text-sm focus:border-accent focus:outline-none"
             autoFocus
             onClick={(e) => { (e.target as HTMLSelectElement).focus(); e.stopPropagation(); }}
           >
@@ -155,7 +158,7 @@ export default function TodoItem({
             value={todo.category}
             onChange={(e) => handleUpdateCategory(todo._id, e.target.value)}
             onClick={(e) => e.stopPropagation()}
-            className={`px-3 py-1.5 rounded-lg cursor-pointer text-xs appearance-none transition-colors ${
+            className={`px-3 py-1.5 rounded-lg cursor-pointer text-sm appearance-none transition-colors ${
               todo.completed ? "bg-black border border-gray-800 text-gray-500" : "bg-black border border-gray-700 text-gray-200 hover:border-gray-600"
             }`}
           >
@@ -176,7 +179,7 @@ export default function TodoItem({
           value={todo.priority}
           onChange={(e) => handleUpdatePriority(todo._id, e.target.value)}
           onClick={(e) => e.stopPropagation()}
-          className={`px-3 py-1.5 rounded-lg cursor-pointer text-xs appearance-none min-w-16 transition-colors ${
+          className={`px-3 py-1.5 rounded-lg cursor-pointer text-sm appearance-none min-w-16 transition-colors ${
             todo.completed ? "bg-black border border-gray-800 text-gray-500" : "bg-black border border-gray-700 text-gray-200 hover:border-gray-600"
           }`}
         >
@@ -185,7 +188,7 @@ export default function TodoItem({
           <option value="Low">Low</option>
         </select>
         {todo.dueDate && (
-          <span className={`text-xs ${todo.completed ? "text-gray-500" : "text-gray-300"}`}>
+          <span className={`text-sm ${todo.completed ? "text-gray-500" : "text-gray-300"}`}>
             Due: {(() => {
               const dueDate = new Date(`${todo.dueDate}T00:00:00`);
               const today = new Date();
@@ -229,7 +232,7 @@ export default function TodoItem({
           </span>
         )}
         {isCollaborative && todo.first_name && (
-          <span className={`text-xs ${todo.completed ? "text-gray-500" : "text-gray-300"}`}>
+          <span className={`text-sm ${todo.completed ? "text-gray-500" : "text-gray-300"}`}>
             Added by: {todo.first_name}
           </span>
         )}

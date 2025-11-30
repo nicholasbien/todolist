@@ -1203,6 +1203,7 @@ export default function AIToDoListApp({
             onKeyPress={(e) => e.key === 'Enter' && handleAddTodo()}
             placeholder="Add a new task..."
             disabled={loading}
+            aria-label="Add new task"
             className="flex-1 p-3 border border-gray-800 rounded-xl bg-black text-gray-100 placeholder-gray-500 focus:border-accent focus:outline-none transition-colors"
           />
           <button

@@ -322,7 +322,7 @@ export default function AgentChatbot({ activeSpace, token, isActive = true }: Ch
               <div className="text-left space-y-4 mt-4">
                 <div>
                   <h4 className="text-sm font-semibold text-gray-200 mb-2">Task Management</h4>
-                  <ul className="text-xs text-gray-400 space-y-1 ml-4">
+                  <ul className="text-sm text-gray-400 space-y-1 ml-4">
                     <li>• Add, update, and search your tasks</li>
                     <li>• Get task recommendations and suggestions</li>
                   </ul>
@@ -330,7 +330,7 @@ export default function AgentChatbot({ activeSpace, token, isActive = true }: Ch
 
                 <div>
                   <h4 className="text-sm font-semibold text-gray-200 mb-2">Journal Access</h4>
-                  <ul className="text-xs text-gray-400 space-y-1 ml-4">
+                  <ul className="text-sm text-gray-400 space-y-1 ml-4">
                     <li>• Add journal entries</li>
                     <li>• Search through your past reflections</li>
                   </ul>
@@ -338,7 +338,7 @@ export default function AgentChatbot({ activeSpace, token, isActive = true }: Ch
 
                 <div>
                   <h4 className="text-sm font-semibold text-gray-200 mb-2">Information & Resources</h4>
-                  <ul className="text-xs text-gray-400 space-y-1 ml-4">
+                  <ul className="text-sm text-gray-400 space-y-1 ml-4">
                     <li>• Search the web for current information</li>
                     <li>• Check current weather and forecasts</li>
                     <li>• Get book recommendations</li>
@@ -348,7 +348,7 @@ export default function AgentChatbot({ activeSpace, token, isActive = true }: Ch
               </div>
 
               <div className="mt-4 pt-4 border-t border-gray-800">
-                <p className="text-xs text-gray-500 italic">
+                <p className="text-sm text-gray-500 italic">
                   Try: &quot;What should I get done today?&quot;, &quot;Summarize my latest journals&quot;, or &quot;What&apos;s the weather in NYC?&quot;
                 </p>
               </div>
@@ -365,12 +365,13 @@ export default function AgentChatbot({ activeSpace, token, isActive = true }: Ch
                 ? 'bg-blue-900/30 text-blue-200 border border-blue-700/50'
                 : 'bg-gray-800 text-gray-100 border border-gray-700'
             }`}>
-              <div className="text-xs mb-1 opacity-75 flex justify-between items-center">
+              <div className="text-sm mb-1 opacity-75 flex justify-between items-center">
                 <span>{msg.role === 'user' ? 'You' : msg.role === 'system' ? 'Tool' : 'Agent'}</span>
                 {msg.role === 'system' && msg.toolData && (
                   <button
                     onClick={() => toggleToolExpansion(idx)}
-                    className="text-xs text-blue-300 hover:text-blue-100 transition-colors"
+                    className="text-sm text-blue-300 hover:text-blue-100 transition-colors"
+                    aria-label={expandedTools.has(idx) ? 'Collapse tool details' : 'Expand tool details'}
                   >
                     {expandedTools.has(idx) ? '▼' : '▶'}
                   </button>
@@ -382,7 +383,7 @@ export default function AgentChatbot({ activeSpace, token, isActive = true }: Ch
                 <PlainTextRenderer content={msg.content} className="text-sm" />
               )}
               {msg.role === 'system' && msg.toolData && expandedTools.has(idx) && (
-                <div className="mt-2 pt-2 border-t border-blue-700/30 text-xs">
+                <div className="mt-2 pt-2 border-t border-blue-700/30 text-sm">
                   <div className="mb-1">
                     <span className="text-blue-300 font-medium">Input:</span>
                     <pre className="mt-1 bg-blue-950/50 p-2 rounded text-blue-100 overflow-x-auto">
@@ -440,6 +441,7 @@ export default function AgentChatbot({ activeSpace, token, isActive = true }: Ch
             onMouseEnter={() => !isOnline && setShowOfflineMessage(true)}
             onMouseLeave={() => setShowOfflineMessage(false)}
             onClick={handleOfflineClick}
+            aria-label="Ask agent a question"
           />
           {showOfflineMessage && !isOnline && (
             <div className="absolute bottom-full left-0 mb-2 bg-gray-800 border border-gray-700 rounded-lg p-3 shadow-lg z-10 w-full">

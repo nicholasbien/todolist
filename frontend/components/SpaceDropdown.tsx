@@ -118,7 +118,7 @@ export default function SpaceDropdown({
                       {space.name}
                     </div>
                     {isCollaborativeSpace(space) && (
-                      <div className="text-xs text-gray-400 leading-none">
+                      <div className="text-sm text-gray-400 leading-none">
                         {space.member_ids?.length || 0} member{(space.member_ids?.length || 0) !== 1 ? 's' : ''}
                         {(space.pending_emails?.length ?? 0) > 0 &&
                           `, ${space.pending_emails?.length} pending`
@@ -133,6 +133,7 @@ export default function SpaceDropdown({
                   <button
                     onClick={(e) => handleEditClick(space, e)}
                     className="p-1 hover:bg-gray-800 rounded text-gray-400 hover:text-gray-200 transition-all flex-shrink-0 opacity-60 sm:opacity-0 sm:group-hover:opacity-100"
+                    aria-label={canEditSpace(space) ? "Edit space" : "Space options"}
                     title={canEditSpace(space) ? "Edit space" : "Space options"}
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
