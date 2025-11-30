@@ -70,15 +70,29 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
       if (response.ok) {
         const userData = await response.json();
-        setUser(userData);
-        setToken(tokenToVerify);
+        // Validate that we got user data with expected fields
+        if (userData && (userData.id || userData._id || userData.user_id) && userData.email) {
+          setUser(userData);
+          setToken(tokenToVerify);
+          console.log('✅ Token verified successfully');
+        } else {
+          console.error('Invalid user data structure:', userData);
+          logout(true);
+        }
       } else {
-        // Token is invalid, clear it
-        logout(true);
+        console.error('Token verification failed with status:', response.status);
+        // Only set authExpired for 401 errors (actual auth issues)
+        // For other errors (500, network issues), just clear state without showing expired message
+        if (response.status === 401) {
+          logout(true);
+        } else {
+          logout(false);
+        }
       }
     } catch (error) {
-      console.error('Token verification failed:', error);
-      logout(true);
+      console.error('Token verification error:', error);
+      // Network errors shouldn't show "session expired" message
+      logout(false);
     } finally {
       setIsLoading(false);
     }

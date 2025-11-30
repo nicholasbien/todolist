@@ -278,6 +278,61 @@ class TestAuthenticationWithDatabase:
         assert todos[0]["space_id"] == default_space_id
 
     @pytest.mark.asyncio
+    async def test_user_data_consistency_between_login_and_auth_me(self, client, test_email):
+        """Test that login and /auth/me return consistent user data structures.
+
+        This test would have caught the bug where login returned 'id' field
+        but /auth/me returned 'user_id' field, causing frontend authentication issues.
+        """
+        # Sign up
+        signup_response = await client.post("/auth/signup", json={"email": test_email})
+        assert signup_response.status_code == 200
+
+        # Get verification code
+        code = await get_verification_code_from_db(test_email)
+        if not code:
+            pytest.skip("Could not retrieve verification code")
+
+        # Login and get user data
+        login_response = await client.post("/auth/login", json={"email": test_email, "code": code})
+        assert login_response.status_code == 200
+        login_data = login_response.json()
+        assert "token" in login_data
+        assert "user" in login_data
+
+        login_user = login_data["user"]
+        token = login_data["token"]
+
+        # Call /auth/me and get user data
+        headers = {"Authorization": f"Bearer {token}"}
+        me_response = await client.get("/auth/me", headers=headers)
+        assert me_response.status_code == 200
+        me_user = me_response.json()
+
+        # Critical: Both responses should have the same user ID field names
+        # This prevents frontend from breaking when it expects consistent field names
+        assert "id" in login_user, "Login response should have 'id' field"
+        assert "id" in me_user, "/auth/me response should have 'id' field"
+        assert login_user["id"] == me_user["id"], "User IDs should match"
+
+        # Both should have the same core fields
+        assert login_user["email"] == me_user["email"]
+        assert login_user.get("first_name") == me_user.get("first_name")
+
+        # Both should have the same optional fields (or both should not have them)
+        for field in [
+            "summary_hour",
+            "summary_minute",
+            "email_instructions",
+            "timezone",
+            "email_enabled",
+            "email_spaces",
+        ]:
+            login_value = login_user.get(field)
+            me_value = me_user.get(field)
+            assert login_value == me_value, f"Field '{field}' should match: login={login_value}, me={me_value}"
+
+    @pytest.mark.asyncio
     async def test_user_isolation(self, client, test_email, test_email2):
         """Test that users can only see their own todos."""
         # Create first user

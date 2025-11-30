@@ -331,6 +331,9 @@ async def login_user(email: str, code: str) -> dict:
         # Ensure user has a default space
         await ensure_user_has_default_space(str(user["_id"]))
 
+        # Reload user data to get updated email_spaces field
+        user = await users_collection.find_one({"_id": user["_id"]})
+
         # Create session
         token = generate_session_token()
         expires_at = datetime.now() + timedelta(hours=JWT_EXPIRATION_HOURS)
@@ -380,9 +383,10 @@ async def verify_session(token: str) -> dict:
         # Record last active time
         await users_collection.update_one({"_id": user["_id"]}, {"$set": {"last_login": datetime.now()}})
 
-        # Note: verify_session keeps user_id for backward compatibility with get_current_user
+        # Return consistent user data structure (using 'id' to match login response)
         return {
-            "user_id": str(user["_id"]),
+            "user_id": str(user["_id"]),  # Keep for backward compatibility
+            "id": str(user["_id"]),  # Add 'id' field to match UserResponse
             "email": user["email"],
             "first_name": user.get("first_name", ""),
             "summary_hour": user.get("summary_hour"),
