@@ -262,7 +262,6 @@ async def generate_todo_summary(
                 "Use ONLY the exact haiku provided in the prompt - never create additional poetry or haiku."
             ),
             input=prompt,
-            temperature=1,
         )
 
         summary = response.output_text

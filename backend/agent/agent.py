@@ -284,7 +284,6 @@ async def stream_agent_response(
                     input=input_messages,
                     tools=tools,
                     stream=True,
-                    temperature=0.7,
                 )
             except Exception as api_error:
                 logger.error(f"OpenAI API Error: {type(api_error).__name__}")
@@ -474,7 +473,6 @@ async def stream_agent_response(
                     input=input_messages,
                     tools=None,  # No tools for final response
                     stream=True,
-                    temperature=0.7,
                 )
             except Exception as api_error:
                 logger.error(f"OpenAI API Error (final response): {type(api_error).__name__}")

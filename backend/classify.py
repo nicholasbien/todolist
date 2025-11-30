@@ -81,7 +81,7 @@ async def classify_task(text: str, categories: List[str], date_added: str) -> Di
 
         # Use Responses API (recommended for all new projects)
         response = client.responses.create(
-            model="gpt-5-nano",
+            model="gpt-4.1-nano",
             instructions=system_prompt,
             input=f'Task: "{text}"',
             temperature=0,
