@@ -26,6 +26,8 @@ export default function AgentChatbot({ activeSpace, token, isActive = true }: Ch
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [thinkingDots, setThinkingDots] = useState(0);
+  const [isOnline, setIsOnline] = useState(true);
+  const [showOfflineMessage, setShowOfflineMessage] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const shouldAutoScrollRef = useRef(true);
@@ -82,6 +84,25 @@ export default function AgentChatbot({ activeSpace, token, isActive = true }: Ch
       if (interval) clearInterval(interval);
     };
   }, [loading]);
+
+  // Track online/offline status
+  useEffect(() => {
+    const updateOnlineStatus = () => {
+      setIsOnline(navigator.onLine);
+    };
+
+    // Set initial status
+    updateOnlineStatus();
+
+    // Listen for online/offline events
+    window.addEventListener('online', updateOnlineStatus);
+    window.addEventListener('offline', updateOnlineStatus);
+
+    return () => {
+      window.removeEventListener('online', updateOnlineStatus);
+      window.removeEventListener('offline', updateOnlineStatus);
+    };
+  }, []);
 
   // Clear messages when space changes
   useEffect(() => {
@@ -232,6 +253,16 @@ export default function AgentChatbot({ activeSpace, token, isActive = true }: Ch
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleAsk();
+    }
+  };
+
+  const handleOfflineClick = () => {
+    if (!isOnline) {
+      setShowOfflineMessage(true);
+      // Auto-hide after 3 seconds on mobile
+      setTimeout(() => {
+        setShowOfflineMessage(false);
+      }, 3000);
     }
   };
 
@@ -387,20 +418,36 @@ export default function AgentChatbot({ activeSpace, token, isActive = true }: Ch
       )}
 
       {/* Input area */}
-      <div className="flex gap-2 flex-shrink-0 items-center mb-4">
-        <input
-          type="text"
-          className="flex-1 bg-gray-900 border border-gray-700 text-gray-100 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-accent"
-          value={question}
-          onChange={(e) => setQuestion(e.target.value)}
-          onKeyPress={handleKeyPress}
-          placeholder="Ask a question..."
-          disabled={loading}
-        />
+      <div className="flex gap-2 flex-shrink-0 items-center mb-4 relative">
+        <div className="flex-1 relative">
+          <input
+            type="text"
+            className={`w-full bg-gray-900 border border-gray-700 text-gray-100 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-accent ${
+              !isOnline ? 'opacity-50 cursor-not-allowed' : ''
+            }`}
+            value={question}
+            onChange={(e) => setQuestion(e.target.value)}
+            onKeyPress={handleKeyPress}
+            placeholder={isOnline ? "Ask a question..." : "Agent requires internet connection"}
+            disabled={loading || !isOnline}
+            onMouseEnter={() => !isOnline && setShowOfflineMessage(true)}
+            onMouseLeave={() => setShowOfflineMessage(false)}
+            onClick={handleOfflineClick}
+          />
+          {showOfflineMessage && !isOnline && (
+            <div className="absolute bottom-full left-0 mb-2 bg-gray-800 border border-gray-700 rounded-lg p-3 shadow-lg z-10 w-full">
+              <p className="text-sm text-gray-300">
+                Network connection required to use Agent mode. The agent needs to communicate with AI services in real-time.
+              </p>
+            </div>
+          )}
+        </div>
         <button
           onClick={handleAsk}
-          disabled={loading || !question.trim() }
+          disabled={loading || !question.trim() || !isOnline}
           className="bg-accent text-foreground px-6 py-3 rounded-lg hover:bg-accent-light disabled:bg-accent-dark disabled:cursor-not-allowed transition-colors"
+          onMouseEnter={() => !isOnline && setShowOfflineMessage(true)}
+          onMouseLeave={() => setShowOfflineMessage(false)}
         >
           Send
         </button>
