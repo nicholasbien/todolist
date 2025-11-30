@@ -87,9 +87,9 @@ This is an AI-powered collaborative todo list application with a React/Next.js f
 - **OpenAI GPT-4.1**: Chat completions with function calling for weather, tasks, journals, and search
 - **Cross-Platform**: Works seamlessly on web (via service worker) and mobile (Capacitor direct calls)
 - **Available Tools**:
-  - Weather: `get_current_weather`, `get_weather_forecast`, `get_weather_alerts`
   - Tasks: `add_task`, `list_tasks`, `update_task`
   - Content: `add_journal_entry`, `search_content`
+  - Weather: `get_current_weather`, `get_weather_forecast`
 
 ### Spaces System
 - **Default Spaces**: Every user gets a personal "Default" space automatically
@@ -250,9 +250,9 @@ For recommendations, the agent will:
 - Provide context-aware responses
 
 #### ✅ Tool Categories
-- **Weather**: `get_current_weather`, `get_weather_forecast`, `get_weather_alerts`
 - **Tasks**: `add_task`, `list_tasks`, `update_task`
 - **Content**: `add_journal_entry`, `search_content`
+- **Weather**: `get_current_weather`, `get_weather_forecast`
 - **External APIs**: `get_book_recommendations`, `get_inspirational_quotes`
 
 ### 6. Monitoring and Debugging

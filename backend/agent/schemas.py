@@ -34,18 +34,6 @@ class WeatherForecastRequest(BaseModel):
     units: Literal["metric", "imperial", "kelvin"] = Field(default="imperial", description="Temperature units")
 
 
-class WeatherAlertsRequest(BaseModel):
-    location: str = Field(
-        ...,
-        description=(
-            "Location in one of these formats: "
-            "City name (e.g., 'Tokyo'), "
-            "City,CountryCode (e.g., 'Paris,FR'), "
-            "City,StateCode,US (e.g., 'Portland,OR,US' for US cities)"
-        ),
-    )
-
-
 class TaskAddRequest(BaseModel):
     text: str = Field(..., min_length=1, description="Task description")
     category: str = Field(
@@ -178,12 +166,6 @@ OPENAI_TOOL_SCHEMAS = {
         "name": "get_weather_forecast",
         "description": "Get multi-day weather forecast for a location. Call when user asks for weather predictions, forecast, or 'weather this week'.",  # noqa: E501
         "parameters": get_openai_tool_schema(WeatherForecastRequest),
-    },
-    "get_weather_alerts": {
-        "type": "function",
-        "name": "get_weather_alerts",
-        "description": "Check for weather alerts in a specific location. Call when user asks about weather warnings, alerts, storms, or weather safety.",  # noqa: E501
-        "parameters": get_openai_tool_schema(WeatherAlertsRequest),
     },
     "get_book_recommendations": {
         "type": "function",

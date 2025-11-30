@@ -39,14 +39,6 @@ from agent.tools import (
     update_task,
 )
 
-try:  # pragma: no cover
-    from agent.tools import get_weather_alerts  # type: ignore[attr-defined]
-except Exception:  # pragma: no cover
-
-    async def get_weather_alerts(request, user_id, space_id=None):
-        return {"ok": True, "location": request.location, "alerts": ["No active weather alerts"]}
-
-
 from .conftest import get_token
 
 
@@ -846,7 +838,6 @@ class TestAgentSystemPrompt:
         expected_tools = {
             "get_current_weather",
             "get_weather_forecast",
-            "get_weather_alerts",
             "add_task",
             "list_tasks",
             "update_task",

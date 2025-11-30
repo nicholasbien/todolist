@@ -39,19 +39,18 @@ Streaming SSE endpoint that provides real-time AI responses with tool execution.
 
 ## Available Tools
 
-### Weather Tools
-1. **get_current_weather**: Current conditions for any location
-2. **get_weather_forecast**: Multi-day forecast (1-5 days)
-3. **get_weather_alerts**: Weather warnings and alerts
-
 ### Task Management Tools
-4. **add_task**: Create new todos with category/priority
-5. **list_tasks**: Retrieve tasks with optional completion filter
-6. **update_task**: Modify task text, priority, or completion status
+1. **add_task**: Create new todos with category/priority
+2. **list_tasks**: Retrieve tasks with optional completion filter
+3. **update_task**: Modify task text, priority, or completion status
 
 ### Content Tools
-7. **add_journal_entry**: Create/update journal entries by date
-8. **search_content**: Search through tasks and journal entries
+4. **add_journal_entry**: Create/update journal entries by date
+5. **search_content**: Search through tasks and journal entries
+
+### Weather Tools
+6. **get_current_weather**: Current conditions for any location
+7. **get_weather_forecast**: Multi-day forecast (1-5 days)
 
 ## Implementation Details
 
