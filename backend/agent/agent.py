@@ -216,7 +216,7 @@ def format_sse_message(event: str, data: dict) -> str:
 
 
 async def stream_agent_response(
-    user_message: str, user_id: str, space_id: Optional[str] = None
+    user_message: str, user_id: str, space_id: Optional[str] = None, user_name: Optional[str] = None
 ) -> AsyncGenerator[str, None]:
     """Stream agent responses with sequential tool execution and summarization."""
 
@@ -287,11 +287,16 @@ async def stream_agent_response(
     category_names = categories if categories else ["General"]
     categories_str = ", ".join(category_names)
 
+    # Build context with user name if available
+    user_context = ""
+    if user_name:
+        user_context = f"You are helping {user_name}.\n"
+
     developer_instructions = f"""{AGENT_SYSTEM_PROMPT}
 
 Today's date: {current_date}
 
-Current context: You are helping the user in their "{space_name}" space.
+{user_context}Current context: You are helping the user in their "{space_name}" space.
 This space has the following categories: {categories_str}.
 When adding new tasks, choose a category from this list, or use "General" if none fit well."""
     input_messages: list[dict[str, Any]] = []
@@ -590,9 +595,11 @@ async def agent_stream(
     if not user_id:
         raise HTTPException(status_code=401, detail="User not authenticated")
 
+    user_name = user_data.get("first_name")
+
     # Create async generator
     async def generate():
-        async for chunk in stream_agent_response(q, user_id, space_id):
+        async for chunk in stream_agent_response(q, user_id, space_id, user_name):
             yield chunk
 
     # Return streaming response
