@@ -128,7 +128,7 @@ export default function JournalComponent({ token, activeSpace }: JournalProps) {
       clearTimeout(saveTimeout);
     }
 
-    if (journalText !== lastSavedText && journalText.trim()) {
+    if (journalText !== lastSavedText) {
       const timeout = setTimeout(() => {
         saveJournalEntry(journalText, false);
       }, 2000); // Auto-save after 2 seconds of inactivity
@@ -183,9 +183,9 @@ export default function JournalComponent({ token, activeSpace }: JournalProps) {
 
   const getSaveStatus = () => {
     if (saving) return 'Saving...';
-    if (journalText !== lastSavedText && journalText.trim()) return 'Unsaved changes';
+    if (journalText !== lastSavedText) return 'Unsaved changes';
     if (currentEntry?.updated_offline) return isOffline ? 'Saved offline' : 'Syncing...';
-    if (lastSavedText) return 'Synced online';
+    if (lastSavedText || currentEntry) return 'Synced online';
     return '';
   };
 
@@ -275,7 +275,7 @@ export default function JournalComponent({ token, activeSpace }: JournalProps) {
               {/* Save button on the right */}
               <button
                 onClick={handleManualSave}
-                disabled={saving || !journalText.trim()}
+                disabled={saving || journalText === lastSavedText}
                 className="bg-accent text-foreground px-6 py-3 rounded-lg hover:bg-accent-light disabled:bg-accent-dark disabled:text-gray-400 transition-colors"
               >
                 {saving ? 'Saving...' : 'Save'}
