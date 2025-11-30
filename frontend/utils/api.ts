@@ -10,13 +10,13 @@ const CONFIG = {
  * Get the correct API base URL for the current environment
  */
 function getApiBaseUrl(forceBackend = false): string {
-  // Check if we're in Capacitor (native app) - special case for mobile
-  if (Capacitor.isNativePlatform()) {
-    return CONFIG.PRODUCTION_BACKEND;
-  }
+  // IMPORTANT: Always use relative URLs (empty string) so service worker can intercept
+  // The service worker will then route to the correct backend based on environment
+  // This is critical for offline functionality on both web and Capacitor
 
   // For web environments (both dev and production), always use service worker + proxy
-  // This ensures consistent behavior everywhere
+  // For Capacitor, also use service worker routing to enable offline functionality
+  // The service worker detects Capacitor via protocol === 'file:' and routes correctly
   return '';
 }
 
@@ -62,11 +62,11 @@ export async function apiRequest(endpoint: string, options: RequestInit = {}): P
     headers,
   };
 
-  console.log(`🔗 API Request: ${endpoint} -> ${url} (Capacitor: ${Capacitor.isNativePlatform()})`);
+  console.log(`🔗 API Request: ${endpoint} -> ${url} (Capacitor: ${Capacitor.isNativePlatform()}, via SW: ${baseUrl === ''})`);
 
-  // Debug logging for Capacitor (console only, no alerts)
-  if (Capacitor.isNativePlatform()) {
-    console.log(`📱 Capacitor API Call: ${endpoint} -> ${url}`);
+  // Debug logging for service worker routing
+  if (baseUrl === '') {
+    console.log(`📡 Request will be intercepted by service worker: ${url}`);
   }
 
   // Handle Railway redirects by following them automatically

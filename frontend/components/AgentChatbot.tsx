@@ -112,9 +112,8 @@ export default function AgentChatbot({ activeSpace, token, isActive = true }: Ch
       if (activeSpace?._id) {
         params.append('space_id', activeSpace._id);
       }
-      const clearUrl = Capacitor.isNativePlatform()
-        ? `https://backend-production-e920.up.railway.app/agent/history?${params.toString()}`
-        : `/agent/history?${params.toString()}`;
+      // Always use relative URL so service worker can intercept (for offline support)
+      const clearUrl = `/agent/history?${params.toString()}`;
 
       const headers: Record<string, string> = {};
       if (token) {
@@ -151,10 +150,9 @@ export default function AgentChatbot({ activeSpace, token, isActive = true }: Ch
         params.append('token', token);
       }
 
-      // Route to backend agent endpoint via service worker
-      const agentUrl = Capacitor.isNativePlatform()
-        ? `https://backend-production-e920.up.railway.app/agent/stream?${params.toString()}`
-        : `/agent/stream?${params.toString()}`;
+      // Always use relative URL so service worker can intercept (for offline support)
+      // Service worker will route to correct backend based on environment
+      const agentUrl = `/agent/stream?${params.toString()}`;
 
       const es = new EventSource(agentUrl);
 
