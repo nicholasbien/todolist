@@ -1,7 +1,7 @@
 // IMPORTANT: Always increment these versions when modifying this service worker file
 // This forces browsers to download and use the updated service worker
-const STATIC_CACHE = 'todo-static-v108';
-const API_CACHE = 'todo-api-v108';
+const STATIC_CACHE = 'todo-static-v110';
+const API_CACHE = 'todo-api-v110';
 
 const GLOBAL_DB_NAME = 'TodoGlobalDB';
 const USER_DB_PREFIX = 'TodoUserDB_';
@@ -668,16 +668,38 @@ async function handleApiRequest(request) {
           const authData = await getAuth();
           if (!authData || !authData.userId) return response; // No user context
 
-          const serverTodos = await response.clone().json();
+          const spaceId = url.searchParams.get('space_id');
 
-          // Save all server todos to IndexedDB for offline access
-          for (const todo of serverTodos) {
-            if (todo && todo._id) {
-              await putTodo(todo, authData.userId);
+          // Check if sync is in progress or there are pending todo operations
+          const queue = await readQueue(authData.userId);
+          const hasPendingTodos = queue.some(op =>
+            (op.type === 'CREATE' || op.type === 'UPDATE' || op.type === 'DELETE') &&
+            (op.data.space_id === spaceId || (!spaceId && !op.data.space_id))
+          );
+
+          if (syncInProgress || hasPendingTodos) {
+            console.log(`⏸️ BLOCKING todo server data - sync: ${syncInProgress}, pending: ${hasPendingTodos}`);
+            // Don't cache server data during sync to prevent race condition
+            // Instead, return current IndexedDB data to maintain UI consistency
+            const offlineTodos = await getTodos(authData.userId, spaceId);
+            console.log(`📦 Returning ${offlineTodos.length} todos from IndexedDB instead of server`);
+            return new Response(JSON.stringify(offlineTodos), {
+              status: 200,
+              headers: { 'Content-Type': 'application/json' }
+            });
+          } else {
+            const serverTodos = await response.clone().json();
+
+            // Save all server todos to IndexedDB for offline access
+            for (const todo of serverTodos) {
+              if (todo && todo._id) {
+                await putTodo(todo, authData.userId);
+              }
             }
+            console.log(`✅ Cached ${serverTodos.length} todos to IndexedDB`);
           }
 
-          return response; // Return original response
+          return response; // Return original server response
         }
 
         // For GET /journals, sync server data to IndexedDB
