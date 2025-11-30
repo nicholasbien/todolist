@@ -1,7 +1,7 @@
 // IMPORTANT: Always increment these versions when modifying this service worker file
 // This forces browsers to download and use the updated service worker
-const STATIC_CACHE = 'todo-static-v107';
-const API_CACHE = 'todo-api-v107';
+const STATIC_CACHE = 'todo-static-v108';
+const API_CACHE = 'todo-api-v108';
 
 const GLOBAL_DB_NAME = 'TodoGlobalDB';
 const USER_DB_PREFIX = 'TodoUserDB_';
@@ -732,6 +732,36 @@ async function handleApiRequest(request) {
           }
 
           return response; // Return original response
+        }
+
+        // For GET /categories, store in IndexedDB
+        if (url.pathname === '/categories') {
+          const authData = await getAuth();
+          if (authData?.userId) {
+            const categories = await response.clone().json();
+            const spaceId = url.searchParams.get('space_id');
+            // Store each category with space_id
+            for (const categoryName of categories) {
+              await putCategory({ name: categoryName, space_id: spaceId }, authData.userId);
+            }
+            console.log(`📂 Cached ${categories.length} categories for space ${spaceId || 'all'} to IndexedDB`);
+          }
+          return response;
+        }
+
+        // For GET /spaces, store in IndexedDB
+        if (url.pathname === '/spaces') {
+          const authData = await getAuth();
+          if (authData?.userId) {
+            const spaces = await response.clone().json();
+            for (const space of spaces) {
+              if (space?._id) {
+                await putSpace(space, authData.userId);
+              }
+            }
+            console.log(`🏢 Cached ${spaces.length} spaces to IndexedDB`);
+          }
+          return response;
         }
       }
 
