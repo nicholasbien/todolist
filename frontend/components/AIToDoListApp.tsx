@@ -1574,7 +1574,7 @@ export default function AIToDoListApp({
                   type="time"
                   value={emailTime}
                   onChange={(e) => setEmailTime(e.target.value)}
-                  className="w-full bg-gray-900 border border-gray-700 text-gray-100 p-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent"
+                  className="w-full bg-gray-900 border border-gray-700 text-gray-100 p-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent disabled:opacity-50 disabled:cursor-not-allowed"
                   disabled={!emailEnabled}
                 />
               </div>
@@ -1584,8 +1584,9 @@ export default function AIToDoListApp({
                 <textarea
                   value={emailInstructions}
                   onChange={(e) => setEmailInstructions(e.target.value)}
-                  className="w-full bg-gray-900 border border-gray-700 text-gray-100 placeholder-gray-500 p-2 rounded-lg h-24 resize-none focus:outline-none focus:ring-2 focus:ring-accent"
+                  className="w-full bg-gray-900 border border-gray-700 text-gray-100 placeholder-gray-500 p-2 rounded-lg h-24 resize-none focus:outline-none focus:ring-2 focus:ring-accent disabled:opacity-50 disabled:cursor-not-allowed"
                   placeholder="Write like a Buddhist monk. Include a haiku at the end."
+                  disabled={!emailEnabled}
                 />
               </div>
 

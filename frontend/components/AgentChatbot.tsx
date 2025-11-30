@@ -49,8 +49,9 @@ export default function AgentChatbot({ activeSpace, token, isActive = true }: Ch
   };
 
   useEffect(() => {
-    // Only auto-scroll if we were at the bottom before the update AND tab is active
-    if (shouldAutoScrollRef.current && isActive) {
+    // Only auto-scroll if we were at the bottom before the update AND tab is active AND we have messages
+    // Don't auto-scroll when showing blank state (messages.length === 0)
+    if (shouldAutoScrollRef.current && isActive && messages.length > 0) {
       // Small delay to ensure DOM updates are complete
       setTimeout(() => {
         scrollToBottom();
