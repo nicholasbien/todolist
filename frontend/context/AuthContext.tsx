@@ -112,11 +112,29 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       const storedUser = localStorage.getItem('auth_user');
 
       if (storedToken && storedUser) {
+        const userData = JSON.parse(storedUser);
         setToken(storedToken);
-        setUser(JSON.parse(storedUser));
+        setUser(userData);
 
-        // Verify token is still valid
-        await verifyToken(storedToken);
+        // Sync auth to service worker IndexedDB for offline access
+        if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+          const userId = userData.id || userData._id || userData.user_id;
+          navigator.serviceWorker.controller.postMessage({
+            type: 'SET_AUTH',
+            token: storedToken,
+            userId: userId
+          });
+          console.log('📤 Synced auth to service worker IndexedDB');
+        }
+
+        // Only verify token if online - offline should trust stored credentials
+        if (navigator.onLine) {
+          console.log('🌐 Online: Verifying stored token...');
+          await verifyToken(storedToken);
+        } else {
+          console.log('📴 Offline: Trusting stored token without verification');
+          setIsLoading(false);
+        }
       } else {
         setIsLoading(false);
       }
@@ -170,6 +188,17 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         setToken(newToken);
         setUser(userData);
         setAuthExpired(false);
+
+        // Sync auth to service worker IndexedDB for offline access
+        if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+          const userId = userData.id || userData._id || userData.user_id;
+          navigator.serviceWorker.controller.postMessage({
+            type: 'SET_AUTH',
+            token: newToken,
+            userId: userId
+          });
+          console.log('📤 Synced auth to service worker IndexedDB after login');
+        }
 
         return { success: true };
       } else {
