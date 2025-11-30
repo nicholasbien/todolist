@@ -23,7 +23,7 @@ describe('Service Worker Route Synchronization', () => {
       const backendContent = fs.readFileSync(backendPath, 'utf8');
       backendEndpoints = extractBackendEndpoints(backendContent);
     } else {
-      // Fallback: known endpoints as of 2025-08-29
+      // Fallback: known endpoints as of 2025-11-30
       backendEndpoints = [
         '/',
         '/auth/signup',
@@ -41,7 +41,7 @@ describe('Service Worker Route Synchronization', () => {
         '/email/update-instructions',
         '/email/update-spaces',
         '/contact',
-        '/chat',
+        '/agent/stream',
         '/insights',
         '/journals',
         '/export'
@@ -123,7 +123,7 @@ describe('Service Worker Route Synchronization', () => {
       'spaces',
       'journals',
       'insights',
-      'chat',
+      'agent',
       'auth',
       'email',
       'contact',
