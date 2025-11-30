@@ -175,7 +175,7 @@ async def send_verification_email(email: str, code: str) -> bool:
 
             body = f"""Hi there!
 
-Your verification code for my todolist app is: {code}
+Your verification code for todolist.nyc is: {code}
 
 This code will expire in 10 minutes.
 
