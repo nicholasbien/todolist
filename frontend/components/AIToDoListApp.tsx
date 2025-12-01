@@ -1145,7 +1145,7 @@ export default function AIToDoListApp({
           {/* Categories - Horizontal scroll (full width) */}
           <div className="mb-3 pt-4">
             {loadingCategories && (
-              <div className="text-gray-400 mb-2 px-4">Loading categories...</div>
+              <div className="text-gray-400 mb-2 px-4 text-center">Loading categories...</div>
             )}
               <div className="flex gap-2 pb-2 overflow-x-auto custom-scrollbar">
               <button
@@ -1379,7 +1379,7 @@ export default function AIToDoListApp({
 
       {/* Todo list */}
       {loadingTodos && (
-        <div className="text-gray-400 mb-2">Loading tasks...</div>
+        <div className="text-gray-400 mb-2 text-center">Loading tasks...</div>
       )}
       <div className="space-y-3">
         {uncompletedTodos.map((todo) => (
