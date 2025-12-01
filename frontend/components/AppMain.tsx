@@ -10,7 +10,7 @@ export default function AppMain() {
     return (
       <main className="min-h-screen bg-background text-foreground flex items-center justify-center">
         <div className="container mx-auto p-4 max-w-md">
-          <div className="animate-pulse">Loading...</div>
+          <div className="animate-pulse text-center">Loading...</div>
         </div>
       </main>
     );

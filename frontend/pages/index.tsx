@@ -9,7 +9,7 @@ const AIToDoListApp = dynamic(() => import('../components/AIToDoListApp'), {
   ssr: false,
   loading: () => (
     <div className="container mx-auto p-4 max-w-md">
-      <div className="animate-pulse">Loading...</div>
+      <div className="animate-pulse text-center">Loading...</div>
     </div>
   )
 });
@@ -485,7 +485,7 @@ export default function Home() {
           <title>todolist.nyc</title>
         </Head>
         <main className="min-h-screen bg-zinc-950 text-white flex items-center justify-center">
-          <div className="animate-pulse">Loading...</div>
+          <div className="animate-pulse text-center">Loading...</div>
         </main>
       </>
     );
