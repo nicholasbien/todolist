@@ -33,10 +33,24 @@ export default function TodoItem({
     setShouldAnimate(true);
   }, []);
 
+  // Cleanup: Remove any lingering focus when component unmounts (mobile fix)
+  useEffect(() => {
+    return () => {
+      if (document.activeElement instanceof HTMLElement) {
+        document.activeElement.blur();
+      }
+    };
+  }, []);
+
   const handleCompleteClick = async (
     e: React.MouseEvent<HTMLButtonElement>
   ) => {
+    // Blur the button to prevent focus state from persisting on mobile
     e.currentTarget.blur();
+    // Also blur any active element to prevent focus transfer
+    if (document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
     setIsCompleting(true);
     // Brief delay to show completion state
     setTimeout(() => {
@@ -47,7 +61,12 @@ export default function TodoItem({
   const handleDeleteClick = async (
     e: React.MouseEvent<HTMLButtonElement>
   ) => {
+    // Blur the button to prevent focus state from persisting on mobile
     e.currentTarget.blur();
+    // Also blur any active element to prevent focus transfer
+    if (document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
     setIsDeleting(true);
     // Brief delay for fade out animation
     setTimeout(() => {
