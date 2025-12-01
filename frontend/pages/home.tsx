@@ -9,27 +9,27 @@ export default function HomePage() {
         <meta name="description" content="Smart task management with AI categorization, collaborative spaces, and offline-first PWA." />
       </Head>
 
-      <div className="min-h-screen bg-gradient-to-br from-purple-600 to-indigo-700">
+      <div className="min-h-screen bg-zinc-950">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           {/* Header */}
           <header className="text-center pt-20 pb-16">
-            <h1 className="text-5xl sm:text-6xl font-bold text-white mb-6">
+            <h1 className="text-5xl sm:text-6xl font-bold text-gray-100 mb-6">
               todolist.nyc
             </h1>
-            <p className="text-xl sm:text-2xl text-white/90 mb-10 max-w-2xl mx-auto">
+            <p className="text-xl sm:text-2xl text-gray-400 mb-10 max-w-2xl mx-auto">
               AI-powered collaborative task management for teams and individuals
             </p>
             <a
               href="https://app.todolist.nyc"
-              className="inline-block bg-white text-purple-600 px-8 py-4 rounded-full text-lg font-semibold hover:bg-gray-100 transition-all transform hover:scale-105 shadow-xl"
+              className="inline-block bg-accent text-white px-8 py-4 rounded-full text-lg font-semibold hover:bg-accent-light transition-all transform hover:scale-105 shadow-xl"
             >
               Open Web App
             </a>
           </header>
 
           {/* Features */}
-          <section className="bg-white rounded-3xl shadow-2xl p-8 sm:p-12 mb-12 max-w-6xl mx-auto">
-            <h2 className="text-3xl sm:text-4xl font-bold text-center text-gray-800 mb-12">
+          <section className="bg-black border border-gray-800 rounded-3xl shadow-2xl p-8 sm:p-12 mb-12 max-w-6xl mx-auto">
+            <h2 className="text-3xl sm:text-4xl font-bold text-center text-gray-100 mb-12">
               Everything you need to stay organized
             </h2>
 
@@ -37,10 +37,10 @@ export default function HomePage() {
               {/* Feature 1 */}
               <div className="text-center">
                 <div className="text-5xl mb-4">🤖</div>
-                <h3 className="text-xl font-semibold text-gray-800 mb-2">
+                <h3 className="text-xl font-semibold text-gray-100 mb-2">
                   Smart AI Categorization
                 </h3>
-                <p className="text-gray-600">
+                <p className="text-gray-400">
                   Tasks are automatically organized using AI-powered categorization
                 </p>
               </div>
@@ -48,10 +48,10 @@ export default function HomePage() {
               {/* Feature 2 */}
               <div className="text-center">
                 <div className="text-5xl mb-4">👥</div>
-                <h3 className="text-xl font-semibold text-gray-800 mb-2">
+                <h3 className="text-xl font-semibold text-gray-100 mb-2">
                   Collaborative Spaces
                 </h3>
-                <p className="text-gray-600">
+                <p className="text-gray-400">
                   Create shared workspaces and invite team members or family
                 </p>
               </div>
@@ -59,10 +59,10 @@ export default function HomePage() {
               {/* Feature 3 */}
               <div className="text-center">
                 <div className="text-5xl mb-4">📱</div>
-                <h3 className="text-xl font-semibold text-gray-800 mb-2">
+                <h3 className="text-xl font-semibold text-gray-100 mb-2">
                   Offline-First PWA
                 </h3>
-                <p className="text-gray-600">
+                <p className="text-gray-400">
                   Works seamlessly offline with automatic sync when you're back online
                 </p>
               </div>
@@ -70,10 +70,10 @@ export default function HomePage() {
               {/* Feature 4 */}
               <div className="text-center">
                 <div className="text-5xl mb-4">✉️</div>
-                <h3 className="text-xl font-semibold text-gray-800 mb-2">
+                <h3 className="text-xl font-semibold text-gray-100 mb-2">
                   Daily Email Summaries
                 </h3>
-                <p className="text-gray-600">
+                <p className="text-gray-400">
                   Get AI-generated summaries of your tasks and progress
                 </p>
               </div>
@@ -81,10 +81,10 @@ export default function HomePage() {
               {/* Feature 5 */}
               <div className="text-center">
                 <div className="text-5xl mb-4">💬</div>
-                <h3 className="text-xl font-semibold text-gray-800 mb-2">
+                <h3 className="text-xl font-semibold text-gray-100 mb-2">
                   AI Assistant
                 </h3>
-                <p className="text-gray-600">
+                <p className="text-gray-400">
                   Ask questions about your tasks and get intelligent answers
                 </p>
               </div>
@@ -92,10 +92,10 @@ export default function HomePage() {
               {/* Feature 6 */}
               <div className="text-center">
                 <div className="text-5xl mb-4">📔</div>
-                <h3 className="text-xl font-semibold text-gray-800 mb-2">
+                <h3 className="text-xl font-semibold text-gray-100 mb-2">
                   Integrated Journal
                 </h3>
-                <p className="text-gray-600">
+                <p className="text-gray-400">
                   Keep daily notes and reflections alongside your tasks
                 </p>
               </div>
@@ -103,19 +103,19 @@ export default function HomePage() {
           </section>
 
           {/* Footer */}
-          <footer className="text-center pb-12 text-white">
+          <footer className="text-center pb-12 text-gray-400">
             <div className="space-x-6 mb-4">
-              <Link href="/privacy" className="hover:underline">
+              <Link href="/privacy" className="hover:text-accent transition-colors">
                 Privacy Policy
               </Link>
-              <Link href="/terms" className="hover:underline">
+              <Link href="/terms" className="hover:text-accent transition-colors">
                 Terms of Service
               </Link>
-              <Link href="/support" className="hover:underline">
+              <Link href="/support" className="hover:text-accent transition-colors">
                 Support
               </Link>
             </div>
-            <p className="text-white/70 text-sm">
+            <p className="text-gray-500 text-sm">
               &copy; 2025 todolist.nyc. All rights reserved.
             </p>
           </footer>
