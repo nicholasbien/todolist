@@ -55,6 +55,9 @@ export async function apiRequest(endpoint: string, options: RequestInit = {}): P
 
   if (token) {
     headers.Authorization = `Bearer ${token}`;
+    console.log(`🔑 Auth header added for ${endpoint}`);
+  } else {
+    console.log(`⚠️ No auth token for ${endpoint}`);
   }
 
   const requestOptions: RequestInit = {

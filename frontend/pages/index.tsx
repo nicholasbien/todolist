@@ -97,6 +97,17 @@ function LoginForm({ onLogin }: LoginFormProps) {
         localStorage.setItem('auth_token', token);
         localStorage.setItem('auth_user', JSON.stringify(user));
 
+        // Sync auth to service worker IndexedDB for offline access
+        if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+          const userId = user.id || user._id || user.user_id;
+          navigator.serviceWorker.controller.postMessage({
+            type: 'SET_AUTH',
+            token: token,
+            userId: userId
+          });
+          console.log('📤 Synced auth to service worker IndexedDB after login');
+        }
+
         // Check if user needs to set their name
         if (!user.first_name) {
           setNeedsName(true);
@@ -128,6 +139,12 @@ function LoginForm({ onLogin }: LoginFormProps) {
       const token = localStorage.getItem('auth_token');
       console.log('Token for update-name:', token ? 'Present' : 'Missing');
 
+      if (!token) {
+        console.error('No token found in localStorage');
+        setError('Session expired. Please log in again.');
+        return;
+      }
+
       const response = await apiRequest('auth/update-name', {
         method: 'POST',
         body: JSON.stringify({ first_name: firstName })
@@ -140,9 +157,11 @@ function LoginForm({ onLogin }: LoginFormProps) {
         localStorage.setItem('auth_user', JSON.stringify(updatedUser));
         onLogin(updatedUser, token);
       } else {
+        console.error('Update name failed:', response.status, data);
         setError(data.detail || 'Failed to update name');
       }
     } catch (error) {
+      console.error('Network error during name update:', error);
       setError('Network error during name update');
     } finally {
       setLoading(false);
