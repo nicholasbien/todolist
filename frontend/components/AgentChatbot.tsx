@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { ChevronDown, ChevronRight } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { MessageRenderer, PlainTextRenderer } from './MessageRenderer';
 
@@ -373,7 +374,7 @@ export default function AgentChatbot({ activeSpace, token, isActive = true }: Ch
                     className="text-sm text-blue-300 hover:text-blue-100 transition-colors"
                     aria-label={expandedTools.has(idx) ? 'Collapse tool details' : 'Expand tool details'}
                   >
-                    {expandedTools.has(idx) ? '▼' : '▶'}
+                    {expandedTools.has(idx) ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
                   </button>
                 )}
               </div>

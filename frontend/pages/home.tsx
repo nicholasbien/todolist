@@ -1,5 +1,6 @@
 import Head from 'next/head';
 import Link from 'next/link';
+import { Bot, Users, Smartphone, Mail, MessageSquare, BookOpen } from 'lucide-react';
 
 export default function HomePage() {
   return (
@@ -36,7 +37,9 @@ export default function HomePage() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
               {/* Feature 1 */}
               <div className="text-center">
-                <div className="text-5xl mb-4">🤖</div>
+                <div className="flex justify-center mb-4">
+                  <Bot className="w-12 h-12 text-accent" />
+                </div>
                 <h3 className="text-xl font-semibold text-gray-100 mb-2">
                   Smart AI Categorization
                 </h3>
@@ -47,7 +50,9 @@ export default function HomePage() {
 
               {/* Feature 2 */}
               <div className="text-center">
-                <div className="text-5xl mb-4">👥</div>
+                <div className="flex justify-center mb-4">
+                  <Users className="w-12 h-12 text-accent" />
+                </div>
                 <h3 className="text-xl font-semibold text-gray-100 mb-2">
                   Collaborative Spaces
                 </h3>
@@ -58,7 +63,9 @@ export default function HomePage() {
 
               {/* Feature 3 */}
               <div className="text-center">
-                <div className="text-5xl mb-4">📱</div>
+                <div className="flex justify-center mb-4">
+                  <Smartphone className="w-12 h-12 text-accent" />
+                </div>
                 <h3 className="text-xl font-semibold text-gray-100 mb-2">
                   Offline-First PWA
                 </h3>
@@ -69,7 +76,9 @@ export default function HomePage() {
 
               {/* Feature 4 */}
               <div className="text-center">
-                <div className="text-5xl mb-4">✉️</div>
+                <div className="flex justify-center mb-4">
+                  <Mail className="w-12 h-12 text-accent" />
+                </div>
                 <h3 className="text-xl font-semibold text-gray-100 mb-2">
                   Daily Email Summaries
                 </h3>
@@ -80,7 +89,9 @@ export default function HomePage() {
 
               {/* Feature 5 */}
               <div className="text-center">
-                <div className="text-5xl mb-4">💬</div>
+                <div className="flex justify-center mb-4">
+                  <MessageSquare className="w-12 h-12 text-accent" />
+                </div>
                 <h3 className="text-xl font-semibold text-gray-100 mb-2">
                   AI Assistant
                 </h3>
@@ -91,7 +102,9 @@ export default function HomePage() {
 
               {/* Feature 6 */}
               <div className="text-center">
-                <div className="text-5xl mb-4">📔</div>
+                <div className="flex justify-center mb-4">
+                  <BookOpen className="w-12 h-12 text-accent" />
+                </div>
                 <h3 className="text-xl font-semibold text-gray-100 mb-2">
                   Integrated Journal
                 </h3>
