@@ -182,6 +182,12 @@ export default function AuthForm() {
             }
           </p>
         </div>
+
+        <div className="mt-4 text-center">
+          <Link href="/home" className="text-sm text-muted hover:text-accent transition-colors">
+            Home
+          </Link>
+        </div>
       </div>
     </div>
   );
