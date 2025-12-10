@@ -504,6 +504,52 @@ about editors. 🌸
    - Run `pytest -v --tb=short` for detailed error output
    - Manual tests require interactive input and a running server
 
+## Updating Logo/Icons
+
+The app uses a browser-based HTML canvas script to generate PWA icons. No npm packages required.
+
+### Quick Update
+
+```bash
+# 1. Open the HTML icon generator in a browser
+open frontend/public/create_icons.html
+
+# 2. The browser will automatically download:
+#    - icon-192x192.png
+#    - icon-512x512.png
+
+# 3. Move the downloaded files to replace the existing icons
+mv ~/Downloads/icon-192x192.png frontend/public/icon-192x192.png
+mv ~/Downloads/icon-512x512.png frontend/public/icon-512x512.png
+
+# 4. Update service worker cache version to force PWA icon refresh
+# Edit frontend/public/sw.js and increment STATIC_CACHE version
+```
+
+### Customizing the Logo
+
+Edit `frontend/public/create_icons.html` to change colors, shapes, or design:
+
+**Current Design Specifications:**
+- **Canvas**: 192x192px (scaled to 512x512px for larger icon)
+- **Colors**:
+  - Background: `#ff7b4a` (orange)
+  - Notebook borders: `#000000` (black, 3.5px)
+  - Spiral binding: `#000000` (black circles and rings)
+  - Unchecked items: `#7f3d25` (brown - opacity blend)
+  - Checked item: `#000000` (solid black)
+  - Checkbox fill: `#ffb8a3` (pink/salmon)
+- **Dimensions**:
+  - Notebook: 130x130px with 4px corner radius
+  - Spine: 20px width
+  - 3D offset: 6px
+  - Checkboxes: 18x18px with 2px corner radius
+  - Spiral rings: 5 rings with calculated spacing
+- **Line thickness**: Borders 3.5px, checkboxes/text 2.5-3.5px, checkmark 2.5px
+- **No npm packages required** - just open in browser and it generates the PNGs
+
+The script uses HTML5 Canvas API to draw the notebook icon with all elements positioned using center-based calculations.
+
 ## License
 
 MIT
