@@ -129,7 +129,7 @@ export default function HomePage() {
               </Link>
             </div>
             <p className="text-gray-500 text-sm">
-              &copy; 2025 todolist.nyc. All rights reserved.
+              &copy; 2025 todolist.nyc
             </p>
           </footer>
         </div>
