@@ -92,7 +92,14 @@ Today's date: {day_of_week + ', ' if day_of_week else ''}{date_only}
 Classify the task into one of these categories: {categories_str}.
 Set priority: High (urgent/critical), Medium (regular), Low (optional).
 Remove all date keywords from the text field (words like: today, tomorrow, on, by, due, etc.).
-Extract due dates relative to today's date above. For "today" use {date_only}. For "tomorrow" use the next day. For day names like "Monday", use the next occurrence.
+
+Date extraction rules (use exact dates, not interpretations):
+- "today" → {date_only}
+- "tomorrow" → the day after {date_only}
+- Weekday names (Monday-Sunday) → the soonest upcoming occurrence of that weekday from {date_only} (if today is that weekday, use today; if that weekday has passed this week, use next week)
+- Explicit dates (2025-12-15, Dec 15, etc.) → use the exact date provided
+- "in X days/weeks" → calculate from {date_only}
+
 Return dueDate in YYYY-MM-DD format or null if no date mentioned."""
 
         logger.info(f'Full prompt:\n{system_prompt}\n\nUser input: "{text}"')
