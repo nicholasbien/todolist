@@ -109,7 +109,7 @@ export default function HomePage() {
                   Offline-First
                 </h3>
                 <p className="text-gray-400">
-                  Works seamlessly offline with automatic sync when you're back online
+                  Works seamlessly offline with automatic sync when you&apos;re back online
                 </p>
               </div>
             </div>
