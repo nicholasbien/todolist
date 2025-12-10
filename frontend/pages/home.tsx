@@ -18,7 +18,7 @@ export default function HomePage() {
               todolist.nyc
             </h1>
             <p className="text-xl sm:text-2xl text-gray-400 mb-10 max-w-2xl mx-auto">
-              AI-powered collaborative task management for teams and individuals
+              AI-powered collaborative task management
             </p>
             <a
               href="https://app.todolist.nyc"
@@ -57,7 +57,7 @@ export default function HomePage() {
                   Collaborative Spaces
                 </h3>
                 <p className="text-gray-400">
-                  Create shared workspaces and invite team members or family
+                  Create shared workspaces and invite friends or family
                 </p>
               </div>
 
