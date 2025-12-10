@@ -21,141 +21,79 @@ export default function PrivacyPage() {
 
           <div className="prose prose-invert max-w-none">
             <p className="text-lg mb-6 text-gray-300">
-              At todolist.nyc, we take your privacy seriously. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our application.
+              todolist.nyc ("the app") helps you manage tasks, journals, and AI-powered features. This Privacy Policy explains what information we collect and how it is used.
             </p>
 
             <h2 className="text-2xl font-bold mt-8 mb-4 text-gray-100">1. Information We Collect</h2>
-
-            <h3 className="text-xl font-semibold mt-6 mb-3 text-gray-200">1.1 Information You Provide</h3>
             <ul className="list-disc pl-6 space-y-2 mb-4 text-gray-300">
-              <li><strong className="text-gray-100">Email Address:</strong> Used for account authentication and login verification codes</li>
-              <li><strong className="text-gray-100">Tasks and To-Do Items:</strong> The tasks you create, including text, categories, priorities, and completion status</li>
-              <li><strong className="text-gray-100">Journal Entries:</strong> Any journal content you create within the app</li>
-              <li><strong className="text-gray-100">Workspace Data:</strong> Information about collaborative spaces you create or join</li>
-              <li><strong className="text-gray-100">AI Queries:</strong> Questions or prompts you send to the AI assistant feature</li>
+              <li><strong className="text-gray-100">Email address</strong> — used only for account authentication (verification codes).</li>
+              <li><strong className="text-gray-100">Tasks, journals, and workspace data</strong> — stored so the app can function.</li>
+              <li><strong className="text-gray-100">AI queries</strong> — sent to OpenAI to provide AI features.</li>
+              <li><strong className="text-gray-100">Device + usage info</strong> — basic app interaction data stored locally to support offline mode.</li>
             </ul>
 
-            <h3 className="text-xl font-semibold mt-6 mb-3 text-gray-200">1.2 Automatically Collected Information</h3>
+            <h2 className="text-2xl font-bold mt-8 mb-4 text-gray-100">2. How Your Data Is Used</h2>
+            <p className="mb-4 text-gray-300">We use your data to:</p>
             <ul className="list-disc pl-6 space-y-2 mb-4 text-gray-300">
-              <li><strong className="text-gray-100">Usage Data:</strong> Information about how you interact with the app (stored locally for offline functionality)</li>
-              <li><strong className="text-gray-100">Device Information:</strong> Basic device and browser information for app functionality</li>
-            </ul>
-
-            <h2 className="text-2xl font-bold mt-8 mb-4 text-gray-100">2. How We Use Your Information</h2>
-            <ul className="list-disc pl-6 space-y-2 mb-4 text-gray-300">
-              <li><strong className="text-gray-100">Account Management:</strong> To create and manage your account, authenticate logins via email verification codes</li>
-              <li><strong className="text-gray-100">Core Functionality:</strong> To provide task management, collaborative spaces, and offline sync capabilities</li>
-              <li><strong className="text-gray-100">AI Features:</strong> Automatic task categorization, generate email summaries, provide AI assistant responses</li>
-              <li><strong className="text-gray-100">Communication:</strong> To send verification codes, email summaries (if enabled), and important service updates</li>
+              <li>Create and manage your account</li>
+              <li>Provide core features (tasks, journals, spaces, offline sync)</li>
+              <li>Support AI features such as categorization and summaries</li>
+              <li>Send optional email summaries or verification codes</li>
             </ul>
 
             <h2 className="text-2xl font-bold mt-8 mb-4 text-gray-100">3. Third-Party Services</h2>
-
-            <h3 className="text-xl font-semibold mt-6 mb-3 text-gray-200">3.1 OpenAI API</h3>
             <p className="mb-4 text-gray-300">
-              We use OpenAI's API to provide AI-powered features. When you use these features, the following data may be sent to OpenAI:
+              <strong className="text-gray-100">OpenAI:</strong> Certain content you create (tasks, journals, queries) is sent to OpenAI when AI features are used. OpenAI may retain this data per their policies (typically 30 days).
             </p>
+            <p className="mb-4 text-gray-300">
+              <strong className="text-gray-100">Email + Database Providers:</strong> Used securely to deliver verification codes, summaries, and store your account data.
+            </p>
+
+            <h2 className="text-2xl font-bold mt-8 mb-4 text-gray-100">4. Data Storage & Security</h2>
             <ul className="list-disc pl-6 space-y-2 mb-4 text-gray-300">
-              <li>Task text content (for automatic categorization)</li>
-              <li>Journal entries (for email summaries and AI assistant context)</li>
-              <li>User queries submitted to the AI assistant</li>
-            </ul>
-            <p className="mb-4 text-gray-300">
-              <strong className="text-gray-100">Purpose:</strong> To provide task categorization, generate email summaries, and respond to AI assistant queries.<br />
-              <strong className="text-gray-100">Data Retention:</strong> OpenAI may retain this data according to their data retention policies (typically 30 days for API requests). Learn more at <a href="https://openai.com/privacy" target="_blank" rel="noopener noreferrer" className="text-accent hover:text-accent-light">OpenAI Privacy Policy</a>.
-            </p>
-
-            <h3 className="text-xl font-semibold mt-6 mb-3 text-gray-200">3.2 Email Service & Database</h3>
-            <p className="mb-4 text-gray-300">
-              We use SMTP services to send verification codes and optional email summaries. Your data is stored in a secure MongoDB cloud database.
-            </p>
-
-            <h2 className="text-2xl font-bold mt-8 mb-4 text-gray-100">4. Data Storage and Security</h2>
-            <ul className="list-disc pl-6 space-y-2 mb-4 text-gray-300">
-              <li><strong className="text-gray-100">Encryption:</strong> All data transmitted between your device and our servers uses HTTPS encryption</li>
-              <li><strong className="text-gray-100">Secure Storage:</strong> Your data is stored in secure, encrypted cloud databases</li>
-              <li><strong className="text-gray-100">Offline Storage:</strong> The app stores data locally on your device using IndexedDB for offline functionality</li>
-              <li><strong className="text-gray-100">Authentication:</strong> We use JWT (JSON Web Token) based authentication to secure your account</li>
+              <li>Encrypted HTTPS connections</li>
+              <li>Secure cloud database storage</li>
+              <li>Local IndexedDB storage for offline mode</li>
+              <li>JWT-based authentication</li>
             </ul>
 
-            <h2 className="text-2xl font-bold mt-8 mb-4 text-gray-100">5. Data Sharing and Disclosure</h2>
-            <p className="mb-4 text-gray-300">
-              We do not sell, trade, or rent your personal information to third parties. We may share your information only in the following circumstances:
-            </p>
+            <h2 className="text-2xl font-bold mt-8 mb-4 text-gray-100">5. Your Choices</h2>
             <ul className="list-disc pl-6 space-y-2 mb-4 text-gray-300">
-              <li><strong className="text-gray-100">With Your Consent:</strong> When you explicitly invite others to collaborative spaces</li>
-              <li><strong className="text-gray-100">Service Providers:</strong> With third-party services (OpenAI, email providers) as described above</li>
-              <li><strong className="text-gray-100">Legal Requirements:</strong> If required by law, court order, or government regulation</li>
+              <li><strong className="text-gray-100">Delete your account:</strong> In Settings → Delete Account (permanently removes all data).</li>
+              <li><strong className="text-gray-100">Export your data:</strong> Available in Settings.</li>
+              <li><strong className="text-gray-100">Disable email summaries:</strong> Optional feature.</li>
             </ul>
 
             <h2 className="text-2xl font-bold mt-8 mb-4 text-gray-100">6. Collaborative Spaces</h2>
-            <ul className="list-disc pl-6 space-y-2 mb-4 text-gray-300">
-              <li>Tasks and data within a space are visible to all members of that space</li>
-              <li>Space owners can invite new members by email</li>
-              <li>You can leave a space at any time</li>
-              <li>Your personal spaces and data remain private unless explicitly shared</li>
-            </ul>
-
-            <h2 className="text-2xl font-bold mt-8 mb-4 text-gray-100">7. Your Rights and Choices</h2>
-
-            <h3 className="text-xl font-semibold mt-6 mb-3 text-gray-200">7.1 Access and Update</h3>
             <p className="mb-4 text-gray-300">
-              You can access and update your information at any time through the app settings.
+              Your shared tasks and journals are visible to members of that space. Personal spaces remain private.
             </p>
 
-            <h3 className="text-xl font-semibold mt-6 mb-3 text-gray-200">7.2 Email Summaries</h3>
+            <h2 className="text-2xl font-bold mt-8 mb-4 text-gray-100">7. Children</h2>
             <p className="mb-4 text-gray-300">
-              You can enable or disable email summaries in your account settings. This is entirely optional.
+              The app is not intended for children under 13.
             </p>
 
-            <h3 className="text-xl font-semibold mt-6 mb-3 text-gray-200">7.3 Data Deletion</h3>
+            <h2 className="text-2xl font-bold mt-8 mb-4 text-gray-100">8. Changes</h2>
             <p className="mb-4 text-gray-300">
-              You have the right to delete your account and all associated data at any time:
-            </p>
-            <ul className="list-disc pl-6 space-y-2 mb-4 text-gray-300">
-              <li>Log into the app</li>
-              <li>Go to Settings</li>
-              <li>Select "Delete Account"</li>
-              <li>Or contact us at <a href="mailto:todolist.notifications@gmail.com" className="text-accent hover:text-accent-light">todolist.notifications@gmail.com</a></li>
-            </ul>
-            <p className="mb-4 text-gray-300">
-              Upon account deletion, we will permanently delete all your data from our servers.
+              We may update this policy and will post the new date here.
             </p>
 
-            <h3 className="text-xl font-semibold mt-6 mb-3 text-gray-200">7.4 Export Your Data</h3>
+            <h2 className="text-2xl font-bold mt-8 mb-4 text-gray-100">9. Contact</h2>
             <p className="mb-4 text-gray-300">
-              You can export your data at any time through the app's export feature.
+              <a href="mailto:todolist.notifications@gmail.com" className="text-accent hover:text-accent-light">Contact Us</a>
             </p>
-
-            <h2 className="text-2xl font-bold mt-8 mb-4 text-gray-100">8. Children's Privacy</h2>
-            <p className="mb-4 text-gray-300">
-              Our service is not intended for children under the age of 13. We do not knowingly collect personal information from children under 13.
-            </p>
-
-            <h2 className="text-2xl font-bold mt-8 mb-4 text-gray-100">9. Changes to This Privacy Policy</h2>
-            <p className="mb-4 text-gray-300">
-              We may update this Privacy Policy from time to time. We will notify you of any changes by posting the new Privacy Policy on this page and updating the "Last updated" date.
-            </p>
-
-            <h2 className="text-2xl font-bold mt-8 mb-4 text-gray-100">10. Contact Us</h2>
-            <p className="mb-4 text-gray-300">
-              If you have any questions or concerns about this Privacy Policy or our data practices, please contact us:
-            </p>
-            <ul className="list-disc pl-6 space-y-2 mb-4 text-gray-300">
-              <li><strong className="text-gray-100">Email:</strong> <a href="mailto:todolist.notifications@gmail.com" className="text-accent hover:text-accent-light">todolist.notifications@gmail.com</a></li>
-              <li><strong className="text-gray-100">Website:</strong> <a href="https://todolist.nyc" className="text-accent hover:text-accent-light">todolist.nyc</a></li>
-            </ul>
           </div>
 
           <footer className="mt-12 pt-6 border-t border-gray-800 text-center text-gray-400">
             <p>
               <Link href="/home" className="text-accent hover:text-accent-light">Back to Home</Link>
-              {' | '}
-              <Link href="/terms" className="text-accent hover:text-accent-light">Terms of Service</Link>
-              {' | '}
+              {' • '}
+              <Link href="/terms" className="text-accent hover:text-accent-light">Terms</Link>
+              {' • '}
               <Link href="/support" className="text-accent hover:text-accent-light">Support</Link>
             </p>
-            <p className="mt-2">&copy; 2025 todolist.nyc. All rights reserved.</p>
+            <p className="mt-2">&copy; 2025 todolist.nyc</p>
           </footer>
         </div>
       </div>
