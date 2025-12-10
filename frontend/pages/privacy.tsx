@@ -86,14 +86,14 @@ export default function PrivacyPage() {
           </div>
 
           <footer className="mt-12 pt-6 border-t border-gray-800 text-center text-gray-400">
-            <p>
-              <Link href="/home" className="text-accent hover:text-accent-light">Back to Home</Link>
+            <div className="mb-2">
+              <Link href="/home" className="hover:text-accent transition-colors">Home</Link>
               {' • '}
-              <Link href="/terms" className="text-accent hover:text-accent-light">Terms</Link>
+              <Link href="/terms" className="hover:text-accent transition-colors">Terms</Link>
               {' • '}
-              <Link href="/support" className="text-accent hover:text-accent-light">Support</Link>
-            </p>
-            <p className="mt-2">&copy; 2025 todolist.nyc</p>
+              <a href="mailto:todolist.notifications@gmail.com" className="hover:text-accent transition-colors">Contact</a>
+            </div>
+            <p className="text-gray-500 text-sm">&copy; 2025 todolist.nyc</p>
           </footer>
         </div>
       </div>

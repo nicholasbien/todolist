@@ -117,16 +117,12 @@ export default function HomePage() {
 
           {/* Footer */}
           <footer className="text-center pb-12 text-gray-400">
-            <div className="space-x-6 mb-4">
-              <Link href="/privacy" className="hover:text-accent transition-colors">
-                Privacy
-              </Link>
-              <Link href="/terms" className="hover:text-accent transition-colors">
-                Terms
-              </Link>
-              <Link href="/support" className="hover:text-accent transition-colors">
-                Support
-              </Link>
+            <div className="mb-4">
+              <Link href="/privacy" className="hover:text-accent transition-colors">Privacy</Link>
+              {' • '}
+              <Link href="/terms" className="hover:text-accent transition-colors">Terms</Link>
+              {' • '}
+              <a href="mailto:todolist.notifications@gmail.com" className="hover:text-accent transition-colors">Contact</a>
             </div>
             <p className="text-gray-500 text-sm">
               &copy; 2025 todolist.nyc
