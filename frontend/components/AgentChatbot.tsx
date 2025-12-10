@@ -314,7 +314,7 @@ export default function AgentChatbot({ activeSpace, token, isActive = true }: Ch
           <div className="flex items-center justify-center min-h-full py-8">
             <div className="max-w-md text-center space-y-4 px-6">
               <p className="text-gray-300 text-base leading-relaxed">
-                Hi, I&apos;m your personal agent
+                Hi, I&apos;m your personal assistant
               </p>
               <p className="text-gray-400 text-sm leading-relaxed">
                 Ask me anything! I can help you manage your tasks, check the weather, find information, and more.
@@ -367,7 +367,7 @@ export default function AgentChatbot({ activeSpace, token, isActive = true }: Ch
                 : 'bg-gray-800 text-gray-100 border border-gray-700'
             }`}>
               <div className="text-sm mb-1 opacity-75 flex justify-between items-center">
-                <span>{msg.role === 'user' ? 'You' : msg.role === 'system' ? 'Tool' : 'Agent'}</span>
+                <span>{msg.role === 'user' ? 'You' : msg.role === 'system' ? 'Tool' : 'Assistant'}</span>
                 {/* Temporarily disabled - tool step dropdown
                 {msg.role === 'system' && msg.toolData && (
                   <button
@@ -409,7 +409,7 @@ export default function AgentChatbot({ activeSpace, token, isActive = true }: Ch
         {loading && (
           <div className="flex justify-start">
             <div className="bg-gray-800 text-gray-100 border border-gray-700 max-w-xs lg:max-w-md px-4 py-2 rounded-lg">
-              <div className="text-xs mb-1 opacity-75">Agent</div>
+              <div className="text-xs mb-1 opacity-75">Assistant</div>
               <div className="text-sm">{`Thinking${'.'.repeat(thinkingDots)}`}</div>
             </div>
           </div>
@@ -441,17 +441,17 @@ export default function AgentChatbot({ activeSpace, token, isActive = true }: Ch
             value={question}
             onChange={(e) => setQuestion(e.target.value)}
             onKeyPress={handleKeyPress}
-            placeholder={isOnline ? "Ask a question..." : "Agent requires internet connection"}
+            placeholder={isOnline ? "Ask a question..." : "Assistant requires internet connection"}
             disabled={loading || !isOnline}
             onMouseEnter={() => !isOnline && setShowOfflineMessage(true)}
             onMouseLeave={() => setShowOfflineMessage(false)}
             onClick={handleOfflineClick}
-            aria-label="Ask agent a question"
+            aria-label="Ask assistant a question"
           />
           {showOfflineMessage && !isOnline && (
             <div className="absolute bottom-full left-0 mb-2 bg-gray-800 border border-gray-700 rounded-lg p-3 shadow-lg z-10 w-full">
               <p className="text-sm text-gray-300">
-                Network connection required to use Agent mode. The agent needs to communicate with AI services in real-time.
+                Network connection required to use Assistant mode. The assistant needs to communicate with AI services in real-time.
               </p>
             </div>
           )}
