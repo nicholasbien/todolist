@@ -51,13 +51,13 @@ export default function HomePage() {
               {/* Feature 2 */}
               <div className="text-center">
                 <div className="flex justify-center mb-4">
-                  <Users className="w-12 h-12 text-accent" />
+                  <Mail className="w-12 h-12 text-accent" />
                 </div>
                 <h3 className="text-xl font-semibold text-gray-100 mb-2">
-                  Collaborative Spaces
+                  Daily Email Summaries
                 </h3>
                 <p className="text-gray-400">
-                  Create shared workspaces and invite friends or family
+                  Get AI-generated summaries of your tasks and progress
                 </p>
               </div>
 
@@ -77,13 +77,13 @@ export default function HomePage() {
               {/* Feature 4 */}
               <div className="text-center">
                 <div className="flex justify-center mb-4">
-                  <Mail className="w-12 h-12 text-accent" />
+                  <Users className="w-12 h-12 text-accent" />
                 </div>
                 <h3 className="text-xl font-semibold text-gray-100 mb-2">
-                  Daily Email Summaries
+                  Collaborative Spaces
                 </h3>
                 <p className="text-gray-400">
-                  Get AI-generated summaries of your tasks and progress
+                  Create shared workspaces and invite friends or family
                 </p>
               </div>
 
