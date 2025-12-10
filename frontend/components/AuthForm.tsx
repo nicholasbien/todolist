@@ -74,7 +74,7 @@ export default function AuthForm() {
       <div className="max-w-md w-full bg-surface rounded-xl shadow-lg p-8">
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold mb-2">
-            <Link href="/home" className="text-foreground hover:text-accent transition-colors">
+            <Link href="/home" className="text-foreground hover:text-accent transition-colors cursor-pointer">
               todolist.nyc
             </Link>
           </h1>
