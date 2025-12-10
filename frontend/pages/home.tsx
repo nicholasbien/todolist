@@ -67,7 +67,7 @@ export default function HomePage() {
                   <Smartphone className="w-12 h-12 text-accent" />
                 </div>
                 <h3 className="text-xl font-semibold text-gray-100 mb-2">
-                  Offline-First PWA
+                  Offline-First
                 </h3>
                 <p className="text-gray-400">
                   Works seamlessly offline with automatic sync when you're back online
