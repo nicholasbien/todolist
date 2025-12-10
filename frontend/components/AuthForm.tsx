@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import Link from 'next/link';
 import { useAuth } from '../context/AuthContext';
 
 export default function AuthForm() {
@@ -72,7 +73,11 @@ export default function AuthForm() {
     <div className="min-h-screen bg-background text-foreground flex items-center justify-center p-4">
       <div className="max-w-md w-full bg-surface rounded-xl shadow-lg p-8">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-foreground mb-2">Todo App</h1>
+          <h1 className="text-3xl font-bold mb-2">
+            <Link href="/home" className="text-foreground hover:text-accent transition-colors">
+              todolist.nyc
+            </Link>
+          </h1>
           <p className="text-muted">
             {step === 'email'
               ? 'Enter your email to get started'
