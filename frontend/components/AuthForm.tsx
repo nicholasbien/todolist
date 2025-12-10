@@ -73,11 +73,11 @@ export default function AuthForm() {
     <div className="min-h-screen bg-background text-foreground flex items-center justify-center p-4">
       <div className="max-w-md w-full bg-surface rounded-xl shadow-lg p-8">
         <div className="text-center mb-8">
-          <Link href="/home">
-            <h1 className="text-3xl font-bold mb-2 text-foreground hover:text-accent transition-colors cursor-pointer">
+          <h1 className="text-3xl font-bold mb-2">
+            <a href="/home" className="text-foreground hover:text-accent transition-colors cursor-pointer">
               todolist.nyc
-            </h1>
-          </Link>
+            </a>
+          </h1>
           <p className="text-muted">
             {step === 'email'
               ? 'Enter your email to get started'
@@ -181,12 +181,6 @@ export default function AuthForm() {
               : 'Check the server console for your verification code'
             }
           </p>
-        </div>
-
-        <div className="mt-4 text-center">
-          <Link href="/home" className="text-sm text-muted hover:text-accent transition-colors">
-            Home
-          </Link>
         </div>
       </div>
     </div>
