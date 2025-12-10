@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { Check, RotateCcw, X } from "lucide-react";
 
 interface TodoItemProps {
   todo: any;
@@ -124,7 +125,7 @@ export default function TodoItem({
               }`}
               aria-label="Mark task as complete"
             >
-              ✓
+              <Check className="w-6 h-6" />
             </button>
           ) : (
             <button
@@ -132,7 +133,7 @@ export default function TodoItem({
               className="text-yellow-400 hover:text-yellow-300 hover:bg-yellow-900/20 text-lg w-11 h-11 flex items-center justify-center rounded-lg transition-colors"
               aria-label="Mark task as incomplete"
             >
-              ↻
+              <RotateCcw className="w-5 h-5" />
             </button>
           )}
           <button
@@ -145,7 +146,7 @@ export default function TodoItem({
             }`}
             aria-label="Delete task"
           >
-            ×
+            <X className="w-6 h-6" />
           </button>
         </div>
       </div>

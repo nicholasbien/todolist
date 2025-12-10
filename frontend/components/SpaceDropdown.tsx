@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
+import { Home, Users, Folder, Plus } from 'lucide-react';
 import { sortSpaces } from '../utils/spaceUtils';
 
 interface Space {
@@ -80,7 +81,7 @@ export default function SpaceDropdown({
         className="flex items-center gap-1 px-2 py-1 hover:bg-gray-900 rounded-lg text-gray-100 text-sm transition-colors"
       >
         <span className="text-base">
-          {activeSpace?.is_default ? '🏠' : activeSpace && isCollaborativeSpace(activeSpace) ? '👥' : '📁'}
+          {activeSpace?.is_default ? <Home className="w-4 h-4" /> : activeSpace && isCollaborativeSpace(activeSpace) ? <Users className="w-4 h-4" /> : <Folder className="w-4 h-4" />}
         </span>
         <span className="font-medium text-sm">
           {loadingSpaces ? 'Loading...' : activeSpace?.name || 'No Space'}
@@ -113,7 +114,7 @@ export default function SpaceDropdown({
                   onClick={() => handleSpaceClick(space)}
                 >
                   <span className="text-sm flex-shrink-0">
-                    {space.is_default ? '🏠' : isCollaborativeSpace(space) ? '👥' : '📁'}
+                    {space.is_default ? <Home className="w-4 h-4" /> : isCollaborativeSpace(space) ? <Users className="w-4 h-4" /> : <Folder className="w-4 h-4" />}
                   </span>
                   <div className="min-w-0 flex-1">
                     <div className="truncate">
@@ -156,7 +157,7 @@ export default function SpaceDropdown({
               onClick={handleCreateClick}
               className="flex items-center gap-2 px-4 py-3 w-full text-left hover:bg-gray-900 text-gray-300 hover:text-gray-100 transition-colors rounded-b-xl"
             >
-              <span className="text-sm">➕</span>
+              <Plus className="w-4 h-4" />
               <span>New Space...</span>
             </button>
           </div>

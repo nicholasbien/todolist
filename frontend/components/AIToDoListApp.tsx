@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
+import { Settings } from "lucide-react";
 import TodoItem from "./TodoItem";
 import AgentChatbot from "./AgentChatbot";
 import { useAuth } from "../context/AuthContext";
@@ -994,10 +995,10 @@ export default function AIToDoListApp({
             <div className="relative" ref={settingsDropdownRef}>
               <button
                 onClick={() => setShowSettingsDropdown(!showSettingsDropdown)}
-                className="text-accent hover:text-accent-light text-base px-2 py-1 flex items-center justify-center rounded-lg hover:bg-gray-900 transition-colors"
+                className="text-gray-100 hover:text-white text-base px-2 py-1 flex items-center justify-center rounded-lg hover:bg-gray-900 transition-colors"
                 title="Settings"
               >
-                ⚙️
+                <Settings className="w-5 h-5" />
               </button>
 
               {showSettingsDropdown && (

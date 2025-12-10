@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { BookOpen } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useOffline } from '../context/OfflineContext';
 
@@ -251,7 +252,7 @@ export default function JournalComponent({ token, activeSpace }: JournalProps) {
 
       {loading ? (
         <div className="text-center py-12">
-          <div className="text-gray-400 mb-4 text-4xl">📖</div>
+          <BookOpen className="w-16 h-16 text-gray-400 mx-auto mb-4" />
           <p className="text-gray-400">Loading journal entry...</p>
         </div>
       ) : (

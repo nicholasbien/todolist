@@ -36,7 +36,8 @@ A modern collaborative todo list application with AI-powered task classification
 - **Offline functionality** - Works without internet connection
 
 ### Technical Features
-- **Modern, responsive UI** with Tailwind CSS
+- **Modern, responsive UI** with Tailwind CSS and Lucide React icons
+- **Professional icon library** - Scalable SVG icons with consistent styling throughout the app
 - **Comprehensive testing** with pytest and manual testing
 - **Legacy data migration** - Automatic migration of existing data to space system
 
@@ -111,9 +112,11 @@ pre-commit install
 ```bash
 cd frontend
 
-# Install dependencies
+# Install dependencies (includes lucide-react for icons)
 npm install
 ```
+
+**UI Icons:** The app uses [Lucide React](https://lucide.dev) for all UI icons - a modern, lightweight icon library with scalable SVG icons that inherit Tailwind color classes.
 
 ## Running the Application
 

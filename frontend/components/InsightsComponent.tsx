@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { BarChart3, AlertTriangle, ClipboardList } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 interface InsightsProps {
@@ -89,7 +90,7 @@ export default function InsightsComponent({ token, activeSpace }: InsightsProps)
   if (loading) {
     return (
       <div className="text-center py-12">
-        <div className="text-gray-400 mb-4 text-4xl">📊</div>
+        <BarChart3 className="w-16 h-16 text-gray-400 mx-auto mb-4" />
         <p className="text-gray-400">Loading insights...</p>
       </div>
     );
@@ -105,7 +106,7 @@ export default function InsightsComponent({ token, activeSpace }: InsightsProps)
         >
           ×
         </button>
-        <div className="text-red-400 mb-4 text-4xl">⚠️</div>
+        <AlertTriangle className="w-16 h-16 text-red-400 mx-auto mb-4" />
         <p className="text-red-400">{error}</p>
         <button
           onClick={fetchInsights}
@@ -120,7 +121,7 @@ export default function InsightsComponent({ token, activeSpace }: InsightsProps)
   if (!insights) {
     return (
       <div className="text-center py-12">
-        <div className="text-gray-400 mb-4 text-4xl">📊</div>
+        <BarChart3 className="w-16 h-16 text-gray-400 mx-auto mb-4" />
         <p className="text-gray-400">No data available</p>
       </div>
     );
@@ -282,7 +283,7 @@ export default function InsightsComponent({ token, activeSpace }: InsightsProps)
       {/* Empty State */}
       {insights.overview.total_tasks === 0 && (
         <div className="text-center py-12">
-          <div className="text-gray-400 mb-4 text-4xl">📝</div>
+          <ClipboardList className="w-16 h-16 text-gray-400 mx-auto mb-4" />
           <h3 className="text-lg font-semibold text-gray-100 mb-2">No Tasks Yet</h3>
           <p className="text-gray-400">Start adding tasks to see your insights and analytics!</p>
         </div>
