@@ -21,7 +21,7 @@ export default function PrivacyPage() {
 
           <div className="prose prose-invert max-w-none">
             <p className="text-lg mb-6 text-gray-300">
-              todolist.nyc ("the app") helps you manage tasks, journals, and AI-powered features. This Privacy Policy explains what information we collect and how it is used.
+              todolist.nyc (&quot;the app&quot;) helps you manage tasks, journals, and AI-powered features. This Privacy Policy explains what information we collect and how it is used.
             </p>
 
             <h2 className="text-2xl font-bold mt-8 mb-4 text-gray-100">1. Information We Collect</h2>

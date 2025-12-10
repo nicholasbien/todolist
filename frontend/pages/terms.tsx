@@ -21,7 +21,7 @@ export default function TermsPage() {
 
           <div className="prose prose-invert max-w-none">
             <p className="text-lg mb-6 text-gray-300">
-              By using todolist.nyc ("the service"), you agree to these Terms.
+              By using todolist.nyc (&quot;the service&quot;), you agree to these Terms.
             </p>
 
             <h2 className="text-2xl font-bold mt-8 mb-4 text-gray-100">1. Using the Service</h2>
@@ -32,7 +32,7 @@ export default function TermsPage() {
 
             <h2 className="text-2xl font-bold mt-8 mb-4 text-gray-100">2. What the Service Provides</h2>
             <p className="mb-4 text-gray-300">
-              The app offers task management, journal features, collaborative spaces, offline support, and AI-powered features using OpenAI's API.
+              The app offers task management, journal features, collaborative spaces, offline support, and AI-powered features using OpenAI&apos;s API.
             </p>
 
             <h2 className="text-2xl font-bold mt-8 mb-4 text-gray-100">3. Acceptable Use</h2>
@@ -64,7 +64,7 @@ export default function TermsPage() {
 
             <h2 className="text-2xl font-bold mt-8 mb-4 text-gray-100">7. Disclaimer</h2>
             <p className="mb-4 text-gray-300">
-              The service is provided "as is," without warranties of any kind.
+              The service is provided &quot;as is,&quot; without warranties of any kind.
             </p>
 
             <h2 className="text-2xl font-bold mt-8 mb-4 text-gray-100">8. Liability</h2>
