@@ -4,6 +4,7 @@
 <body>
 <canvas id="canvas192" width="192" height="192" style="border:1px solid #000;"></canvas>
 <canvas id="canvas512" width="512" height="512" style="border:1px solid #000;"></canvas>
+<canvas id="canvas1024" width="1024" height="1024" style="border:1px solid #000;"></canvas>
 <script>
 function drawNotebook(ctx, size) {
   const scale = size / 192;
@@ -140,6 +141,11 @@ const canvas512 = document.getElementById('canvas512');
 const ctx512 = canvas512.getContext('2d');
 drawNotebook(ctx512, 512);
 
+// Create 1024x1024 icon
+const canvas1024 = document.getElementById('canvas1024');
+const ctx1024 = canvas1024.getContext('2d');
+drawNotebook(ctx1024, 1024);
+
 // Convert to downloads
 setTimeout(() => {
   const link192 = document.createElement('a');
@@ -152,9 +158,15 @@ setTimeout(() => {
   link512.href = canvas512.toDataURL();
   link512.click();
 
+  const link1024 = document.createElement('a');
+  link1024.download = 'icon-1024x1024.png';
+  link1024.href = canvas1024.toDataURL();
+  link1024.click();
+
   // Also log the data URLs for manual saving
   console.log('192x192 PNG data:', canvas192.toDataURL());
   console.log('512x512 PNG data:', canvas512.toDataURL());
+  console.log('1024x1024 PNG data:', canvas1024.toDataURL());
 }, 1000);
 </script>
 </body>

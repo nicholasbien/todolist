@@ -75,6 +75,7 @@ ctx.stroke();
 - `frontend/public/icon-192x192.png` - 192x192px PWA icon (regenerated)
 - `frontend/public/icon-512x512.png` - 512x512px PWA icon (regenerated)
 - `frontend/public/sw.js` - Service worker cache version bumped to v112
+- `frontend/ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png` - iOS app icon updated
 
 ## Service Worker Update
 
@@ -89,10 +90,18 @@ To regenerate icons in the future:
 1. Edit `frontend/public/create_icons.html` to modify the design
 2. Open the file in any web browser
 3. Icons automatically download after 1 second:
-   - `icon-192x192.png`
-   - `icon-512x512.png`
+   - `icon-192x192.png` (for PWA)
+   - `icon-512x512.png` (for PWA)
+   - `icon-1024x1024.png` (for iOS @2x)
 4. Move downloaded files to `frontend/public/` (if not already there)
 5. Bump service worker cache version in `frontend/public/sw.js`
+6. Update iOS app icon:
+   ```bash
+   # Copy the 1024x1024 icon (iOS @2x requires 1024x1024, not 512x512)
+   cp .playwright-mcp/icon-1024x1024.png frontend/ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png
+   cd frontend && npx cap sync ios
+   ```
+7. Rebuild and reinstall iOS app for changes to take effect
 
 ## Design Specifications
 

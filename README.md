@@ -550,6 +550,56 @@ Edit `frontend/public/create_icons.html` to change colors, shapes, or design:
 
 The script uses HTML5 Canvas API to draw the notebook icon with all elements positioned using center-based calculations.
 
+### Updating iOS/Capacitor App Icon
+
+After updating the PWA icons, also update the iOS native app icon:
+
+```bash
+# The HTML generator now creates a 1024x1024 icon as well
+# Copy the 1024x1024 icon to the iOS AppIcon directory (AppIcon-512@2x.png requires 1024x1024)
+cp .playwright-mcp/icon-1024x1024.png frontend/ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png
+
+# Or if you downloaded manually:
+# cp ~/Downloads/icon-1024x1024.png frontend/ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png
+
+# Sync changes to iOS
+cd frontend
+npx cap sync ios
+
+# Rebuild the iOS app in Xcode or via CLI
+npx cap run ios  # For simulator
+# The updated icon will appear after rebuilding and reinstalling the app
+```
+
+**Note**: iOS requires 1024x1024 for the `@2x` icon (the `@2x` suffix means 2x resolution: 512 * 2 = 1024). The HTML generator creates three sizes: 192x192, 512x512, and 1024x1024. After copying the icon, you need to rebuild and reinstall the app for the changes to take effect.
+
+### Updating iOS Splash Screen
+
+The app also has a custom splash screen generator for iOS:
+
+```bash
+# 1. Open the splash screen generator
+open frontend/public/create_splash.html
+
+# 2. The browser will automatically download splash-2732x2732.png
+
+# 3. Copy to all three iOS splash screen files
+cp .playwright-mcp/splash-2732x2732.png frontend/ios/App/App/Assets.xcassets/Splash.imageset/splash-2732x2732.png
+cp .playwright-mcp/splash-2732x2732.png frontend/ios/App/App/Assets.xcassets/Splash.imageset/splash-2732x2732-1.png
+cp .playwright-mcp/splash-2732x2732.png frontend/ios/App/App/Assets.xcassets/Splash.imageset/splash-2732x2732-2.png
+
+# Or if you downloaded manually:
+# cp ~/Downloads/splash-2732x2732.png frontend/ios/App/App/Assets.xcassets/Splash.imageset/splash-2732x2732.png
+# (and repeat for -1.png and -2.png)
+
+# 4. Sync and rebuild
+cd frontend
+npx cap sync ios
+npx cap run ios  # For simulator
+```
+
+**Splash Design**: Orange background (#ff7b4a) with centered logo (400x400) and "todolist.nyc" in black Georgia serif font below. Matches the app's color scheme and branding.
+
 ## License
 
 MIT
