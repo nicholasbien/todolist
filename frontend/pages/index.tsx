@@ -311,7 +311,7 @@ export default function Home() {
   const [showExportModal, setShowExportModal] = useState(false);
   const [showAccountSettings, setShowAccountSettings] = useState(false);
   const [exportType, setExportType] = useState<'todos' | 'journals'>('todos');
-  const [exportFormat, setExportFormat] = useState<'jsonl' | 'csv'>('jsonl');
+  const [exportFormat, setExportFormat] = useState<'json' | 'csv'>('csv');
   const [exportSpaces, setExportSpaces] = useState<Space[]>([]);
   const [exportSpaceId, setExportSpaceId] = useState('');
   const [exporting, setExporting] = useState(false);
@@ -567,11 +567,11 @@ export default function Home() {
                 <label className="block text-sm text-gray-300 mb-2">Format</label>
                 <select
                   value={exportFormat}
-                  onChange={(e) => setExportFormat(e.target.value as 'jsonl' | 'csv')}
+                  onChange={(e) => setExportFormat(e.target.value as 'json' | 'csv')}
                   className="w-full bg-gray-900 border border-gray-700 text-gray-100 p-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent"
                 >
-                  <option value="jsonl">JSONL</option>
                   <option value="csv">CSV</option>
+                  <option value="json">JSON</option>
                 </select>
               </div>
               <div>

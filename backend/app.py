@@ -762,10 +762,10 @@ async def api_delete_journal_entry(entry_id: str, current_user: dict = Depends(g
 async def export_data(
     data: str,
     space_id: str,
-    format: str = "jsonl",
+    format: str = "csv",
     current_user: dict = Depends(get_current_user),
 ):
-    """Export user's todos or journal entries in JSONL or CSV format."""
+    """Export user's todos or journal entries in JSON or CSV format."""
     valid_types = {"todos": todos_collection, "journals": journals_collection}
     if data not in valid_types:
         raise HTTPException(status_code=400, detail="Invalid data type")
@@ -784,13 +784,12 @@ async def export_data(
         item.pop("created_offline", None)
         item["first_name"] = current_user.get("first_name", "")
 
-    if format == "jsonl":
-        lines = [json.dumps(item) for item in items]
-        content = "\n".join(lines)
+    if format == "json":
+        content = json.dumps(items, indent=2)
         return Response(
             content=content,
             media_type="application/json",
-            headers={"Content-Disposition": f"attachment; filename={data}.jsonl"},
+            headers={"Content-Disposition": f"attachment; filename={data}.json"},
         )
 
     if format == "csv":
