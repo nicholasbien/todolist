@@ -119,10 +119,10 @@ export default function HomePage() {
           <footer className="text-center pb-12 text-gray-400">
             <div className="space-x-6 mb-4">
               <Link href="/privacy" className="hover:text-accent transition-colors">
-                Privacy Policy
+                Privacy
               </Link>
               <Link href="/terms" className="hover:text-accent transition-colors">
-                Terms of Service
+                Terms
               </Link>
               <Link href="/support" className="hover:text-accent transition-colors">
                 Support
