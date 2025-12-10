@@ -4,6 +4,7 @@
 <body>
 <canvas id="canvas192" width="192" height="192" style="border:1px solid #000;"></canvas>
 <canvas id="canvas512" width="512" height="512" style="border:1px solid #000;"></canvas>
+<canvas id="canvas1024" width="1024" height="1024" style="border:1px solid #000;"></canvas>
 <script>
 function drawNotebook(ctx, size) {
   const scale = size / 192;
@@ -12,88 +13,121 @@ function drawNotebook(ctx, size) {
   ctx.fillStyle = '#ff7b4a';
   ctx.fillRect(0, 0, size, size);
 
+  // Centered and bigger notebook with less border
+  // Canvas is 192x192, true center is 96
+  const canvasSize = 192;
+  const centerX = canvasSize / 2;
+  const centerY = canvasSize / 2;
+  const notebookWidth = 130;
+  const notebookHeight = 130;
+  const spineWidth = 20;
+  const offset3D = 6;  // 3D effect offset
+
+  // Calculate positions for proper centering
+  // Total visual width: spine + notebook + 3D offset
+  const totalVisualWidth = spineWidth + notebookWidth + offset3D;
+  const totalVisualHeight = notebookHeight + offset3D;
+
+  // Center the entire visual element (shifted left to account for visual weight)
+  const leftEdge = (canvasSize - totalVisualWidth) / 2 - 8;  // Shift 8px left for better centering
+  const topEdge = (canvasSize - totalVisualHeight) / 2;
+
+  const spineX = leftEdge;
+  const notebookX = leftEdge + spineWidth;
+  const notebookY = topEdge;
+
   // Notebook spine (same orange)
   ctx.fillStyle = '#ff7b4a';
-  ctx.fillRect(32 * scale, 44 * scale, 24 * scale, 104 * scale);
+  ctx.fillRect(spineX * scale, notebookY * scale, spineWidth * scale, notebookHeight * scale);
 
-  // Back notebook cover (offset)
+  // Back notebook cover (offset) - centered with more 3D depth
   ctx.fillStyle = '#ff7b4a';
   ctx.beginPath();
-  ctx.roundRect(62 * scale, 50 * scale, 104 * scale, 104 * scale, 4 * scale);
+  ctx.roundRect((notebookX + 6) * scale, (notebookY + 6) * scale, notebookWidth * scale, notebookHeight * scale, 4 * scale);
   ctx.fill();
-  ctx.strokeStyle = 'white';
-  ctx.lineWidth = 1.5 * scale;
+  ctx.strokeStyle = '#000000';  // Black border
+  ctx.lineWidth = 3.5 * scale;
   ctx.stroke();
 
-  // Front notebook cover (main)
+  // Front notebook cover (main) - centered
   ctx.fillStyle = '#ff7b4a';
   ctx.beginPath();
-  ctx.roundRect(56 * scale, 44 * scale, 104 * scale, 104 * scale, 4 * scale);
+  ctx.roundRect(notebookX * scale, notebookY * scale, notebookWidth * scale, notebookHeight * scale, 4 * scale);
   ctx.fill();
-  ctx.strokeStyle = 'white';
-  ctx.lineWidth = 1.5 * scale;
+  ctx.strokeStyle = '#000000';  // Black border
+  ctx.lineWidth = 3.5 * scale;
   ctx.stroke();
 
-  // Spiral binding - equal distance inside and outside notebook
-  ctx.fillStyle = 'white';
-  const ringYPositions = [59.75, 70.75, 81.75, 92.75, 103.75, 114.75, 125.75, 136.75];
+  // Spiral binding - 5 rings (circles inside notebook)
+  ctx.fillStyle = '#000000';  // Black spirals
+  const ringCount = 5;
+  const ringSpacing = notebookHeight / (ringCount + 1);
 
-  // Ring bodies (moderately rounded lines)
-  ringYPositions.forEach(y => {
+  // Ring bodies - extend from spine into notebook
+  for (let i = 1; i <= ringCount; i++) {
+    const y = notebookY + (i * ringSpacing);
     ctx.beginPath();
-    ctx.roundRect(48 * scale, (y - 0.75) * scale, 16 * scale, 1.5 * scale, 0.75 * scale);
+    ctx.roundRect((spineX + spineWidth / 2) * scale, (y - 1.75) * scale, (spineWidth / 2 + 8) * scale, 3.5 * scale, 1.75 * scale);
     ctx.fill();
-  });
+  }
 
-  // Ring end circles
-  ringYPositions.forEach(y => {
+  // Ring end circles - positioned inside notebook (solid black)
+  for (let i = 1; i <= ringCount; i++) {
+    const y = notebookY + (i * ringSpacing);
     ctx.beginPath();
-    ctx.arc(64 * scale, y * scale, 1.5 * scale, 0, 2 * Math.PI);
+    ctx.arc((notebookX + 8) * scale, y * scale, 5 * scale, 0, 2 * Math.PI);  // Bigger circles
     ctx.fill();
-  });
+  }
 
-  // Cover border (white) - this is handled above with the front cover
+  // Three checkboxes with text - centered in notebook
+  const boxSize = 18;
+  const boxX = notebookX + 20;  // Left margin inside notebook
+  const boxSpacing = notebookHeight / 4;
 
-  // Three vertical boxes (white)
-  ctx.strokeStyle = 'white';
-  ctx.lineWidth = 1 * scale;
-  ctx.strokeRect(78 * scale, 68 * scale, 16 * scale, 16 * scale);
-  ctx.strokeRect(78 * scale, 88 * scale, 16 * scale, 16 * scale);
-  ctx.strokeRect(78 * scale, 108 * scale, 16 * scale, 16 * scale);
+  // Pink/salmon fill color for boxes
+  const boxFillColor = '#ffb8a3';
 
-  // Text lines next to boxes (white)
-  ctx.strokeStyle = 'white';
-  ctx.lineWidth = 1 * scale;
-  // First box text lines
+  // Draw 3 checkboxes
+  for (let i = 0; i < 3; i++) {
+    const boxY = notebookY + boxSpacing * (i + 0.7);
+
+    // All boxes are pink/salmon (matching reference) with slight rounding
+    ctx.fillStyle = boxFillColor;
+    ctx.beginPath();
+    ctx.roundRect(boxX * scale, boxY * scale, boxSize * scale, boxSize * scale, 2 * scale);
+    ctx.fill();
+
+    // Box border color matches line color - solid color calculated from opacity blend
+    if (i === 1) {
+      ctx.strokeStyle = '#000000';  // Solid black for checked item
+    } else {
+      // Solid color approximating black @ 50% opacity over #ff7b4a background
+      ctx.strokeStyle = '#7f3d25';  // Pre-calculated blend: (255+0)/2=127, (123+0)/2=61, (74+0)/2=37
+    }
+    ctx.lineWidth = 2.5 * scale;
+    ctx.beginPath();
+    ctx.roundRect(boxX * scale, boxY * scale, boxSize * scale, boxSize * scale, 2 * scale);
+    ctx.stroke();
+
+    // Text line next to checkbox - same color as box outline, thicker like reference
+    // (strokeStyle already set above to match box border)
+    ctx.lineWidth = 3.5 * scale;  // Thicker to match reference
+    ctx.beginPath();
+    ctx.moveTo((boxX + boxSize + 6) * scale, (boxY + boxSize/2) * scale);
+    ctx.lineTo((notebookX + notebookWidth - 10) * scale, (boxY + boxSize/2) * scale);
+    ctx.stroke();
+  }
+
+  // Cleaner, simpler checkmark in middle box (matching reference style)
+  const middleBoxY = notebookY + boxSpacing * 1.7;
+  ctx.strokeStyle = '#000000';
+  ctx.lineWidth = 2.5 * scale;  // Matching box border thickness
+  ctx.lineCap = 'butt';  // Sharp ends like reference
+  ctx.lineJoin = 'miter';  // Sharp corners like reference
   ctx.beginPath();
-  ctx.moveTo(98 * scale, 74 * scale);
-  ctx.lineTo(140 * scale, 74 * scale);
-  ctx.moveTo(98 * scale, 78 * scale);
-  ctx.lineTo(135 * scale, 78 * scale);
-  ctx.stroke();
-
-  // Second box text lines
-  ctx.beginPath();
-  ctx.moveTo(98 * scale, 94 * scale);
-  ctx.lineTo(145 * scale, 94 * scale);
-  ctx.moveTo(98 * scale, 98 * scale);
-  ctx.lineTo(130 * scale, 98 * scale);
-  ctx.stroke();
-
-  // Third box text lines
-  ctx.beginPath();
-  ctx.moveTo(98 * scale, 114 * scale);
-  ctx.lineTo(142 * scale, 114 * scale);
-  ctx.moveTo(98 * scale, 118 * scale);
-  ctx.lineTo(128 * scale, 118 * scale);
-  ctx.stroke();
-
-  // Checkmark in middle box (white)
-  ctx.lineWidth = 2 * scale;
-  ctx.beginPath();
-  ctx.moveTo(80 * scale, 96 * scale);
-  ctx.lineTo(85 * scale, 100 * scale);
-  ctx.lineTo(92 * scale, 92 * scale);
+  ctx.moveTo((boxX + 4) * scale, (middleBoxY + boxSize/2) * scale);
+  ctx.lineTo((boxX + boxSize/2 - 1) * scale, (middleBoxY + boxSize - 5) * scale);
+  ctx.lineTo((boxX + boxSize - 3) * scale, (middleBoxY + 4) * scale);
   ctx.stroke();
 }
 
@@ -107,6 +141,11 @@ const canvas512 = document.getElementById('canvas512');
 const ctx512 = canvas512.getContext('2d');
 drawNotebook(ctx512, 512);
 
+// Create 1024x1024 icon
+const canvas1024 = document.getElementById('canvas1024');
+const ctx1024 = canvas1024.getContext('2d');
+drawNotebook(ctx1024, 1024);
+
 // Convert to downloads
 setTimeout(() => {
   const link192 = document.createElement('a');
@@ -119,9 +158,15 @@ setTimeout(() => {
   link512.href = canvas512.toDataURL();
   link512.click();
 
+  const link1024 = document.createElement('a');
+  link1024.download = 'icon-1024x1024.png';
+  link1024.href = canvas1024.toDataURL();
+  link1024.click();
+
   // Also log the data URLs for manual saving
   console.log('192x192 PNG data:', canvas192.toDataURL());
   console.log('512x512 PNG data:', canvas512.toDataURL());
+  console.log('1024x1024 PNG data:', canvas1024.toDataURL());
 }, 1000);
 </script>
 </body>

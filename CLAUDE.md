@@ -53,6 +53,10 @@ cd backend && source venv/bin/activate && python app.py
 # The backend runs on http://localhost:8000
 ```
 
+### Updating Logo/Icons
+
+For complete instructions on updating or customizing the app logo/icons, see the **"Updating Logo/Icons"** section in `README.md`.
+
 ## Architecture Overview
 
 This is an AI-powered collaborative todo list application with a React/Next.js frontend and FastAPI backend, supporting multi-user spaces for team collaboration.

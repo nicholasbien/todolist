@@ -36,7 +36,8 @@ A modern collaborative todo list application with AI-powered task classification
 - **Offline functionality** - Works without internet connection
 
 ### Technical Features
-- **Modern, responsive UI** with Tailwind CSS
+- **Modern, responsive UI** with Tailwind CSS and Lucide React icons
+- **Professional icon library** - Scalable SVG icons with consistent styling throughout the app
 - **Comprehensive testing** with pytest and manual testing
 - **Legacy data migration** - Automatic migration of existing data to space system
 
@@ -111,9 +112,11 @@ pre-commit install
 ```bash
 cd frontend
 
-# Install dependencies
+# Install dependencies (includes lucide-react for icons)
 npm install
 ```
+
+**UI Icons:** The app uses [Lucide React](https://lucide.dev) for all UI icons - a modern, lightweight icon library with scalable SVG icons that inherit Tailwind color classes.
 
 ## Running the Application
 
@@ -503,6 +506,102 @@ about editors. 🌸
    - All automated tests use mock databases and should pass without setup
    - Run `pytest -v --tb=short` for detailed error output
    - Manual tests require interactive input and a running server
+
+## Updating Logo/Icons
+
+The app uses a browser-based HTML canvas script to generate PWA icons. No npm packages required.
+
+### Quick Update
+
+```bash
+# 1. Open the HTML icon generator in a browser
+open frontend/public/create_icons.html
+
+# 2. The browser will automatically download:
+#    - icon-192x192.png
+#    - icon-512x512.png
+
+# 3. Move the downloaded files to replace the existing icons
+mv ~/Downloads/icon-192x192.png frontend/public/icon-192x192.png
+mv ~/Downloads/icon-512x512.png frontend/public/icon-512x512.png
+
+# 4. Update service worker cache version to force PWA icon refresh
+# Edit frontend/public/sw.js and increment STATIC_CACHE version
+```
+
+### Customizing the Logo
+
+Edit `frontend/public/create_icons.html` to change colors, shapes, or design:
+
+**Current Design Specifications:**
+- **Canvas**: 192x192px (scaled to 512x512px for larger icon)
+- **Colors**:
+  - Background: `#ff7b4a` (orange)
+  - Notebook borders: `#000000` (black, 3.5px)
+  - Spiral binding: `#000000` (black circles and rings)
+  - Unchecked items: `#7f3d25` (brown - opacity blend)
+  - Checked item: `#000000` (solid black)
+  - Checkbox fill: `#ffb8a3` (pink/salmon)
+- **Dimensions**:
+  - Notebook: 130x130px with 4px corner radius
+  - Spine: 20px width
+  - 3D offset: 6px
+  - Checkboxes: 18x18px with 2px corner radius
+  - Spiral rings: 5 rings with calculated spacing
+- **Line thickness**: Borders 3.5px, checkboxes/text 2.5-3.5px, checkmark 2.5px
+- **No npm packages required** - just open in browser and it generates the PNGs
+
+The script uses HTML5 Canvas API to draw the notebook icon with all elements positioned using center-based calculations.
+
+### Updating iOS/Capacitor App Icon
+
+After updating the PWA icons, also update the iOS native app icon:
+
+```bash
+# The HTML generator now creates a 1024x1024 icon as well
+# Copy the 1024x1024 icon to the iOS AppIcon directory (AppIcon-512@2x.png requires 1024x1024)
+cp .playwright-mcp/icon-1024x1024.png frontend/ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png
+
+# Or if you downloaded manually:
+# cp ~/Downloads/icon-1024x1024.png frontend/ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png
+
+# Sync changes to iOS
+cd frontend
+npx cap sync ios
+
+# Rebuild the iOS app in Xcode or via CLI
+npx cap run ios  # For simulator
+# The updated icon will appear after rebuilding and reinstalling the app
+```
+
+**Note**: iOS requires 1024x1024 for the `@2x` icon (the `@2x` suffix means 2x resolution: 512 * 2 = 1024). The HTML generator creates three sizes: 192x192, 512x512, and 1024x1024. After copying the icon, you need to rebuild and reinstall the app for the changes to take effect.
+
+### Updating iOS Splash Screen
+
+The app also has a custom splash screen generator for iOS:
+
+```bash
+# 1. Open the splash screen generator
+open frontend/public/create_splash.html
+
+# 2. The browser will automatically download splash-2732x2732.png
+
+# 3. Copy to all three iOS splash screen files
+cp .playwright-mcp/splash-2732x2732.png frontend/ios/App/App/Assets.xcassets/Splash.imageset/splash-2732x2732.png
+cp .playwright-mcp/splash-2732x2732.png frontend/ios/App/App/Assets.xcassets/Splash.imageset/splash-2732x2732-1.png
+cp .playwright-mcp/splash-2732x2732.png frontend/ios/App/App/Assets.xcassets/Splash.imageset/splash-2732x2732-2.png
+
+# Or if you downloaded manually:
+# cp ~/Downloads/splash-2732x2732.png frontend/ios/App/App/Assets.xcassets/Splash.imageset/splash-2732x2732.png
+# (and repeat for -1.png and -2.png)
+
+# 4. Sync and rebuild
+cd frontend
+npx cap sync ios
+npx cap run ios  # For simulator
+```
+
+**Splash Design**: Orange background (#ff7b4a) with centered logo (400x400) and "todolist.nyc" in black Georgia serif font below. Matches the app's color scheme and branding.
 
 ## License
 

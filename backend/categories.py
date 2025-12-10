@@ -46,9 +46,23 @@ class Category(BaseModel):
     space_id: Optional[str] = None
 
 
-async def get_categories(space_id: Optional[str] = None) -> List[str]:
-    """Get all categories for a space."""
+async def ensure_general_category(space_id: Optional[str] = None) -> None:
+    """Ensure a General category exists for the space."""
     try:
+        general_query = {"name": "General", "space_id": space_id}
+        if not await categories_collection.find_one(general_query):
+            await categories_collection.insert_one(general_query)
+            logger.info(f"Created General category for space {space_id}")
+    except Exception as e:
+        logger.error(f"Error ensuring General category: {str(e)}")
+
+
+async def get_categories(space_id: Optional[str] = None) -> List[str]:
+    """Get all categories for a space, ensuring General always exists."""
+    try:
+        # Ensure General category exists
+        await ensure_general_category(space_id)
+
         # Query for categories with matching space_id (including None)
         cursor = categories_collection.find({"space_id": space_id}, {"name": 1, "_id": 0})
 

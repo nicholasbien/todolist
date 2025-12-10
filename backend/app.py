@@ -320,7 +320,9 @@ async def api_create_todo(request: Request, current_user: dict = Depends(get_cur
         # Only classify if not created offline and no category provided
         if not body.get("created_offline", False) and not body.get("category"):
             try:
+                # Get categories (this automatically ensures "General" exists)
                 categories_list = await get_categories(body.get("space_id")) if body.get("space_id") else []
+
                 classification = await classify_task(
                     classify_text,
                     categories_list,
