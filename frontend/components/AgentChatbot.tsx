@@ -368,6 +368,7 @@ export default function AgentChatbot({ activeSpace, token, isActive = true }: Ch
             }`}>
               <div className="text-sm mb-1 opacity-75 flex justify-between items-center">
                 <span>{msg.role === 'user' ? 'You' : msg.role === 'system' ? 'Tool' : 'Agent'}</span>
+                {/* Temporarily disabled - tool step dropdown
                 {msg.role === 'system' && msg.toolData && (
                   <button
                     onClick={() => toggleToolExpansion(idx)}
@@ -377,12 +378,14 @@ export default function AgentChatbot({ activeSpace, token, isActive = true }: Ch
                     {expandedTools.has(idx) ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
                   </button>
                 )}
+                */}
               </div>
               {msg.role === 'assistant' ? (
                 <MessageRenderer content={msg.content} className="text-sm" />
               ) : (
                 <PlainTextRenderer content={msg.content} className="text-sm" />
               )}
+              {/* Temporarily disabled - tool step input/output details
               {msg.role === 'system' && msg.toolData && expandedTools.has(idx) && (
                 <div className="mt-2 pt-2 border-t border-blue-700/30 text-sm">
                   <div className="mb-1">
@@ -399,6 +402,7 @@ export default function AgentChatbot({ activeSpace, token, isActive = true }: Ch
                   </div>
                 </div>
               )}
+              */}
             </div>
           </div>
         ))}
