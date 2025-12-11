@@ -115,6 +115,42 @@ export default function HomePage() {
             </div>
           </section>
 
+          {/* Screenshots Section */}
+          <section className="mb-16">
+            <h2 className="text-3xl font-bold text-center text-gray-100 mb-12">
+              See It in Action
+            </h2>
+
+            <div className="space-y-12">
+              {/* Tasks Screenshot */}
+              <div className="rounded-xl overflow-hidden border border-gray-800 shadow-2xl">
+                <img
+                  src="/screenshots/tasks-view.png"
+                  alt="Smart task management with AI categorization - tasks automatically sorted by category and priority"
+                  className="w-full"
+                />
+              </div>
+
+              {/* Agent Screenshot */}
+              <div className="rounded-xl overflow-hidden border border-gray-800 shadow-2xl">
+                <img
+                  src="/screenshots/agent-response.png"
+                  alt="AI Assistant providing personalized daily task recommendations and scheduling advice"
+                  className="w-full"
+                />
+              </div>
+
+              {/* Journal Screenshot */}
+              <div className="rounded-xl overflow-hidden border border-gray-800 shadow-2xl">
+                <img
+                  src="/screenshots/journal-entry.png"
+                  alt="Integrated daily journal with date navigation and automatic saving"
+                  className="w-full"
+                />
+              </div>
+            </div>
+          </section>
+
           {/* Footer */}
           <footer className="text-center pb-12 text-gray-400">
             <div className="mb-4">
