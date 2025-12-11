@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Test script to compare email summary quality between gpt-4.1 and gpt-5.1.
+Test script to compare email summary quality between gpt-4.1 and gpt-5.2.
 
 Run with: python test_email_model_comparison.py
 """
@@ -220,7 +220,7 @@ async def main():
 
     # Test both models
     result_41 = await test_model("gpt-4.1", "gpt-4.1")
-    result_51 = await test_model("gpt-5.1", "gpt-5.1")
+    result_52 = await test_model("gpt-5.2", "gpt-5.2")
 
     # Print results
     print("\n" + "=" * 80)
@@ -233,9 +233,9 @@ async def main():
     print(result_41)
 
     print("\n" + "─" * 80)
-    print("GPT-5.1 OUTPUT:")
+    print("GPT-5.2 OUTPUT:")
     print("─" * 80)
-    print(result_51)
+    print(result_52)
 
     # Analysis
     print("\n" + "=" * 80)
@@ -257,7 +257,7 @@ async def main():
         }
 
     analysis_41 = analyze_output(result_41)
-    analysis_51 = analyze_output(result_51)
+    analysis_52 = analyze_output(result_52)
 
     print("\nGPT-4.1:")
     print(f"  Length: {analysis_41['length']} chars, {analysis_41['lines']} lines")
@@ -268,14 +268,14 @@ async def main():
     print(f"  Has Priority Focus: {analysis_41['has_priority_focus']}")
     print(f"  Has Haiku: {analysis_41['has_haiku']}")
 
-    print("\nGPT-5.1:")
-    print(f"  Length: {analysis_51['length']} chars, {analysis_51['lines']} lines")
-    print(f"  Sections: {analysis_51['section_count']}")
-    print(f"  Has Overview: {analysis_51['has_overview']}")
-    print(f"  Has Reflection: {analysis_51['has_reflection']}")
-    print(f"  Has Recent Wins: {analysis_51['has_recent_wins']}")
-    print(f"  Has Priority Focus: {analysis_51['has_priority_focus']}")
-    print(f"  Has Haiku: {analysis_51['has_haiku']}")
+    print("\nGPT-5.2:")
+    print(f"  Length: {analysis_52['length']} chars, {analysis_52['lines']} lines")
+    print(f"  Sections: {analysis_52['section_count']}")
+    print(f"  Has Overview: {analysis_52['has_overview']}")
+    print(f"  Has Reflection: {analysis_52['has_reflection']}")
+    print(f"  Has Recent Wins: {analysis_52['has_recent_wins']}")
+    print(f"  Has Priority Focus: {analysis_52['has_priority_focus']}")
+    print(f"  Has Haiku: {analysis_52['has_haiku']}")
 
     print("\n" + "=" * 80)
     print("Test complete! Review the outputs above to compare quality.")

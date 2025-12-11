@@ -329,7 +329,7 @@ When adding new tasks, choose a category from this list, or use "General" if non
             # Make API call
             try:
                 stream = await client.responses.create(
-                    model="gpt-5.1",
+                    model="gpt-5.2",
                     instructions=developer_instructions,
                     input=input_messages,
                     tools=tools,
@@ -518,7 +518,7 @@ When adding new tasks, choose a category from this list, or use "General" if non
 
             try:
                 stream = await client.responses.create(
-                    model="gpt-5.1",
+                    model="gpt-5.2",
                     instructions=f"{developer_instructions}\n\n{final_instruction}",
                     input=input_messages,
                     tools=None,  # No tools for final response

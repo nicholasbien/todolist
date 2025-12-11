@@ -256,7 +256,7 @@ async def generate_todo_summary(
         # Use OpenAI to generate the summary
         client = openai.AsyncOpenAI(api_key=openai.api_key)
         response = await client.responses.create(
-            model="gpt-5.1",
+            model="gpt-5.2",
             instructions=(
                 "You are a helpful personal assistant creating daily todo summaries. "
                 "Use ONLY the exact haiku provided in the prompt - never create additional poetry or haiku."

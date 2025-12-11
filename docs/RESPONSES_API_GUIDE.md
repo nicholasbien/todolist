@@ -42,7 +42,7 @@ from openai import OpenAI
 client = OpenAI()
 
 response = client.responses.create(
-    model="gpt-5.1",
+    model="gpt-5.2",
     instructions="You are a helpful assistant.",
     input="What is the capital of France?",
 )
@@ -54,7 +54,7 @@ print(response.output_text)
 
 ```python
 response = client.responses.create(
-    model="gpt-5.1",
+    model="gpt-5.2",
     instructions="You are a helpful assistant.",
     input=[
         {"role": "user", "content": "What is the capital of France?"},
@@ -134,7 +134,7 @@ input_list = [
 ]
 
 response = client.responses.create(
-    model="gpt-5.1",
+    model="gpt-5.2",
     tools=tools,
     input=input_list,
 )
@@ -158,7 +158,7 @@ for item in response.output:
 
 # 4. Get final response
 response = client.responses.create(
-    model="gpt-5.1",
+    model="gpt-5.2",
     tools=tools,
     input=input_list,
 )
@@ -195,7 +195,7 @@ The Responses API provides semantic streaming events:
 ```python
 # Sync version
 stream = client.responses.create(
-    model="gpt-5.1",
+    model="gpt-5.2",
     input=[{"role": "user", "content": "Hello!"}],
     stream=True,
 )
@@ -213,7 +213,7 @@ for event in stream:
 
 # Async version
 stream = await client.responses.create(
-    model="gpt-5.1",
+    model="gpt-5.2",
     input=[{"role": "user", "content": "Hello!"}],
     stream=True,
 )
@@ -277,7 +277,7 @@ input_messages = [
 
 # Call 1: Model decides to call list_tasks
 response = client.responses.create(
-    model="gpt-5.1",
+    model="gpt-5.2",
     input=input_messages,
     tools=tools
 )
@@ -297,7 +297,7 @@ for item in response.output:
 
 # Call 2: Model generates final response with tool results
 response = client.responses.create(
-    model="gpt-5.1",
+    model="gpt-5.2",
     input=input_messages,  # Full conversation history
     tools=tools
 )
@@ -409,7 +409,7 @@ text = response.choices[0].message.content
 
 # After: Responses API
 response = client.responses.create(
-    model="gpt-5.1",
+    model="gpt-5.2",
     instructions="You are helpful.",
     input=[{"role": "user", "content": "Hello"}]
 )
