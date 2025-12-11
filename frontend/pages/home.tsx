@@ -134,10 +134,10 @@ export default function HomePage() {
                 </div>
               </div>
 
-              {/* Agent Screenshot */}
+              {/* Assistant Screenshot */}
               <div className="rounded-lg overflow-hidden border border-gray-800 shadow-xl hover:shadow-2xl transition-shadow">
                 <img
-                  src="/screenshots/agent-response.png"
+                  src="/screenshots/assistant-response.png"
                   alt="AI Assistant providing personalized recommendations"
                   className="w-full h-auto"
                 />

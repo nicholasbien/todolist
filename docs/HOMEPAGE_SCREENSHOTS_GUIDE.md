@@ -6,7 +6,7 @@ This guide documents how to capture screenshots of the todolist.nyc app using Pl
 
 The homepage displays three feature screenshots in a responsive grid layout:
 1. **Tasks View** - Smart task categorization
-2. **AI Agent** - AI-powered daily planning
+2. **AI Assistant** - AI-powered daily planning
 3. **Journal Entry** - Integrated daily journal
 
 ## Prerequisites
@@ -51,13 +51,13 @@ await browser_take_screenshot({
 
 **Result**: Screenshot saved to `.playwright-mcp/homepage-screenshots/tasks-view.png`
 
-### 4. Screenshot #2: AI Agent Response
+### 4. Screenshot #2: AI Assistant Response
 
-The agent screenshot shows a user question and the AI's response.
+The assistant screenshot shows a user question and the AI's response.
 
 ```javascript
-// Navigate to Agent tab
-await browser_click({ element: "Agent tab", ref: "..." });
+// Navigate to Assistant tab
+await browser_click({ element: "Assistant tab", ref: "..." });
 
 // Ask a question
 await browser_type({
@@ -67,17 +67,17 @@ await browser_type({
 });
 await browser_click({ element: "Send button", ref: "..." });
 
-// Wait for response to appear
-await browser_wait_for({ text: "Energy/health boost", time: 5 });
+// Wait for response to appear (adjust wait time as needed)
+await browser_wait_for({ time: 5 });
 
 // Scroll up to see question and start of response (if needed)
 await browser_evaluate({
-  function: "() => { window.scrollTo(0, 0); }"
+  function: "() => { const chatContainer = document.querySelector('[class*=\"overflow-y-auto\"]'); if (chatContainer) chatContainer.scrollTop = 0; }"
 });
 
 // Take screenshot
 await browser_take_screenshot({
-  filename: "agent-response.png"
+  filename: "assistant-response.png"
 });
 ```
 
@@ -122,7 +122,7 @@ cp .playwright-mcp/homepage-screenshots/*.png frontend/public/screenshots/
 
 # Or copy individually
 cp .playwright-mcp/homepage-screenshots/tasks-view.png frontend/public/screenshots/
-cp .playwright-mcp/homepage-screenshots/agent-response.png frontend/public/screenshots/
+cp .playwright-mcp/homepage-screenshots/assistant-response.png frontend/public/screenshots/
 cp .playwright-mcp/homepage-screenshots/journal-entry.png frontend/public/screenshots/
 ```
 
@@ -160,10 +160,10 @@ The screenshots are displayed in a responsive grid:
       </div>
     </div>
 
-    {/* Agent Screenshot */}
+    {/* Assistant Screenshot */}
     <div className="rounded-lg overflow-hidden border border-gray-800 shadow-xl hover:shadow-2xl transition-shadow">
       <img
-        src="/screenshots/agent-response.png"
+        src="/screenshots/assistant-response.png"
         alt="AI Assistant providing personalized recommendations"
         className="w-full h-auto"
       />
@@ -239,11 +239,11 @@ await browser_wait_for({ text: "Expected content", time: 5 });
 Use the test account or create sample data that looks good in screenshots:
 - 3-5 tasks with varied categories
 - A thoughtful journal entry
-- An interesting agent query with a detailed response
+- An interesting assistant query with a detailed response
 
 ### 3. Scroll Positioning
 For long responses, scroll to show the most relevant part:
-- Agent: Show question + beginning of response
+- Assistant: Show question + beginning of response
 - Journal: Show entry text clearly
 - Tasks: Show multiple categorized tasks
 
@@ -271,17 +271,17 @@ git push origin nicholas/homepage
 ```
 frontend/
 ├── pages/
-│   └── home.tsx              # Homepage with screenshot grid
+│   └── home.tsx                 # Homepage with screenshot grid
 └── public/
     └── screenshots/
-        ├── tasks-view.png     # Tasks with AI categorization
-        ├── agent-response.png # AI agent conversation
-        └── journal-entry.png  # Daily journal entry
+        ├── tasks-view.png        # Tasks with AI categorization
+        ├── assistant-response.png # AI assistant conversation
+        └── journal-entry.png     # Daily journal entry
 
 .playwright-mcp/
-└── homepage-screenshots/     # Playwright working directory
+└── homepage-screenshots/        # Playwright working directory
     ├── tasks-view.png
-    ├── agent-response.png
+    ├── assistant-response.png
     └── journal-entry.png
 ```
 
@@ -290,11 +290,11 @@ frontend/
 ### Screenshots Too Large
 Playwright saves high-resolution screenshots. They display responsively on the page with `w-full h-auto`.
 
-### Agent Response Too Long
+### Assistant Response Too Long
 Scroll up to show the user's question and the beginning of the AI response:
 ```javascript
 await browser_evaluate({
-  function: "() => { window.scrollTo(0, 0); }"
+  function: "() => { const chatContainer = document.querySelector('[class*=\"overflow-y-auto\"]'); if (chatContainer) chatContainer.scrollTop = 0; }"
 });
 ```
 
