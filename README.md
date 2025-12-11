@@ -335,6 +335,17 @@ For other hosting platforms:
 - **Backend**: Render, DigitalOcean, or Heroku
 - **Database**: MongoDB Atlas (cloud) instead of local MongoDB
 
+### Domain Configuration
+
+To redirect your root domain to the app's homepage:
+
+1. **Set up domain redirect** in your DNS/domain provider:
+   - **Domain**: `todolist.nyc`
+   - **Destination**: `https://app.todolist.nyc/home`
+   - **Type**: Permanent (301)
+
+This ensures that visitors to `todolist.nyc` are automatically redirected to the app homepage at `app.todolist.nyc/home`.
+
 ## Environment Variables
 
 ### Backend (.env)
