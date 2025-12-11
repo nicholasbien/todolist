@@ -953,7 +953,9 @@ export default function AIToDoListApp({
           onClick={handleScrollToTop}
         >
           <h1 className="text-xl font-bold mr-4">
-            todolist.nyc
+            <Link href="/home" className="hover:text-accent transition-colors">
+              todolist.nyc
+            </Link>
           </h1>
           <div
             className="flex items-center space-x-1"

@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/router';
+import Link from 'next/link';
 import { useOffline } from '../context/OfflineContext';
 import dynamic from 'next/dynamic';
 import Head from 'next/head';
@@ -179,7 +180,9 @@ function LoginForm({ onLogin }: LoginFormProps) {
     <div className="min-h-screen bg-zinc-950 flex items-center justify-center p-4">
       <div className="max-w-md w-full bg-black border border-gray-800 rounded-xl shadow-2xl p-8">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-100 mb-2">todolist.nyc</h1>
+          <Link href="/home">
+            <h1 className="text-3xl font-bold text-gray-100 mb-2 hover:text-accent transition-colors cursor-pointer">todolist.nyc</h1>
+          </Link>
           <p className="text-gray-400">
             {step === 'email'
               ? 'Enter your email to get started'
