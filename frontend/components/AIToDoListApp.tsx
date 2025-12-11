@@ -1111,7 +1111,7 @@ export default function AIToDoListApp({
               : 'text-gray-400 hover:text-gray-300'
           }`}
         >
-          Agent
+          Assistant
         </button>
         <button
           onClick={() => handleTabChange(2)}
@@ -1511,7 +1511,7 @@ export default function AIToDoListApp({
         >
           {/* Header Row with Page Title */}
           {/* <div className="mb-6" style={{ flexShrink: 0 }}>
-            <h2 className="text-xl font-semibold text-gray-100">Agent</h2>
+            <h2 className="text-xl font-semibold text-gray-100">Assistant</h2>
           </div> */}
           <div style={{ flex: 1, minHeight: 0 }}>
             <AgentChatbot activeSpace={activeSpace} token={token} isActive={activeTab === 'agent'} />
