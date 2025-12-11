@@ -121,32 +121,41 @@ export default function HomePage() {
               See It in Action
             </h2>
 
-            <div className="space-y-12">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
               {/* Tasks Screenshot */}
-              <div className="rounded-xl overflow-hidden border border-gray-800 shadow-2xl">
+              <div className="rounded-lg overflow-hidden border border-gray-800 shadow-xl hover:shadow-2xl transition-shadow">
                 <img
                   src="/screenshots/tasks-view.png"
-                  alt="Smart task management with AI categorization - tasks automatically sorted by category and priority"
-                  className="w-full"
+                  alt="Smart task management with AI categorization"
+                  className="w-full h-auto"
                 />
+                <div className="p-4 bg-gray-900">
+                  <p className="text-sm text-gray-300">Smart task categorization</p>
+                </div>
               </div>
 
               {/* Agent Screenshot */}
-              <div className="rounded-xl overflow-hidden border border-gray-800 shadow-2xl">
+              <div className="rounded-lg overflow-hidden border border-gray-800 shadow-xl hover:shadow-2xl transition-shadow">
                 <img
                   src="/screenshots/agent-response.png"
-                  alt="AI Assistant providing personalized daily task recommendations and scheduling advice"
-                  className="w-full"
+                  alt="AI Assistant providing personalized recommendations"
+                  className="w-full h-auto"
                 />
+                <div className="p-4 bg-gray-900">
+                  <p className="text-sm text-gray-300">AI-powered daily planning</p>
+                </div>
               </div>
 
               {/* Journal Screenshot */}
-              <div className="rounded-xl overflow-hidden border border-gray-800 shadow-2xl">
+              <div className="rounded-lg overflow-hidden border border-gray-800 shadow-xl hover:shadow-2xl transition-shadow">
                 <img
                   src="/screenshots/journal-entry.png"
-                  alt="Integrated daily journal with date navigation and automatic saving"
-                  className="w-full"
+                  alt="Integrated daily journal"
+                  className="w-full h-auto"
                 />
+                <div className="p-4 bg-gray-900">
+                  <p className="text-sm text-gray-300">Integrated daily journal</p>
+                </div>
               </div>
             </div>
           </section>
