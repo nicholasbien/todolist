@@ -178,7 +178,8 @@ function LoginForm({ onLogin }: LoginFormProps) {
 
   return (
     <div className="min-h-screen bg-zinc-950 flex items-center justify-center p-4">
-      <div className="max-w-md w-full bg-black border border-gray-800 rounded-xl shadow-2xl p-8">
+      <div className="max-w-md w-full">
+        <div className="bg-black border border-gray-800 rounded-xl shadow-2xl p-8">
         <div className="text-center mb-8">
           <Link href="/home">
             <h1 className="text-3xl font-bold text-gray-100 mb-2 hover:text-accent transition-colors cursor-pointer">todolist.nyc</h1>
@@ -296,7 +297,26 @@ function LoginForm({ onLogin }: LoginFormProps) {
             </button>
           </form>
         )}
+        </div>
 
+        {/* Footer links - outside and below the box */}
+        <div className="text-center mt-6 text-sm text-gray-400 space-x-2">
+          <Link href="/home" className="hover:text-accent transition-colors">
+            Home
+          </Link>
+          <span>•</span>
+          <Link href="/privacy" className="hover:text-accent transition-colors">
+            Privacy
+          </Link>
+          <span>•</span>
+          <Link href="/terms" className="hover:text-accent transition-colors">
+            Terms
+          </Link>
+          <span>•</span>
+          <a href="mailto:todolist.notifications@gmail.com" className="hover:text-accent transition-colors">
+            Contact
+          </a>
+        </div>
       </div>
     </div>
   );
