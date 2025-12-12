@@ -18,13 +18,13 @@ export default function HomePage() {
               todolist.nyc
             </h1>
             <p className="text-lg sm:text-xl text-gray-400 mb-10 max-w-2xl mx-auto">
-              AI-powered collaborative task management
+              AI-powered task management app
             </p>
             <Link
               href="/"
               className="inline-block bg-accent text-white px-8 py-4 rounded-full text-lg font-semibold hover:bg-accent-light transition-all transform hover:scale-105 shadow-xl"
             >
-              Open Web App
+              Get Started
             </Link>
           </header>
 
