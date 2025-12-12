@@ -954,7 +954,7 @@ export default function AIToDoListApp({
       }}
     >
       {/* Header - Manual safe area padding with contentInset:'never' */}
-      <div className="flex-shrink-0 pl-4 pr-2 pt-8">
+      <div className="flex-shrink-0 pl-4 pr-2 pt-4">
         <div
           className="flex justify-between items-center mb-1"
           onClick={handleScrollToTop}
