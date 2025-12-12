@@ -345,7 +345,16 @@ export default function Home() {
     };
 
     checkAuth();
-    // OfflineProvider handles network status updates
+
+    // Prevent body scrolling on main app page (Capacitor iOS fix)
+    document.body.style.overflow = 'hidden';
+    document.body.style.height = '100vh';
+
+    return () => {
+      // Re-enable scrolling when leaving page
+      document.body.style.overflow = '';
+      document.body.style.height = '';
+    };
   }, []);
 
   useEffect(() => {
