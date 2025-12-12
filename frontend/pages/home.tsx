@@ -18,7 +18,7 @@ export default function HomePage() {
               todolist.nyc
             </h1>
             <p className="text-lg sm:text-xl text-gray-400 mb-10 max-w-2xl mx-auto">
-              AI-powered task management app
+              AI-powered task management
             </p>
             <Link
               href="/"
