@@ -30,7 +30,7 @@ const config: CapacitorConfig = {
     }
   },
   ios: {
-    contentInset: 'always', // Let Capacitor handle safe areas natively
+    contentInset: 'never', // Manual safe area handling for precise height control
     allowsLinkPreview: false,
     scrollEnabled: true, // Enable WebView scrolling for info pages (home/privacy/terms)
     backgroundColor: '#000000',
