@@ -30,7 +30,7 @@ const config: CapacitorConfig = {
     }
   },
   ios: {
-    contentInset: 'never', // Manual safe area handling with env() variables
+    contentInset: 'always', // Auto-handles safe area padding, prevents scrolling under status bar
     allowsLinkPreview: false,
     scrollEnabled: true, // Enable WebView scrolling for info pages (home/privacy/terms)
     backgroundColor: '#000000',
