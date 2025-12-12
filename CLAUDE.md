@@ -461,6 +461,47 @@ Without version bumps, browsers will continue using the cached old service worke
 
 ## Common Issues
 
+### iOS Safe Area Padding (SOLVED)
+
+**Problem**: Header overlaps with iPhone notch/status bar, or unwanted scrolling in Capacitor iOS app.
+
+**Solution**: Use padding approach with `contentInset: 'never'`
+
+```tsx
+// Main app container
+<div
+  className="flex flex-col max-w-md mx-auto overflow-hidden"
+  style={{
+    height: '100dvh',
+    paddingTop: 'env(safe-area-inset-top)',
+    paddingBottom: 'env(safe-area-inset-bottom)'
+  }}
+>
+  <div className="flex-shrink-0 pl-4 pr-2 pt-8">
+    {/* Header content */}
+  </div>
+  {/* Rest of app */}
+</div>
+```
+
+**capacitor.config.ts:**
+```typescript
+ios: {
+  contentInset: 'never', // Manual safe area handling via CSS padding
+  scrollEnabled: true,
+  backgroundColor: '#000000',
+}
+```
+
+**Key Points:**
+- ✅ Use `height: 100dvh` (don't subtract safe area)
+- ✅ Use `padding-top/bottom: env(safe-area-inset-*)` to push content into safe area
+- ❌ DON'T use `calc(100dvh - env(...))` - over-shrinks on iOS Safari
+- ✅ `contentInset: 'never'` DOES allow `env()` variables to work
+- ✅ Works on web (env() = 0) and iOS (env() = ~59px top, ~34px bottom)
+
+**See:** `docs/IOS_SAFE_AREA_INVESTIGATION.md` for complete debugging history.
+
 ### Field Serialization Bug: `_id` vs `id`
 
 **Problem**: Service worker expects `_id` fields for IndexedDB storage, but inconsistent backend serialization can return `id` instead.
