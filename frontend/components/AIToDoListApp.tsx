@@ -945,8 +945,15 @@ export default function AIToDoListApp({
 
 
   return (
-    <div className="fixed inset-0 flex flex-col max-w-md mx-auto bg-background overflow-hidden">
-      {/* Header - contentInset:'always' handles safe area automatically */}
+    <div
+      className="flex flex-col max-w-md mx-auto overflow-hidden"
+      style={{
+        height: '100dvh',
+        paddingTop: 'env(safe-area-inset-top)',
+        paddingBottom: 'env(safe-area-inset-bottom)'
+      }}
+    >
+      {/* Header - Manual safe area padding with contentInset:'never' */}
       <div className="flex-shrink-0 pl-4 pr-2 pt-8">
         <div
           className="flex justify-between items-center mb-1"
