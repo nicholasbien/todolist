@@ -946,8 +946,8 @@ export default function AIToDoListApp({
 
   return (
     <div className="h-screen h-[100dvh] overflow-hidden flex flex-col max-w-md mx-auto">
-      {/* Header */}
-      <div className="flex-shrink-0 pt-8 pl-4 pr-2">
+      {/* Header - contentInset:'never' with manual env(safe-area-inset-top) + pt-8 */}
+      <div className="flex-shrink-0 pl-4 pr-2" style={{ paddingTop: 'calc(env(safe-area-inset-top) + 2rem)' }}>
         <div
           className="flex justify-between items-center mb-1"
           onClick={handleScrollToTop}

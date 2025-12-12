@@ -23,8 +23,13 @@ npm install
 # Run development server (from project root)
 cd frontend && npm run dev
 
-# Build for production
+# Build for production (web only)
 npm run build
+
+# Build for Capacitor (iOS/Android) - IMPORTANT: Use this for mobile builds!
+npm run cap:build
+# This builds with CAPACITOR_BUILD=true (creates 'out' directory) AND syncs to iOS/Android
+# After running, rebuild in Xcode/Android Studio
 
 # Start production server
 npm start
