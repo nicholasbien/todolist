@@ -345,16 +345,6 @@ export default function Home() {
     };
 
     checkAuth();
-
-    // Prevent body scrolling on main app page (Capacitor iOS fix)
-    document.body.style.overflow = 'hidden';
-    document.body.style.height = '100vh';
-
-    return () => {
-      // Re-enable scrolling when leaving page
-      document.body.style.overflow = '';
-      document.body.style.height = '';
-    };
   }, []);
 
   useEffect(() => {
@@ -538,7 +528,7 @@ export default function Home() {
       <Head>
         <title>todolist.nyc</title>
       </Head>
-      <main className="min-h-screen bg-zinc-950 text-white">
+      <main className="h-screen h-[100dvh] overflow-hidden bg-zinc-950 text-white">
         <AIToDoListApp
           user={user}
           token={token}

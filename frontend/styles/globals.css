@@ -6,26 +6,13 @@ html,
 body {
   @apply bg-background text-foreground font-serif;
   overflow-x: hidden;
-  overflow-y: auto; /* Enable vertical scrolling for iOS info pages */
   /* Prevent bounce scrolling on iOS */
   overscroll-behavior-y: none;
-  /* Don't use position: fixed or height: 100% on body - causes iOS issues */
-  -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
 }
 
 #__next {
-  min-height: 100vh;
-  min-height: 100dvh; /* Use dynamic viewport for Capacitor */
   width: 100%;
-  display: flex;
-  flex-direction: column;
-}
-
-/* PWA fix: content extends behind status bar, so use full viewport */
-@media (display-mode: standalone) {
-  #__next {
-    min-height: 100vh;
-  }
+  /* Let individual pages control their own height and scrolling */
 }
 
 @keyframes fade-in {
