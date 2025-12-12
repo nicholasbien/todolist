@@ -32,7 +32,7 @@ const config: CapacitorConfig = {
   ios: {
     contentInset: 'always', // Let Capacitor handle safe areas natively
     allowsLinkPreview: false,
-    scrollEnabled: false, // Disable WebView scrolling, let content handle it
+    scrollEnabled: true, // Enable WebView scrolling for info pages (home/privacy/terms)
     backgroundColor: '#000000',
     // Required when Info.plist includes WKAppBoundDomains
     limitsNavigationsToAppBoundDomains: true

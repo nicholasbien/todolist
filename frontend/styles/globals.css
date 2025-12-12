@@ -6,9 +6,11 @@ html,
 body {
   @apply bg-background text-foreground font-serif;
   overflow-x: hidden;
+  overflow-y: auto; /* Enable vertical scrolling for iOS info pages */
   /* Prevent bounce scrolling on iOS */
   overscroll-behavior-y: none;
   /* Don't use position: fixed or height: 100% on body - causes iOS issues */
+  -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
 }
 
 #__next {
