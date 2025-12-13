@@ -1,7 +1,7 @@
 // IMPORTANT: Always increment these versions when modifying this service worker file
 // This forces browsers to download and use the updated service worker
-const STATIC_CACHE = 'todo-static-v113';
-const API_CACHE = 'todo-api-v113';
+const STATIC_CACHE = 'todo-static-v114';
+const API_CACHE = 'todo-api-v114';
 
 const GLOBAL_DB_NAME = 'TodoGlobalDB';
 const USER_DB_PREFIX = 'TodoUserDB_';
@@ -1236,11 +1236,15 @@ async function handleOfflineRequest(request, url) {
 
 async function handleStaticRequest(request) {
   try {
+    const url = new URL(request.url);
+    const DISALLOWED_NAV_PATHS = ['/home', '/privacy', '/terms'];
+
     // Try network first for static files
     const response = await fetch(request);
 
     // Cache successful GET requests
-    if (response.ok && request.method === 'GET') {
+    const isDisallowedPage = request.mode === 'navigate' && DISALLOWED_NAV_PATHS.includes(url.pathname);
+    if (response.ok && request.method === 'GET' && !isDisallowedPage) {
       const cache = await caches.open(STATIC_CACHE);
       cache.put(request, response.clone());
     }
