@@ -1,0 +1,49 @@
+Thanks for testing AI Todo List!
+
+GETTING STARTED:
+Sign up with your email → Check email for verification code → Log in
+
+KEY FEATURES TO TEST:
+
+1. AI Task Classification
+   - Add tasks like "Buy groceries" or "Team meeting at 3pm"
+   - Verify they auto-categorize correctly
+
+2. Offline Sync (CRITICAL!)
+   - Enable airplane mode
+   - Add/edit tasks
+   - Disable airplane mode
+   - Verify all changes sync automatically
+
+3. AI Assistant
+   - Tap chat icon
+   - Ask "What are my tasks?" or "Add task to learn Swift"
+   - Verify responses work correctly
+
+4. Journal Entries
+   - Tap journal icon
+   - Add daily notes
+   - Test offline sync
+
+5. Email Summaries
+   - Go to Settings
+   - Enable daily email summaries
+   - Set preferred time
+   - Verify emails arrive with task insights
+
+6. iOS-Specific
+   - Check header alignment with notch/status bar
+   - Test on your specific iPhone model
+   - Try both light and dark mode
+
+FEEDBACK NEEDED:
+- Does offline sync work reliably?
+- Is AI classification accurate?
+- Any UI issues on your device?
+- Performance/crashes?
+
+Report issues via:
+- TestFlight feedback feature
+- In-app contact form (Settings → Contact)
+
+Thanks!

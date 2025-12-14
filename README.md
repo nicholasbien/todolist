@@ -10,12 +10,12 @@ A modern collaborative todo list application with AI-powered task classification
 ## Features
 
 ### Core Functionality
-- **AI-powered task classification** using OpenAI GPT-5-nano
+- **AI-powered task classification** using OpenAI GPT-4.1-nano
 - **Multi-user collaboration spaces** - Create shared workspaces and invite team members
 - **Email verification authentication** with JWT sessions
 - **Space-specific categories** - Each space has its own set of categories
-- **Daily email summaries** with AI-generated insights
-- **Space-aware AI agent** - Intelligent assistant with tool calling for weather, tasks, journals, and recommendations
+- **Daily email summaries** with AI-generated insights (GPT-5.2)
+- **Space-aware AI agent** - Intelligent assistant with tool calling (GPT-5.2) for weather, tasks, journals, and recommendations
 - **Customizable email instructions** for personalized summaries
 - **Book recommendations** via Open Library integration
 
