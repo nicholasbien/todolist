@@ -123,6 +123,8 @@ export default function AIToDoListApp({
   const [editCategoryVal, setEditCategoryVal] = useState('General');
   const [editPriorityVal, setEditPriorityVal] = useState('Medium');
   const [editDueDate, setEditDueDate] = useState<string>('');
+  const [editSpaceId, setEditSpaceId] = useState<string>('');
+  const [editSpaceCategories, setEditSpaceCategories] = useState<string[]>([]);
 
   // Track latest fetch requests to avoid race conditions when switching spaces
   const todosFetchIdRef = useRef(0);
@@ -784,12 +786,33 @@ export default function AIToDoListApp({
     }
   };
 
-  const handleEditTodo = (todo) => {
+  const handleEditTodo = async (todo) => {
     setTodoToEdit(todo);
     setEditText(todo.text);
     setEditNotes(todo.notes || '');
     setEditCategoryVal(todo.category);
     setEditPriorityVal(todo.priority);
+
+    // Initialize space - use fallback chain
+    const initialSpaceId = todo.space_id || activeSpace?._id || '';
+    setEditSpaceId(initialSpaceId);
+
+    // Fetch categories for the todo's current space
+    if (initialSpaceId) {
+      try {
+        const response = await authenticatedFetch(`/categories?space_id=${initialSpaceId}`);
+        if (response.ok) {
+          const cats = await response.json();
+          setEditSpaceCategories(cats);
+        }
+      } catch (err) {
+        console.error('Error fetching categories for space:', err);
+        setEditSpaceCategories(['General']);
+      }
+    } else {
+      // No space selected - use current space's categories
+      setEditSpaceCategories(categories);
+    }
 
     // Format date for HTML date input (YYYY-MM-DD)
     let formattedDate = '';
@@ -810,6 +833,30 @@ export default function AIToDoListApp({
     setShowEditTodoModal(true);
   };
 
+  const handleEditSpaceChange = async (newSpaceId: string) => {
+    setEditSpaceId(newSpaceId);
+
+    // Fetch categories for the new space if provided
+    if (newSpaceId) {
+      try {
+        const response = await authenticatedFetch(`/categories?space_id=${newSpaceId}`);
+        if (response.ok) {
+          const cats = await response.json();
+          setEditSpaceCategories(cats);
+
+          // If current category doesn't exist in new space, reset to "General"
+          if (!cats.includes(editCategoryVal)) {
+            setEditCategoryVal('General');
+          }
+        }
+      } catch (err) {
+        console.error('Error fetching categories for new space:', err);
+        setEditSpaceCategories(['General']);
+        setEditCategoryVal('General');
+      }
+    }
+  };
+
   const handleSaveTodoEdit = async () => {
     if (!todoToEdit) return;
     try {
@@ -819,6 +866,7 @@ export default function AIToDoListApp({
         category: editCategoryVal,
         priority: editPriorityVal,
         dueDate: editDueDate || null,
+        space_id: editSpaceId, // Always include space_id since todos must have a space
       };
       const response = await authenticatedFetch(`/todos/${todoToEdit._id}`, {
         method: 'PUT',
@@ -1458,12 +1506,34 @@ export default function AIToDoListApp({
               placeholder="Notes"
               className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 text-base h-24 resize-none focus:outline-none focus:ring-2 focus:ring-accent"
             />
+            <div>
+              <label className="block text-sm text-gray-300 mb-2">Space</label>
+              <select
+                value={editSpaceId}
+                onChange={(e) => handleEditSpaceChange(e.target.value)}
+                className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 text-base focus:outline-none"
+              >
+                {editSpaceId && !spaces.some((space) => space._id === editSpaceId) && (
+                  <option value={editSpaceId}>Current space</option>
+                )}
+                {spaces.map((space) => (
+                  <option key={space._id || space.name} value={space._id}>
+                    {space.name || 'Untitled Space'}
+                  </option>
+                ))}
+              </select>
+              {editSpaceId !== todoToEdit?.space_id && (
+                <p className="text-yellow-500 text-sm mt-1">
+                  ⚠ Moving to a different space
+                </p>
+              )}
+            </div>
             <select
               value={editCategoryVal}
               onChange={(e) => setEditCategoryVal(e.target.value)}
               className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 text-base focus:outline-none"
             >
-              {categories.map((cat) => (
+              {editSpaceCategories.map((cat) => (
                 <option key={cat} value={cat}>
                   {cat}
                 </option>
