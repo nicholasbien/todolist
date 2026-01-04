@@ -390,6 +390,12 @@ async def api_update_todo(todo_id: str, request: Request, current_user: dict = D
             updates["priority"] = body["priority"]
         if "dueDate" in body:
             updates["dueDate"] = body["dueDate"]
+        if "space_id" in body:
+            new_space_id = body["space_id"]
+            # Validate user has access to destination space
+            if new_space_id and not await user_in_space(current_user["user_id"], new_space_id):
+                raise HTTPException(status_code=403, detail="Not authorized to move to target space")
+            updates["space_id"] = new_space_id
 
         if not updates:
             raise HTTPException(status_code=400, detail="No valid fields to update")
@@ -397,6 +403,9 @@ async def api_update_todo(todo_id: str, request: Request, current_user: dict = D
         logger.info(f"Updating todo {todo_id} with: {updates} for user: {current_user['email']}")
         logger.info(f"CURRENT_USER DEBUG: {current_user}")
         return await update_todo_fields(todo_id, updates, current_user["user_id"])
+    except HTTPException:
+        # Re-raise HTTP exceptions (like 403, 404) without converting to 500
+        raise
     except Exception as e:
         logger.error(f"Error updating todo - Exception type: {type(e)}, Exception args: {e.args}, Exception: {repr(e)}")
         raise HTTPException(status_code=500, detail=f"Error updating todo: {repr(e)}")
