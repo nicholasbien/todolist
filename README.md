@@ -118,6 +118,17 @@ npm install
 
 **UI Icons:** The app uses [Lucide React](https://lucide.dev) for all UI icons - a modern, lightweight icon library with scalable SVG icons that inherit Tailwind color classes.
 
+### Sample Data (Optional)
+
+Get a realistic workspace instantly by loading the provided seed script after your backend virtualenv is active:
+
+```bash
+cd scripts
+python populate_sample_data.py --space Demo
+```
+
+This creates a demo space with representative todos, journals, and categories so you can exercise the AI classification and email summary flows without typing everything from scratch.
+
 ## Running the Application
 
 ### Development Mode
