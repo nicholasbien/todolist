@@ -87,6 +87,16 @@ Then configure your environment variables (see below) and start the servers.
 └── deploy.sh                # Railway deployment script
 ```
 
+## Documentation Map
+
+Need a deeper dive into specific workflows? The `docs/` directory keeps the long-form guides tidy:
+
+- `docs/PWA_APP_STORE_MIGRATION_PLAN.md` – notes for shipping the PWA to traditional app stores
+- `docs/PRODUCTION_SECURITY_PLAN.md` – security checklist before going live
+- `docs/APP_STORE_REVIEW_NOTES.md` – history of review feedback and how to respond
+
+Start here whenever you’re working on releases or audits so tribal knowledge doesn’t get lost.
+
 ## Manual Setup
 
 ### Backend Setup
