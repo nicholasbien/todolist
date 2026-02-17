@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { BookOpen } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useOffline } from '../context/OfflineContext';
@@ -39,8 +39,8 @@ export default function JournalComponent({ token, activeSpace }: JournalProps) {
   const [error, setError] = useState<string>('');
   const [lastSavedText, setLastSavedText] = useState<string>('');
 
-  // Auto-save timeout
-  const [saveTimeout, setSaveTimeout] = useState<NodeJS.Timeout | null>(null);
+  // Auto-save timeout ref (useRef to avoid re-render loops)
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const fetchJournalEntry = useCallback(async (date: string) => {
     if (!authenticatedFetch) return;
@@ -98,7 +98,7 @@ export default function JournalComponent({ token, activeSpace }: JournalProps) {
 
       const requestBody = {
         date: selectedDate,
-        text: text.trim(),
+        text: text,
         space_id: activeSpace?._id || null
       };
 
@@ -125,24 +125,24 @@ export default function JournalComponent({ token, activeSpace }: JournalProps) {
 
   // Auto-save functionality
   useEffect(() => {
-    if (saveTimeout) {
-      clearTimeout(saveTimeout);
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+      saveTimeoutRef.current = null;
     }
 
     if (journalText !== lastSavedText) {
-      const timeout = setTimeout(() => {
+      saveTimeoutRef.current = setTimeout(() => {
         saveJournalEntry(journalText, false);
       }, 2000); // Auto-save after 2 seconds of inactivity
-
-      setSaveTimeout(timeout);
     }
 
     return () => {
-      if (saveTimeout) {
-        clearTimeout(saveTimeout);
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+        saveTimeoutRef.current = null;
       }
     };
-  }, [journalText, lastSavedText, saveJournalEntry, saveTimeout]);
+  }, [journalText, lastSavedText, saveJournalEntry]);
 
   // Refresh journal entry after offline sync completes
   useEffect(() => {
