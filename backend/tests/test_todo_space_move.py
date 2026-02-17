@@ -1,6 +1,5 @@
 """Tests for moving todos between spaces via space_id updates."""
 from datetime import datetime
-from unittest.mock import AsyncMock, patch
 
 import pytest
 from tests.test_auth import get_verification_code_from_db
@@ -43,12 +42,11 @@ async def test_move_todo_between_spaces(client, test_email):
         "space_id": default_space["_id"],
         "category": "General",
     }
-    with patch("app.classify_task", new=AsyncMock(return_value={"category": "General", "priority": "Medium"})):
-        create_resp = await client.post("/todos", json=todo_payload, headers=headers)
-        assert create_resp.status_code == 200
-        todo = create_resp.json()
-        todo_id = todo["_id"]
-        assert todo["space_id"] == default_space["_id"]
+    create_resp = await client.post("/todos", json=todo_payload, headers=headers)
+    assert create_resp.status_code == 200
+    todo = create_resp.json()
+    todo_id = todo["_id"]
+    assert todo["space_id"] == default_space["_id"]
 
     # Move the todo to the work space
     update_resp = await client.put(f"/todos/{todo_id}", json={"space_id": work_space_id}, headers=headers)
@@ -97,11 +95,10 @@ async def test_cannot_move_todo_to_unauthorized_space(client, test_email):
         "space_id": user2_default_space["_id"],
         "category": "General",
     }
-    with patch("app.classify_task", new=AsyncMock(return_value={"category": "General", "priority": "Medium"})):
-        create_resp = await client.post("/todos", json=todo_payload, headers=headers2)
-        assert create_resp.status_code == 200
-        todo = create_resp.json()
-        todo_id = todo["_id"]
+    create_resp = await client.post("/todos", json=todo_payload, headers=headers2)
+    assert create_resp.status_code == 200
+    todo = create_resp.json()
+    todo_id = todo["_id"]
 
     # User 2 attempts to move todo to User 1's private space (should fail with 403)
     update_resp = await client.put(f"/todos/{todo_id}", json={"space_id": user1_space["_id"]}, headers=headers2)
@@ -135,11 +132,10 @@ async def test_update_space_and_other_fields_together(client, test_email):
         "category": "General",
         "priority": "Low",
     }
-    with patch("app.classify_task", new=AsyncMock(return_value={"category": "General", "priority": "Low"})):
-        create_resp = await client.post("/todos", json=todo_payload, headers=headers)
-        assert create_resp.status_code == 200
-        todo = create_resp.json()
-        todo_id = todo["_id"]
+    create_resp = await client.post("/todos", json=todo_payload, headers=headers)
+    assert create_resp.status_code == 200
+    todo = create_resp.json()
+    todo_id = todo["_id"]
 
     # Update space, text, and priority all together
     update_resp = await client.put(
