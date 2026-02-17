@@ -1,6 +1,6 @@
 // IMPORTANT: Always increment these versions when modifying this service worker file
 // This forces browsers to download and use the updated service worker
-const STATIC_CACHE = 'todo-static-v118';
+const STATIC_CACHE = 'todo-static-v119';
 
 const GLOBAL_DB_NAME = 'TodoGlobalDB';
 const USER_DB_PREFIX = 'TodoUserDB_';
@@ -1024,6 +1024,10 @@ async function handleOfflineRequest(request, url) {
       await putTodo(updated, authData.userId);
       await addQueue({ type: 'UPDATE', data: updated }, authData.userId);
       return new Response(JSON.stringify(updated), { headers: { 'Content-Type': 'application/json' } });
+    } else {
+      return new Response(JSON.stringify({ error: 'Todo not found' }), {
+        status: 404, headers: { 'Content-Type': 'application/json' }
+      });
     }
   }
 
@@ -1055,6 +1059,10 @@ async function handleOfflineRequest(request, url) {
       }
 
       return new Response(JSON.stringify({ message: 'Todo updated' }), { headers: { 'Content-Type': 'application/json' } });
+    } else {
+      return new Response(JSON.stringify({ error: 'Todo not found' }), {
+        status: 404, headers: { 'Content-Type': 'application/json' }
+      });
     }
   }
 
@@ -1078,9 +1086,12 @@ async function handleOfflineRequest(request, url) {
       } else {
         await addQueue({ type: 'DELETE', data: { _id: id } }, authData.userId);
       }
+      return new Response(null, { status: 204 });
+    } else {
+      return new Response(JSON.stringify({ error: 'Todo not found' }), {
+        status: 404, headers: { 'Content-Type': 'application/json' }
+      });
     }
-
-    return new Response(null, { status: 204 });
   }
 
   // ========= CATEGORY OPERATIONS =========
