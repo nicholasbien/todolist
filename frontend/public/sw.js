@@ -1,11 +1,11 @@
 // IMPORTANT: Always increment these versions when modifying this service worker file
 // This forces browsers to download and use the updated service worker
-const STATIC_CACHE = 'todo-static-v116';
-const API_CACHE = 'todo-api-v116';
+const STATIC_CACHE = 'todo-static-v117';
+const API_CACHE = 'todo-api-v117';
 
 const GLOBAL_DB_NAME = 'TodoGlobalDB';
 const USER_DB_PREFIX = 'TodoUserDB_';
-const DB_VERSION = 12;
+const DB_VERSION = 13;
 
 // Configuration
 const CONFIG = {
@@ -55,6 +55,7 @@ function openUserDB(userId) {
     request.onsuccess = () => resolve(request.result);
     request.onupgradeneeded = (event) => {
       const db = event.target.result;
+      const oldVersion = event.oldVersion;
       if (!db.objectStoreNames.contains(TODOS)) {
         db.createObjectStore(TODOS, { keyPath: '_id' });
       }
@@ -72,6 +73,18 @@ function openUserDB(userId) {
       }
       if (!db.objectStoreNames.contains(ID_MAP)) {
         db.createObjectStore(ID_MAP, { keyPath: 'key' });
+      }
+      // v13: Clear potentially corrupted data from pre-fix versions.
+      // syncServerDataToLocal() repopulates from server on activate.
+      if (oldVersion > 0 && oldVersion < 13) {
+        const tx = event.target.transaction;
+        const storesToClear = [TODOS, CATEGORIES, SPACES, QUEUE, JOURNALS, ID_MAP];
+        for (const name of storesToClear) {
+          if (db.objectStoreNames.contains(name)) {
+            tx.objectStore(name).clear();
+          }
+        }
+        console.log('🔄 Cleared stale data from pre-v13 database');
       }
     };
   });
