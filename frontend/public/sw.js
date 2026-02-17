@@ -1,11 +1,11 @@
 // IMPORTANT: Always increment these versions when modifying this service worker file
 // This forces browsers to download and use the updated service worker
-const STATIC_CACHE = 'todo-static-v114';
-const API_CACHE = 'todo-api-v114';
+const STATIC_CACHE = 'todo-static-v115';
+const API_CACHE = 'todo-api-v115';
 
 const GLOBAL_DB_NAME = 'TodoGlobalDB';
 const USER_DB_PREFIX = 'TodoUserDB_';
-const DB_VERSION = 11;
+const DB_VERSION = 12;
 
 // Configuration
 const CONFIG = {
@@ -19,6 +19,7 @@ const SPACES = 'spaces';
 const QUEUE = 'queue';
 const AUTH = 'auth';
 const JOURNALS = 'journals';
+const ID_MAP = 'idmap';
 
 const DEFAULT_CATEGORIES = ['General'];
 
@@ -69,6 +70,9 @@ function openUserDB(userId) {
       if (!db.objectStoreNames.contains(JOURNALS)) {
         db.createObjectStore(JOURNALS, { keyPath: '_id' });
       }
+      if (!db.objectStoreNames.contains(ID_MAP)) {
+        db.createObjectStore(ID_MAP, { keyPath: 'key' });
+      }
     };
   });
 }
@@ -80,8 +84,8 @@ async function globalDbTx(store, mode, fn) {
     const tx = db.transaction([store], mode);
     const st = tx.objectStore(store);
     const req = fn(st);
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
+    req.onsuccess = () => { db.close(); resolve(req.result); };
+    req.onerror = () => { db.close(); reject(req.error); };
   });
 }
 
@@ -92,8 +96,8 @@ async function userDbTx(userId, store, mode, fn) {
     const tx = db.transaction([store], mode);
     const st = tx.objectStore(store);
     const req = fn(st);
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
+    req.onsuccess = () => { db.close(); resolve(req.result); };
+    req.onerror = () => { db.close(); reject(req.error); };
   });
 }
 
@@ -218,6 +222,20 @@ const clearQueue = async (userId) => {
   return userDbTx(effectiveUserId, QUEUE, 'readwrite', (s) => s.clear());
 };
 
+// Remove a single queue item by its auto-increment id
+const removeQueueItem = async (itemId, userId) => {
+  const authData = userId ? null : await getAuth();
+  const effectiveUserId = userId || (authData ? authData.userId : null);
+  return userDbTx(effectiveUserId, QUEUE, 'readwrite', (s) => s.delete(itemId));
+};
+
+// Update a single queue item in-place by its auto-increment id
+const updateQueueItem = async (itemId, newData, userId) => {
+  const authData = userId ? null : await getAuth();
+  const effectiveUserId = userId || (authData ? authData.userId : null);
+  return userDbTx(effectiveUserId, QUEUE, 'readwrite', (s) => s.put({ ...newData, id: itemId }));
+};
+
 // Journal operations
 const getJournals = async (userId, date = null, spaceId = null) => {
   // For IndexedDB operations, we need to determine which user database to access
@@ -260,11 +278,12 @@ const delJournal = async (id, userId) => {
 };
 
 // ID mapping functions for persisting offline → server ID mappings
+// Uses dedicated ID_MAP store so clearQueue() doesn't destroy mappings (Bug 2 fix)
 const getIdMap = async (userId) => {
   const authData = userId ? null : await getAuth();
   const effectiveUserId = userId || (authData ? authData.userId : null);
   try {
-    const result = await userDbTx(effectiveUserId, QUEUE, 'readonly', (s) => s.get('idMap'));
+    const result = await userDbTx(effectiveUserId, ID_MAP, 'readonly', (s) => s.get('idMap'));
     return result ? result.mappings : {};
   } catch (e) {
     return {};
@@ -274,14 +293,14 @@ const getIdMap = async (userId) => {
 const putIdMap = async (idMap, userId) => {
   const authData = userId ? null : await getAuth();
   const effectiveUserId = userId || (authData ? authData.userId : null);
-  return userDbTx(effectiveUserId, QUEUE, 'readwrite', (s) => s.put({ id: 'idMap', mappings: idMap }));
+  return userDbTx(effectiveUserId, ID_MAP, 'readwrite', (s) => s.put({ key: 'idMap', mappings: idMap }));
 };
 
 const clearIdMap = async (userId) => {
   const authData = userId ? null : await getAuth();
   const effectiveUserId = userId || (authData ? authData.userId : null);
   try {
-    return userDbTx(effectiveUserId, QUEUE, 'readwrite', (s) => s.delete('idMap'));
+    return userDbTx(effectiveUserId, ID_MAP, 'readwrite', (s) => s.delete('idMap'));
   } catch (e) {
     // Ignore if doesn't exist
   }
@@ -434,10 +453,11 @@ async function syncServerDataToLocal() {
     if (!authData || !authData.userId) return; // No user to sync for
 
     const headers = await getAuthHeaders();
+    const backendBase = getBackendUrl();
 
     // Fetch and store spaces first
     try {
-      const spacesResponse = await fetch('/spaces', { headers });
+      const spacesResponse = await fetch(`${backendBase}/spaces`, { headers });
       if (spacesResponse.ok) {
         const serverSpaces = await spacesResponse.json();
         for (const space of serverSpaces) {
@@ -450,7 +470,7 @@ async function syncServerDataToLocal() {
 
     // Fetch and store categories (now space-aware)
     try {
-      const categoriesResponse = await fetch('/categories', { headers });
+      const categoriesResponse = await fetch(`${backendBase}/categories`, { headers });
       if (categoriesResponse.ok) {
         const serverCategories = await categoriesResponse.json();
         for (const categoryName of serverCategories) {
@@ -463,7 +483,7 @@ async function syncServerDataToLocal() {
 
     // Fetch and store todos
     try {
-      const todosResponse = await fetch('/todos', { headers });
+      const todosResponse = await fetch(`${backendBase}/todos`, { headers });
       if (todosResponse.ok) {
         const serverTodos = await todosResponse.json();
         for (const todo of serverTodos) {
@@ -476,7 +496,7 @@ async function syncServerDataToLocal() {
 
     // Fetch and store journals
     try {
-      const journalsResponse = await fetch('/journals', { headers });
+      const journalsResponse = await fetch(`${backendBase}/journals`, { headers });
       if (journalsResponse.ok) {
         const serverJournals = await journalsResponse.json();
 
@@ -697,6 +717,17 @@ async function handleApiRequest(request) {
                 await putTodo(todo, authData.userId);
               }
             }
+
+            // Remove stale local todos not present in server response (Bug 5 fix)
+            // Only remove server-origin IDs; preserve offline_ IDs; scope to current space
+            const serverIdSet = new Set(serverTodos.map(t => t._id));
+            const localTodos = await getTodos(authData.userId, spaceId);
+            for (const local of localTodos) {
+              if (!local._id.startsWith('offline_') && !serverIdSet.has(local._id)) {
+                await delTodo(local._id, authData.userId);
+              }
+            }
+
             console.log(`✅ Cached ${serverTodos.length} todos to IndexedDB`);
           }
 
@@ -740,6 +771,16 @@ async function handleApiRequest(request) {
                   cachedCount++;
                 }
               }
+
+              // Remove stale local journals not present in server response (Bug 5 fix)
+              const serverJournalIdSet = new Set(serverJournals.filter(j => j && j._id).map(j => j._id));
+              const localJournals = await getJournals(authData.userId, null, spaceId);
+              for (const local of localJournals) {
+                if (!local._id.startsWith('offline_journal_') && !serverJournalIdSet.has(local._id)) {
+                  await delJournal(local._id, authData.userId);
+                }
+              }
+
               if (cachedCount > 0) {
                 console.log(`📝 Cached ${cachedCount} journal(s) to IndexedDB`);
               }
@@ -788,15 +829,9 @@ async function handleApiRequest(request) {
         }
       }
 
-      // Trigger sync for non-GET requests and GET requests that weren't already synced
-      if (response.ok) {
-        if (request.method !== 'GET') {
-          syncQueue();
-        } else if (url.pathname !== '/journals') {
-          // Sync for other GET requests after caching
-          console.log(`🔄 Syncing queue after GET ${url.pathname}`);
-          syncQueue().catch(err => console.error('GET sync error:', err));
-        }
+      // Trigger sync only for non-GET requests (Bug 7 fix: remove redundant GET sync calls)
+      if (response.ok && request.method !== 'GET') {
+        syncQueue();
       }
       return response;
     } catch (err) {
@@ -942,21 +977,17 @@ async function handleOfflineRequest(request, url) {
 
     await putJournal(journalData, authData ? authData.userId : null);
 
-    // Use queue optimization for all journal operations - replace existing entries with latest state
+    // Use atomic queue update for journal operations (Bug 6 fix)
     const queue = await readQueue(authData ? authData.userId : null);
-    const existingQueueIndex = queue.findIndex(op =>
+    const existingOp = queue.find(op =>
       (op.type === 'CREATE_JOURNAL' || op.type === 'UPDATE_JOURNAL') &&
       op.data.date === data.date &&
       op.data.space_id === (data.space_id || null)
     );
 
-    if (existingQueueIndex !== -1) {
-      // Replace existing queue entry with latest state
-      queue[existingQueueIndex] = { type: operationType, data: journalData };
-      await clearQueue(authData ? authData.userId : null);
-      for (const op of queue) {
-        await addQueue(op, authData ? authData.userId : null);
-      }
+    if (existingOp) {
+      // Atomic in-place update of existing queue entry
+      await updateQueueItem(existingOp.id, { type: operationType, data: journalData, timestamp: Date.now() }, authData ? authData.userId : null);
     } else {
       // Add new queue entry
       await addQueue({ type: operationType, data: journalData }, authData ? authData.userId : null);
@@ -978,14 +1009,12 @@ async function handleOfflineRequest(request, url) {
       await delJournal(id, authData ? authData.userId : null);
 
       if (id.startsWith('offline_journal_')) {
-        // Remove the CREATE operation from queue to prevent resurrection
+        // Remove the CREATE operation from queue to prevent resurrection (Bug 6 fix: atomic removal)
         const queue = await readQueue(authData ? authData.userId : null);
-        const filteredQueue = queue.filter(op => !(op.type === 'CREATE_JOURNAL' && op.data._id === id));
-        if (filteredQueue.length !== queue.length) {
-          console.log(`🗑️ Removed pending CREATE_JOURNAL operation for deleted offline journal ${id}`);
-          await clearQueue(authData ? authData.userId : null);
-          for (const op of filteredQueue) {
-            await addQueue(op, authData ? authData.userId : null);
+        for (const op of queue) {
+          if (op.type === 'CREATE_JOURNAL' && op.data._id === id) {
+            await removeQueueItem(op.id, authData ? authData.userId : null);
+            console.log(`🗑️ Removed pending CREATE_JOURNAL operation for deleted offline journal ${id}`);
           }
         }
         console.log(`🗑️ Offline journal ${id} deleted and CREATE operation cancelled`);
@@ -1062,20 +1091,12 @@ async function handleOfflineRequest(request, url) {
       }
       await putTodo(updated, authData.userId);
 
-      // Handle offline todo completion - update the queued CREATE operation
+      // Handle offline todo completion - update ALL matching queued operations (Bug 9 fix)
       if (id.startsWith('offline_')) {
         const queue = await readQueue(authData.userId);
-        const updatedQueue = queue.map(op => {
-          if (op.type === 'CREATE' && op.data._id === id) {
-            return { ...op, data: { ...op.data, completed: updated.completed, dateCompleted: updated.dateCompleted } };
-          }
-          return op;
-        });
-
-        if (JSON.stringify(queue) !== JSON.stringify(updatedQueue)) {
-          await clearQueue(authData.userId);
-          for (const op of updatedQueue) {
-            await addQueue(op, authData.userId);
+        for (const op of queue) {
+          if ((op.type === 'CREATE' || op.type === 'UPDATE') && op.data._id === id) {
+            await updateQueueItem(op.id, { ...op, data: { ...op.data, completed: updated.completed, dateCompleted: updated.dateCompleted }, timestamp: Date.now() }, authData.userId);
           }
         }
       } else {
@@ -1096,13 +1117,11 @@ async function handleOfflineRequest(request, url) {
       await delTodo(id, authData.userId);
 
       if (id.startsWith('offline_')) {
-        // Remove the CREATE operation from queue to prevent resurrection
+        // Remove the CREATE operation from queue to prevent resurrection (Bug 6 fix: atomic removal)
         const queue = await readQueue(authData.userId);
-        const filteredQueue = queue.filter(op => !(op.type === 'CREATE' && op.data._id === id));
-        if (filteredQueue.length !== queue.length) {
-          await clearQueue(authData.userId);
-          for (const op of filteredQueue) {
-            await addQueue(op, authData.userId);
+        for (const op of queue) {
+          if (op.type === 'CREATE' && op.data._id === id) {
+            await removeQueueItem(op.id, authData.userId);
           }
         }
       } else {
@@ -1280,74 +1299,70 @@ function normalizePriority(p) {
   return 'Medium';
 }
 
+// Helper to get backend URL (module-level for use in sync and syncServerDataToLocal)
+function getBackendUrl() {
+  const isCapacitor = self.location?.protocol === 'file:';
+  const isProdHost = self.location?.hostname?.endsWith(CONFIG.PRODUCTION_DOMAIN);
+  return (isProdHost || isCapacitor) ? CONFIG.PRODUCTION_BACKEND : CONFIG.LOCAL_BACKEND;
+}
+
 // Global sync lock to prevent concurrent syncing
 let syncInProgress = false;
+let syncPending = false;
 
 async function syncQueue() {
   const authData = await getAuth();
   if (!authData || !authData.userId) return; // No user to sync for
 
-  // Prevent concurrent sync operations
+  // Prevent concurrent sync operations (Bug 7 fix: set flag synchronously before any await)
   if (syncInProgress) {
-    console.log('Sync already in progress, skipping...');
+    syncPending = true;
+    console.log('Sync already in progress, will run follow-up sync...');
     return;
   }
 
   syncInProgress = true;
-  // console.log('Starting sync...');
-
-  // Determine environment for sync requests
-  const isCapacitor = self.location?.protocol === 'file:';
-  const isProdHost = self.location?.hostname?.endsWith(CONFIG.PRODUCTION_DOMAIN);
-
-  // Helper to get backend URL
-  const getBackendUrl = () => {
-    return (isProdHost || isCapacitor) ? CONFIG.PRODUCTION_BACKEND : CONFIG.LOCAL_BACKEND;
-  };
 
   try {
     const queue = await readQueue(authData.userId);
     const headers = await getAuthHeaders();
+    const backendUrl = getBackendUrl();
 
     // Load persistent ID mapping
     let idMap = await getIdMap(authData.userId);
-    // console.log('📋 Loaded ID mapping:', idMap);
 
   for (const op of queue) {
     try {
       let res;
+      let success = false;
       switch (op.type) {
         case 'CREATE':
           if (op.data._id.startsWith('offline_')) {
             const { _id: offlineId, ...payload } = op.data;
-            const todoSyncUrl = `${getBackendUrl()}/todos`;
-            res = await fetch(todoSyncUrl, {
+            res = await fetch(`${backendUrl}/todos`, {
               method: 'POST',
               headers,
               body: JSON.stringify(payload),
             });
             if (res && res.ok) {
-              // Immediately replace offline todo with server version
               const serverTodo = await res.json();
               console.log(`🔄 Sync SUCCESS: Replacing offline todo ${offlineId} with server todo ${serverTodo._id}`);
 
-              // Update ID mapping
               idMap[offlineId] = serverTodo._id;
-              console.log(`🗺️ Added ID mapping: ${offlineId} -> ${serverTodo._id}`);
-
-              // Persist mapping immediately in case sync is interrupted
               await putIdMap(idMap, authData.userId);
 
-              await delTodo(offlineId, authData.userId); // Remove offline version
-              await putTodo(serverTodo, authData.userId); // Add server version
+              await delTodo(offlineId, authData.userId);
+              await putTodo(serverTodo, authData.userId);
               console.log(`✅ Synced offline todo ${offlineId} -> ${serverTodo._id}`);
+              success = true;
             } else {
               console.log(`❌ Sync FAILED: Offline todo ${offlineId} will be preserved`);
             }
+          } else {
+            success = true; // Non-offline CREATE, just remove from queue
           }
           break;
         case 'UPDATE':
-          // Check if we need to translate offline ID to server ID
           let updateId = op.data._id;
           if (updateId.startsWith('offline_') && idMap[updateId]) {
             updateId = idMap[updateId];
@@ -1355,19 +1370,20 @@ async function syncQueue() {
           }
 
           if (!updateId.startsWith('offline_')) {
-            res = await fetch(`/todos/${updateId}`, {
+            res = await fetch(`${backendUrl}/todos/${updateId}`, {
               method: 'PUT',
               headers,
               body: JSON.stringify({ ...op.data, _id: updateId }),
             });
             if (res && res.ok) {
-              // Update local copy with the changes
               await putTodo({ ...op.data, _id: updateId }, authData.userId);
+              success = true;
             }
+          } else {
+            success = true; // Skip unmapped offline IDs, remove from queue
           }
           break;
         case 'COMPLETE':
-          // Check if we need to translate offline ID to server ID
           let completeId = op.data._id;
           if (completeId.startsWith('offline_') && idMap[completeId]) {
             completeId = idMap[completeId];
@@ -1375,12 +1391,11 @@ async function syncQueue() {
           }
 
           if (!completeId.startsWith('offline_')) {
-            res = await fetch(`/todos/${completeId}/complete`, {
+            res = await fetch(`${backendUrl}/todos/${completeId}/complete`, {
               method: 'PUT',
               headers
             });
             if (res && res.ok) {
-              // Update local todo completion status
               const existingTodos = await getTodos(authData.userId);
               const existingTodo = existingTodos.find(t => t._id === completeId);
               if (existingTodo) {
@@ -1392,11 +1407,13 @@ async function syncQueue() {
                 }
                 await putTodo(updated, authData.userId);
               }
+              success = true;
             }
+          } else {
+            success = true; // Skip unmapped offline IDs, remove from queue
           }
           break;
         case 'DELETE':
-          // Check if we need to translate offline ID to server ID
           let deleteId = op.data._id;
           if (deleteId.startsWith('offline_') && idMap[deleteId]) {
             deleteId = idMap[deleteId];
@@ -1404,19 +1421,20 @@ async function syncQueue() {
           }
 
           if (!deleteId.startsWith('offline_')) {
-            res = await fetch(`/todos/${deleteId}`, {
+            res = await fetch(`${backendUrl}/todos/${deleteId}`, {
               method: 'DELETE',
               headers
             });
             if (res && res.ok) {
-              // Remove from local storage
               await delTodo(deleteId, authData.userId);
+              success = true;
             }
+          } else {
+            success = true; // Skip unmapped offline IDs, remove from queue
           }
           break;
         case 'CREATE_CATEGORY':
-          const categorySyncUrl = `${getBackendUrl()}/categories`;
-          res = await fetch(categorySyncUrl, {
+          res = await fetch(`${backendUrl}/categories`, {
             method: 'POST',
             headers,
             body: JSON.stringify(op.data),
@@ -1424,25 +1442,28 @@ async function syncQueue() {
           if (res.ok) {
             const serverCategory = await res.json();
             await putCategory({ ...serverCategory, space_id: op.data.space_id }, authData.userId);
+            success = true;
           }
           break;
-        case 'DELETE_CATEGORY':
-          const deleteUrl = op.data.space_id
-            ? `/categories/${encodeURIComponent(op.data.name)}?space_id=${op.data.space_id}`
-            : `/categories/${encodeURIComponent(op.data.name)}`;
-          res = await fetch(deleteUrl, {
+        case 'DELETE_CATEGORY': {
+          const deleteCatUrl = op.data.space_id
+            ? `${backendUrl}/categories/${encodeURIComponent(op.data.name)}?space_id=${op.data.space_id}`
+            : `${backendUrl}/categories/${encodeURIComponent(op.data.name)}`;
+          res = await fetch(deleteCatUrl, {
             method: 'DELETE',
             headers
           });
           if (res.ok) {
             await delCategory(op.data.name, authData.userId, op.data.space_id);
+            success = true;
           }
           break;
-        case 'RENAME_CATEGORY':
-          const renameUrl = op.data.space_id
-            ? `/categories/${encodeURIComponent(op.data.old_name)}?space_id=${op.data.space_id}`
-            : `/categories/${encodeURIComponent(op.data.old_name)}`;
-          res = await fetch(renameUrl, {
+        }
+        case 'RENAME_CATEGORY': {
+          const renameCatUrl = op.data.space_id
+            ? `${backendUrl}/categories/${encodeURIComponent(op.data.old_name)}?space_id=${op.data.space_id}`
+            : `${backendUrl}/categories/${encodeURIComponent(op.data.old_name)}`;
+          res = await fetch(renameCatUrl, {
             method: 'PUT',
             headers,
             body: JSON.stringify({ new_name: op.data.new_name })
@@ -1450,40 +1471,34 @@ async function syncQueue() {
           if (res.ok) {
             await delCategory(op.data.old_name, authData.userId, op.data.space_id);
             await putCategory({ name: op.data.new_name, space_id: op.data.space_id }, authData.userId);
+            success = true;
           }
           break;
+        }
         case 'CREATE_JOURNAL':
           if (op.data._id.startsWith('offline_journal_')) {
             const { _id: offlineId, ...payload } = op.data;
-            const createJournalUrl = `${getBackendUrl()}/journals`;
-            res = await fetch(createJournalUrl, {
+            res = await fetch(`${backendUrl}/journals`, {
               method: 'POST',
               headers,
               body: JSON.stringify(payload),
             });
             if (res && res.ok) {
-              // Immediately replace offline journal with server version
               const serverJournal = await res.json();
               console.log(`🔄 Journal Sync SUCCESS: Replacing offline journal ${offlineId} with server journal ${serverJournal._id}`);
 
-              // Update ID mapping
               idMap[offlineId] = serverJournal._id;
-              console.log(`🗺️ Added Journal ID mapping: ${offlineId} -> ${serverJournal._id}`);
-
-              // Persist mapping immediately
               await putIdMap(idMap, authData.userId);
 
-              await delJournal(offlineId, authData.userId); // Remove offline version
-              // Store synced version without offline flags
+              await delJournal(offlineId, authData.userId);
               await putJournal({ ...serverJournal, updated_offline: false }, authData.userId);
               console.log(`✅ Synced offline journal ${offlineId} -> ${serverJournal._id}`);
+              success = true;
             } else {
               console.log(`❌ Journal Sync FAILED: Offline journal ${offlineId} will be preserved`);
             }
           } else {
-            // Handle both offline-generated and regular journal updates
-            const createJournalUrl2 = `${getBackendUrl()}/journals`;
-            res = await fetch(createJournalUrl2, {
+            res = await fetch(`${backendUrl}/journals`, {
               method: 'POST',
               headers,
               body: JSON.stringify(op.data),
@@ -1491,37 +1506,29 @@ async function syncQueue() {
             if (res && res.ok) {
               const serverJournal = await res.json();
               await putJournal({ ...serverJournal, updated_offline: false }, authData.userId);
+              success = true;
             }
           }
           break;
-        case 'UPDATE_JOURNAL':
-          // Update existing server journal with offline changes
+        case 'UPDATE_JOURNAL': {
           const { _id, created_offline, updated_offline, ...updatePayload } = op.data;
           console.log(`🔄 Processing UPDATE_JOURNAL for ${op.data.date}, ID: ${_id}`);
-          console.log(`📝 UPDATE_JOURNAL payload:`, updatePayload);
-          // Use the proper API routing for sync requests
-          const updateJournalUrl = `${getBackendUrl()}/journals`;
-          res = await fetch(updateJournalUrl, {
+          res = await fetch(`${backendUrl}/journals`, {
             method: 'POST',
             headers,
             body: JSON.stringify(updatePayload),
           });
-          console.log(`📡 UPDATE_JOURNAL response status: ${res?.status}`);
           if (res && res.ok) {
             const serverJournal = await res.json();
             console.log(`✅ UPDATE_JOURNAL Sync SUCCESS: Updated server journal ${serverJournal._id} for date ${op.data.date}`);
-            console.log(`📝 UPDATE_JOURNAL server response:`, serverJournal);
-            console.log(`📝 UPDATE_JOURNAL original offline data:`, op.data);
-            // Store synced version without offline flags but preserve any local changes
             await putJournal({ ...serverJournal, updated_offline: false }, authData.userId);
+            success = true;
           } else {
-            const errorText = res ? await res.text() : 'No response';
             console.log(`❌ UPDATE_JOURNAL Sync FAILED: Journal ${_id} offline changes preserved`);
-            console.log(`❌ Error details: Status ${res?.status}, Response: ${errorText}`);
           }
           break;
+        }
         case 'DELETE_JOURNAL':
-          // Check if we need to translate offline ID to server ID
           let deleteJournalId = op.data._id;
           if (deleteJournalId.startsWith('offline_journal_') && idMap[deleteJournalId]) {
             deleteJournalId = idMap[deleteJournalId];
@@ -1529,33 +1536,49 @@ async function syncQueue() {
           }
 
           if (!deleteJournalId.startsWith('offline_journal_')) {
-            const deleteJournalUrl = `${getBackendUrl()}/journals/${deleteJournalId}`;
-            res = await fetch(deleteJournalUrl, {
+            res = await fetch(`${backendUrl}/journals/${deleteJournalId}`, {
               method: 'DELETE',
               headers
             });
             if (res && res.ok) {
-              // Remove from local storage
               await delJournal(deleteJournalId, authData.userId);
+              success = true;
             }
+          } else {
+            success = true; // Skip unmapped offline IDs, remove from queue
           }
           break;
       }
+
+      // Per-operation queue deletion (Bug 1 fix)
+      if (success) {
+        await removeQueueItem(op.id, authData.userId);
+      } else {
+        // Increment retry count; drop after 3 failures
+        const retryCount = (op.retryCount || 0) + 1;
+        if (retryCount >= 3) {
+          console.log(`🗑️ Dropping op ${op.type} after ${retryCount} retries`);
+          await removeQueueItem(op.id, authData.userId);
+        } else {
+          await updateQueueItem(op.id, { ...op, retryCount, timestamp: Date.now() }, authData.userId);
+        }
+      }
     } catch (err) {
-      // Continue processing other operations on error
-      // Failed operations remain in offline state until next sync attempt
+      // On error, increment retry count; drop after 3 failures
       console.log('Sync operation failed:', err);
+      const retryCount = (op.retryCount || 0) + 1;
+      if (retryCount >= 3) {
+        console.log(`🗑️ Dropping op ${op.type} after ${retryCount} retries (error)`);
+        try { await removeQueueItem(op.id, authData.userId); } catch (e) {}
+      } else {
+        try { await updateQueueItem(op.id, { ...op, retryCount, timestamp: Date.now() }, authData.userId); } catch (e) {}
+      }
       continue;
     }
   }
 
     // Persist the updated ID mapping
     await putIdMap(idMap, authData.userId);
-    // console.log('📋 Saved updated ID mapping:', idMap);
-
-    // Always clear queue after processing (prevents infinite retry loops)
-    await clearQueue(authData.userId);
-    // console.log('Sync completed');
   } finally {
     syncInProgress = false;
 
@@ -1565,6 +1588,12 @@ async function syncQueue() {
       for (const client of clientList) {
         client.postMessage({ type: 'SYNC_COMPLETE' });
       }
+    }
+
+    // If a sync was requested while we were busy, run one follow-up (Bug 7 fix)
+    if (syncPending) {
+      syncPending = false;
+      syncQueue();
     }
   }
 }
@@ -1604,7 +1633,13 @@ if (typeof module !== 'undefined') {
     addQueue,
     readQueue,
     clearQueue,
+    removeQueueItem,
+    updateQueueItem,
+    getIdMap,
+    putIdMap,
+    clearIdMap,
     getAuthHeaders,
+    getBackendUrl,
     syncQueue,
     handleRequest: handleApiRequest,
     handleApiRequest,

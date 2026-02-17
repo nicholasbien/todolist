@@ -62,7 +62,7 @@ describe('Todo Operations', () => {
     await sw.addQueue({ type: 'UPDATE', data: todo }, 'user1');
     await sw.syncQueue();
 
-    expect(fetch).toHaveBeenCalledWith('/todos/todo123', {
+    expect(fetch).toHaveBeenCalledWith('http://localhost:8000/todos/todo123', {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -82,7 +82,7 @@ describe('Todo Operations', () => {
     await sw.addQueue({ type: 'COMPLETE', data: completeData }, 'user1');
     await sw.syncQueue();
 
-    expect(fetch).toHaveBeenCalledWith('/todos/todo123/complete', {
+    expect(fetch).toHaveBeenCalledWith('http://localhost:8000/todos/todo123/complete', {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -101,7 +101,7 @@ describe('Todo Operations', () => {
     await sw.addQueue({ type: 'DELETE', data: deleteData }, 'user1');
     await sw.syncQueue();
 
-    expect(fetch).toHaveBeenCalledWith('/todos/todo123', {
+    expect(fetch).toHaveBeenCalledWith('http://localhost:8000/todos/todo123', {
       method: 'DELETE',
       headers: {
         'Content-Type': 'application/json',
@@ -170,7 +170,7 @@ describe('Category Operations', () => {
     await sw.addQueue({ type: 'DELETE_CATEGORY', data: deleteData }, 'user1');
     await sw.syncQueue();
 
-    expect(fetch).toHaveBeenCalledWith('/categories/Old%20Category', {
+    expect(fetch).toHaveBeenCalledWith('http://localhost:8000/categories/Old%20Category', {
       method: 'DELETE',
       headers: {
         'Content-Type': 'application/json',
@@ -189,7 +189,7 @@ describe('Category Operations', () => {
     await sw.addQueue({ type: 'RENAME_CATEGORY', data: renameData }, 'user1');
     await sw.syncQueue();
 
-    expect(fetch).toHaveBeenCalledWith('/categories/Old', {
+    expect(fetch).toHaveBeenCalledWith('http://localhost:8000/categories/Old', {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -281,10 +281,10 @@ describe('Error Handling', () => {
     // Should not throw
     await expect(sw.syncQueue()).resolves.toBeUndefined();
 
-    // Queue should be cleared regardless of individual operation errors
-    // This prevents infinite retry loops and relies on final GET /todos for consistency
+    // Failed op should remain in queue with incremented retryCount (Bug 1 fix)
     const queue = await sw.readQueue('user1');
-    expect(queue).toHaveLength(0);
+    expect(queue).toHaveLength(1);
+    expect(queue[0].retryCount).toBe(1);
   });
 
   test('should not sync when no auth data available', async () => {
@@ -510,9 +510,10 @@ describe('Integration Tests', () => {
     // Failed sync should preserve offline todo
     expect(localTodos.find(t => t._id === 'offline_2')).toBeDefined();
 
-    // Queue should be empty
+    // Queue should contain the failed op with retryCount (Bug 1 fix: per-op deletion)
     const finalQueue = await sw.readQueue('user1');
-    expect(finalQueue).toHaveLength(0);
+    expect(finalQueue).toHaveLength(1);
+    expect(finalQueue[0].retryCount).toBe(1);
   });
 
   test('concurrent sync protection in realistic scenario', async () => {
@@ -589,10 +590,10 @@ describe('ID Remapping and Cleanup', () => {
 
     // First call should be POST creating the todo
     expect(fetch).toHaveBeenNthCalledWith(1, 'http://localhost:8000/todos', expect.any(Object));
-    // Second call should be PUT using remapped server ID
-    expect(fetch).toHaveBeenNthCalledWith(2, '/todos/server_xyz', expect.objectContaining({ method: 'PUT' }));
-    // Third call should be DELETE using same server ID
-    expect(fetch).toHaveBeenNthCalledWith(3, '/todos/server_xyz', expect.objectContaining({ method: 'DELETE' }));
+    // Second call should be PUT using remapped server ID (absolute URL)
+    expect(fetch).toHaveBeenNthCalledWith(2, 'http://localhost:8000/todos/server_xyz', expect.objectContaining({ method: 'PUT' }));
+    // Third call should be DELETE using same server ID (absolute URL)
+    expect(fetch).toHaveBeenNthCalledWith(3, 'http://localhost:8000/todos/server_xyz', expect.objectContaining({ method: 'DELETE' }));
   });
 
   test('offline create then complete syncs both operations', async () => {
@@ -616,7 +617,7 @@ describe('ID Remapping and Cleanup', () => {
     await sw.syncQueue();
 
     expect(fetch).toHaveBeenNthCalledWith(1, 'http://localhost:8000/todos', expect.objectContaining({ method: 'POST' }));
-    expect(fetch).toHaveBeenNthCalledWith(2, '/todos/server_new/complete', expect.objectContaining({ method: 'PUT' }));
+    expect(fetch).toHaveBeenNthCalledWith(2, 'http://localhost:8000/todos/server_new/complete', expect.objectContaining({ method: 'PUT' }));
 
     const todos = await sw.getTodos('user1');
     expect(todos).toHaveLength(1);
@@ -702,7 +703,7 @@ describe('ID Remapping and Cleanup', () => {
     );
     expect(fetch).toHaveBeenNthCalledWith(
       2,
-      '/todos/server_map',
+      'http://localhost:8000/todos/server_map',
       expect.objectContaining({ method: 'PUT' })
     );
   });
