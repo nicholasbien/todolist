@@ -400,6 +400,21 @@ export default function AIToDoListApp({
     };
   }, [token, user, fetchTodos]);
 
+  // Refresh todos after service worker sync completes (IDs may have changed)
+  useEffect(() => {
+    const handleSyncMessage = (event: MessageEvent) => {
+      if (event.data?.type === 'SYNC_COMPLETE') {
+        console.log('Sync complete — refreshing todos');
+        fetchTodos(false);
+      }
+    };
+
+    navigator.serviceWorker?.addEventListener('message', handleSyncMessage);
+    return () => {
+      navigator.serviceWorker?.removeEventListener('message', handleSyncMessage);
+    };
+  }, [fetchTodos]);
+
   // Refresh data when navigating between main tabs
   useEffect(() => {
     if (activeTab === 'tasks') {
