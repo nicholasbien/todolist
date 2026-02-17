@@ -1,11 +1,11 @@
 // IMPORTANT: Always increment these versions when modifying this service worker file
 // This forces browsers to download and use the updated service worker
-const STATIC_CACHE = 'todo-static-v116';
-const API_CACHE = 'todo-api-v116';
+const STATIC_CACHE = 'todo-static-v114';
+const API_CACHE = 'todo-api-v114';
 
 const GLOBAL_DB_NAME = 'TodoGlobalDB';
 const USER_DB_PREFIX = 'TodoUserDB_';
-const DB_VERSION = 13;
+const DB_VERSION = 11;
 
 // Configuration
 const CONFIG = {
@@ -17,13 +17,8 @@ const TODOS = 'todos';
 const CATEGORIES = 'categories';
 const SPACES = 'spaces';
 const QUEUE = 'queue';
-const ID_MAP = 'id_map';
 const AUTH = 'auth';
 const JOURNALS = 'journals';
-const ENTITIES = 'entities';
-const OUTBOX = 'outbox';
-const META = 'meta';
-const CONFLICTS = 'conflicts';
 
 const DEFAULT_CATEGORIES = ['General'];
 
@@ -71,31 +66,8 @@ function openUserDB(userId) {
       if (!db.objectStoreNames.contains(QUEUE)) {
         db.createObjectStore(QUEUE, { keyPath: 'id', autoIncrement: true });
       }
-      if (!db.objectStoreNames.contains(ID_MAP)) {
-        db.createObjectStore(ID_MAP, { keyPath: 'key' });
-      }
       if (!db.objectStoreNames.contains(JOURNALS)) {
         db.createObjectStore(JOURNALS, { keyPath: '_id' });
-      }
-      if (!db.objectStoreNames.contains(ENTITIES)) {
-        const entityStore = db.createObjectStore(ENTITIES, { keyPath: 'key' });
-        entityStore.createIndex('entityType', 'entityType', { unique: false });
-        entityStore.createIndex('clientId', 'clientId', { unique: false });
-        entityStore.createIndex('serverId', 'serverId', { unique: false });
-      }
-      if (!db.objectStoreNames.contains(OUTBOX)) {
-        const outboxStore = db.createObjectStore(OUTBOX, { keyPath: 'opId' });
-        outboxStore.createIndex('status', 'status', { unique: false });
-        outboxStore.createIndex('entityType', 'entityType', { unique: false });
-        outboxStore.createIndex('nextAttemptAt', 'nextAttemptAt', { unique: false });
-      }
-      if (!db.objectStoreNames.contains(META)) {
-        db.createObjectStore(META, { keyPath: 'key' });
-      }
-      if (!db.objectStoreNames.contains(CONFLICTS)) {
-        const conflictStore = db.createObjectStore(CONFLICTS, { keyPath: 'conflictId' });
-        conflictStore.createIndex('entityType', 'entityType', { unique: false });
-        conflictStore.createIndex('detectedAt', 'detectedAt', { unique: false });
       }
     };
   });
@@ -133,14 +105,13 @@ const putAuth = (token, userId) => globalDbTx(AUTH, 'readwrite', (s) => s.put({ 
 const getTodos = async (userId, spaceId = null) => {
   const authData = userId ? null : await getAuth();
   const effectiveUserId = userId || (authData ? authData.userId : null);
-  if (!effectiveUserId) return [];
-
-  const entityRecords = await getEntityRecords(effectiveUserId, 'todos');
-  const allTodos = entityRecords.length > 0 ? entityRecords.map(r => r.payload) : await userDbTx(effectiveUserId, TODOS, 'readonly', (s) => s.getAll());
+  const allTodos = await userDbTx(effectiveUserId, TODOS, 'readonly', (s) => s.getAll());
 
   if (spaceId) {
+    // Filter by space_id
     return allTodos.filter(t => t.space_id === spaceId);
   } else {
+    // Return all todos
     return allTodos;
   }
 };
@@ -148,19 +119,14 @@ const getTodos = async (userId, spaceId = null) => {
 const putTodo = async (todo, userId) => {
   const authData = userId ? null : await getAuth();
   const effectiveUserId = userId || (authData ? authData.userId : null);
-  const result = await userDbTx(effectiveUserId, TODOS, 'readwrite', (s) => s.put(todo));
-  const serverId = todo?._id && !String(todo._id).startsWith('offline_') ? todo._id : null;
-  await putEntityRecord(effectiveUserId, 'todos', todo._id, todo, { serverId });
-  return result;
+  return userDbTx(effectiveUserId, TODOS, 'readwrite', (s) => s.put(todo));
 };
 
 
 const delTodo = async (id, userId) => {
   const authData = userId ? null : await getAuth();
   const effectiveUserId = userId || (authData ? authData.userId : null);
-  const result = await userDbTx(effectiveUserId, TODOS, 'readwrite', (s) => s.delete(id));
-  await deleteEntityRecord(effectiveUserId, 'todos', id);
-  return result;
+  return userDbTx(effectiveUserId, TODOS, 'readwrite', (s) => s.delete(id));
 };
 
 const clearTodos = async (userId) => {
@@ -178,41 +144,31 @@ const clearJournals = async (userId) => {
 const getSpaces = async (userId) => {
   const authData = userId ? null : await getAuth();
   const effectiveUserId = userId || (authData ? authData.userId : null);
-  if (!effectiveUserId) return [];
-
-  const entityRecords = await getEntityRecords(effectiveUserId, 'spaces');
-  const spaces = entityRecords.length > 0 ? entityRecords.map(r => r.payload) : await userDbTx(effectiveUserId, SPACES, 'readonly', (s) => s.getAll());
-  return spaces;
+  return userDbTx(effectiveUserId, SPACES, 'readonly', (s) => s.getAll());
 };
 
 const putSpace = async (space, userId) => {
   const authData = userId ? null : await getAuth();
   const effectiveUserId = userId || (authData ? authData.userId : null);
-  const result = await userDbTx(effectiveUserId, SPACES, 'readwrite', (s) => s.put(space));
-  const serverId = space?._id && !String(space._id).startsWith('offline_') ? space._id : null;
-  await putEntityRecord(effectiveUserId, 'spaces', space._id, space, { serverId });
-  return result;
+  return userDbTx(effectiveUserId, SPACES, 'readwrite', (s) => s.put(space));
 };
 
 const delSpace = async (id, userId) => {
   const authData = userId ? null : await getAuth();
   const effectiveUserId = userId || (authData ? authData.userId : null);
-  const result = await userDbTx(effectiveUserId, SPACES, 'readwrite', (s) => s.delete(id));
-  await deleteEntityRecord(effectiveUserId, 'spaces', id);
-  return result;
+  return userDbTx(effectiveUserId, SPACES, 'readwrite', (s) => s.delete(id));
 };
 
 const getCategories = async (userId, spaceId = null) => {
   const authData = userId ? null : await getAuth();
   const effectiveUserId = userId || (authData ? authData.userId : null);
-  if (!effectiveUserId) return [];
-
-  const entityRecords = await getEntityRecords(effectiveUserId, 'categories');
-  const allCategories = entityRecords.length > 0 ? entityRecords.map(r => r.payload) : await userDbTx(effectiveUserId, CATEGORIES, 'readonly', (s) => s.getAll());
+  const allCategories = await userDbTx(effectiveUserId, CATEGORIES, 'readonly', (s) => s.getAll());
 
   if (spaceId) {
+    // Get categories for specific space
     return allCategories.filter(c => c.space_id === spaceId);
   } else {
+    // Get all categories
     return allCategories;
   }
 };
@@ -228,10 +184,7 @@ const putCategory = async (category, userId) => {
     console.warn('Category created without space_id:', category.name);
   }
 
-  const result = await userDbTx(effectiveUserId, CATEGORIES, 'readwrite', (s) => s.put(categoryWithSpace));
-  const clientId = `${categoryWithSpace.space_id || 'global'}:${categoryWithSpace.name}`;
-  await putEntityRecord(effectiveUserId, 'categories', clientId, categoryWithSpace, { serverId: clientId });
-  return result;
+  return userDbTx(effectiveUserId, CATEGORIES, 'readwrite', (s) => s.put(categoryWithSpace));
 };
 
 const delCategory = async (name, userId, spaceId = null) => {
@@ -244,40 +197,13 @@ const delCategory = async (name, userId, spaceId = null) => {
 
   for (const category of toDelete) {
     await userDbTx(effectiveUserId, CATEGORIES, 'readwrite', (s) => s.delete(category.id));
-    const clientId = `${category.space_id || 'global'}:${category.name}`;
-    await deleteEntityRecord(effectiveUserId, 'categories', clientId);
   }
 };
 
 const addQueue = async (action, userId) => {
   const authData = userId ? null : await getAuth();
   const effectiveUserId = userId || (authData ? authData.userId : null);
-  const entry = { ...action, timestamp: action.timestamp || Date.now(), mirrored: true };
-  const result = await userDbTx(effectiveUserId, QUEUE, 'readwrite', (s) => s.add(entry));
-  if (!action.mirrored) {
-    const { entityType, action: mappedAction } = mapLegacyOp(entry);
-    const clientId = entry.data?._id || entry.data?.clientId || generateClientId();
-    const outboxOp = {
-      opId: generateOpId(),
-      entityType,
-      action: mappedAction,
-      clientId,
-      serverId: null,
-      payload: entry.data,
-      baseVersion: entry.data?.server_version || entry.data?.version || null,
-      createdAt: entry.timestamp || Date.now(),
-      updatedAt: Date.now(),
-      status: 'queued',
-      attempts: 0,
-      nextAttemptAt: entry.timestamp || Date.now(),
-      lastError: null,
-      dependsOn: entry.dependsOn || null
-    };
-    await addOutboxOp(effectiveUserId, outboxOp);
-    await setMetaValue(effectiveUserId, 'pending_count', await getPendingOutboxCount(effectiveUserId));
-    await broadcastSyncStatus(effectiveUserId, { syncInProgress });
-  }
-  return result;
+  return userDbTx(effectiveUserId, QUEUE, 'readwrite', (s) => s.add({ ...action, timestamp: Date.now() }));
 };
 
 const readQueue = async (userId) => {
@@ -294,6 +220,7 @@ const clearQueue = async (userId) => {
 
 // Journal operations
 const getJournals = async (userId, date = null, spaceId = null) => {
+  // For IndexedDB operations, we need to determine which user database to access
   let effectiveUserId = userId;
   if (!effectiveUserId) {
     const authData = await getAuth();
@@ -305,8 +232,7 @@ const getJournals = async (userId, date = null, spaceId = null) => {
     return [];
   }
 
-  const entityRecords = await getEntityRecords(effectiveUserId, 'journals');
-  const allJournals = entityRecords.length > 0 ? entityRecords.map(r => r.payload) : await userDbTx(effectiveUserId, JOURNALS, 'readonly', (s) => s.getAll());
+  const allJournals = await userDbTx(effectiveUserId, JOURNALS, 'readonly', (s) => s.getAll());
 
   let filteredJournals = allJournals;
 
@@ -324,19 +250,13 @@ const getJournals = async (userId, date = null, spaceId = null) => {
 const putJournal = async (journal, userId) => {
   const authData = userId ? null : await getAuth();
   const effectiveUserId = userId || (authData ? authData.userId : null);
-  const result = await userDbTx(effectiveUserId, JOURNALS, 'readwrite', (s) => s.put(journal));
-  const clientId = journal?._id || `journal_${journal.date}_${journal.space_id || 'global'}`;
-  const serverId = journal?._id && !String(journal._id).startsWith('offline_journal_') ? journal._id : null;
-  await putEntityRecord(effectiveUserId, 'journals', clientId, journal, { serverId });
-  return result;
+  return userDbTx(effectiveUserId, JOURNALS, 'readwrite', (s) => s.put(journal));
 };
 
 const delJournal = async (id, userId) => {
   const authData = userId ? null : await getAuth();
   const effectiveUserId = userId || (authData ? authData.userId : null);
-  const result = await userDbTx(effectiveUserId, JOURNALS, 'readwrite', (s) => s.delete(id));
-  await deleteEntityRecord(effectiveUserId, 'journals', id);
-  return result;
+  return userDbTx(effectiveUserId, JOURNALS, 'readwrite', (s) => s.delete(id));
 };
 
 // ID mapping functions for persisting offline → server ID mappings
@@ -344,7 +264,7 @@ const getIdMap = async (userId) => {
   const authData = userId ? null : await getAuth();
   const effectiveUserId = userId || (authData ? authData.userId : null);
   try {
-    const result = await userDbTx(effectiveUserId, ID_MAP, 'readonly', (s) => s.get('idMap'));
+    const result = await userDbTx(effectiveUserId, QUEUE, 'readonly', (s) => s.get('idMap'));
     return result ? result.mappings : {};
   } catch (e) {
     return {};
@@ -354,228 +274,16 @@ const getIdMap = async (userId) => {
 const putIdMap = async (idMap, userId) => {
   const authData = userId ? null : await getAuth();
   const effectiveUserId = userId || (authData ? authData.userId : null);
-  return userDbTx(effectiveUserId, ID_MAP, 'readwrite', (s) => s.put({ key: 'idMap', mappings: idMap }));
+  return userDbTx(effectiveUserId, QUEUE, 'readwrite', (s) => s.put({ id: 'idMap', mappings: idMap }));
 };
 
 const clearIdMap = async (userId) => {
   const authData = userId ? null : await getAuth();
   const effectiveUserId = userId || (authData ? authData.userId : null);
   try {
-    return userDbTx(effectiveUserId, ID_MAP, 'readwrite', (s) => s.delete('idMap'));
+    return userDbTx(effectiveUserId, QUEUE, 'readwrite', (s) => s.delete('idMap'));
   } catch (e) {
     // Ignore if doesn't exist
-  }
-};
-
-const getEntityKey = (entityType, clientId) => `${entityType}:${clientId}`;
-
-const getEntityRecords = async (userId, entityType) => {
-  const authData = userId ? null : await getAuth();
-  const effectiveUserId = userId || (authData ? authData.userId : null);
-  if (!effectiveUserId) return [];
-  return userDbTx(effectiveUserId, ENTITIES, 'readonly', (s) => {
-    try {
-      const idx = s.index('entityType');
-      return idx.getAll(entityType);
-    } catch (err) {
-      return s.getAll();
-    }
-  });
-};
-
-const putEntityRecord = async (userId, entityType, clientId, payload, overrides = {}) => {
-  const authData = userId ? null : await getAuth();
-  const effectiveUserId = userId || (authData ? authData.userId : null);
-  if (!effectiveUserId) return null;
-  const key = getEntityKey(entityType, clientId);
-  const updatedAt = payload?.updated_at || payload?.updatedAt || payload?.dateAdded || new Date().toISOString();
-  const record = {
-    key,
-    entityType,
-    clientId,
-    serverId: overrides.serverId ?? payload?._id ?? payload?.id ?? null,
-    payload,
-    deleted: overrides.deleted ?? false,
-    updatedAt,
-    serverVersion: overrides.serverVersion ?? payload?.server_version ?? payload?.version ?? null,
-  };
-  return userDbTx(effectiveUserId, ENTITIES, 'readwrite', (s) => s.put(record));
-};
-
-const deleteEntityRecord = async (userId, entityType, clientId) => {
-  const authData = userId ? null : await getAuth();
-  const effectiveUserId = userId || (authData ? authData.userId : null);
-  if (!effectiveUserId) return null;
-  const key = getEntityKey(entityType, clientId);
-  return userDbTx(effectiveUserId, ENTITIES, 'readwrite', (s) => s.delete(key));
-};
-
-const getIdMapEntry = async (userId, entityType, clientId) => {
-  const authData = userId ? null : await getAuth();
-  const effectiveUserId = userId || (authData ? authData.userId : null);
-  if (!effectiveUserId) return null;
-  const key = `${entityType}:${clientId}`;
-  try {
-    return await userDbTx(effectiveUserId, ID_MAP, 'readonly', (s) => s.get(key));
-  } catch (e) {
-    return null;
-  }
-};
-
-const putIdMapEntry = async (userId, entry) => {
-  const authData = userId ? null : await getAuth();
-  const effectiveUserId = userId || (authData ? authData.userId : null);
-  if (!effectiveUserId) return null;
-  return userDbTx(effectiveUserId, ID_MAP, 'readwrite', (s) => s.put(entry));
-};
-
-const addOutboxOp = async (userId, op) => {
-  const authData = userId ? null : await getAuth();
-  const effectiveUserId = userId || (authData ? authData.userId : null);
-  if (!effectiveUserId) return null;
-  return userDbTx(effectiveUserId, OUTBOX, 'readwrite', (s) => s.put(op));
-};
-
-const updateOutboxOp = async (userId, op) => {
-  const authData = userId ? null : await getAuth();
-  const effectiveUserId = userId || (authData ? authData.userId : null);
-  if (!effectiveUserId) return null;
-  return userDbTx(effectiveUserId, OUTBOX, 'readwrite', (s) => s.put(op));
-};
-
-const getOutboxOps = async (userId) => {
-  const authData = userId ? null : await getAuth();
-  const effectiveUserId = userId || (authData ? authData.userId : null);
-  if (!effectiveUserId) return [];
-  return userDbTx(effectiveUserId, OUTBOX, 'readonly', (s) => s.getAll());
-};
-
-const getMetaValue = async (userId, key) => {
-  const authData = userId ? null : await getAuth();
-  const effectiveUserId = userId || (authData ? authData.userId : null);
-  if (!effectiveUserId) return null;
-  try {
-    const result = await userDbTx(effectiveUserId, META, 'readonly', (s) => s.get(key));
-    return result ? result.value : null;
-  } catch (e) {
-    return null;
-  }
-};
-
-const setMetaValue = async (userId, key, value) => {
-  const authData = userId ? null : await getAuth();
-  const effectiveUserId = userId || (authData ? authData.userId : null);
-  if (!effectiveUserId) return null;
-  return userDbTx(effectiveUserId, META, 'readwrite', (s) => s.put({ key, value }));
-};
-
-const getConflictCount = async (userId) => {
-  const authData = userId ? null : await getAuth();
-  const effectiveUserId = userId || (authData ? authData.userId : null);
-  if (!effectiveUserId) return 0;
-  try {
-    const conflicts = await userDbTx(effectiveUserId, CONFLICTS, 'readonly', (s) => s.getAll());
-    return conflicts.length;
-  } catch (e) {
-    return 0;
-  }
-};
-
-const generateOpId = () => {
-  if (self.crypto && self.crypto.randomUUID) return self.crypto.randomUUID();
-  return `op_${Date.now()}_${Math.random().toString(36).slice(2)}`;
-};
-
-const generateClientId = (prefix = 'offline') => {
-  if (self.crypto && self.crypto.randomUUID) return `${prefix}_${self.crypto.randomUUID()}`;
-  return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2)}`;
-};
-
-const calculateBackoffMs = (attempts) => {
-  const base = 2000;
-  const max = 5 * 60 * 1000;
-  const exp = Math.min(max, base * Math.pow(2, attempts - 1));
-  const jitter = exp * 0.2 * (Math.random() * 2 - 1);
-  return Math.max(0, Math.floor(exp + jitter));
-};
-
-const getPendingOutboxCount = async (userId) => {
-  const authData = userId ? null : await getAuth();
-  const effectiveUserId = userId || (authData ? authData.userId : null);
-  if (!effectiveUserId) return 0;
-  const ops = await getOutboxOps(effectiveUserId);
-  return ops.filter(op => op.status !== 'applied' && op.status !== 'conflict').length;
-};
-
-const broadcastSyncStatus = async (userId, override = {}) => {
-  const pendingCount = override.pendingCount ?? await getPendingOutboxCount(userId);
-  const lastSyncAt = override.lastSyncAt ?? await getMetaValue(userId, 'last_sync_at');
-  const lastError = override.lastError ?? await getMetaValue(userId, 'last_error');
-  const conflictCount = override.conflictCount ?? await getConflictCount(userId);
-  const syncInProgressFlag = override.syncInProgress ?? false;
-  if (self.clients && self.clients.matchAll) {
-    const clientList = await self.clients.matchAll({ type: 'window' });
-    for (const client of clientList) {
-      client.postMessage({
-        type: 'SYNC_STATUS',
-        payload: { pendingCount, lastSyncAt, lastError, conflictCount, syncInProgress: syncInProgressFlag }
-      });
-    }
-  }
-};
-
-const migrateLegacyQueueToOutbox = async (userId) => {
-  const legacyQueue = await readQueue(userId);
-  if (!legacyQueue || legacyQueue.length === 0) return;
-  for (const op of legacyQueue) {
-    if (op.mirrored) {
-      continue;
-    }
-    const { entityType, action } = mapLegacyOp(op);
-    const clientId = op.data?._id || op.data?.clientId || generateClientId();
-    const outboxOp = {
-      opId: generateOpId(),
-      entityType,
-      action,
-      clientId,
-      serverId: null,
-      payload: op.data,
-      baseVersion: op.data?.server_version || op.data?.version || null,
-      createdAt: op.timestamp || Date.now(),
-      updatedAt: Date.now(),
-      status: 'queued',
-      attempts: 0,
-      nextAttemptAt: op.timestamp || Date.now(),
-      lastError: null,
-      dependsOn: op.dependsOn || null
-    };
-    await addOutboxOp(userId, outboxOp);
-  }
-  await clearQueue(userId);
-};
-
-const mapLegacyOp = (op) => {
-  switch (op.type) {
-    case 'CREATE':
-    case 'UPDATE':
-    case 'DELETE':
-    case 'COMPLETE':
-      return { entityType: 'todos', action: op.type === 'COMPLETE' ? 'complete' : op.type.toLowerCase() };
-    case 'CREATE_CATEGORY':
-    case 'DELETE_CATEGORY':
-      return { entityType: 'categories', action: op.type === 'DELETE_CATEGORY' ? 'delete' : 'create' };
-    case 'RENAME_CATEGORY':
-      return { entityType: 'categories', action: 'rename' };
-    case 'CREATE_SPACE':
-    case 'UPDATE_SPACE':
-    case 'DELETE_SPACE':
-      return { entityType: 'spaces', action: op.type === 'DELETE_SPACE' ? 'delete' : op.type === 'UPDATE_SPACE' ? 'update' : 'create' };
-    case 'CREATE_JOURNAL':
-    case 'UPDATE_JOURNAL':
-    case 'DELETE_JOURNAL':
-      return { entityType: 'journals', action: op.type === 'DELETE_JOURNAL' ? 'delete' : op.type === 'UPDATE_JOURNAL' ? 'update' : 'create' };
-    default:
-      return { entityType: 'todos', action: op.type?.toLowerCase?.() || 'update' };
   }
 };
 
@@ -791,30 +499,12 @@ async function syncServerDataToLocal() {
 }
 
 self.addEventListener('install', (event) => {
-  const withTimeout = (promise, ms, label) =>
-    Promise.race([
-      promise,
-      new Promise((resolve) => setTimeout(() => {
-        if (label) console.log(`⚠️ Install step timed out: ${label}`);
-        resolve(null);
-      }, ms))
-    ]);
-  const isLocalhost = self.location?.hostname === 'localhost' || self.location?.hostname === '127.0.0.1';
-  if (isLocalhost) {
-    // Avoid dev server install hangs; run cache/DB init best-effort without blocking install.
-    cacheStaticFiles().catch((err) => console.log('⚠️ cacheStaticFiles failed:', err));
-    caches.open(API_CACHE).catch((err) => console.log('⚠️ caches.open failed:', err));
-    openGlobalDB().catch((err) => console.log('⚠️ openGlobalDB failed:', err));
-    event.waitUntil(Promise.resolve());
-    self.skipWaiting();
-    return;
-  }
   event.waitUntil(
     Promise.all([
       // Pre-cache static files with individual error handling
-      withTimeout(cacheStaticFiles(), 5000, 'cacheStaticFiles'),
-      withTimeout(caches.open(API_CACHE), 5000, 'caches.open(API_CACHE)'),
-      withTimeout(openGlobalDB(), 5000, 'openGlobalDB')
+      cacheStaticFiles(),
+      caches.open(API_CACHE),
+      openGlobalDB()
     ])
   );
   self.skipWaiting();
@@ -823,14 +513,9 @@ self.addEventListener('install', (event) => {
 // Helper function to cache static files with individual error handling
 async function cacheStaticFiles() {
   const cache = await caches.open(STATIC_CACHE);
-  const isLocalhost = self.location?.hostname === 'localhost' || self.location?.hostname === '127.0.0.1';
 
   // Cache files individually to avoid failing if one file is missing
   const cachePromises = STATIC_FILES.map(async (url) => {
-    if (isLocalhost && url === '/') {
-      console.log('ℹ️ Skipping caching / in localhost dev');
-      return null;
-    }
     try {
       const response = await fetch(url);
       if (response.ok) {
@@ -987,13 +672,11 @@ async function handleApiRequest(request) {
 
           // Check if sync is in progress or there are pending todo operations
           const queue = await readQueue(authData.userId);
-          const outboxOps = await getOutboxOps(authData.userId);
-          const hasPendingOutboxTodos = outboxOps.some(op => op.entityType === 'todos' && op.status !== 'applied' && op.status !== 'conflict');
           // Simple conservative check: block for ANY pending todo operation
           // This prevents race conditions regardless of space_id matching
           const hasPendingTodos = queue.some(op =>
             op.type === 'CREATE' || op.type === 'UPDATE' || op.type === 'DELETE'
-          ) || hasPendingOutboxTodos;
+          );
 
           if (syncInProgress || hasPendingTodos) {
             console.log(`⏸️ BLOCKING todo server data - sync: ${syncInProgress}, pending: ${hasPendingTodos}`);
@@ -1006,8 +689,7 @@ async function handleApiRequest(request) {
               headers: { 'Content-Type': 'application/json' }
             });
           } else {
-            const serverPayload = await response.clone().json();
-            const serverTodos = Array.isArray(serverPayload) ? serverPayload : [];
+            const serverTodos = await response.clone().json();
 
             // Save all server todos to IndexedDB for offline access
             for (const todo of serverTodos) {
@@ -1016,18 +698,6 @@ async function handleApiRequest(request) {
               }
             }
             console.log(`✅ Cached ${serverTodos.length} todos to IndexedDB`);
-
-            const localTodos = await getTodos(authData.userId, spaceId);
-            const offlineTodos = localTodos.filter(todo =>
-              (todo && todo._id && todo._id.startsWith('offline_')) || todo.created_offline
-            );
-            const serverIds = new Set(serverTodos.map(todo => todo && todo._id).filter(Boolean));
-            const mergedTodos = serverTodos.concat(offlineTodos.filter(todo => !serverIds.has(todo._id)));
-
-            return new Response(JSON.stringify(mergedTodos), {
-              status: 200,
-              headers: { 'Content-Type': 'application/json' }
-            });
           }
 
           return response; // Return original server response
@@ -1047,18 +717,13 @@ async function handleApiRequest(request) {
           if (serverResponse !== null) {
             // Simple approach: Don't cache ANY server journal data if sync is in progress or there's pending data
             const queue = await readQueue(authData.userId);
-            const outboxOps = await getOutboxOps(authData.userId);
             console.log(`🔍 JOURNAL DEBUG - Queue length: ${queue.length}, User: ${authData.userId}`);
             console.log(`🔍 JOURNAL DEBUG - Queue contents:`, queue.map(op => `${op.type}:${op.data.date}`));
 
-            const hasPendingOutboxJournals = outboxOps.some(op =>
-              op.entityType === 'journals' && op.status !== 'applied' && op.status !== 'conflict' &&
-              ((op.payload?.space_id === spaceId) || (!spaceId && !op.payload?.space_id))
-            );
             const hasPendingJournals = queue.some(op =>
               (op.type === 'CREATE_JOURNAL' || op.type === 'UPDATE_JOURNAL') &&
               (op.data.space_id === spaceId || (!spaceId && !op.data.space_id))
-            ) || hasPendingOutboxJournals;
+            );
             console.log(`🔍 JOURNAL DEBUG - Pending journals for space ${spaceId}: ${hasPendingJournals}`);
             console.log(`🔍 JOURNAL DEBUG - Sync in progress: ${syncInProgress}`);
 
@@ -1287,7 +952,7 @@ async function handleOfflineRequest(request, url) {
 
     if (existingQueueIndex !== -1) {
       // Replace existing queue entry with latest state
-      queue[existingQueueIndex] = { ...queue[existingQueueIndex], type: operationType, data: journalData, mirrored: true };
+      queue[existingQueueIndex] = { type: operationType, data: journalData };
       await clearQueue(authData ? authData.userId : null);
       for (const op of queue) {
         await addQueue(op, authData ? authData.userId : null);
@@ -1629,7 +1294,7 @@ async function syncQueue() {
   }
 
   syncInProgress = true;
-  await broadcastSyncStatus(authData.userId, { syncInProgress: true });
+  // console.log('Starting sync...');
 
   // Determine environment for sync requests
   const isCapacitor = self.location?.protocol === 'file:';
@@ -1641,90 +1306,85 @@ async function syncQueue() {
   };
 
   try {
-    await migrateLegacyQueueToOutbox(authData.userId);
+    const queue = await readQueue(authData.userId);
     const headers = await getAuthHeaders();
-    const now = Date.now();
-    const outboxOps = await getOutboxOps(authData.userId);
-    const orderedEntityTypes = ['spaces', 'categories', 'todos', 'journals'];
 
-    const pendingOps = outboxOps
-      .filter(op => ['queued', 'failed'].includes(op.status))
-      .filter(op => (op.nextAttemptAt || 0) <= now)
-      .sort((a, b) => {
-        const typeOrder = orderedEntityTypes.indexOf(a.entityType) - orderedEntityTypes.indexOf(b.entityType);
-        if (typeOrder !== 0) return typeOrder;
-        return (a.createdAt || 0) - (b.createdAt || 0);
-      });
+    // Load persistent ID mapping
+    let idMap = await getIdMap(authData.userId);
+    // console.log('📋 Loaded ID mapping:', idMap);
 
-    let lastError = null;
-    let hadSuccess = false;
-
-    for (const op of pendingOps) {
-      if (op.dependsOn) {
-        const dependency = await getIdMapEntry(authData.userId, op.entityType, op.dependsOn);
-        if (!dependency?.serverId) {
-          continue;
-        }
-      }
-
-      op.status = 'inflight';
-      op.updatedAt = Date.now();
-      await updateOutboxOp(authData.userId, op);
-
-      try {
-        let res;
-        let resolvedServerId = op.serverId;
-        if (!resolvedServerId && op.clientId) {
-          const mapEntry = await getIdMapEntry(authData.userId, op.entityType, op.clientId);
-          if (mapEntry?.serverId) resolvedServerId = mapEntry.serverId;
-        }
-
-        const isOfflineId = (id) => id && (String(id).startsWith('offline_') || String(id).startsWith('offline_journal_'));
-        const clientId = op.clientId || op.payload?._id;
-        const serverId = resolvedServerId || (clientId && !isOfflineId(clientId) ? clientId : null);
-
-        if (op.entityType === 'todos') {
-          if (op.action === 'create') {
+  for (const op of queue) {
+    try {
+      let res;
+      switch (op.type) {
+        case 'CREATE':
+          if (op.data._id.startsWith('offline_')) {
+            const { _id: offlineId, ...payload } = op.data;
             const todoSyncUrl = `${getBackendUrl()}/todos`;
             res = await fetch(todoSyncUrl, {
               method: 'POST',
               headers,
-              body: JSON.stringify(op.payload),
+              body: JSON.stringify(payload),
             });
             if (res && res.ok) {
+              // Immediately replace offline todo with server version
               const serverTodo = await res.json();
-              const offlineId = clientId;
-              if (offlineId && offlineId !== serverTodo._id) {
-                await delTodo(offlineId, authData.userId);
-              }
-              await putTodo(serverTodo, authData.userId);
-              await putIdMapEntry(authData.userId, { key: `todos:${clientId}`, entityType: 'todos', clientId, serverId: serverTodo._id });
-              op.status = 'applied';
-              hadSuccess = true;
+              console.log(`🔄 Sync SUCCESS: Replacing offline todo ${offlineId} with server todo ${serverTodo._id}`);
+
+              // Update ID mapping
+              idMap[offlineId] = serverTodo._id;
+              console.log(`🗺️ Added ID mapping: ${offlineId} -> ${serverTodo._id}`);
+
+              // Persist mapping immediately in case sync is interrupted
+              await putIdMap(idMap, authData.userId);
+
+              await delTodo(offlineId, authData.userId); // Remove offline version
+              await putTodo(serverTodo, authData.userId); // Add server version
+              console.log(`✅ Synced offline todo ${offlineId} -> ${serverTodo._id}`);
+            } else {
+              console.log(`❌ Sync FAILED: Offline todo ${offlineId} will be preserved`);
             }
-          } else if (op.action === 'update') {
-            if (!serverId) throw new Error('Missing server ID for todo update');
-            res = await fetch(`/todos/${serverId}`, {
+          }
+          break;
+        case 'UPDATE':
+          // Check if we need to translate offline ID to server ID
+          let updateId = op.data._id;
+          if (updateId.startsWith('offline_') && idMap[updateId]) {
+            updateId = idMap[updateId];
+            console.log(`🗺️ Translating UPDATE ID: ${op.data._id} -> ${updateId}`);
+          }
+
+          if (!updateId.startsWith('offline_')) {
+            res = await fetch(`/todos/${updateId}`, {
               method: 'PUT',
               headers,
-              body: JSON.stringify({ ...op.payload, _id: serverId }),
+              body: JSON.stringify({ ...op.data, _id: updateId }),
             });
             if (res && res.ok) {
-              await putTodo({ ...op.payload, _id: serverId }, authData.userId);
-              op.status = 'applied';
-              hadSuccess = true;
+              // Update local copy with the changes
+              await putTodo({ ...op.data, _id: updateId }, authData.userId);
             }
-          } else if (op.action === 'complete') {
-            if (!serverId) throw new Error('Missing server ID for todo completion');
-            res = await fetch(`/todos/${serverId}/complete`, {
+          }
+          break;
+        case 'COMPLETE':
+          // Check if we need to translate offline ID to server ID
+          let completeId = op.data._id;
+          if (completeId.startsWith('offline_') && idMap[completeId]) {
+            completeId = idMap[completeId];
+            console.log(`🗺️ Translating COMPLETE ID: ${op.data._id} -> ${completeId}`);
+          }
+
+          if (!completeId.startsWith('offline_')) {
+            res = await fetch(`/todos/${completeId}/complete`, {
               method: 'PUT',
               headers
             });
             if (res && res.ok) {
+              // Update local todo completion status
               const existingTodos = await getTodos(authData.userId);
-              const existingTodo = existingTodos.find(t => t._id === serverId);
+              const existingTodo = existingTodos.find(t => t._id === completeId);
               if (existingTodo) {
-                const updated = { ...existingTodo, completed: op.payload?.completed ?? true };
+                const updated = { ...existingTodo, completed: op.data.completed };
                 if (updated.completed) {
                   updated.dateCompleted = new Date().toISOString();
                 } else {
@@ -1732,197 +1392,172 @@ async function syncQueue() {
                 }
                 await putTodo(updated, authData.userId);
               }
-              op.status = 'applied';
-              hadSuccess = true;
             }
-          } else if (op.action === 'delete') {
-            if (!serverId) throw new Error('Missing server ID for todo delete');
-            res = await fetch(`/todos/${serverId}`, {
+          }
+          break;
+        case 'DELETE':
+          // Check if we need to translate offline ID to server ID
+          let deleteId = op.data._id;
+          if (deleteId.startsWith('offline_') && idMap[deleteId]) {
+            deleteId = idMap[deleteId];
+            console.log(`🗺️ Translating DELETE ID: ${op.data._id} -> ${deleteId}`);
+          }
+
+          if (!deleteId.startsWith('offline_')) {
+            res = await fetch(`/todos/${deleteId}`, {
               method: 'DELETE',
               headers
             });
             if (res && res.ok) {
-              await delTodo(serverId, authData.userId);
-              op.status = 'applied';
-              hadSuccess = true;
+              // Remove from local storage
+              await delTodo(deleteId, authData.userId);
             }
           }
-        }
-
-        if (op.entityType === 'categories') {
-          if (op.action === 'create') {
-            const categorySyncUrl = `${getBackendUrl()}/categories`;
-            res = await fetch(categorySyncUrl, {
-              method: 'POST',
-              headers,
-              body: JSON.stringify(op.payload),
-            });
-            if (res && res.ok) {
-              const serverCategory = await res.json();
-              await putCategory({ ...serverCategory, space_id: op.payload.space_id }, authData.userId);
-              op.status = 'applied';
-              hadSuccess = true;
-            }
-          } else if (op.action === 'delete') {
-            const deleteUrl = op.payload.space_id
-              ? `/categories/${encodeURIComponent(op.payload.name)}?space_id=${op.payload.space_id}`
-              : `/categories/${encodeURIComponent(op.payload.name)}`;
-            res = await fetch(deleteUrl, {
-              method: 'DELETE',
-              headers
-            });
-            if (res && res.ok) {
-              await delCategory(op.payload.name, authData.userId, op.payload.space_id);
-              op.status = 'applied';
-              hadSuccess = true;
-            }
-          } else if (op.action === 'rename') {
-            const renameUrl = op.payload.space_id
-              ? `/categories/${encodeURIComponent(op.payload.old_name)}?space_id=${op.payload.space_id}`
-              : `/categories/${encodeURIComponent(op.payload.old_name)}`;
-            res = await fetch(renameUrl, {
-              method: 'PUT',
-              headers,
-              body: JSON.stringify({ new_name: op.payload.new_name })
-            });
-            if (res && res.ok) {
-              await delCategory(op.payload.old_name, authData.userId, op.payload.space_id);
-              await putCategory({ name: op.payload.new_name, space_id: op.payload.space_id }, authData.userId);
-              op.status = 'applied';
-              hadSuccess = true;
-            }
+          break;
+        case 'CREATE_CATEGORY':
+          const categorySyncUrl = `${getBackendUrl()}/categories`;
+          res = await fetch(categorySyncUrl, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify(op.data),
+          });
+          if (res.ok) {
+            const serverCategory = await res.json();
+            await putCategory({ ...serverCategory, space_id: op.data.space_id }, authData.userId);
           }
-        }
-
-        if (op.entityType === 'spaces') {
-          if (op.action === 'create') {
-            const createSpaceUrl = `${getBackendUrl()}/spaces`;
-            res = await fetch(createSpaceUrl, {
-              method: 'POST',
-              headers,
-              body: JSON.stringify(op.payload),
-            });
-            if (res && res.ok) {
-              const serverSpace = await res.json();
-              if (clientId && clientId !== serverSpace._id) {
-                await delSpace(clientId, authData.userId);
-              }
-              await putSpace(serverSpace, authData.userId);
-              await putIdMapEntry(authData.userId, { key: `spaces:${clientId}`, entityType: 'spaces', clientId, serverId: serverSpace._id });
-              op.status = 'applied';
-              hadSuccess = true;
-            }
-          } else if (op.action === 'update') {
-            if (!serverId) throw new Error('Missing server ID for space update');
-            res = await fetch(`/spaces/${serverId}`, {
-              method: 'PUT',
-              headers,
-              body: JSON.stringify(op.payload),
-            });
-            if (res && res.ok) {
-              await putSpace({ ...op.payload, _id: serverId }, authData.userId);
-              op.status = 'applied';
-              hadSuccess = true;
-            }
-          } else if (op.action === 'delete') {
-            if (!serverId) throw new Error('Missing server ID for space delete');
-            res = await fetch(`/spaces/${serverId}`, {
-              method: 'DELETE',
-              headers
-            });
-            if (res && res.ok) {
-              await delSpace(serverId, authData.userId);
-              op.status = 'applied';
-              hadSuccess = true;
-            }
+          break;
+        case 'DELETE_CATEGORY':
+          const deleteUrl = op.data.space_id
+            ? `/categories/${encodeURIComponent(op.data.name)}?space_id=${op.data.space_id}`
+            : `/categories/${encodeURIComponent(op.data.name)}`;
+          res = await fetch(deleteUrl, {
+            method: 'DELETE',
+            headers
+          });
+          if (res.ok) {
+            await delCategory(op.data.name, authData.userId, op.data.space_id);
           }
-        }
-
-        if (op.entityType === 'journals') {
-          if (op.action === 'create' || op.action === 'update') {
-            const journalUrl = `${getBackendUrl()}/journals`;
-            res = await fetch(journalUrl, {
+          break;
+        case 'RENAME_CATEGORY':
+          const renameUrl = op.data.space_id
+            ? `/categories/${encodeURIComponent(op.data.old_name)}?space_id=${op.data.space_id}`
+            : `/categories/${encodeURIComponent(op.data.old_name)}`;
+          res = await fetch(renameUrl, {
+            method: 'PUT',
+            headers,
+            body: JSON.stringify({ new_name: op.data.new_name })
+          });
+          if (res.ok) {
+            await delCategory(op.data.old_name, authData.userId, op.data.space_id);
+            await putCategory({ name: op.data.new_name, space_id: op.data.space_id }, authData.userId);
+          }
+          break;
+        case 'CREATE_JOURNAL':
+          if (op.data._id.startsWith('offline_journal_')) {
+            const { _id: offlineId, ...payload } = op.data;
+            const createJournalUrl = `${getBackendUrl()}/journals`;
+            res = await fetch(createJournalUrl, {
               method: 'POST',
               headers,
-              body: JSON.stringify(op.payload),
+              body: JSON.stringify(payload),
+            });
+            if (res && res.ok) {
+              // Immediately replace offline journal with server version
+              const serverJournal = await res.json();
+              console.log(`🔄 Journal Sync SUCCESS: Replacing offline journal ${offlineId} with server journal ${serverJournal._id}`);
+
+              // Update ID mapping
+              idMap[offlineId] = serverJournal._id;
+              console.log(`🗺️ Added Journal ID mapping: ${offlineId} -> ${serverJournal._id}`);
+
+              // Persist mapping immediately
+              await putIdMap(idMap, authData.userId);
+
+              await delJournal(offlineId, authData.userId); // Remove offline version
+              // Store synced version without offline flags
+              await putJournal({ ...serverJournal, updated_offline: false }, authData.userId);
+              console.log(`✅ Synced offline journal ${offlineId} -> ${serverJournal._id}`);
+            } else {
+              console.log(`❌ Journal Sync FAILED: Offline journal ${offlineId} will be preserved`);
+            }
+          } else {
+            // Handle both offline-generated and regular journal updates
+            const createJournalUrl2 = `${getBackendUrl()}/journals`;
+            res = await fetch(createJournalUrl2, {
+              method: 'POST',
+              headers,
+              body: JSON.stringify(op.data),
             });
             if (res && res.ok) {
               const serverJournal = await res.json();
-              const offlineId = clientId;
-              if (offlineId && offlineId !== serverJournal._id) {
-                await delJournal(offlineId, authData.userId);
-              }
               await putJournal({ ...serverJournal, updated_offline: false }, authData.userId);
-              await putIdMapEntry(authData.userId, { key: `journals:${clientId}`, entityType: 'journals', clientId, serverId: serverJournal._id });
-              op.status = 'applied';
-              hadSuccess = true;
             }
-          } else if (op.action === 'delete') {
-            if (!serverId) throw new Error('Missing server ID for journal delete');
-            const deleteJournalUrl = `${getBackendUrl()}/journals/${serverId}`;
+          }
+          break;
+        case 'UPDATE_JOURNAL':
+          // Update existing server journal with offline changes
+          const { _id, created_offline, updated_offline, ...updatePayload } = op.data;
+          console.log(`🔄 Processing UPDATE_JOURNAL for ${op.data.date}, ID: ${_id}`);
+          console.log(`📝 UPDATE_JOURNAL payload:`, updatePayload);
+          // Use the proper API routing for sync requests
+          const updateJournalUrl = `${getBackendUrl()}/journals`;
+          res = await fetch(updateJournalUrl, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify(updatePayload),
+          });
+          console.log(`📡 UPDATE_JOURNAL response status: ${res?.status}`);
+          if (res && res.ok) {
+            const serverJournal = await res.json();
+            console.log(`✅ UPDATE_JOURNAL Sync SUCCESS: Updated server journal ${serverJournal._id} for date ${op.data.date}`);
+            console.log(`📝 UPDATE_JOURNAL server response:`, serverJournal);
+            console.log(`📝 UPDATE_JOURNAL original offline data:`, op.data);
+            // Store synced version without offline flags but preserve any local changes
+            await putJournal({ ...serverJournal, updated_offline: false }, authData.userId);
+          } else {
+            const errorText = res ? await res.text() : 'No response';
+            console.log(`❌ UPDATE_JOURNAL Sync FAILED: Journal ${_id} offline changes preserved`);
+            console.log(`❌ Error details: Status ${res?.status}, Response: ${errorText}`);
+          }
+          break;
+        case 'DELETE_JOURNAL':
+          // Check if we need to translate offline ID to server ID
+          let deleteJournalId = op.data._id;
+          if (deleteJournalId.startsWith('offline_journal_') && idMap[deleteJournalId]) {
+            deleteJournalId = idMap[deleteJournalId];
+            console.log(`🗺️ Translating DELETE_JOURNAL ID: ${op.data._id} -> ${deleteJournalId}`);
+          }
+
+          if (!deleteJournalId.startsWith('offline_journal_')) {
+            const deleteJournalUrl = `${getBackendUrl()}/journals/${deleteJournalId}`;
             res = await fetch(deleteJournalUrl, {
               method: 'DELETE',
               headers
             });
             if (res && res.ok) {
-              await delJournal(serverId, authData.userId);
-              op.status = 'applied';
-              hadSuccess = true;
+              // Remove from local storage
+              await delJournal(deleteJournalId, authData.userId);
             }
           }
-        }
-
-        if (res && res.status === 409) {
-          const conflictId = generateOpId();
-          let serverPayload = null;
-          try {
-            serverPayload = await res.json();
-          } catch {
-            serverPayload = null;
-          }
-          await userDbTx(authData.userId, CONFLICTS, 'readwrite', (s) => s.put({
-            conflictId,
-            entityType: op.entityType,
-            clientId: op.clientId,
-            serverPayload,
-            localPayload: op.payload,
-            detectedAt: new Date().toISOString(),
-            resolution: null
-          }));
-          op.status = 'conflict';
-        }
-
-        if (op.status === 'applied' || op.status === 'conflict') {
-          op.updatedAt = Date.now();
-          await updateOutboxOp(authData.userId, op);
-          continue;
-        }
-
-        if (!res || !res.ok) {
-          throw new Error(`Sync failed with status ${res?.status || 'unknown'}`);
-        }
-      } catch (err) {
-        op.status = 'failed';
-        op.attempts = (op.attempts || 0) + 1;
-        op.nextAttemptAt = Date.now() + calculateBackoffMs(op.attempts);
-        op.lastError = err?.message || String(err);
-        op.updatedAt = Date.now();
-        lastError = op.lastError;
-        await updateOutboxOp(authData.userId, op);
+          break;
       }
+    } catch (err) {
+      // Continue processing other operations on error
+      // Failed operations remain in offline state until next sync attempt
+      console.log('Sync operation failed:', err);
+      continue;
     }
+  }
 
-    if (hadSuccess) {
-      await setMetaValue(authData.userId, 'last_sync_at', new Date().toISOString());
-    }
-    if (lastError) {
-      await setMetaValue(authData.userId, 'last_error', lastError);
-    }
-    const pendingCount = await getPendingOutboxCount(authData.userId);
-    await setMetaValue(authData.userId, 'pending_count', pendingCount);
+    // Persist the updated ID mapping
+    await putIdMap(idMap, authData.userId);
+    // console.log('📋 Saved updated ID mapping:', idMap);
+
+    // Always clear queue after processing (prevents infinite retry loops)
+    await clearQueue(authData.userId);
+    // console.log('Sync completed');
   } finally {
     syncInProgress = false;
-    await broadcastSyncStatus(authData.userId, { syncInProgress: false });
 
     // Notify all clients that sync has completed
     if (self.clients && self.clients.matchAll) {
@@ -1933,6 +1568,7 @@ async function syncQueue() {
     }
   }
 }
+
 self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'SYNC_WHEN_ONLINE') {
     syncQueue();

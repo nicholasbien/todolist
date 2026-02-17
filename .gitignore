@@ -15,3 +15,4 @@ frontend/.pw-live-profile/
 frontend/ios/App/.DS_Store
 frontend/tsconfig.tsbuildinfo
 mcp-server/node_modules/
+.codex/
