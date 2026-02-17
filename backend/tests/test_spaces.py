@@ -187,3 +187,30 @@ async def test_invite_and_member_listing(client, test_email, test_email2, test_e
     )
     assert resp2.status_code == 200
     assert sent == [test_email3]
+
+
+@pytest.mark.asyncio
+async def test_non_owner_cannot_invite(client, test_email, test_email2, test_email3):
+    """Only the space owner can invite members."""
+    token1 = await get_token(client, test_email)
+    headers1 = {"Authorization": f"Bearer {token1}"}
+
+    # Owner creates space and invites user2
+    space_id = await create_test_space(client, token1, "Owner Only Invites")
+    await client.post(
+        f"/spaces/{space_id}/invite",
+        json={"emails": [test_email2]},
+        headers=headers1,
+    )
+
+    # User2 (non-owner member) tries to invite user3 — should be denied
+    token2 = await get_token(client, test_email2)
+    headers2 = {"Authorization": f"Bearer {token2}"}
+
+    resp = await client.post(
+        f"/spaces/{space_id}/invite",
+        json={"emails": [test_email3]},
+        headers=headers2,
+    )
+    assert resp.status_code == 403
+    assert "owner" in resp.json()["detail"].lower()

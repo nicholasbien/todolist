@@ -501,7 +501,7 @@ async def api_create_space_endpoint(req: SpaceCreateRequest, current_user: dict 
 
 @app.post("/spaces/{space_id}/invite")
 async def api_invite_members(space_id: str, req: InviteRequest, current_user: dict = Depends(get_current_user)):
-    await invite_members(space_id, current_user["email"], req.emails)
+    await invite_members(space_id, current_user["email"], req.emails, inviter_user_id=current_user["user_id"])
     return {"message": "Invitations sent"}
 
 

@@ -124,11 +124,14 @@ async def user_in_space(user_id: str, space_id: str) -> bool:
     return user_id in space.get("member_ids", [])
 
 
-async def invite_members(space_id: str, inviter_email: str, emails: List[str]) -> None:
-    """Invite users to a space via email."""
+async def invite_members(space_id: str, inviter_email: str, emails: List[str], inviter_user_id: str = "") -> None:
+    """Invite users to a space via email. Only the space owner can invite."""
     space = await spaces_collection.find_one({"_id": ObjectId(space_id)})
     if not space:
         raise HTTPException(status_code=404, detail="Space not found")
+
+    if space.get("owner_id") != inviter_user_id:
+        raise HTTPException(status_code=403, detail="Only the space owner can invite members")
 
     pending = set(space.get("pending_emails", []))
     member_ids = set(space.get("member_ids", []))
