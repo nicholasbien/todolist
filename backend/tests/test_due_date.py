@@ -1,39 +1,44 @@
+from unittest.mock import MagicMock, patch
+
 import classify
 import pytest
+from classify import TaskClassification
 from dateparse import manual_parse_due_date
 
 
-class FakeCompletion:
-    def __init__(self, content):
-        self.choices = [type("obj", (), {"message": type("obj", (), {"content": content})()})]
-
-
 @pytest.mark.asyncio
-async def test_prompt_contains_date_context(monkeypatch):
+async def test_prompt_contains_date_context():
+    """Test that the classification prompt includes date context."""
     captured = {}
 
-    def fake_create(model, messages, temperature):
-        captured["messages"] = messages
-        return FakeCompletion('{"category": "General", "priority": "Low", "text": "task", "dueDate": null}')
+    def fake_parse(*args, **kwargs):
+        captured["input"] = kwargs.get("input", args[0] if args else None)
+        mock_response = MagicMock()
+        mock_response.output_parsed = TaskClassification(category="General", priority="Low", text="task", dueDate=None)
+        return mock_response
 
-    monkeypatch.setattr(classify.client.chat.completions, "create", fake_create)
+    with patch.object(classify.client.responses, "parse", side_effect=fake_parse):
+        await classify.classify_task("do it tomorrow", [], "2025-06-10")
 
-    await classify.classify_task("do it tomorrow", [], "2025-06-10")
-
-    system_msg = captured["messages"][0]["content"]
+    # The input should contain the system prompt with date context
+    input_messages = captured["input"]
+    system_msg = input_messages[0]["content"]
     assert "Tuesday, 2025-06-10" in system_msg
 
 
 @pytest.mark.asyncio
-async def test_fallback_manual_parse(monkeypatch):
-    def fake_create(model, messages, temperature):
-        return FakeCompletion(
-            '{"category": "General", "priority": "Low", "text": "Bike to Bear Mountain", "dueDate": null}'
+async def test_fallback_manual_parse():
+    """Test that manual date parsing kicks in when OpenAI returns no dueDate."""
+
+    def fake_parse(*args, **kwargs):
+        mock_response = MagicMock()
+        mock_response.output_parsed = TaskClassification(
+            category="General", priority="Low", text="Bike to Bear Mountain", dueDate=None
         )
+        return mock_response
 
-    monkeypatch.setattr(classify.client.chat.completions, "create", fake_create)
-
-    result = await classify.classify_task("Bike to Bear Mountain in two weeks", [], "2025-06-10")
+    with patch.object(classify.client.responses, "parse", side_effect=fake_parse):
+        result = await classify.classify_task("Bike to Bear Mountain in two weeks", [], "2025-06-10")
 
     assert result["dueDate"] == "2025-06-24"
     assert result["text"] == "Bike to Bear Mountain"
@@ -79,9 +84,6 @@ def test_manual_parse_due_date_various():
     # US format
     check("due 7/4/2025", "2025-07-04", "")
     check("by 07-04-2025", "2025-07-04", "")
-    # EU format (ambiguous, now always US)
-    # check("before 04/07/2025", "2025-07-04", "")  # This would now be April 7th, 2025 (US)
-    # check("until 04-07-2025", "2025-07-04", "")   # This would now be April 7th, 2025 (US)
     # Date only
     check("2025-07-04", "2025-07-04", "")
     check("7/4/2025", "2025-07-04", "")

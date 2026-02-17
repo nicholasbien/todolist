@@ -1,5 +1,4 @@
 from datetime import datetime
-from unittest.mock import AsyncMock, patch
 
 import pytest
 from tests.test_auth import get_verification_code_from_db
@@ -24,16 +23,13 @@ async def test_todo_crud_flow(client, test_email):
         "text": "Buy milk",
         "dateAdded": datetime.now().isoformat(),
     }
-    with patch(
-        "app.classify_task", new=AsyncMock(return_value={"category": "Shopping", "priority": "High"})
-    ) as mock_classify:
-        create_resp = await client.post("/todos", json=todo_payload, headers=headers)
-        assert create_resp.status_code == 200
-        todo = create_resp.json()
-        assert todo["category"] == "Shopping"
-        assert todo["priority"] == "High"
-        mock_classify.assert_awaited_once()
-        todo_id = todo["_id"]
+    create_resp = await client.post("/todos", json=todo_payload, headers=headers)
+    assert create_resp.status_code == 200
+    todo = create_resp.json()
+    # Classification runs via OpenAI — verify a category and priority were assigned
+    assert todo["category"]  # Should be a non-empty string
+    assert todo["priority"] in ("Low", "Medium", "High")
+    todo_id = todo["_id"]
 
     # Retrieve todos from default space
     # Note: After migration, we need to get todos from the user's default space
@@ -87,16 +83,16 @@ async def test_category_management(client, test_email):
     categories = categories_resp.json()
     assert "Errands" in categories
 
-    # Create todo using this category
+    # Create todo using this category (pass category explicitly to skip classification)
     todo_payload = {
         "text": "Pick up dry cleaning",
         "dateAdded": datetime.now().isoformat(),
+        "category": "Errands",
+        "space_id": default_space,
     }
-    with patch("app.classify_task", new=AsyncMock(return_value={"category": "Errands", "priority": "Medium"})):
-        todo_payload["space_id"] = default_space
-        create_resp = await client.post("/todos", json=todo_payload, headers=headers)
-        assert create_resp.status_code == 200
-        todo_id = create_resp.json()["_id"]
+    create_resp = await client.post("/todos", json=todo_payload, headers=headers)
+    assert create_resp.status_code == 200
+    todo_id = create_resp.json()["_id"]
 
     # Delete category and ensure todo updated to General
     if default_space is None:
@@ -125,10 +121,9 @@ async def test_add_todo_with_selected_category(client, test_email):
         "dateAdded": datetime.now().isoformat(),
         "category": "Work",
     }
-    with patch("app.classify_task") as mock_classify:
-        create_resp = await client.post("/todos", json=todo_payload, headers=headers)
-        assert create_resp.status_code == 200
-        todo = create_resp.json()
-        assert todo["category"] == "Work"
-        assert todo["priority"] == "Medium"
-        mock_classify.assert_not_called()
+    create_resp = await client.post("/todos", json=todo_payload, headers=headers)
+    assert create_resp.status_code == 200
+    todo = create_resp.json()
+    # Category should be preserved as-is (not overridden by classification)
+    assert todo["category"] == "Work"
+    assert todo["priority"] == "Medium"

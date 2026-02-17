@@ -1,5 +1,3 @@
-from unittest.mock import AsyncMock, patch
-
 import pytest
 from tests.test_auth import get_verification_code_from_db
 
@@ -70,7 +68,6 @@ async def test_todos_isolated_between_spaces_and_default(client, test_email, tes
     assert "Default space todo" not in space_todo_texts
 
 
-@pytest.mark.skip(reason="AI classification over-aggressively removes 'by User X' as date keywords")
 @pytest.mark.asyncio
 async def test_collaborative_todo_visibility(client, test_email, test_email2):
     """Test that all space members can see todos created by any member."""
@@ -85,30 +82,21 @@ async def test_collaborative_todo_visibility(client, test_email, test_email2):
     invite_resp = await client.post(f"/spaces/{space_id}/invite", json={"emails": [test_email2]}, headers=headers1)
     assert invite_resp.status_code == 200
 
-    with patch(
-        "app.classify_task",
-        new=AsyncMock(
-            side_effect=[
-                {"category": "General", "priority": "Low", "dueDate": None, "text": "Todo by User 1"},
-                {"category": "General", "priority": "Low", "dueDate": None, "text": "Todo by User 2"},
-            ]
-        ),
-    ):
-        # User 1 creates a todo in the space
-        todo1_resp = await client.post(
-            "/todos",
-            json={"text": "Todo by User 1", "space_id": space_id},
-            headers=headers1,
-        )
-        assert todo1_resp.status_code == 200
+    # User 1 creates a todo in the space (pass category to skip classification)
+    todo1_resp = await client.post(
+        "/todos",
+        json={"text": "Todo by User 1", "category": "General", "space_id": space_id},
+        headers=headers1,
+    )
+    assert todo1_resp.status_code == 200
 
-        # User 2 creates a todo in the space
-        todo2_resp = await client.post(
-            "/todos",
-            json={"text": "Todo by User 2", "space_id": space_id},
-            headers=headers2,
-        )
-        assert todo2_resp.status_code == 200
+    # User 2 creates a todo in the space
+    todo2_resp = await client.post(
+        "/todos",
+        json={"text": "Todo by User 2", "category": "General", "space_id": space_id},
+        headers=headers2,
+    )
+    assert todo2_resp.status_code == 200
 
     # User 1 should see both todos
     user1_todos_resp = await client.get(f"/todos?space_id={space_id}", headers=headers1)

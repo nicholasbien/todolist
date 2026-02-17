@@ -9,22 +9,34 @@
  * 5. space_id is included in update request
  */
 import React from 'react';
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent, act } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import AIToDoListApp from '../components/AIToDoListApp';
 
 // Mock the auth context
 const mockAuthContext = {
-  user: { email: 'test@example.com', user_id: 'user1' },
+  user: { email: 'test@example.com', id: 'user1' },
   token: 'test-token',
   login: jest.fn(),
   logout: jest.fn(),
+  clearAuthExpired: jest.fn(),
   authenticatedFetch: jest.fn(),
 };
 
 jest.mock('../context/AuthContext', () => ({
   useAuth: () => mockAuthContext,
 }));
+
+// Mock service worker
+Object.defineProperty(navigator, 'serviceWorker', {
+  value: {
+    controller: { postMessage: jest.fn() },
+    getRegistration: jest.fn().mockResolvedValue({ update: jest.fn() }),
+    addEventListener: jest.fn(),
+    removeEventListener: jest.fn(),
+  },
+  configurable: true,
+});
 
 // Mock window.matchMedia
 Object.defineProperty(window, 'matchMedia', {
@@ -66,14 +78,19 @@ describe('Todo Space Change in Edit Modal', () => {
     ];
     const mockCategories = ['General', 'Work', 'Personal'];
 
-    mockAuthContext.authenticatedFetch
-      .mockResolvedValueOnce({ ok: true, json: async () => mockSpaces }) // GET /spaces
-      .mockResolvedValueOnce({ ok: true, json: async () => mockTodos }) // GET /todos
-      .mockResolvedValueOnce({ ok: true, json: async () => mockCategories }) // GET /categories
-      .mockResolvedValueOnce({ ok: true, json: async () => [] }) // GET /members
-      .mockResolvedValueOnce({ ok: true, json: async () => mockCategories }); // GET /categories for edit modal
+    mockAuthContext.authenticatedFetch.mockImplementation((url: string) => {
+      if (url === '/spaces') return Promise.resolve({ ok: true, json: async () => mockSpaces });
+      if (url.startsWith('/todos')) return Promise.resolve({ ok: true, json: async () => mockTodos });
+      if (url.startsWith('/categories')) return Promise.resolve({ ok: true, json: async () => mockCategories });
+      if (url.includes('/members')) return Promise.resolve({ ok: true, json: async () => [] });
+      return Promise.resolve({ ok: true, json: async () => [] });
+    });
 
-    const { container } = render(<AIToDoListApp />);
+    let container: HTMLElement;
+    await act(async () => {
+      const result = render(<AIToDoListApp user={mockAuthContext.user} token={mockAuthContext.token} onLogout={jest.fn()} />);
+      container = result.container;
+    });
 
     // Wait for data to load
     await waitFor(() => {
@@ -82,7 +99,9 @@ describe('Todo Space Change in Edit Modal', () => {
 
     // Click on the todo to open edit modal
     const todoElement = screen.getByText('Test todo');
-    fireEvent.click(todoElement);
+    await act(async () => {
+      fireEvent.click(todoElement);
+    });
 
     // Wait for modal to appear
     await waitFor(() => {
@@ -90,7 +109,7 @@ describe('Todo Space Change in Edit Modal', () => {
     });
 
     // Verify space selector exists
-    const spaceSelects = container.querySelectorAll('select');
+    const spaceSelects = container!.querySelectorAll('select');
     // Should have: space selector, category selector, priority selector
     expect(spaceSelects.length).toBeGreaterThanOrEqual(3);
 
@@ -145,7 +164,7 @@ describe('Todo Space Change in Edit Modal', () => {
       return Promise.resolve({ ok: true, json: async () => [] });
     });
 
-    const { container } = render(<AIToDoListApp />);
+    const { container } = render(<AIToDoListApp user={mockAuthContext.user} token={mockAuthContext.token} onLogout={jest.fn()} />);
 
     // Wait for data to load
     await waitFor(() => {
@@ -220,7 +239,9 @@ describe('Todo Space Change in Edit Modal', () => {
       return Promise.resolve({ ok: true, json: async () => [] });
     });
 
-    render(<AIToDoListApp />);
+    await act(async () => {
+      render(<AIToDoListApp user={mockAuthContext.user} token={mockAuthContext.token} onLogout={jest.fn()} />);
+    });
 
     // Wait for data to load
     await waitFor(() => {
@@ -228,7 +249,9 @@ describe('Todo Space Change in Edit Modal', () => {
     });
 
     // Click on the todo to open edit modal
-    fireEvent.click(screen.getByText('Test todo'));
+    await act(async () => {
+      fireEvent.click(screen.getByText('Test todo'));
+    });
 
     // Wait for modal to appear
     await waitFor(() => {
@@ -238,16 +261,25 @@ describe('Todo Space Change in Edit Modal', () => {
     // Find and change the space selector
     const spaceLabel = screen.getByText('Space');
     const spaceSelect = spaceLabel.nextElementSibling as HTMLSelectElement;
-    fireEvent.change(spaceSelect, { target: { value: 'space2' } });
+    await act(async () => {
+      fireEvent.change(spaceSelect, { target: { value: 'space2' } });
+    });
 
-    // Click save
-    const saveButton = screen.getByText('Save');
-    fireEvent.click(saveButton);
+    // Click the Save button in the edit modal
+    // The edit modal's save button is associated with handleSaveTodoEdit
+    const editModal = screen.getByText('Edit Task').closest('[class*="fixed"]') || document.body;
+    const saveButton = Array.from(editModal.querySelectorAll('button')).find(
+      btn => btn.textContent === 'Save'
+    );
+    expect(saveButton).toBeTruthy();
+    await act(async () => {
+      fireEvent.click(saveButton!);
+    });
 
     // Wait for update request
     await waitFor(() => {
       const updateCalls = mockAuthContext.authenticatedFetch.mock.calls.filter(
-        (call) => call[0].includes('/todos/todo1') && call[1]?.method === 'PUT'
+        (call: any[]) => call[0].includes('/todos/todo1') && call[1]?.method === 'PUT'
       );
       expect(updateCalls.length).toBeGreaterThan(0);
     });
@@ -287,7 +319,7 @@ describe('Todo Space Change in Edit Modal', () => {
       return Promise.resolve({ ok: true, json: async () => [] });
     });
 
-    render(<AIToDoListApp />);
+    render(<AIToDoListApp user={mockAuthContext.user} token={mockAuthContext.token} onLogout={jest.fn()} />);
 
     // Wait for data to load
     await waitFor(() => {

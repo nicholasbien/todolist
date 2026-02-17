@@ -26,6 +26,7 @@ async def client():
     import categories
     import chats
     import db
+    import journals
     import spaces
     import todos
     from mongomock_motor import AsyncMongoMockClient
@@ -39,9 +40,11 @@ async def client():
     auth.users_collection = db.db.users
     auth.sessions_collection = db.db.sessions
     todos.todos_collection = db.db.todos
+    todos.db = db.db  # health_check() uses todos.db.command("ping")
     categories.categories_collection = db.db.categories
     spaces.spaces_collection = db.db.spaces
     chats.chats_collection = db.db.chats
+    journals.journals_collection = db.db.journals
 
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://testserver") as async_client:
         yield async_client

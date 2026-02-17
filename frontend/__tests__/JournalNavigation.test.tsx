@@ -26,7 +26,7 @@ describe('JournalComponent date navigation', () => {
   test('arrows change the selected date', () => {
     render(<JournalComponent token="token" activeSpace={null} />);
 
-    const dateInput = screen.getByLabelText('Date:') as HTMLInputElement;
+    const dateInput = screen.getByLabelText('Select journal date') as HTMLInputElement;
     const prevButton = screen.getByRole('button', { name: 'Previous day' });
     const nextButton = screen.getByRole('button', { name: 'Next day' });
 
