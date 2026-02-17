@@ -10,9 +10,13 @@ function MyApp({ Component, pageProps }: AppProps) {
     if ('serviceWorker' in navigator) {
       console.log('📱 Registering service worker...');
       navigator.serviceWorker
-        .register('/sw.js')
+        .register('/sw.js', { updateViaCache: 'none' })
         .then((registration) => {
           console.log('✅ Service Worker registered successfully:', registration);
+          // Force an update check in dev to avoid stale SW script caching.
+          registration.update().catch((err) => {
+            console.log('⚠️ Service Worker update check failed:', err);
+          });
         })
         .catch((registrationError) => {
           console.log('❌ Service Worker registration failed: ', registrationError);

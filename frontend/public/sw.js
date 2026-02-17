@@ -799,6 +799,16 @@ self.addEventListener('install', (event) => {
         resolve(null);
       }, ms))
     ]);
+  const isLocalhost = self.location?.hostname === 'localhost' || self.location?.hostname === '127.0.0.1';
+  if (isLocalhost) {
+    // Avoid dev server install hangs; run cache/DB init best-effort without blocking install.
+    cacheStaticFiles().catch((err) => console.log('⚠️ cacheStaticFiles failed:', err));
+    caches.open(API_CACHE).catch((err) => console.log('⚠️ caches.open failed:', err));
+    openGlobalDB().catch((err) => console.log('⚠️ openGlobalDB failed:', err));
+    event.waitUntil(Promise.resolve());
+    self.skipWaiting();
+    return;
+  }
   event.waitUntil(
     Promise.all([
       // Pre-cache static files with individual error handling
