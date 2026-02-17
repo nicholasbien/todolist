@@ -10,6 +10,7 @@ frontend/out/
 frontend/coverage/
 frontend/.DS_Store
 frontend/.claude/
+frontend/.pw-offline-profile/
 frontend/ios/App/.DS_Store
 frontend/tsconfig.tsbuildinfo
 mcp-server/node_modules/
