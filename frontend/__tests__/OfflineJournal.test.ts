@@ -259,9 +259,10 @@ describe('Offline Journal Functionality', () => {
 
     await sw.syncQueue();
 
-    // Verify queue was cleared even on failure (to prevent infinite retries)
+    // Failed op remains in queue with retryCount (per-operation deletion)
     const queue = await sw.readQueue('user1');
-    expect(queue.length).toBe(0);
+    expect(queue.length).toBe(1);
+    expect(queue[0].retryCount).toBe(1);
 
     // Verify offline journal is still preserved
     const journals = await sw.getJournals('user1');

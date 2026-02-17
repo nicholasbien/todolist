@@ -12,3 +12,5 @@ frontend/.claude/
 frontend/ios/App/.DS_Store
 frontend/tsconfig.tsbuildinfo
 mcp-server/node_modules/
+.pw-offline-profile/
+.playwright-mcp/
