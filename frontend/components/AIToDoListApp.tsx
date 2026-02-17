@@ -126,6 +126,10 @@ export default function AIToDoListApp({
   const [editSpaceId, setEditSpaceId] = useState<string>('');
   const [editSpaceCategories, setEditSpaceCategories] = useState<string[]>([]);
 
+  // Long-press to edit category
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressTriggeredRef = useRef(false);
+
   // Track latest fetch requests to avoid race conditions when switching spaces
   const todosFetchIdRef = useRef(0);
   const categoriesFetchIdRef = useRef(0);
@@ -1229,7 +1233,39 @@ export default function AIToDoListApp({
                 return (
                 <button
                   key={catName}
-                  onClick={() => setActiveCat(catName)}
+                  onClick={() => {
+                    if (longPressTriggeredRef.current) return;
+                    setActiveCat(catName);
+                  }}
+                  onContextMenu={(e) => {
+                    if (catName === 'General') return;
+                    e.preventDefault();
+                    setActiveCat(catName);
+                    setEditCatName(catName);
+                    setShowEditCategoryModal(true);
+                  }}
+                  onTouchStart={() => {
+                    longPressTriggeredRef.current = false;
+                    longPressTimerRef.current = setTimeout(() => {
+                      if (catName === 'General') return;
+                      longPressTriggeredRef.current = true;
+                      setActiveCat(catName);
+                      setEditCatName(catName);
+                      setShowEditCategoryModal(true);
+                    }, 500);
+                  }}
+                  onTouchEnd={() => {
+                    if (longPressTimerRef.current) {
+                      clearTimeout(longPressTimerRef.current);
+                      longPressTimerRef.current = null;
+                    }
+                  }}
+                  onTouchMove={() => {
+                    if (longPressTimerRef.current) {
+                      clearTimeout(longPressTimerRef.current);
+                      longPressTimerRef.current = null;
+                    }
+                  }}
                   className={`px-4 py-2 rounded-xl text-base transition-colors flex-shrink-0 ${
                     catName === activeCat
                       ? 'bg-accent text-foreground shadow-lg'
