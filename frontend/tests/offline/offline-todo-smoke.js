@@ -18,8 +18,15 @@ const CODE = process.env.TEST_CODE || '000000';
   await page.click('button:has-text("Send Verification Code")');
   await page.waitForSelector('input#code', { timeout: 20000 });
   await page.fill('input#code', CODE);
-  await page.waitForSelector('button:has-text("Verify Code")', { state: 'visible', timeout: 20000 });
-  await page.click('button:has-text("Verify Code")');
+  await page.waitForSelector('button:has-text("Sign In")', { state: 'visible', timeout: 20000 });
+  await page.click('button:has-text("Sign In")');
+
+  // Some accounts require a first-name step on first login.
+  if (await page.isVisible('input#firstName')) {
+    await page.fill('input#firstName', 'Test');
+    await page.click('button:has-text("Continue")');
+  }
+
   await page.waitForSelector('text=Tasks', { timeout: 20000 });
 
   await page.context().setOffline(true);
