@@ -1,7 +1,7 @@
 // IMPORTANT: Always increment these versions when modifying this service worker file
 // This forces browsers to download and use the updated service worker
-const STATIC_CACHE = 'todo-static-v115';
-const API_CACHE = 'todo-api-v115';
+const STATIC_CACHE = 'todo-static-v116';
+const API_CACHE = 'todo-api-v116';
 
 const GLOBAL_DB_NAME = 'TodoGlobalDB';
 const USER_DB_PREFIX = 'TodoUserDB_';
@@ -145,8 +145,6 @@ const getTodos = async (userId, spaceId = null) => {
   }
 };
 
-const putTodo};
-
 const putTodo = async (todo, userId) => {
   const authData = userId ? null : await getAuth();
   const effectiveUserId = userId || (authData ? authData.userId : null);
@@ -187,8 +185,6 @@ const getSpaces = async (userId) => {
   return spaces;
 };
 
-const putSpace};
-
 const putSpace = async (space, userId) => {
   const authData = userId ? null : await getAuth();
   const effectiveUserId = userId || (authData ? authData.userId : null);
@@ -220,8 +216,6 @@ const getCategories = async (userId, spaceId = null) => {
     return allCategories;
   }
 };
-
-const putCategory};
 
 const putCategory = async (category, userId) => {
   const authData = userId ? null : await getAuth();
@@ -326,8 +320,6 @@ const getJournals = async (userId, date = null, spaceId = null) => {
 
   return filteredJournals;
 };
-
-const putJournal};
 
 const putJournal = async (journal, userId) => {
   const authData = userId ? null : await getAuth();
@@ -799,12 +791,20 @@ async function syncServerDataToLocal() {
 }
 
 self.addEventListener('install', (event) => {
+  const withTimeout = (promise, ms, label) =>
+    Promise.race([
+      promise,
+      new Promise((resolve) => setTimeout(() => {
+        if (label) console.log(`⚠️ Install step timed out: ${label}`);
+        resolve(null);
+      }, ms))
+    ]);
   event.waitUntil(
     Promise.all([
       // Pre-cache static files with individual error handling
-      cacheStaticFiles(),
-      caches.open(API_CACHE),
-      openGlobalDB()
+      withTimeout(cacheStaticFiles(), 5000, 'cacheStaticFiles'),
+      withTimeout(caches.open(API_CACHE), 5000, 'caches.open(API_CACHE)'),
+      withTimeout(openGlobalDB(), 5000, 'openGlobalDB')
     ])
   );
   self.skipWaiting();
@@ -813,9 +813,14 @@ self.addEventListener('install', (event) => {
 // Helper function to cache static files with individual error handling
 async function cacheStaticFiles() {
   const cache = await caches.open(STATIC_CACHE);
+  const isLocalhost = self.location?.hostname === 'localhost' || self.location?.hostname === '127.0.0.1';
 
   // Cache files individually to avoid failing if one file is missing
   const cachePromises = STATIC_FILES.map(async (url) => {
+    if (isLocalhost && url === '/') {
+      console.log('ℹ️ Skipping caching / in localhost dev');
+      return null;
+    }
     try {
       const response = await fetch(url);
       if (response.ok) {
@@ -1859,11 +1864,17 @@ async function syncQueue() {
 
         if (res && res.status === 409) {
           const conflictId = generateOpId();
+          let serverPayload = null;
+          try {
+            serverPayload = await res.json();
+          } catch {
+            serverPayload = null;
+          }
           await userDbTx(authData.userId, CONFLICTS, 'readwrite', (s) => s.put({
             conflictId,
             entityType: op.entityType,
             clientId: op.clientId,
-            serverPayload: await res.json().catch(() => null),
+            serverPayload,
             localPayload: op.payload,
             detectedAt: new Date().toISOString(),
             resolution: null
