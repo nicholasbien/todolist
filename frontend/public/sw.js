@@ -1,11 +1,11 @@
 // IMPORTANT: Always increment these versions when modifying this service worker file
 // This forces browsers to download and use the updated service worker
-const STATIC_CACHE = 'todo-static-v114';
-const API_CACHE = 'todo-api-v114';
+const STATIC_CACHE = 'todo-static-v115';
+const API_CACHE = 'todo-api-v115';
 
 const GLOBAL_DB_NAME = 'TodoGlobalDB';
 const USER_DB_PREFIX = 'TodoUserDB_';
-const DB_VERSION = 11;
+const DB_VERSION = 12;
 
 // Configuration
 const CONFIG = {
@@ -17,6 +17,7 @@ const TODOS = 'todos';
 const CATEGORIES = 'categories';
 const SPACES = 'spaces';
 const QUEUE = 'queue';
+const ID_MAP = 'id_map';
 const AUTH = 'auth';
 const JOURNALS = 'journals';
 
@@ -65,6 +66,9 @@ function openUserDB(userId) {
       }
       if (!db.objectStoreNames.contains(QUEUE)) {
         db.createObjectStore(QUEUE, { keyPath: 'id', autoIncrement: true });
+      }
+      if (!db.objectStoreNames.contains(ID_MAP)) {
+        db.createObjectStore(ID_MAP, { keyPath: 'key' });
       }
       if (!db.objectStoreNames.contains(JOURNALS)) {
         db.createObjectStore(JOURNALS, { keyPath: '_id' });
@@ -264,7 +268,7 @@ const getIdMap = async (userId) => {
   const authData = userId ? null : await getAuth();
   const effectiveUserId = userId || (authData ? authData.userId : null);
   try {
-    const result = await userDbTx(effectiveUserId, QUEUE, 'readonly', (s) => s.get('idMap'));
+    const result = await userDbTx(effectiveUserId, ID_MAP, 'readonly', (s) => s.get('idMap'));
     return result ? result.mappings : {};
   } catch (e) {
     return {};
@@ -274,14 +278,14 @@ const getIdMap = async (userId) => {
 const putIdMap = async (idMap, userId) => {
   const authData = userId ? null : await getAuth();
   const effectiveUserId = userId || (authData ? authData.userId : null);
-  return userDbTx(effectiveUserId, QUEUE, 'readwrite', (s) => s.put({ id: 'idMap', mappings: idMap }));
+  return userDbTx(effectiveUserId, ID_MAP, 'readwrite', (s) => s.put({ key: 'idMap', mappings: idMap }));
 };
 
 const clearIdMap = async (userId) => {
   const authData = userId ? null : await getAuth();
   const effectiveUserId = userId || (authData ? authData.userId : null);
   try {
-    return userDbTx(effectiveUserId, QUEUE, 'readwrite', (s) => s.delete('idMap'));
+    return userDbTx(effectiveUserId, ID_MAP, 'readwrite', (s) => s.delete('idMap'));
   } catch (e) {
     // Ignore if doesn't exist
   }
@@ -689,7 +693,8 @@ async function handleApiRequest(request) {
               headers: { 'Content-Type': 'application/json' }
             });
           } else {
-            const serverTodos = await response.clone().json();
+            const serverPayload = await response.clone().json();
+            const serverTodos = Array.isArray(serverPayload) ? serverPayload : [];
 
             // Save all server todos to IndexedDB for offline access
             for (const todo of serverTodos) {
@@ -698,6 +703,18 @@ async function handleApiRequest(request) {
               }
             }
             console.log(`✅ Cached ${serverTodos.length} todos to IndexedDB`);
+
+            const localTodos = await getTodos(authData.userId, spaceId);
+            const offlineTodos = localTodos.filter(todo =>
+              (todo && todo._id && todo._id.startsWith('offline_')) || todo.created_offline
+            );
+            const serverIds = new Set(serverTodos.map(todo => todo && todo._id).filter(Boolean));
+            const mergedTodos = serverTodos.concat(offlineTodos.filter(todo => !serverIds.has(todo._id)));
+
+            return new Response(JSON.stringify(mergedTodos), {
+              status: 200,
+              headers: { 'Content-Type': 'application/json' }
+            });
           }
 
           return response; // Return original server response
@@ -1312,6 +1329,7 @@ async function syncQueue() {
     // Load persistent ID mapping
     let idMap = await getIdMap(authData.userId);
     // console.log('📋 Loaded ID mapping:', idMap);
+    const failedOps = [];
 
   for (const op of queue) {
     try {
@@ -1343,6 +1361,7 @@ async function syncQueue() {
               console.log(`✅ Synced offline todo ${offlineId} -> ${serverTodo._id}`);
             } else {
               console.log(`❌ Sync FAILED: Offline todo ${offlineId} will be preserved`);
+              failedOps.push(op);
             }
           }
           break;
@@ -1363,7 +1382,11 @@ async function syncQueue() {
             if (res && res.ok) {
               // Update local copy with the changes
               await putTodo({ ...op.data, _id: updateId }, authData.userId);
+            } else {
+              failedOps.push(op);
             }
+          } else {
+            failedOps.push(op);
           }
           break;
         case 'COMPLETE':
@@ -1392,7 +1415,11 @@ async function syncQueue() {
                 }
                 await putTodo(updated, authData.userId);
               }
+            } else {
+              failedOps.push(op);
             }
+          } else {
+            failedOps.push(op);
           }
           break;
         case 'DELETE':
@@ -1411,7 +1438,11 @@ async function syncQueue() {
             if (res && res.ok) {
               // Remove from local storage
               await delTodo(deleteId, authData.userId);
+            } else {
+              failedOps.push(op);
             }
+          } else {
+            failedOps.push(op);
           }
           break;
         case 'CREATE_CATEGORY':
@@ -1545,6 +1576,7 @@ async function syncQueue() {
       // Continue processing other operations on error
       // Failed operations remain in offline state until next sync attempt
       console.log('Sync operation failed:', err);
+      failedOps.push(op);
       continue;
     }
   }
@@ -1553,8 +1585,11 @@ async function syncQueue() {
     await putIdMap(idMap, authData.userId);
     // console.log('📋 Saved updated ID mapping:', idMap);
 
-    // Always clear queue after processing (prevents infinite retry loops)
+    // Clear queue then re-add failed operations for retry
     await clearQueue(authData.userId);
+    for (const op of failedOps) {
+      await addQueue(op, authData.userId);
+    }
     // console.log('Sync completed');
   } finally {
     syncInProgress = false;
