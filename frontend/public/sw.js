@@ -1,7 +1,7 @@
 // IMPORTANT: Always increment these versions when modifying this service worker file
 // This forces browsers to download and use the updated service worker
-const STATIC_CACHE = 'todo-static-v115';
-const API_CACHE = 'todo-api-v115';
+const STATIC_CACHE = 'todo-static-v116';
+const API_CACHE = 'todo-api-v116';
 
 const GLOBAL_DB_NAME = 'TodoGlobalDB';
 const USER_DB_PREFIX = 'TodoUserDB_';
@@ -773,11 +773,16 @@ async function handleApiRequest(request) {
               }
 
               // Remove stale local journals not present in server response (Bug 5 fix)
-              const serverJournalIdSet = new Set(serverJournals.filter(j => j && j._id).map(j => j._id));
-              const localJournals = await getJournals(authData.userId, null, spaceId);
-              for (const local of localJournals) {
-                if (!local._id.startsWith('offline_journal_') && !serverJournalIdSet.has(local._id)) {
-                  await delJournal(local._id, authData.userId);
+              // Only run cleanup on unfiltered fetches (no date param) to avoid
+              // deleting valid journals when response is a single date-filtered entry
+              const dateParam = url.searchParams.get('date');
+              if (!dateParam) {
+                const serverJournalIdSet = new Set(serverJournals.filter(j => j && j._id).map(j => j._id));
+                const localJournals = await getJournals(authData.userId, null, spaceId);
+                for (const local of localJournals) {
+                  if (!local._id.startsWith('offline_journal_') && !serverJournalIdSet.has(local._id)) {
+                    await delJournal(local._id, authData.userId);
+                  }
                 }
               }
 
@@ -829,9 +834,20 @@ async function handleApiRequest(request) {
         }
       }
 
-      // Trigger sync only for non-GET requests (Bug 7 fix: remove redundant GET sync calls)
-      if (response.ok && request.method !== 'GET') {
-        syncQueue();
+      // Trigger sync for non-GET requests, and also for GET requests if there are
+      // queued operations (so transient failures that didn't flip onLine still get retried)
+      if (response.ok) {
+        if (request.method !== 'GET') {
+          syncQueue();
+        } else {
+          // Lightweight check: only sync on GETs if queue is non-empty
+          getAuth().then(auth => {
+            if (!auth?.userId) return;
+            readQueue(auth.userId).then(q => {
+              if (q.length > 0) syncQueue();
+            });
+          }).catch(() => {});
+        }
       }
       return response;
     } catch (err) {
@@ -1335,6 +1351,7 @@ async function syncQueue() {
     try {
       let res;
       let success = false;
+      let deferred = false; // true = unmapped offline ID, leave in queue without retry increment
       switch (op.type) {
         case 'CREATE':
           if (op.data._id.startsWith('offline_')) {
@@ -1380,7 +1397,9 @@ async function syncQueue() {
               success = true;
             }
           } else {
-            success = true; // Skip unmapped offline IDs, remove from queue
+            // Unmapped offline ID — keep in queue until CREATE succeeds and mapping exists
+            deferred = true;
+            console.log(`⏳ Deferring UPDATE for unmapped offline ID: ${op.data._id}`);
           }
           break;
         case 'COMPLETE':
@@ -1410,7 +1429,9 @@ async function syncQueue() {
               success = true;
             }
           } else {
-            success = true; // Skip unmapped offline IDs, remove from queue
+            // Unmapped offline ID — keep in queue until CREATE succeeds and mapping exists
+            deferred = true;
+            console.log(`⏳ Deferring COMPLETE for unmapped offline ID: ${op.data._id}`);
           }
           break;
         case 'DELETE':
@@ -1430,7 +1451,9 @@ async function syncQueue() {
               success = true;
             }
           } else {
-            success = true; // Skip unmapped offline IDs, remove from queue
+            // Unmapped offline ID — keep in queue until CREATE succeeds and mapping exists
+            deferred = true;
+            console.log(`⏳ Deferring DELETE for unmapped offline ID: ${op.data._id}`);
           }
           break;
         case 'CREATE_CATEGORY':
@@ -1553,6 +1576,8 @@ async function syncQueue() {
       // Per-operation queue deletion (Bug 1 fix)
       if (success) {
         await removeQueueItem(op.id, authData.userId);
+      } else if (deferred) {
+        // Unmapped offline ID — leave in queue untouched, will retry after CREATE succeeds
       } else {
         // Increment retry count; drop after 3 failures
         const retryCount = (op.retryCount || 0) + 1;

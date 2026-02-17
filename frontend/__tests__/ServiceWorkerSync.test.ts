@@ -110,7 +110,7 @@ describe('Todo Operations', () => {
     });
   });
 
-  test('syncQueue skips offline IDs for UPDATE/DELETE/COMPLETE operations', async () => {
+  test('syncQueue defers unmapped offline IDs for UPDATE/DELETE/COMPLETE operations', async () => {
     const sw = require('../public/sw.js');
     await sw.putAuth('token123', 'user1');
 
@@ -125,12 +125,12 @@ describe('Todo Operations', () => {
 
     await sw.syncQueue();
 
-    // Should not make any API calls since all operations target offline IDs
+    // Should not make any API calls since all operations target unmapped offline IDs
     expect(fetch).toHaveBeenCalledTimes(0);
 
-    // Queue should still be cleared
+    // Ops should remain in queue waiting for ID mapping from their CREATE
     const queue = await sw.readQueue('user1');
-    expect(queue).toHaveLength(0);
+    expect(queue).toHaveLength(3);
   });
 });
 

@@ -218,7 +218,7 @@ describe('Bug 5: Stale data cleanup on GET responses', () => {
     expect(otherSpaceTodos[0]._id).toBe('server_other');
   });
 
-  test('stale journals removed after GET /journals', async () => {
+  test('stale journals removed after unfiltered GET /journals', async () => {
     const sw = require('../public/sw.js');
     await sw.putAuth('token123', 'user1');
 
@@ -228,7 +228,7 @@ describe('Bug 5: Stale data cleanup on GET responses', () => {
     await sw.putJournal(activeJournal, 'user1');
     await sw.putJournal(staleJournal, 'user1');
 
-    // Mock server returning only the active journal
+    // Mock server returning only the active journal (unfiltered request)
     global.fetch = jest.fn().mockResolvedValue({
       ok: true,
       json: async () => [activeJournal],
@@ -242,6 +242,7 @@ describe('Bug 5: Stale data cleanup on GET responses', () => {
     const origSync = sw.syncQueue;
     sw.syncQueue = jest.fn().mockResolvedValue(undefined);
 
+    // Unfiltered request (no date param) — should run stale cleanup
     const request = new Request('/journals?space_id=space1', { method: 'GET' });
     await sw.handleApiRequest(request);
 
@@ -250,6 +251,41 @@ describe('Bug 5: Stale data cleanup on GET responses', () => {
     const localJournals = await sw.getJournals('user1', null, 'space1');
     expect(localJournals.some((j: any) => j._id === 'journal_1')).toBe(true);
     expect(localJournals.some((j: any) => j._id === 'journal_old')).toBe(false);
+  });
+
+  test('date-filtered GET /journals does NOT delete other journals', async () => {
+    const sw = require('../public/sw.js');
+    await sw.putAuth('token123', 'user1');
+
+    // Pre-populate with journals for different dates
+    const dec1Journal = { _id: 'journal_dec1', date: '2024-12-01', space_id: 'space1', text: 'Dec 1' };
+    const dec2Journal = { _id: 'journal_dec2', date: '2024-12-02', space_id: 'space1', text: 'Dec 2' };
+    await sw.putJournal(dec1Journal, 'user1');
+    await sw.putJournal(dec2Journal, 'user1');
+
+    // Mock server returning only dec1 journal (date-filtered response)
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => dec1Journal,
+      clone: function() { return { json: async () => dec1Journal }; }
+    });
+
+    Object.defineProperty(global.navigator, 'onLine', { writable: true, value: true });
+    (global as any).self.location = { hostname: 'localhost' };
+
+    const origSync = sw.syncQueue;
+    sw.syncQueue = jest.fn().mockResolvedValue(undefined);
+
+    // Date-filtered request — should NOT run stale cleanup
+    const request = new Request('/journals?date=2024-12-01&space_id=space1', { method: 'GET' });
+    await sw.handleApiRequest(request);
+
+    sw.syncQueue = origSync;
+
+    // Both journals should still exist
+    const localJournals = await sw.getJournals('user1');
+    expect(localJournals.some((j: any) => j._id === 'journal_dec1')).toBe(true);
+    expect(localJournals.some((j: any) => j._id === 'journal_dec2')).toBe(true);
   });
 });
 
@@ -366,6 +402,62 @@ describe('Bug 7: Sync guard race condition', () => {
     // Only one sync should have processed the CREATE (the first one)
     // The follow-up sync should find an empty queue
     expect(fetchCallCount).toBe(1);
+  });
+});
+
+describe('PR Review Fix: Unmapped offline ops are deferred, not dropped', () => {
+  test('UPDATE/COMPLETE/DELETE for unmapped offline IDs stay in queue', async () => {
+    const sw = require('../public/sw.js');
+    await sw.putAuth('token123', 'user1');
+
+    // Queue a CREATE that will fail, plus dependent ops
+    const offlineTodo = { _id: 'offline_1', text: 'test', user_id: 'user1' };
+    await sw.putTodo(offlineTodo, 'user1');
+    await sw.addQueue({ type: 'CREATE', data: offlineTodo }, 'user1');
+    await sw.addQueue({ type: 'UPDATE', data: { _id: 'offline_1', text: 'updated', user_id: 'user1' } }, 'user1');
+    await sw.addQueue({ type: 'COMPLETE', data: { _id: 'offline_1', completed: true } }, 'user1');
+
+    // CREATE fails — no ID mapping created
+    global.fetch = jest.fn().mockResolvedValue({ ok: false, status: 500 });
+
+    await sw.syncQueue();
+
+    const queue = await sw.readQueue('user1');
+    // CREATE stays (retryCount 1), UPDATE stays (deferred), COMPLETE stays (deferred)
+    expect(queue).toHaveLength(3);
+    expect(queue.find((op: any) => op.type === 'CREATE').retryCount).toBe(1);
+    // UPDATE and COMPLETE should NOT have retryCount (they weren't attempted)
+    expect(queue.find((op: any) => op.type === 'UPDATE').retryCount).toBeUndefined();
+    expect(queue.find((op: any) => op.type === 'COMPLETE').retryCount).toBeUndefined();
+  });
+
+  test('deferred ops execute after CREATE succeeds in next sync', async () => {
+    const sw = require('../public/sw.js');
+    await sw.putAuth('token123', 'user1');
+
+    const offlineTodo = { _id: 'offline_1', text: 'test', completed: false, user_id: 'user1' };
+    await sw.putTodo(offlineTodo, 'user1');
+    await sw.addQueue({ type: 'CREATE', data: offlineTodo }, 'user1');
+    await sw.addQueue({ type: 'COMPLETE', data: { _id: 'offline_1', completed: true } }, 'user1');
+
+    // First sync: CREATE succeeds, COMPLETE gets deferred (mapping created mid-sync)
+    const serverTodo = { ...offlineTodo, _id: 'server_1' };
+    global.fetch = jest.fn().mockResolvedValue({ ok: true, json: async () => serverTodo });
+
+    await sw.syncQueue();
+
+    // Wait for follow-up sync (syncPending triggers it)
+    await new Promise(resolve => setTimeout(resolve, 100));
+
+    // After follow-up sync, COMPLETE should have been executed using the mapping
+    const queue = await sw.readQueue('user1');
+    expect(queue).toHaveLength(0);
+
+    // fetch should have been called: POST /todos (CREATE) + PUT /todos/server_1/complete (COMPLETE)
+    const fetchCalls = (fetch as jest.Mock).mock.calls;
+    const completeCalls = fetchCalls.filter(([url]: any) => url.includes('/complete'));
+    expect(completeCalls).toHaveLength(1);
+    expect(completeCalls[0][0]).toBe('http://localhost:8000/todos/server_1/complete');
   });
 });
 
