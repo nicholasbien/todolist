@@ -78,41 +78,52 @@ describe('Service Worker Route Synchronization', () => {
 
     if (missingRoutes.length > 0) {
       throw new Error(`Missing service worker routes for endpoints: ${missingRoutes.join(', ')}\n\n` +
-           `Add these to both route checks in public/sw.js:\n` +
-           missingRoutes.map(route => `url.pathname.startsWith('/${route}') ||`).join('\n'));
+           `Add these to the API_ROUTES array in public/sw.js:\n` +
+           missingRoutes.map(route => `'/${route}'`).join(', '));
     }
 
     expect(missingRoutes).toHaveLength(0);
   });
 
-  test('service worker routes are synchronized in both locations', () => {
-    // Extract routes from both isCapacitorLocal and isApi checks
+  test('isCapacitorLocal and isApi both use isApiPath (single source of truth)', () => {
+    // After the refactor, both checks use isApiPath() — no duplicated route lists
+    expect(serviceWorkerContent).toContain('isApiPath(url.pathname)');
+
+    // The old duplicated startsWith chains should be gone
     const capacitorRoutes = extractRoutesFromSection(serviceWorkerContent, 'isCapacitorLocal');
     const apiRoutes = extractRoutesFromSection(serviceWorkerContent, 'isApi');
 
-    console.log('Capacitor routes:', capacitorRoutes.sort());
-    console.log('API routes:', apiRoutes.sort());
-
-    // Both sections should have identical routes
-    expect(capacitorRoutes.sort()).toEqual(apiRoutes.sort());
+    // With isApiPath(), there are no inline startsWith calls in these sections
+    console.log('Inline capacitor routes (should be empty):', capacitorRoutes);
+    console.log('Inline API routes (should be empty):', apiRoutes);
+    expect(capacitorRoutes).toHaveLength(0);
+    expect(apiRoutes).toHaveLength(0);
   });
 
-  test('service worker cache versions are incremented format', () => {
+  test('API_ROUTES array is the single source of truth', () => {
+    const apiRoutesArray = extractApiRoutesArray(serviceWorkerContent);
+    expect(apiRoutesArray.length).toBeGreaterThan(0);
+    console.log('API_ROUTES:', apiRoutesArray.sort());
+
+    // Verify critical routes are in the array
+    const criticalPrefixes = ['todos', 'categories', 'spaces', 'journals', 'auth', 'agent'];
+    for (const prefix of criticalPrefixes) {
+      expect(apiRoutesArray).toContain(prefix);
+    }
+  });
+
+  test('service worker cache version is valid', () => {
     const staticCacheMatch = serviceWorkerContent.match(/STATIC_CACHE = 'todo-static-v(\d+)'/);
-    const apiCacheMatch = serviceWorkerContent.match(/API_CACHE = 'todo-api-v(\d+)'/);
 
     expect(staticCacheMatch).toBeTruthy();
-    expect(apiCacheMatch).toBeTruthy();
 
-    if (staticCacheMatch && apiCacheMatch) {
+    if (staticCacheMatch) {
       const staticVersion = parseInt(staticCacheMatch[1]);
-      const apiVersion = parseInt(apiCacheMatch[1]);
-
-      // Versions should be numbers and match each other
       expect(staticVersion).toBeGreaterThan(0);
-      expect(apiVersion).toBeGreaterThan(0);
-      expect(staticVersion).toBe(apiVersion);
     }
+
+    // API_CACHE has been removed — all caching uses IndexedDB
+    expect(serviceWorkerContent).not.toContain('API_CACHE');
   });
 
   test('all current endpoints are properly routed', () => {
@@ -164,20 +175,26 @@ function extractBackendEndpoints(content: string): string[] {
 }
 
 /**
- * Extract service worker routes from content
+ * Extract service worker routes from the API_ROUTES array (single source of truth)
  */
 function extractServiceWorkerRoutes(content: string): string[] {
+  return extractApiRoutesArray(content);
+}
+
+/**
+ * Parse the API_ROUTES array from sw.js
+ */
+function extractApiRoutesArray(content: string): string[] {
+  const match = content.match(/const API_ROUTES\s*=\s*\[([\s\S]*?)\]/);
+  if (!match) return [];
+
   const routes: string[] = [];
-
-  // Find all startsWith patterns in the isApi check
-  const startsWithRegex = /url\.pathname\.startsWith\('\/([^']+)'\)/g;
-  let match;
-
-  while ((match = startsWithRegex.exec(content)) !== null) {
-    routes.push(match[1]);
+  const routeRegex = /'\/([^']+)'/g;
+  let routeMatch;
+  while ((routeMatch = routeRegex.exec(match[1])) !== null) {
+    routes.push(routeMatch[1]);
   }
-
-  return [...new Set(routes)]; // Remove duplicates
+  return [...new Set(routes)];
 }
 
 /**

@@ -1,7 +1,6 @@
 // IMPORTANT: Always increment these versions when modifying this service worker file
 // This forces browsers to download and use the updated service worker
-const STATIC_CACHE = 'todo-static-v117';
-const API_CACHE = 'todo-api-v117';
+const STATIC_CACHE = 'todo-static-v118';
 
 const GLOBAL_DB_NAME = 'TodoGlobalDB';
 const USER_DB_PREFIX = 'TodoUserDB_';
@@ -22,6 +21,17 @@ const JOURNALS = 'journals';
 const ID_MAP = 'idmap';
 
 const DEFAULT_CATEGORIES = ['General'];
+
+// API route prefixes intercepted by the service worker.
+// Single source of truth — used by the fetch listener, tests, and route validation.
+const API_ROUTES = [
+  '/todos', '/categories', '/spaces', '/journals', '/insights',
+  '/agent', '/auth', '/email', '/contact', '/export', '/health'
+];
+
+function isApiPath(pathname) {
+  return API_ROUTES.some(route => pathname.startsWith(route));
+}
 
 // Static files to cache for offline use
 const STATIC_FILES = [
@@ -536,7 +546,6 @@ self.addEventListener('install', (event) => {
     Promise.all([
       // Pre-cache static files with individual error handling
       cacheStaticFiles(),
-      caches.open(API_CACHE),
       openGlobalDB()
     ])
   );
@@ -572,7 +581,7 @@ self.addEventListener('activate', (event) => {
       caches.keys().then((names) =>
         Promise.all(
           names.map((n) => {
-            if (![STATIC_CACHE, API_CACHE].includes(n)) return caches.delete(n);
+            if (n !== STATIC_CACHE) return caches.delete(n);
             return null;
           })
         )
@@ -590,32 +599,8 @@ self.addEventListener('fetch', (event) => {
 
   // Check if this is a same-origin request or a Capacitor file:// request
   const isSameOrigin = url.origin === self.location.origin;
-  const isCapacitorLocal = self.location.protocol === 'file:' &&
-                        (url.pathname.startsWith('/todos') ||
-                         url.pathname.startsWith('/categories') ||
-                         url.pathname.startsWith('/spaces') ||
-                         url.pathname.startsWith('/journals') ||
-                         url.pathname.startsWith('/insights') ||
-                         url.pathname.startsWith('/agent') ||
-                         url.pathname.startsWith('/auth') ||
-                         url.pathname.startsWith('/email') ||
-                         url.pathname.startsWith('/contact') ||
-                         url.pathname.startsWith('/export') ||
-                         url.pathname.startsWith('/health'));
-
-  // Handle all API requests including auth
-  const isApi = (isSameOrigin || isCapacitorLocal) &&
-                (url.pathname.startsWith('/todos') ||
-                 url.pathname.startsWith('/categories') ||
-                 url.pathname.startsWith('/spaces') ||
-                 url.pathname.startsWith('/journals') ||
-                 url.pathname.startsWith('/insights') ||
-                 url.pathname.startsWith('/agent') ||
-                 url.pathname.startsWith('/auth') ||
-                 url.pathname.startsWith('/email') ||
-                 url.pathname.startsWith('/contact') ||
-                 url.pathname.startsWith('/export') ||
-                 url.pathname.startsWith('/health'));
+  const isCapacitorLocal = self.location.protocol === 'file:' && isApiPath(url.pathname);
+  const isApi = (isSameOrigin || isCapacitorLocal) && isApiPath(url.pathname);
 
 
   // Special handling for /api/agent - pass through to Next.js instead of backend
@@ -635,225 +620,162 @@ self.addEventListener('fetch', (event) => {
   }
 });
 
-async function handleApiRequest(request) {
-  const online = self.navigator.onLine;
-  const url = new URL(request.url);
+// ── GET response caching handlers ─────────────────────────────
+// Each handler caches server GET responses into IndexedDB for offline access.
+// Auth is resolved once by the caller and passed in.
 
-
-  // Extract space_id from query parameters
+async function cacheGetTodos(url, response, authData) {
   const spaceId = url.searchParams.get('space_id');
+  const queue = await readQueue(authData.userId);
+  const hasPendingTodos = queue.some(op =>
+    op.type === 'CREATE' || op.type === 'UPDATE' || op.type === 'DELETE'
+  );
 
-  // Check if this is an offline-generated ID that shouldn't go to server
-  const pathParts = url.pathname.split('/');
-  const isOfflineId = pathParts.some(part => part.startsWith('offline_'));
+  if (syncInProgress || hasPendingTodos) {
+    console.log(`⏸️ BLOCKING todo server data - sync: ${syncInProgress}, pending: ${hasPendingTodos}`);
+    return; // Signal caller to return IndexedDB data instead
+  }
+
+  const serverTodos = await response.clone().json();
+  for (const todo of serverTodos) {
+    if (todo && todo._id) await putTodo(todo, authData.userId);
+  }
+
+  // Remove stale local todos not in server response (preserve offline_ IDs, scope to space)
+  const serverIdSet = new Set(serverTodos.map(t => t._id));
+  const localTodos = await getTodos(authData.userId, spaceId);
+  for (const local of localTodos) {
+    if (!local._id.startsWith('offline_') && !serverIdSet.has(local._id)) {
+      await delTodo(local._id, authData.userId);
+    }
+  }
+  console.log(`✅ Cached ${serverTodos.length} todos to IndexedDB`);
+  return 'cached';
+}
+
+async function cacheGetJournals(url, response, authData) {
+  const spaceId = url.searchParams.get('space_id');
+  const serverResponse = await response.clone().json();
+  if (serverResponse === null) return 'cached';
+
+  const queue = await readQueue(authData.userId);
+  const hasPendingJournals = queue.some(op =>
+    (op.type === 'CREATE_JOURNAL' || op.type === 'UPDATE_JOURNAL') &&
+    (op.data.space_id === spaceId || (!spaceId && !op.data.space_id))
+  );
+
+  if (syncInProgress || hasPendingJournals) {
+    console.log(`⏸️ BLOCKING journal server data - sync: ${syncInProgress}, pending: ${hasPendingJournals}`);
+  } else {
+    const serverJournals = Array.isArray(serverResponse) ? serverResponse : [serverResponse];
+    for (const journal of serverJournals) {
+      if (journal && journal._id && journal.date) await putJournal(journal, authData.userId);
+    }
+
+    // Only run stale cleanup on unfiltered fetches (no date param)
+    const dateParam = url.searchParams.get('date');
+    if (!dateParam) {
+      const serverJournalIdSet = new Set(serverJournals.filter(j => j && j._id).map(j => j._id));
+      const localJournals = await getJournals(authData.userId, null, spaceId);
+      for (const local of localJournals) {
+        if (!local._id.startsWith('offline_journal_') && !serverJournalIdSet.has(local._id)) {
+          await delJournal(local._id, authData.userId);
+        }
+      }
+    }
+  }
+
+  // Sync queued journal operations after caching
+  syncQueue().catch(err => console.error('Journal sync error:', err));
+  return 'cached';
+}
+
+async function cacheGetCategories(url, response, authData) {
+  const categories = await response.clone().json();
+  const spaceId = url.searchParams.get('space_id');
+  for (const categoryName of categories) {
+    await putCategory({ name: categoryName, space_id: spaceId }, authData.userId);
+  }
+  console.log(`📂 Cached ${categories.length} categories for space ${spaceId || 'all'} to IndexedDB`);
+  return 'cached';
+}
+
+async function cacheGetSpaces(url, response, authData) {
+  const spaces = await response.clone().json();
+  for (const space of spaces) {
+    if (space && space._id) await putSpace(space, authData.userId);
+  }
+  console.log(`🏢 Cached ${spaces.length} spaces to IndexedDB`);
+  return 'cached';
+}
+
+const GET_CACHE_HANDLERS = {
+  '/todos': cacheGetTodos,
+  '/journals': cacheGetJournals,
+  '/categories': cacheGetCategories,
+  '/spaces': cacheGetSpaces,
+};
+
+// ── Backend request construction ──────────────────────────────
+
+async function buildBackendRequest(request, url) {
+  const backendUrl = getBackendUrl();
+  const apiPath = url.pathname.replace(/^\//, '');
+  const targetUrl = `${backendUrl}/${apiPath}${url.search}`;
+
+  const noAuthRequired = ['/auth/signup', '/auth/login'];
+  const needsAuth = !noAuthRequired.includes(url.pathname);
+  const headers = needsAuth
+    ? await getAuthHeaders()
+    : { 'Content-Type': 'application/json' };
+
+  const proxyRequest = new Request(targetUrl, {
+    method: request.method,
+    headers,
+    body: request.method !== 'GET' && request.method !== 'HEAD' ? await request.blob() : null
+  });
+
+  return { targetUrl, proxyRequest };
+}
+
+// ── Main API request handler ──────────────────────────────────
+
+async function handleApiRequest(request) {
+  const url = new URL(request.url);
+  const online = self.navigator.onLine;
+  const isOfflineId = url.pathname.split('/').some(part => part.startsWith('offline_'));
 
   if (online && !isOfflineId) {
     try {
-      // For GET requests, we need to be careful about sync timing to preserve offline data
-      // Sync will be triggered after response handling to avoid overwriting offline changes
-
-      // Determine environment
-      const isCapacitor = self.location.protocol === 'file:';
-      const isProdHost = self.location.hostname.endsWith(CONFIG.PRODUCTION_DOMAIN);
-
-      // Route directly to backend
-      const apiPath = url.pathname.startsWith('/') ? url.pathname.slice(1) : url.pathname;
-      const queryString = url.search;
-
-      // Use production backend for deployed domains and Capacitor
-      const backendUrl = (isProdHost || isCapacitor)
-        ? CONFIG.PRODUCTION_BACKEND
-        : CONFIG.LOCAL_BACKEND;
-
-      const targetUrl = `${backendUrl}/${apiPath}${queryString}`;
-
-      // Forward the request with auth headers (except for signup/login endpoints)
-      const noAuthRequired = ['/auth/signup', '/auth/login'];
-      const needsAuth = !noAuthRequired.includes(url.pathname);
-      const headers = needsAuth
-        ? await getAuthHeaders()
-        : { 'Content-Type': 'application/json' };
-
-      const proxyRequest = new Request(targetUrl, {
-        method: request.method,
-        headers,
-        body: request.method !== 'GET' && request.method !== 'HEAD' ? await request.blob() : null
-      });
-
+      const { targetUrl, proxyRequest } = await buildBackendRequest(request, url);
       console.log(`🔗 Service worker routing: ${request.url} -> ${targetUrl}`);
-      console.log(`📱 Is Capacitor: ${isCapacitor}, Prod host: ${isProdHost}, Protocol: ${self.location.protocol}`);
+      const response = await fetch(proxyRequest);
 
-
-      let response;
-      try {
-        response = await fetch(proxyRequest);
-      } catch (error) {
-        throw error;
-      }
-
-      // Don't cache auth requests
+      // Cache GET responses to IndexedDB (skip auth endpoints)
       if (request.method === 'GET' && response.ok && !url.pathname.startsWith('/auth')) {
-        const cache = await caches.open(API_CACHE);
-        cache.put(request, response.clone());
-
-        // For GET /todos, sync pending operations then merge with fresh server data
-        if (url.pathname === '/todos') {
-          const authData = await getAuth();
-          if (!authData || !authData.userId) return response; // No user context
-
-          const spaceId = url.searchParams.get('space_id');
-
-          // Check if sync is in progress or there are pending todo operations
-          const queue = await readQueue(authData.userId);
-          // Simple conservative check: block for ANY pending todo operation
-          // This prevents race conditions regardless of space_id matching
-          const hasPendingTodos = queue.some(op =>
-            op.type === 'CREATE' || op.type === 'UPDATE' || op.type === 'DELETE'
-          );
-
-          if (syncInProgress || hasPendingTodos) {
-            console.log(`⏸️ BLOCKING todo server data - sync: ${syncInProgress}, pending: ${hasPendingTodos}`);
-            // Don't cache server data during sync to prevent race condition
-            // Instead, return current IndexedDB data to maintain UI consistency
-            const offlineTodos = await getTodos(authData.userId, spaceId);
-            console.log(`📦 Returning ${offlineTodos.length} todos from IndexedDB instead of server`);
-            return new Response(JSON.stringify(offlineTodos), {
-              status: 200,
-              headers: { 'Content-Type': 'application/json' }
-            });
-          } else {
-            const serverTodos = await response.clone().json();
-
-            // Save all server todos to IndexedDB for offline access
-            for (const todo of serverTodos) {
-              if (todo && todo._id) {
-                await putTodo(todo, authData.userId);
-              }
+        const authData = await getAuth();
+        if (authData && authData.userId) {
+          const handler = GET_CACHE_HANDLERS[url.pathname];
+          if (handler) {
+            const result = await handler(url, response, authData);
+            // If cacheGetTodos blocked (pending ops), return IndexedDB data instead
+            if (!result && url.pathname === '/todos') {
+              const spaceId = url.searchParams.get('space_id');
+              const offlineTodos = await getTodos(authData.userId, spaceId);
+              return new Response(JSON.stringify(offlineTodos), {
+                status: 200,
+                headers: { 'Content-Type': 'application/json' }
+              });
             }
-
-            // Remove stale local todos not present in server response (Bug 5 fix)
-            // Only remove server-origin IDs; preserve offline_ IDs; scope to current space
-            const serverIdSet = new Set(serverTodos.map(t => t._id));
-            const localTodos = await getTodos(authData.userId, spaceId);
-            for (const local of localTodos) {
-              if (!local._id.startsWith('offline_') && !serverIdSet.has(local._id)) {
-                await delTodo(local._id, authData.userId);
-              }
-            }
-
-            console.log(`✅ Cached ${serverTodos.length} todos to IndexedDB`);
           }
-
-          return response; // Return original server response
-        }
-
-        // For GET /journals, sync server data to IndexedDB
-        if (url.pathname === '/journals') {
-          const authData = await getAuth();
-          if (!authData || !authData.userId) {
-            console.log('⚠️ No auth data for journal caching');
-            return response; // No user context
-          }
-
-          const serverResponse = await response.clone().json();
-
-          // Only process non-null responses
-          if (serverResponse !== null) {
-            // Simple approach: Don't cache ANY server journal data if sync is in progress or there's pending data
-            const queue = await readQueue(authData.userId);
-            console.log(`🔍 JOURNAL DEBUG - Queue length: ${queue.length}, User: ${authData.userId}`);
-            console.log(`🔍 JOURNAL DEBUG - Queue contents:`, queue.map(op => `${op.type}:${op.data.date}`));
-
-            const hasPendingJournals = queue.some(op =>
-              (op.type === 'CREATE_JOURNAL' || op.type === 'UPDATE_JOURNAL') &&
-              (op.data.space_id === spaceId || (!spaceId && !op.data.space_id))
-            );
-            console.log(`🔍 JOURNAL DEBUG - Pending journals for space ${spaceId}: ${hasPendingJournals}`);
-            console.log(`🔍 JOURNAL DEBUG - Sync in progress: ${syncInProgress}`);
-
-            if (syncInProgress || hasPendingJournals) {
-              console.log(`⏸️ BLOCKING journal server data - sync: ${syncInProgress}, pending: ${hasPendingJournals}`);
-              // Don't cache server data, return original response
-            } else {
-              // Safe to cache server data
-              const serverJournals = Array.isArray(serverResponse) ? serverResponse : [serverResponse];
-              let cachedCount = 0;
-              for (const journal of serverJournals) {
-                if (journal && journal._id && journal.date) {
-                  await putJournal(journal, authData.userId);
-                  cachedCount++;
-                }
-              }
-
-              // Remove stale local journals not present in server response (Bug 5 fix)
-              // Only run cleanup on unfiltered fetches (no date param) to avoid
-              // deleting valid journals when response is a single date-filtered entry
-              const dateParam = url.searchParams.get('date');
-              if (!dateParam) {
-                const serverJournalIdSet = new Set(serverJournals.filter(j => j && j._id).map(j => j._id));
-                const localJournals = await getJournals(authData.userId, null, spaceId);
-                for (const local of localJournals) {
-                  if (!local._id.startsWith('offline_journal_') && !serverJournalIdSet.has(local._id)) {
-                    await delJournal(local._id, authData.userId);
-                  }
-                }
-              }
-
-              if (cachedCount > 0) {
-                console.log(`📝 Cached ${cachedCount} journal(s) to IndexedDB`);
-              }
-            }
-          } else {
-            console.log('📝 No journal data to cache');
-          }
-
-          // Now sync queued journal operations after response caching to preserve offline changes
-          if (url.pathname === '/journals' && request.method === 'GET') {
-            console.log(`🔄 Syncing journal queue after GET response caching`);
-            syncQueue().catch(err => console.error('Journal sync error:', err));
-          }
-
-          return response; // Return original response
-        }
-
-        // For GET /categories, store in IndexedDB
-        if (url.pathname === '/categories') {
-          const authData = await getAuth();
-          if (authData?.userId) {
-            const categories = await response.clone().json();
-            const spaceId = url.searchParams.get('space_id');
-            // Store each category with space_id
-            for (const categoryName of categories) {
-              await putCategory({ name: categoryName, space_id: spaceId }, authData.userId);
-            }
-            console.log(`📂 Cached ${categories.length} categories for space ${spaceId || 'all'} to IndexedDB`);
-          }
-          return response;
-        }
-
-        // For GET /spaces, store in IndexedDB
-        if (url.pathname === '/spaces') {
-          const authData = await getAuth();
-          if (authData?.userId) {
-            const spaces = await response.clone().json();
-            for (const space of spaces) {
-              if (space?._id) {
-                await putSpace(space, authData.userId);
-              }
-            }
-            console.log(`🏢 Cached ${spaces.length} spaces to IndexedDB`);
-          }
-          return response;
         }
       }
 
-      // Trigger sync for non-GET requests, and also for GET requests if there are
-      // queued operations (so transient failures that didn't flip onLine still get retried)
+      // Trigger sync for writes, and for reads if queue has pending ops
       if (response.ok) {
         if (request.method !== 'GET') {
           syncQueue();
         } else {
-          // Lightweight check: only sync on GETs if queue is non-empty
           getAuth().then(auth => {
             if (!auth?.userId) return;
             readQueue(auth.userId).then(q => {
@@ -1681,6 +1603,14 @@ if (typeof module !== 'undefined') {
     syncQueue,
     handleRequest: handleApiRequest,
     handleApiRequest,
+    buildBackendRequest,
+    isApiPath,
+    API_ROUTES,
+    GET_CACHE_HANDLERS,
+    cacheGetTodos,
+    cacheGetJournals,
+    cacheGetCategories,
+    cacheGetSpaces,
     generateInsights,
   };
 }

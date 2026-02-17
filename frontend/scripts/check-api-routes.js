@@ -70,9 +70,9 @@ console.log('================');
 
 if (missingRoutes.length > 0) {
   console.log(`❌ Missing routes: ${missingRoutes.join(', ')}`);
-  console.log('\n📝 Add these to public/sw.js in BOTH isCapacitorLocal and isApi checks:');
+  console.log('\n📝 Add these to the API_ROUTES array in public/sw.js:');
   missingRoutes.forEach(route => {
-    console.log(`   url.pathname.startsWith('/${route}') ||`);
+    console.log(`   '/${route}',`);
   });
 } else {
   console.log('✅ All required routes are present');
@@ -85,29 +85,21 @@ if (extraRoutes.length > 0) {
   console.log('✅ No extra routes found');
 }
 
-// Check cache version consistency
+// Check cache version
 const staticCacheMatch = swContent.match(/STATIC_CACHE = 'todo-static-v(\d+)'/);
-const apiCacheMatch = swContent.match(/API_CACHE = 'todo-api-v(\d+)'/);
 
-if (staticCacheMatch && apiCacheMatch) {
+if (staticCacheMatch) {
   const staticVersion = parseInt(staticCacheMatch[1]);
-  const apiVersion = parseInt(apiCacheMatch[1]);
-
-  console.log(`\n📦 Cache Versions: static=v${staticVersion}, api=v${apiVersion}`);
-
-  if (staticVersion !== apiVersion) {
-    console.log('❌ Cache versions don\'t match!');
-  } else {
-    console.log('✅ Cache versions synchronized');
-  }
+  console.log(`\n📦 Cache Version: static=v${staticVersion}`);
+  console.log('✅ Cache version found (API_CACHE removed — IndexedDB used for all caching)');
 } else {
-  console.log('❌ Could not find cache version patterns');
+  console.log('❌ Could not find STATIC_CACHE version pattern');
 }
 
 // Summary
 console.log('\n📊 Summary:');
 console.log('===========');
-if (missingRoutes.length === 0 && staticCacheMatch && apiCacheMatch) {
+if (missingRoutes.length === 0 && staticCacheMatch) {
   console.log('✅ All checks passed! API routing is properly configured.');
 } else {
   console.log('⚠️  Issues found that need attention.');
@@ -134,16 +126,17 @@ function extractBackendEndpoints(content) {
 }
 
 /**
- * Extract service worker routes from content
+ * Extract service worker routes from the API_ROUTES array
  */
 function extractServiceWorkerRoutes(content) {
-  const routes = [];
-  const startsWithRegex = /url\.pathname\.startsWith\('\/([^']+)'\)/g;
-  let match;
+  const arrayMatch = content.match(/const API_ROUTES\s*=\s*\[([\s\S]*?)\]/);
+  if (!arrayMatch) return [];
 
-  while ((match = startsWithRegex.exec(content)) !== null) {
+  const routes = [];
+  const routeRegex = /'\/([^']+)'/g;
+  let match;
+  while ((match = routeRegex.exec(arrayMatch[1])) !== null) {
     routes.push(match[1]);
   }
-
-  return [...new Set(routes)]; // Remove duplicates
+  return [...new Set(routes)];
 }
