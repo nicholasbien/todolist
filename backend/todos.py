@@ -295,7 +295,12 @@ async def migrate_legacy_todos() -> None:
 
 async def health_check():
     try:
-        await db.command("ping")
+        # Try ping first, fall back to listing collections for mock DBs
+        try:
+            await db.command("ping")
+        except (TypeError, AttributeError, NotImplementedError):
+            # mongomock doesn't support db.command; verify connectivity another way
+            await db.list_collection_names()
         return {"status": "healthy", "database": "connected"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database connection error: {str(e)}")

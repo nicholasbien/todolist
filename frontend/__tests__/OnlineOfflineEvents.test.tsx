@@ -24,7 +24,9 @@ Object.defineProperty(navigator, 'serviceWorker', {
     },
     getRegistration: jest.fn().mockResolvedValue({
       update: jest.fn()
-    })
+    }),
+    addEventListener: jest.fn(),
+    removeEventListener: jest.fn(),
   },
   configurable: true
 });

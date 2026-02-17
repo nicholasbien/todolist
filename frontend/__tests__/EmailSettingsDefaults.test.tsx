@@ -11,7 +11,9 @@ jest.mock('../context/AuthContext', () => {
 Object.defineProperty(navigator, 'serviceWorker', {
   value: {
     controller: { postMessage: jest.fn() },
-    getRegistration: jest.fn().mockResolvedValue({ update: jest.fn() })
+    getRegistration: jest.fn().mockResolvedValue({ update: jest.fn() }),
+    addEventListener: jest.fn(),
+    removeEventListener: jest.fn(),
   },
   configurable: true
 });

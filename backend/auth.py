@@ -479,7 +479,7 @@ async def delete_user_account(user_id: str) -> dict:
         logger.info(f"Deleted {todos_result.deleted_count} todos for user {user_email}")
 
         # 2. Delete all journals owned by this user
-        journals_result = await collections.journals.delete_many({"user_id": user_object_id})
+        journals_result = await collections.journals.delete_many({"user_id": user_id})
         logger.info(f"Deleted {journals_result.deleted_count} journals for user {user_email}")
 
         # 3. Get all spaces owned by this user to delete their categories
@@ -508,7 +508,7 @@ async def delete_user_account(user_id: str) -> dict:
         logger.info(f"Removed user {user_email} from {pending_spaces_result.modified_count} pending invites")
 
         # 7. Delete all sessions for this user
-        sessions_result = await sessions_collection.delete_many({"user_id": user_object_id})
+        sessions_result = await sessions_collection.delete_many({"user_id": user_id})
         logger.info(f"Deleted {sessions_result.deleted_count} sessions for user {user_email}")
 
         # 8. Finally, delete the user account itself

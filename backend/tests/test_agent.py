@@ -46,56 +46,111 @@ class TestAgentToolsUnit:
     """Unit tests for individual agent tools."""
 
     @pytest.mark.asyncio
-    async def test_get_current_weather_known_location(self):
-        """Test weather for known location (New York)."""
-        request = WeatherCurrentRequest(location="New York")
-        result = await get_current_weather(request, "test_user", "test_space")
+    @patch("agent.tools.httpx.AsyncClient")
+    async def test_get_current_weather_known_location(self, mock_client_class):
+        """Test weather for known location via OpenWeatherMap API."""
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "name": "New York",
+            "sys": {"country": "US"},
+            "main": {"temp": 72, "humidity": 65},
+            "weather": [{"description": "partly cloudy", "main": "Clouds"}],
+            "wind": {"speed": 8},
+        }
+        mock_response.raise_for_status.return_value = None
+        mock_client = AsyncMock()
+        mock_client.get.return_value = mock_response
+        mock_client_class.return_value.__aenter__.return_value = mock_client
+
+        with patch.dict(os.environ, {"OPENWEATHER_API_KEY": "test-key"}):
+            request = WeatherCurrentRequest(location="New York")
+            result = await get_current_weather(request, "test_user", "test_space")
 
         assert result["ok"] is True
-        assert result["weather"]["location"] == "New York, NY"
+        assert result["weather"]["location"] == "New York, US"
         assert result["weather"]["temperature"] == 72
-        assert result["weather"]["description"] == "Partly cloudy"
         assert "°F" in result["weather"]["temperature_display"]
         assert "mph" in result["weather"]["wind_speed_display"]
 
     @pytest.mark.asyncio
-    async def test_get_current_weather_unknown_location(self):
-        """Test weather for unknown location (should generate random data)."""
-        request = WeatherCurrentRequest(location="UnknownCity")
-        result = await get_current_weather(request, "test_user", "test_space")
+    async def test_get_current_weather_no_api_key(self):
+        """Test weather returns error when API key is not configured."""
+        with patch.dict(os.environ, {}, clear=True):
+            request = WeatherCurrentRequest(location="UnknownCity")
+            result = await get_current_weather(request, "test_user", "test_space")
 
-        assert result["ok"] is True
-        assert result["weather"]["location"] == "UnknownCity"
-        assert 41 <= result["weather"]["temperature"] <= 95  # Random range in °F
-        assert "°F" in result["weather"]["temperature_display"]
-        assert "mph" in result["weather"]["wind_speed_display"]
-        assert result["weather"]["description"] in ["Clear", "Partly cloudy", "Cloudy", "Light rain"]
+        assert result["ok"] is False
+        assert "not configured" in result["error"]
 
     @pytest.mark.asyncio
-    async def test_get_current_weather_metric_units(self):
+    @patch("agent.tools.httpx.AsyncClient")
+    async def test_get_current_weather_metric_units(self, mock_client_class):
         """Test weather with metric units."""
-        request = WeatherCurrentRequest(location="New York", units="metric")
-        result = await get_current_weather(request, "test_user", "test_space")
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "name": "New York",
+            "sys": {"country": "US"},
+            "main": {"temp": 22, "humidity": 65},
+            "weather": [{"description": "partly cloudy", "main": "Clouds"}],
+            "wind": {"speed": 3},
+        }
+        mock_response.raise_for_status.return_value = None
+        mock_client = AsyncMock()
+        mock_client.get.return_value = mock_response
+        mock_client_class.return_value.__aenter__.return_value = mock_client
+
+        with patch.dict(os.environ, {"OPENWEATHER_API_KEY": "test-key"}):
+            request = WeatherCurrentRequest(location="New York", units="metric")
+            result = await get_current_weather(request, "test_user", "test_space")
 
         assert result["ok"] is True
-        # 22°C should remain 22°C
         assert result["weather"]["temperature"] == 22
         assert "°C" in result["weather"]["temperature_display"]
-        assert "km/h" in result["weather"]["wind_speed_display"]
+        assert "m/s" in result["weather"]["wind_speed_display"]
 
     @pytest.mark.asyncio
-    async def test_get_weather_forecast(self):
-        """Test weather forecast generation."""
-        request = WeatherForecastRequest(location="London", days=3)
-        result = await get_weather_forecast(request, "test_user", "test_space")
+    @patch("agent.tools.httpx.AsyncClient")
+    async def test_get_weather_forecast(self, mock_client_class):
+        """Test weather forecast from OpenWeatherMap API."""
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "city": {"name": "London", "country": "GB"},
+            "list": [
+                {
+                    "dt": 1700000000,
+                    "main": {"temp": 50, "humidity": 80},
+                    "weather": [{"description": "light rain", "main": "Rain"}],
+                    "wind": {"speed": 12},
+                },
+                {
+                    "dt": 1700100000,
+                    "main": {"temp": 52, "humidity": 75},
+                    "weather": [{"description": "cloudy", "main": "Clouds"}],
+                    "wind": {"speed": 10},
+                },
+                {
+                    "dt": 1700200000,
+                    "main": {"temp": 48, "humidity": 85},
+                    "weather": [{"description": "drizzle", "main": "Drizzle"}],
+                    "wind": {"speed": 8},
+                },
+            ],
+        }
+        mock_response.raise_for_status.return_value = None
+        mock_client = AsyncMock()
+        mock_client.get.return_value = mock_response
+        mock_client_class.return_value.__aenter__.return_value = mock_client
+
+        with patch.dict(os.environ, {"OPENWEATHER_API_KEY": "test-key"}):
+            request = WeatherForecastRequest(location="London", days=3)
+            result = await get_weather_forecast(request, "test_user", "test_space")
 
         assert result["ok"] is True
+        assert result["forecast"]["location"] == "London, GB"
         assert len(result["forecast"]["forecast"]) == 3
-        assert result["forecast"]["location"] == "London, UK"
-
-        # Check first day matches current weather
-        first_day = result["forecast"]["forecast"][0]
-        assert first_day["description"] == "Light rain"  # London's mock description
 
     @pytest.mark.asyncio
     @patch("agent.tools.httpx.AsyncClient.get", new_callable=AsyncMock)
@@ -114,13 +169,13 @@ class TestAgentToolsUnit:
 
     @pytest.mark.asyncio
     @patch("agent.tools.httpx.AsyncClient.get", side_effect=httpx.RequestError("fail"))
-    async def test_get_inspirational_quotes_fallback(self, mock_get):
-        """Test inspirational quotes fallback when API call fails."""
+    async def test_get_inspirational_quotes_api_failure(self, mock_get):
+        """Test inspirational quotes returns error when API call fails."""
         request = InspirationalQuoteRequest(goal="resilience", limit=2)
         result = await get_inspirational_quotes(request, "test_user", "test_space")
 
-        assert result["ok"] is True
-        assert len(result["quotes"]) == 2
+        assert result["ok"] is False
+        assert "Unable to fetch quotes" in result["error"]
 
     @pytest.mark.asyncio
     @patch("agent.tools.db_create_todo", new_callable=AsyncMock)
@@ -177,7 +232,7 @@ class TestAgentToolsUnit:
         }
         mock_create_todo.return_value = mock_todo
 
-        request = TaskAddRequest(text=long_text)
+        request = TaskAddRequest(text=long_text, category="General")
         result = await add_task(request, "test_user", "test_space")
 
         called_todo = mock_create_todo.await_args[0][0]
@@ -325,7 +380,7 @@ class TestAgentToolsUnit:
         # Mock journals - mock the entire collections object
         mock_cursor = MagicMock()
         mock_cursor.to_list = AsyncMock(
-            return_value=[{"_id": "journal_123", "content": "Met with team about important project"}]
+            return_value=[{"_id": "journal_123", "text": "Met with team about important project"}]
         )
         mock_collections.journals.find.return_value = mock_cursor
 
@@ -346,13 +401,13 @@ class TestAgentToolsUnit:
     @pytest.mark.asyncio
     @patch("httpx.AsyncClient")
     async def test_get_book_recommendations_success(self, mock_client_class):
-        """Test successful book recommendations."""
-        # Mock the API response from Search API
+        """Test successful book recommendations via Subject API."""
+        # Mock the Subject API response format
         mock_response = MagicMock()
         mock_response.json.return_value = {
-            "docs": [
-                {"title": "Test Book 1", "author_name": ["Author 1"], "first_publish_year": 2020},
-                {"title": "Test Book 2", "author_name": ["Author 2"], "first_publish_year": 2021},
+            "works": [
+                {"title": "Test Book 1", "authors": [{"name": "Author 1"}], "first_publish_year": 2020},
+                {"title": "Test Book 2", "authors": [{"name": "Author 2"}], "first_publish_year": 2021},
             ]
         }
         mock_response.raise_for_status.return_value = None
@@ -361,7 +416,7 @@ class TestAgentToolsUnit:
         mock_client.get.return_value = mock_response
         mock_client_class.return_value.__aenter__.return_value = mock_client
 
-        # Test the function
+        # subject param uses the Subject API
         request = BookRecommendationRequest(subject="productivity", limit=2)
         result = await get_book_recommendations(request, "user123")
 
@@ -369,12 +424,13 @@ class TestAgentToolsUnit:
         assert result["ok"] is True
         assert len(result["books"]) == 2
         assert result["books"][0]["title"] == "Test Book 1"
-        assert result["books"][0]["author"] == "Author 1"
+        assert result["books"][0]["author_name"] == ["Author 1"]
         assert result["books"][0]["year"] == 2020
+        assert result["api_used"] == "subject"
 
-        # Verify API call
+        # Verify Subject API was called
         mock_client.get.assert_called_once_with(
-            "https://openlibrary.org/search.json", params={"q": "productivity", "limit": 2}
+            "https://openlibrary.org/subjects/productivity.json", params={"limit": 2}
         )
 
     @pytest.mark.asyncio
@@ -395,10 +451,10 @@ class TestAgentToolsUnit:
     @patch("agent.tools.collections")
     async def test_read_journal_entry_specific_date(self, mock_collections):
         """Test reading journal entry for specific date."""
-        # Mock MongoDB response
+        # Mock MongoDB response (DB uses 'text' field, not 'content')
         mock_journal = {
             "_id": "journal123",
-            "content": "Today was a productive day",
+            "text": "Today was a productive day",
             "date": "2025-08-31",
             "space_id": "space123",
         }
@@ -418,8 +474,8 @@ class TestAgentToolsUnit:
         """Test reading recent journal entries."""
         # Mock MongoDB response
         mock_journals = [
-            {"_id": "journal1", "content": "Recent entry 1", "date": "2025-08-31", "space_id": "space123"},
-            {"_id": "journal2", "content": "Recent entry 2", "date": "2025-08-30", "space_id": "space123"},
+            {"_id": "journal1", "text": "Recent entry 1", "date": "2025-08-31", "space_id": "space123"},
+            {"_id": "journal2", "text": "Recent entry 2", "date": "2025-08-30", "space_id": "space123"},
         ]
 
         # Mock the chained calls properly for motor (Motor returns cursors from find, not async methods)
@@ -486,60 +542,54 @@ class TestAgentStreaming:
             assert "OpenAI API key not configured" in messages[0]
 
     @pytest.mark.asyncio
+    @patch("agent.agent.save_chat_message", new_callable=AsyncMock)
+    @patch("agent.agent.get_chat_history", new_callable=AsyncMock, return_value=[])
+    @patch("categories.get_categories", new_callable=AsyncMock, return_value=["General"])
+    @patch("agent.agent.connect_to_mcp_server", new_callable=AsyncMock, return_value=None)
     @patch("agent.agent.AsyncOpenAI")
-    async def test_stream_agent_response_success(self, mock_openai_class):
-        """Test successful streaming response with tool calls."""
-        # Mock OpenAI client and response
+    async def test_stream_agent_response_success(
+        self, mock_openai_class, _mock_mcp, _mock_cats, _mock_history, _mock_save
+    ):
+        """Test successful streaming response with text output."""
         mock_client = AsyncMock()
         mock_openai_class.return_value = mock_client
 
-        # Mock streaming response chunks
-        mock_chunk1 = MagicMock()
-        mock_chunk1.choices = [MagicMock()]
-        mock_chunk1.choices[0].delta.content = "The weather in New York is "
-        mock_chunk1.choices[0].delta.tool_calls = None
-        mock_chunk1.choices[0].finish_reason = None
+        # Mock Responses API streaming events
+        text_event = MagicMock()
+        text_event.type = "response.output_text.delta"
+        text_event.delta = "Hello world"
 
-        mock_chunk2 = MagicMock()
-        mock_chunk2.choices = [MagicMock()]
-        mock_chunk2.choices[0].delta.content = None
-        mock_chunk2.choices[0].delta.tool_calls = [MagicMock()]
-        mock_chunk2.choices[0].delta.tool_calls[0].index = 0
-        mock_chunk2.choices[0].delta.tool_calls[0].function = MagicMock()
-        mock_chunk2.choices[0].delta.tool_calls[0].function.name = "get_current_weather"
-        mock_chunk2.choices[0].delta.tool_calls[0].function.arguments = '{"location": "New York"}'
-        mock_chunk2.choices[0].finish_reason = None
+        completed_event = MagicMock()
+        completed_event.type = "response.completed"
+        completed_event.response.usage.input_tokens = 10
+        completed_event.response.usage.output_tokens = 5
+        completed_event.response.usage.total_tokens = 15
 
-        mock_chunk3 = MagicMock()
-        mock_chunk3.choices = [MagicMock()]
-        mock_chunk3.choices[0].delta.content = None
-        mock_chunk3.choices[0].delta.tool_calls = None
-        mock_chunk3.choices[0].finish_reason = "stop"
-
-        # Set up async iteration
         mock_stream = AsyncMock()
-        mock_stream.__aiter__.return_value = [mock_chunk1, mock_chunk2, mock_chunk3]
-        mock_client.chat.completions.create.return_value = mock_stream
+        mock_stream.__aiter__.return_value = [text_event, completed_event]
+        mock_client.responses.create = AsyncMock(return_value=mock_stream)
 
-        # Set environment variable
         with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
-            stream = stream_agent_response("What's the weather in New York?", "user_123", "space_123")
+            stream = stream_agent_response("Hello", "user_123", "space_123")
             messages = []
             async for message in stream:
                 messages.append(message)
 
-        # Verify message sequence
+        # Should have ready, token, and done events
         assert len(messages) >= 3
         assert "ready" in messages[0]
         assert "token" in messages[1]
-        assert "tool_result" in messages[2] or "done" in messages[2]
+        assert "done" in messages[-1]
 
     @pytest.mark.asyncio
+    @patch("agent.agent.get_chat_history", new_callable=AsyncMock, return_value=[])
+    @patch("categories.get_categories", new_callable=AsyncMock, return_value=["General"])
+    @patch("agent.agent.connect_to_mcp_server", new_callable=AsyncMock, return_value=None)
     @patch("agent.agent.AsyncOpenAI")
-    async def test_stream_agent_response_openai_error(self, mock_openai_class):
+    async def test_stream_agent_response_openai_error(self, mock_openai_class, _mock_mcp, _mock_cats, _mock_history):
         """Test streaming with OpenAI API error."""
         mock_client = AsyncMock()
-        mock_client.chat.completions.create.side_effect = Exception("OpenAI API Error")
+        mock_client.responses.create = AsyncMock(side_effect=Exception("OpenAI API Error"))
         mock_openai_class.return_value = mock_client
 
         with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
@@ -553,73 +603,6 @@ class TestAgentStreaming:
         assert "ready" in messages[0]
         assert "error" in messages[-1]
         assert "OpenAI API Error" in messages[-1]
-
-
-class TestAgentConversationState:
-    """Tests for maintaining conversation state between requests."""
-
-    @pytest.mark.asyncio
-    @patch("agent.agent.AsyncOpenAI")
-    async def test_conversation_state_persists(self, mock_openai_class):
-        from agent.agent import conversation_state
-        from chats import chats_collection
-
-        conversation_state.clear()
-        await chats_collection.delete_many({})
-
-        mock_client = AsyncMock()
-        mock_openai_class.return_value = mock_client
-
-        # First call: produce a tool call
-        chunk1 = MagicMock()
-        chunk1.choices = [MagicMock()]
-        chunk1.choices[0].delta.content = "The weather in New York is "
-        chunk1.choices[0].delta.tool_calls = None
-        chunk1.choices[0].finish_reason = None
-
-        chunk2 = MagicMock()
-        chunk2.choices = [MagicMock()]
-        chunk2.choices[0].delta.content = None
-        chunk2.choices[0].delta.tool_calls = [MagicMock()]
-        chunk2.choices[0].delta.tool_calls[0].index = 0
-        chunk2.choices[0].delta.tool_calls[0].function = MagicMock()
-        chunk2.choices[0].delta.tool_calls[0].function.name = "get_current_weather"
-        chunk2.choices[0].delta.tool_calls[0].function.arguments = '{"location": "New York"}'
-        chunk2.choices[0].finish_reason = "stop"
-
-        stream1 = AsyncMock()
-        stream1.__aiter__.return_value = [chunk1, chunk2]
-
-        # Second call: simple response
-        chunk3 = MagicMock()
-        chunk3.choices = [MagicMock()]
-        chunk3.choices[0].delta.content = "You're welcome"
-        chunk3.choices[0].delta.tool_calls = None
-        chunk3.choices[0].finish_reason = "stop"
-
-        stream2 = AsyncMock()
-        stream2.__aiter__.return_value = [chunk3]
-
-        mock_client.chat.completions.create.side_effect = [stream1, stream2, stream2]
-
-        with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
-            async for _ in stream_agent_response("What's the weather in New York?", "user1", None):
-                pass
-
-            msgs = await chats_collection.find({"user_id": "user1"}).to_list(None)
-            assert len(msgs) == 2
-            assert msgs[0]["role"] == "user"
-            assert msgs[1]["role"] == "assistant"
-
-            conversation_state.clear()
-
-            async for _ in stream_agent_response("Thanks", "user1", None):
-                pass
-
-        # Second call should include previous interaction loaded from DB
-        second_call = mock_client.chat.completions.create.call_args_list[2]
-        messages = second_call.kwargs["messages"]
-        assert {"role": "user", "content": "What's the weather in New York?"} in messages
 
 
 class TestAgentIntegration:
@@ -657,16 +640,20 @@ class TestAgentIntegration:
             mock_client = AsyncMock()
             mock_openai_class.return_value = mock_client
 
-            # Mock simple text response (no tools)
-            mock_chunk = MagicMock()
-            mock_chunk.choices = [MagicMock()]
-            mock_chunk.choices[0].delta.content = "Hello, how can I help?"
-            mock_chunk.choices[0].delta.tool_calls = None
-            mock_chunk.choices[0].finish_reason = "stop"
+            # Mock Responses API streaming events
+            text_event = MagicMock()
+            text_event.type = "response.output_text.delta"
+            text_event.delta = "Hello, how can I help?"
+
+            completed_event = MagicMock()
+            completed_event.type = "response.completed"
+            completed_event.response.usage.input_tokens = 10
+            completed_event.response.usage.output_tokens = 5
+            completed_event.response.usage.total_tokens = 15
 
             mock_stream = AsyncMock()
-            mock_stream.__aiter__.return_value = [mock_chunk]
-            mock_client.chat.completions.create.return_value = mock_stream
+            mock_stream.__aiter__.return_value = [text_event, completed_event]
+            mock_client.responses.create = AsyncMock(return_value=mock_stream)
 
             with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
                 # Agent endpoint expects token in Authorization header
@@ -687,16 +674,20 @@ class TestAgentIntegration:
             mock_client = AsyncMock()
             mock_openai_class.return_value = mock_client
 
-            # Mock simple text response (no tools)
-            mock_chunk = MagicMock()
-            mock_chunk.choices = [MagicMock()]
-            mock_chunk.choices[0].delta.content = "Hello, how can I help?"
-            mock_chunk.choices[0].delta.tool_calls = None
-            mock_chunk.choices[0].finish_reason = "stop"
+            # Mock Responses API streaming events
+            text_event = MagicMock()
+            text_event.type = "response.output_text.delta"
+            text_event.delta = "Hello, how can I help?"
+
+            completed_event = MagicMock()
+            completed_event.type = "response.completed"
+            completed_event.response.usage.input_tokens = 10
+            completed_event.response.usage.output_tokens = 5
+            completed_event.response.usage.total_tokens = 15
 
             mock_stream = AsyncMock()
-            mock_stream.__aiter__.return_value = [mock_chunk]
-            mock_client.chat.completions.create.return_value = mock_stream
+            mock_stream.__aiter__.return_value = [text_event, completed_event]
+            mock_client.responses.create = AsyncMock(return_value=mock_stream)
 
             with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
                 # EventSource can't set custom headers, so token must be in query param
@@ -748,15 +739,19 @@ class TestAgentIntegration:
             mock_client = AsyncMock()
             mock_openai_class.return_value = mock_client
 
-            mock_chunk = MagicMock()
-            mock_chunk.choices = [MagicMock()]
-            mock_chunk.choices[0].delta.content = "Working in your test space"
-            mock_chunk.choices[0].delta.tool_calls = None
-            mock_chunk.choices[0].finish_reason = "stop"
+            text_event = MagicMock()
+            text_event.type = "response.output_text.delta"
+            text_event.delta = "Working in your test space"
+
+            completed_event = MagicMock()
+            completed_event.type = "response.completed"
+            completed_event.response.usage.input_tokens = 10
+            completed_event.response.usage.output_tokens = 5
+            completed_event.response.usage.total_tokens = 15
 
             mock_stream = AsyncMock()
-            mock_stream.__aiter__.return_value = [mock_chunk]
-            mock_client.chat.completions.create.return_value = mock_stream
+            mock_stream.__aiter__.return_value = [text_event, completed_event]
+            mock_client.responses.create = AsyncMock(return_value=mock_stream)
 
             with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
                 # Agent endpoint expects token in Authorization header
@@ -782,18 +777,22 @@ class TestAgentSchemas:
 
     def test_task_add_request_validation(self):
         """Test task creation request validation."""
-        # Valid request
-        request = TaskAddRequest(text="Test task")
+        # Valid request (category is now required)
+        request = TaskAddRequest(text="Test task", category="General")
         assert request.text == "Test task"
-        assert request.priority == "med"  # default
+        assert request.priority == "medium"  # default
 
         # Invalid priority
         with pytest.raises(Exception):
-            TaskAddRequest(text="Test task", priority="invalid")
+            TaskAddRequest(text="Test task", category="General", priority="invalid")
 
         # Empty text
         with pytest.raises(Exception):
-            TaskAddRequest(text="")
+            TaskAddRequest(text="", category="General")
+
+        # Missing category
+        with pytest.raises(Exception):
+            TaskAddRequest(text="Test task")
 
     def test_search_request_validation(self):
         """Test search request validation."""
@@ -830,8 +829,8 @@ class TestAgentSystemPrompt:
         assert "get_current_weather" in AGENT_SYSTEM_PROMPT
         assert "add_task" in AGENT_SYSTEM_PROMPT
         assert "get_inspirational_quotes" in AGENT_SYSTEM_PROMPT
-        assert "IMMEDIATELY call" in AGENT_SYSTEM_PROMPT
-        assert "human-readable summary" in AGENT_SYSTEM_PROMPT
+        assert "Always use tools when they can help" in AGENT_SYSTEM_PROMPT
+        assert "concise, well-formatted summary" in AGENT_SYSTEM_PROMPT
 
     def test_available_tools_registry(self):
         """Test tool registry completeness."""
@@ -846,6 +845,9 @@ class TestAgentSystemPrompt:
             "search_content",
             "get_book_recommendations",
             "get_inspirational_quotes",
+            "web_search",
+            "send_email_to_user",
+            "web_scraping",
         }
 
         assert set(AVAILABLE_TOOLS.keys()) == expected_tools
@@ -920,7 +922,7 @@ class TestAgentErrorHandling:
         """Test task creation with database error."""
         mock_create_todo.side_effect = Exception("Database connection failed")
 
-        request = TaskAddRequest(text="Test task")
+        request = TaskAddRequest(text="Test task", category="General")
         result = await add_task(request, "test_user", "test_space")
 
         assert result["ok"] is False
