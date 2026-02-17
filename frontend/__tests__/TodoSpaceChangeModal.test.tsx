@@ -164,7 +164,11 @@ describe('Todo Space Change in Edit Modal', () => {
       return Promise.resolve({ ok: true, json: async () => [] });
     });
 
-    const { container } = render(<AIToDoListApp user={mockAuthContext.user} token={mockAuthContext.token} onLogout={jest.fn()} />);
+    let container: HTMLElement;
+    await act(async () => {
+      const result = render(<AIToDoListApp user={mockAuthContext.user} token={mockAuthContext.token} onLogout={jest.fn()} />);
+      container = result.container;
+    });
 
     // Wait for data to load
     await waitFor(() => {
@@ -319,7 +323,9 @@ describe('Todo Space Change in Edit Modal', () => {
       return Promise.resolve({ ok: true, json: async () => [] });
     });
 
-    render(<AIToDoListApp user={mockAuthContext.user} token={mockAuthContext.token} onLogout={jest.fn()} />);
+    await act(async () => {
+      render(<AIToDoListApp user={mockAuthContext.user} token={mockAuthContext.token} onLogout={jest.fn()} />);
+    });
 
     // Wait for data to load
     await waitFor(() => {
