@@ -29,6 +29,7 @@ export default function AgentChatbot({ activeSpace, token, isActive = true }: Ch
   const [thinkingDots, setThinkingDots] = useState(0);
   const [isOnline, setIsOnline] = useState(true);
   const [showOfflineMessage, setShowOfflineMessage] = useState(false);
+  const [debugMode, setDebugMode] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const shouldAutoScrollRef = useRef(true);
@@ -36,8 +37,7 @@ export default function AgentChatbot({ activeSpace, token, isActive = true }: Ch
   const checkIfAtBottom = () => {
     if (!chatContainerRef.current) return true;
     const { scrollTop, scrollHeight, clientHeight } = chatContainerRef.current;
-    // TODO: simplify the scrolling logic
-    return scrollTop + clientHeight >= scrollHeight - 50; // 50px threshold for "at bottom"
+    return scrollTop + clientHeight >= scrollHeight - 50;
   };
 
   const handleScroll = () => {
@@ -292,7 +292,13 @@ export default function AgentChatbot({ activeSpace, token, isActive = true }: Ch
     <div className="flex flex-col h-full">
       {/* Clear button at top */}
       {messages.length > 0 && (
-        <div className="mb-2 flex justify-end flex-shrink-0">
+        <div className="mb-2 flex justify-end gap-2 flex-shrink-0">
+          <button
+            onClick={() => setDebugMode(d => !d)}
+            className={`px-3 py-1 rounded text-sm transition-colors ${debugMode ? 'bg-blue-800 text-blue-200 hover:bg-blue-700' : 'bg-gray-700 text-gray-200 hover:bg-gray-600'}`}
+          >
+            {debugMode ? 'Debug ON' : 'Debug'}
+          </button>
           <button
             onClick={handleClear}
             disabled={loading}
@@ -368,8 +374,7 @@ export default function AgentChatbot({ activeSpace, token, isActive = true }: Ch
             }`}>
               <div className="text-sm mb-1 opacity-75 flex justify-between items-center">
                 <span>{msg.role === 'user' ? 'You' : msg.role === 'system' ? 'Tool' : 'Assistant'}</span>
-                {/* Temporarily disabled - tool step dropdown
-                {msg.role === 'system' && msg.toolData && (
+                {debugMode && msg.role === 'system' && msg.toolData && (
                   <button
                     onClick={() => toggleToolExpansion(idx)}
                     className="text-sm text-blue-300 hover:text-blue-100 transition-colors"
@@ -378,15 +383,13 @@ export default function AgentChatbot({ activeSpace, token, isActive = true }: Ch
                     {expandedTools.has(idx) ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
                   </button>
                 )}
-                */}
               </div>
               {msg.role === 'assistant' ? (
                 <MessageRenderer content={msg.content} className="text-sm" />
               ) : (
                 <PlainTextRenderer content={msg.content} className="text-sm" />
               )}
-              {/* Temporarily disabled - tool step input/output details
-              {msg.role === 'system' && msg.toolData && expandedTools.has(idx) && (
+              {debugMode && msg.role === 'system' && msg.toolData && expandedTools.has(idx) && (
                 <div className="mt-2 pt-2 border-t border-blue-700/30 text-sm">
                   <div className="mb-1">
                     <span className="text-blue-300 font-medium">Input:</span>
@@ -402,7 +405,6 @@ export default function AgentChatbot({ activeSpace, token, isActive = true }: Ch
                   </div>
                 </div>
               )}
-              */}
             </div>
           </div>
         ))}
