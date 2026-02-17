@@ -63,7 +63,8 @@ function LoginForm({ onLogin }: LoginFormProps) {
 
       if (response.ok) {
         setStep('code');
-        // setMessage('Verification code sent! Check your email.');
+        const serverMessage = data?.message;
+        setMessage(serverMessage || 'Verification code sent! Check your email.');
       } else {
         setError(data.detail || 'Signup failed');
       }
