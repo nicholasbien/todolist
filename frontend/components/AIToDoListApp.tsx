@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { Settings } from "lucide-react";
+import { Settings, ArrowUpDown, GripVertical } from "lucide-react";
 import TodoItem from "./TodoItem";
 import AgentChatbot from "./AgentChatbot";
 import { useAuth } from "../context/AuthContext";
@@ -9,6 +9,22 @@ import JournalComponent from "./JournalComponent";
 import SpaceDropdown from "./SpaceDropdown";
 import { sortSpaces } from "../utils/spaceUtils";
 import SwipeableViews from "react-swipeable-views-react-18-fix";
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  TouchSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  useSortable,
+  verticalListSortingStrategy,
+  arrayMove,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
 interface Props {
   user: any;
@@ -24,6 +40,45 @@ interface Props {
   onShowContactModal?: () => void;
   onShowAccountSettings?: () => void;
   isOffline?: boolean;
+}
+
+type SortMode = 'auto' | 'date' | 'dueDate' | 'custom';
+
+function SortableItem({ id, children, disabled }: { id: string; children: React.ReactNode; disabled?: boolean }) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id, disabled });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style}>
+      <div className="flex items-center gap-1">
+        {!disabled && (
+          <button
+            {...attributes}
+            {...listeners}
+            className="touch-none p-1 text-gray-500 hover:text-gray-300 cursor-grab active:cursor-grabbing flex-shrink-0"
+            aria-label="Drag to reorder"
+          >
+            <GripVertical size={18} />
+          </button>
+        )}
+        <div className="flex-1 min-w-0">
+          {children}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 /**
@@ -55,6 +110,7 @@ export default function AIToDoListApp({
   const [error, setError] = useState<React.ReactNode>("");
   const [newCat, setNewCat] = useState("");
   const [activeCat, setActiveCat] = useState("All");
+  const [sortMode, setSortMode] = useState<SortMode>('auto');
   const [showAddCategoryModal, setShowAddCategoryModal] = useState(false);
   const [showEditCategoryModal, setShowEditCategoryModal] = useState(false);
   const [editCatName, setEditCatName] = useState("");
@@ -338,6 +394,10 @@ export default function AIToDoListApp({
     }
     // Reset category filter when switching spaces
     setActiveCat('All');
+    // Restore sort mode for this space
+    const spaceId = activeSpace?._id || 'default';
+    const saved = localStorage.getItem(`sortMode_${spaceId}`);
+    setSortMode((saved as SortMode) || 'auto');
   }, [activeSpace, fetchSpaceData, token, user]);
 
   // Update email time when user info loads
@@ -976,26 +1036,92 @@ export default function AIToDoListApp({
   };
 
 
+  // Sort mode handler — persist to localStorage
+  const handleSortModeChange = useCallback((mode: SortMode) => {
+    setSortMode(mode);
+    const spaceId = activeSpace?._id || 'default';
+    localStorage.setItem(`sortMode_${spaceId}`, mode);
+  }, [activeSpace]);
+
+  // Drag-and-drop sensors
+  const pointerSensor = useSensor(PointerSensor, { activationConstraint: { distance: 8 } });
+  const touchSensor = useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } });
+  const sensors = useSensors(pointerSensor, touchSensor);
+
+  // Handle drag end for custom sort
+  const handleDragEnd = useCallback(async (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    setTodos(prev => {
+      // Get current uncompleted todos in sort order for the active category
+      const filtered = prev
+        .filter(t => !t.completed)
+        .filter(t => activeCat === 'All' || t.category === activeCat)
+        .sort((a, b) => (a.sortOrder ?? Number.MAX_SAFE_INTEGER) - (b.sortOrder ?? Number.MAX_SAFE_INTEGER));
+      const ids = filtered.map(t => t._id);
+
+      const oldIndex = ids.indexOf(active.id as string);
+      const newIndex = ids.indexOf(over.id as string);
+      if (oldIndex === -1 || newIndex === -1) return prev;
+
+      const reorderedIds = arrayMove(ids, oldIndex, newIndex);
+
+      // Update sortOrder on all todos
+      const updated = prev.map(t => {
+        const idx = reorderedIds.indexOf(t._id);
+        if (idx !== -1) return { ...t, sortOrder: idx };
+        return t;
+      });
+
+      // Persist to backend (fire and forget)
+      authenticatedFetch('/todos/reorder', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ todoIds: reorderedIds }),
+      }).catch(err => console.error('Failed to save reorder:', err));
+
+      return updated;
+    });
+  }, [authenticatedFetch, activeCat]);
+
   // Filter and sort todos by category
   const allFilteredTodos = (activeCat === "All"
     ? todos
     : todos.filter(todo => todo.category === activeCat));
 
+  // Sort function based on current sort mode
+  const sortTodos = (a: any, b: any) => {
+    switch (sortMode) {
+      case 'date':
+        return new Date(b.dateAdded).getTime() - new Date(a.dateAdded).getTime();
+      case 'dueDate': {
+        if (!a.dueDate && !b.dueDate) return 0;
+        if (!a.dueDate) return 1;
+        if (!b.dueDate) return -1;
+        return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+      }
+      case 'custom': {
+        const aOrder = a.sortOrder ?? Number.MAX_SAFE_INTEGER;
+        const bOrder = b.sortOrder ?? Number.MAX_SAFE_INTEGER;
+        return aOrder - bOrder;
+      }
+      default: {
+        // Auto: priority then date
+        const priorityOrder = { 'High': 3, 'Medium': 2, 'Low': 1 };
+        const priorityDiff = (priorityOrder[b.priority] || 0) - (priorityOrder[a.priority] || 0);
+        if (priorityDiff !== 0) return priorityDiff;
+        return new Date(b.dateAdded).getTime() - new Date(a.dateAdded).getTime();
+      }
+    }
+  };
+
   // Separate completed and uncompleted todos
   const uncompletedTodos = allFilteredTodos
     .filter(todo => !todo.completed)
-    .sort((a, b) => {
-      // First sort by priority (High > Medium > Low)
-      const priorityOrder = { 'High': 3, 'Medium': 2, 'Low': 1 };
-      const priorityDiff = (priorityOrder[b.priority] || 0) - (priorityOrder[a.priority] || 0);
+    .sort(sortTodos);
 
-      if (priorityDiff !== 0) {
-        return priorityDiff;
-      }
-
-      // Then sort by date (most recent first)
-      return new Date(b.dateAdded).getTime() - new Date(a.dateAdded).getTime();
-    });
+  const uncompletedTodoIds = uncompletedTodos.map(t => t._id);
 
   const completedTodos = allFilteredTodos
     .filter((todo) => todo.completed)
@@ -1264,6 +1390,24 @@ export default function AIToDoListApp({
             </div>
           </div>
 
+          {/* Sort mode selector */}
+          <div className="flex items-center gap-2 px-3 mb-2">
+            <ArrowUpDown size={14} className="text-gray-500 flex-shrink-0" />
+            {(['auto', 'date', 'dueDate', 'custom'] as SortMode[]).map((mode) => (
+              <button
+                key={mode}
+                onClick={() => handleSortModeChange(mode)}
+                className={`px-2.5 py-1 rounded-lg text-xs transition-colors ${
+                  sortMode === mode
+                    ? 'bg-accent text-foreground'
+                    : 'text-gray-400 hover:text-gray-200'
+                }`}
+              >
+                {mode === 'auto' ? 'Auto' : mode === 'date' ? 'Date' : mode === 'dueDate' ? 'Due Date' : 'Custom'}
+              </button>
+            ))}
+          </div>
+
           {/* Rest of content with padding */}
           <div className="px-2">
       {/* Add new todo */}
@@ -1454,23 +1598,28 @@ export default function AIToDoListApp({
       {loadingTodos && (
         <div className="text-gray-400 mb-2 text-center">Loading tasks...</div>
       )}
-      <div className="space-y-3">
-        {uncompletedTodos.map((todo) => (
-          <TodoItem
-            key={todo._id}
-            todo={todo}
-            categories={categories}
-            editingCategory={editingCategory}
-            setEditingCategory={setEditingCategory}
-            handleUpdateCategory={handleUpdateCategory}
-            handleUpdatePriority={handleUpdatePriority}
-            handleCompleteTodo={handleCompleteTodo}
-            handleDeleteTodo={handleDeleteTodo}
-            isCollaborative={(activeSpace?.member_ids?.length ?? 0) > 1}
-            onEdit={handleEditTodo}
-          />
-        ))}
-      </div>
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+        <SortableContext items={uncompletedTodoIds} strategy={verticalListSortingStrategy}>
+          <div className="space-y-3">
+            {uncompletedTodos.map((todo) => (
+              <SortableItem key={todo._id} id={todo._id} disabled={sortMode !== 'custom'}>
+                <TodoItem
+                  todo={todo}
+                  categories={categories}
+                  editingCategory={editingCategory}
+                  setEditingCategory={setEditingCategory}
+                  handleUpdateCategory={handleUpdateCategory}
+                  handleUpdatePriority={handleUpdatePriority}
+                  handleCompleteTodo={handleCompleteTodo}
+                  handleDeleteTodo={handleDeleteTodo}
+                  isCollaborative={(activeSpace?.member_ids?.length ?? 0) > 1}
+                  onEdit={handleEditTodo}
+                />
+              </SortableItem>
+            ))}
+          </div>
+        </SortableContext>
+      </DndContext>
 
       {/* Show/Hide Completed Toggle Button */}
       {completedTodos.length > 0 && (

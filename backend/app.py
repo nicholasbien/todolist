@@ -361,6 +361,25 @@ async def api_create_todo(request: Request, current_user: dict = Depends(get_cur
         raise HTTPException(status_code=500, detail=f"Error creating todo: {str(e)}")
 
 
+@app.put("/todos/reorder")
+async def api_reorder_todos(request: Request, current_user: dict = Depends(get_current_user)):
+    try:
+        body = await request.json()
+        todo_ids = body.get("todoIds", [])
+        if not todo_ids:
+            raise HTTPException(status_code=400, detail="todoIds required")
+        from bson import ObjectId
+
+        for i, todo_id in enumerate(todo_ids):
+            await todos_collection.update_one({"_id": ObjectId(todo_id)}, {"$set": {"sortOrder": i}})
+        return {"ok": True}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error reordering todos: {repr(e)}")
+        raise HTTPException(status_code=500, detail=f"Error reordering todos: {repr(e)}")
+
+
 @app.delete("/todos/{todo_id}")
 async def api_delete_todo(todo_id: str, current_user: dict = Depends(get_current_user)):
     logger.info(f"Deleting todo with ID: {todo_id} for user: {current_user['email']}")
@@ -390,6 +409,8 @@ async def api_update_todo(todo_id: str, request: Request, current_user: dict = D
             updates["priority"] = body["priority"]
         if "dueDate" in body:
             updates["dueDate"] = body["dueDate"]
+        if "sortOrder" in body:
+            updates["sortOrder"] = body["sortOrder"]
         if "space_id" in body:
             new_space_id = body["space_id"]
             # Validate user has access to destination space
