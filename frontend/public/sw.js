@@ -253,7 +253,9 @@ const delCategory = async (name, userId, spaceId = null) => {
 const addQueue = async (action, userId) => {
   const authData = userId ? null : await getAuth();
   const effectiveUserId = userId || (authData ? authData.userId : null);
-  return userDbTx(effectiveUserId, QUEUE, 'readwrite', (s) => s.add({ ...action, timestamp: Date.now() }));
+  const result = await userDbTx(effectiveUserId, QUEUE, 'readwrite', (s) => s.add({ ...action, timestamp: Date.now() }));
+  if (_pendingQueueCount >= 0) _pendingQueueCount++;
+  return result;
 };
 
 const readQueue = async (userId) => {
@@ -265,14 +267,18 @@ const readQueue = async (userId) => {
 const clearQueue = async (userId) => {
   const authData = userId ? null : await getAuth();
   const effectiveUserId = userId || (authData ? authData.userId : null);
-  return userDbTx(effectiveUserId, QUEUE, 'readwrite', (s) => s.clear());
+  const result = await userDbTx(effectiveUserId, QUEUE, 'readwrite', (s) => s.clear());
+  _pendingQueueCount = 0;
+  return result;
 };
 
 // Remove a single queue item by its auto-increment id
 const removeQueueItem = async (itemId, userId) => {
   const authData = userId ? null : await getAuth();
   const effectiveUserId = userId || (authData ? authData.userId : null);
-  return userDbTx(effectiveUserId, QUEUE, 'readwrite', (s) => s.delete(itemId));
+  const result = await userDbTx(effectiveUserId, QUEUE, 'readwrite', (s) => s.delete(itemId));
+  if (_pendingQueueCount > 0) _pendingQueueCount--;
+  return result;
 };
 
 // Update a single queue item in-place by its auto-increment id
@@ -649,13 +655,11 @@ self.addEventListener('fetch', (event) => {
 
 async function cacheGetTodos(url, response, authData) {
   const spaceId = url.searchParams.get('space_id');
-  const queue = await readQueue(authData.userId);
-  const hasPendingTodos = queue.some(op =>
-    op.type === 'CREATE' || op.type === 'UPDATE' || op.type === 'DELETE'
-  );
 
-  if (syncInProgress || hasPendingTodos) {
-    console.log(`⏸️ BLOCKING todo server data - sync: ${syncInProgress}, pending: ${hasPendingTodos}`);
+  // Use in-memory counter instead of reading full queue from IndexedDB
+  await getPendingQueueCount(authData.userId);
+  if (syncInProgress || hasPendingQueueOps()) {
+    console.log(`⏸️ BLOCKING todo server data - sync: ${syncInProgress}, pending: ${_pendingQueueCount}`);
     return; // Signal caller to return IndexedDB data instead
   }
 
@@ -663,17 +667,26 @@ async function cacheGetTodos(url, response, authData) {
   for (const todo of serverTodos) {
     if (todo && todo._id) await putTodo(todo, authData.userId);
   }
-
-  // Remove stale local todos not in server response (preserve offline_ IDs, scope to space)
-  const serverIdSet = new Set(serverTodos.map(t => t._id));
-  const localTodos = await getTodos(authData.userId, spaceId);
-  for (const local of localTodos) {
-    if (!local._id.startsWith('offline_') && !serverIdSet.has(local._id)) {
-      await delTodo(local._id, authData.userId);
-    }
-  }
   console.log(`✅ Cached ${serverTodos.length} todos to IndexedDB`);
+
+  // Remove stale local todos asynchronously — don't block the response
+  cleanupStaleTodos(serverTodos, authData.userId, spaceId);
   return 'cached';
+}
+
+// Runs in the background after response is returned to the frontend
+async function cleanupStaleTodos(serverTodos, userId, spaceId) {
+  try {
+    const serverIdSet = new Set(serverTodos.map(t => t._id));
+    const localTodos = await getTodos(userId, spaceId);
+    for (const local of localTodos) {
+      if (!local._id.startsWith('offline_') && !serverIdSet.has(local._id)) {
+        await delTodo(local._id, userId);
+      }
+    }
+  } catch (err) {
+    console.error('Stale todo cleanup error:', err);
+  }
 }
 
 async function cacheGetJournals(url, response, authData) {
@@ -681,36 +694,41 @@ async function cacheGetJournals(url, response, authData) {
   const serverResponse = await response.clone().json();
   if (serverResponse === null) return 'cached';
 
-  const queue = await readQueue(authData.userId);
-  const hasPendingJournals = queue.some(op =>
-    (op.type === 'CREATE_JOURNAL' || op.type === 'UPDATE_JOURNAL') &&
-    (op.data.space_id === spaceId || (!spaceId && !op.data.space_id))
-  );
-
-  if (syncInProgress || hasPendingJournals) {
-    console.log(`⏸️ BLOCKING journal server data - sync: ${syncInProgress}, pending: ${hasPendingJournals}`);
+  // Use in-memory counter instead of reading full queue from IndexedDB
+  await getPendingQueueCount(authData.userId);
+  if (syncInProgress || hasPendingQueueOps()) {
+    console.log(`⏸️ BLOCKING journal server data - sync: ${syncInProgress}, pending: ${_pendingQueueCount}`);
   } else {
     const serverJournals = Array.isArray(serverResponse) ? serverResponse : [serverResponse];
     for (const journal of serverJournals) {
       if (journal && journal._id && journal.date) await putJournal(journal, authData.userId);
     }
 
-    // Only run stale cleanup on unfiltered fetches (no date param)
+    // Remove stale local journals asynchronously — don't block the response
     const dateParam = url.searchParams.get('date');
     if (!dateParam) {
-      const serverJournalIdSet = new Set(serverJournals.filter(j => j && j._id).map(j => j._id));
-      const localJournals = await getJournals(authData.userId, null, spaceId);
-      for (const local of localJournals) {
-        if (!local._id.startsWith('offline_journal_') && !serverJournalIdSet.has(local._id)) {
-          await delJournal(local._id, authData.userId);
-        }
-      }
+      cleanupStaleJournals(serverJournals, authData.userId, spaceId);
     }
   }
 
   // Sync queued journal operations after caching
   syncQueue().catch(err => console.error('Journal sync error:', err));
   return 'cached';
+}
+
+// Runs in the background after response is returned to the frontend
+async function cleanupStaleJournals(serverJournals, userId, spaceId) {
+  try {
+    const serverIdSet = new Set(serverJournals.filter(j => j && j._id).map(j => j._id));
+    const localJournals = await getJournals(userId, null, spaceId);
+    for (const local of localJournals) {
+      if (!local._id.startsWith('offline_journal_') && !serverIdSet.has(local._id)) {
+        await delJournal(local._id, userId);
+      }
+    }
+  } catch (err) {
+    console.error('Stale journal cleanup error:', err);
+  }
 }
 
 async function cacheGetCategories(url, response, authData) {
@@ -799,12 +817,10 @@ async function handleApiRequest(request) {
         if (request.method !== 'GET') {
           syncQueue();
         } else {
-          getAuth().then(auth => {
-            if (!auth?.userId) return;
-            readQueue(auth.userId).then(q => {
-              if (q.length > 0) syncQueue();
-            });
-          }).catch(() => {});
+          // Use in-memory counter — no IndexedDB read needed
+          if (hasPendingQueueOps()) {
+            syncQueue();
+          }
         }
       }
       return response;
@@ -1289,6 +1305,22 @@ function getBackendUrl() {
   const isCapacitor = self.location?.protocol === 'file:';
   const isProdHost = self.location?.hostname?.endsWith(CONFIG.PRODUCTION_DOMAIN);
   return (isProdHost || isCapacitor) ? CONFIG.PRODUCTION_BACKEND : CONFIG.LOCAL_BACKEND;
+}
+
+// In-memory pending queue counter — avoids reading full queue from IndexedDB on every GET
+// Initialized lazily on first access; incremented/decremented by addQueue/removeQueueItem/clearQueue
+let _pendingQueueCount = -1; // -1 = uninitialized
+
+async function getPendingQueueCount(userId) {
+  if (_pendingQueueCount >= 0) return _pendingQueueCount;
+  // Initialize from IndexedDB on first call
+  const queue = await readQueue(userId);
+  _pendingQueueCount = queue.length;
+  return _pendingQueueCount;
+}
+
+function hasPendingQueueOps() {
+  return _pendingQueueCount > 0;
 }
 
 // Global sync lock to prevent concurrent syncing
