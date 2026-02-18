@@ -1074,31 +1074,48 @@ export default function AIToDoListApp({
     if (!over || active.id === over.id) return;
 
     setTodos(prev => {
-      // Get current uncompleted todos in sort order for the active category
-      const filtered = prev
+      // Global uncompleted todos in current sort order
+      const allUncompleted = prev
         .filter(t => !t.completed)
-        .filter(t => activeCat === 'All' || t.category === activeCat)
         .sort((a, b) => (a.sortOrder ?? Number.MAX_SAFE_INTEGER) - (b.sortOrder ?? Number.MAX_SAFE_INTEGER));
+
+      // Filtered view (what the user sees)
+      const filtered = activeCat === 'All'
+        ? allUncompleted
+        : allUncompleted.filter(t => t.category === activeCat);
       const ids = filtered.map(t => t._id);
 
       const oldIndex = ids.indexOf(active.id as string);
       const newIndex = ids.indexOf(over.id as string);
       if (oldIndex === -1 || newIndex === -1) return prev;
 
-      const reorderedIds = arrayMove(ids, oldIndex, newIndex);
+      const reorderedFiltered = arrayMove(filtered, oldIndex, newIndex);
 
-      // Update sortOrder on all todos
+      // Splice reordered items back into global positions
+      const globalOrder = [...allUncompleted];
+      let filterIdx = 0;
+      for (let i = 0; i < globalOrder.length; i++) {
+        if (activeCat === 'All' || globalOrder[i].category === activeCat) {
+          globalOrder[i] = reorderedFiltered[filterIdx++];
+        }
+      }
+
+      // Reassign sortOrder to the full global list
+      const idToOrder = new Map<string, number>();
+      globalOrder.forEach((t, i) => idToOrder.set(t._id, i));
+
       const updated = prev.map(t => {
-        const idx = reorderedIds.indexOf(t._id);
-        if (idx !== -1) return { ...t, sortOrder: idx };
+        const order = idToOrder.get(t._id);
+        if (order != null) return { ...t, sortOrder: order };
         return t;
       });
 
-      // Persist to backend (fire and forget)
+      // Persist all uncompleted todo IDs in new global order
+      const allReorderedIds = globalOrder.map(t => t._id);
       authenticatedFetch('/todos/reorder', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ todoIds: reorderedIds }),
+        body: JSON.stringify({ todoIds: allReorderedIds }),
       }).catch(err => console.error('Failed to save reorder:', err));
 
       return updated;
