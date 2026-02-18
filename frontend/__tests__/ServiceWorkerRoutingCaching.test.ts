@@ -199,6 +199,8 @@ describe('cacheGetTodos', () => {
     const url = new URL('http://localhost/todos?space_id=sp1');
 
     await sw.cacheGetTodos(url, response, { userId: 'user1', token: 'token123' });
+    // Allow async stale cleanup to complete
+    await new Promise(r => setTimeout(r, 50));
 
     const todos = await sw.getTodos('user1');
     expect(todos).toHaveLength(1);
@@ -260,6 +262,8 @@ describe('cacheGetJournals', () => {
 
     const result = await sw.cacheGetJournals(url, response, { userId: 'user1', token: 'token123' });
     expect(result).toBe('cached');
+    // Allow async stale cleanup to complete
+    await new Promise(r => setTimeout(r, 50));
 
     const journals = await sw.getJournals('user1');
     // Stale journal should be removed, only server journal remains

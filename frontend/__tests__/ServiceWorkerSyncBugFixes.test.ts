@@ -181,6 +181,8 @@ describe('Bug 5: Stale data cleanup on GET responses', () => {
 
     const request = new Request('/todos?space_id=space1', { method: 'GET' });
     await sw.handleApiRequest(request);
+    // Allow async stale cleanup to complete
+    await new Promise(r => setTimeout(r, 50));
 
     const localTodos = await sw.getTodos('user1', 'space1');
     // Active todo should exist
@@ -211,6 +213,8 @@ describe('Bug 5: Stale data cleanup on GET responses', () => {
 
     const request = new Request('/todos?space_id=space1', { method: 'GET' });
     await sw.handleApiRequest(request);
+    // Allow async stale cleanup to complete
+    await new Promise(r => setTimeout(r, 50));
 
     // Other space's todo should be untouched
     const otherSpaceTodos = await sw.getTodos('user1', 'space2');
@@ -245,6 +249,8 @@ describe('Bug 5: Stale data cleanup on GET responses', () => {
     // Unfiltered request (no date param) — should run stale cleanup
     const request = new Request('/journals?space_id=space1', { method: 'GET' });
     await sw.handleApiRequest(request);
+    // Allow async stale cleanup to complete
+    await new Promise(r => setTimeout(r, 50));
 
     sw.syncQueue = origSync;
 

@@ -49,6 +49,7 @@ const _userDbCache = new Map();
 function _resetDbCache() {
   _globalDbCache = null;
   _userDbCache.clear();
+  _pendingQueueCount = -1;
 }
 
 // Open global database for auth data (cached)
