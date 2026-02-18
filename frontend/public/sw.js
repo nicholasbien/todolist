@@ -1,6 +1,6 @@
 // IMPORTANT: Always increment these versions when modifying this service worker file
 // This forces browsers to download and use the updated service worker
-const STATIC_CACHE = 'todo-static-v120';
+const STATIC_CACHE = 'todo-static-v121';
 
 const GLOBAL_DB_NAME = 'TodoGlobalDB';
 const USER_DB_PREFIX = 'TodoUserDB_';
@@ -1013,6 +1013,20 @@ async function handleOfflineRequest(request, url) {
     return new Response(JSON.stringify(todoData), { headers: { 'Content-Type': 'application/json' } });
   }
 
+  // Reorder todos (custom sort)
+  if (request.method === 'PUT' && apiPath === '/todos/reorder') {
+    const todoIds = data.todoIds || [];
+    const allTodos = await getTodos(authData.userId);
+    for (let i = 0; i < todoIds.length; i++) {
+      const todo = allTodos.find(t => t._id === todoIds[i]);
+      if (todo) {
+        await putTodo({ ...todo, sortOrder: i }, authData.userId);
+      }
+    }
+    await addQueue({ type: 'REORDER_TODOS', data: { todoIds } }, authData.userId);
+    return new Response(JSON.stringify({ ok: true }), { headers: { 'Content-Type': 'application/json' } });
+  }
+
   // Update todo (category, priority changes)
   if (request.method === 'PUT' && apiPath.startsWith('/todos/') && !apiPath.endsWith('/complete')) {
     const id = apiPath.split('/')[2];
@@ -1323,6 +1337,26 @@ async function syncQueue() {
             }
           } else {
             success = true; // Non-offline CREATE, just remove from queue
+          }
+          break;
+        case 'REORDER_TODOS':
+          // Translate any offline IDs to server IDs
+          const reorderIds = (op.data.todoIds || []).map(id =>
+            id.startsWith('offline_') && idMap[id] ? idMap[id] : id
+          );
+          // Only sync if all IDs are resolved (no remaining offline_ IDs)
+          if (reorderIds.every(id => !id.startsWith('offline_'))) {
+            res = await fetch(`${backendUrl}/todos/reorder`, {
+              method: 'PUT',
+              headers,
+              body: JSON.stringify({ todoIds: reorderIds }),
+            });
+            if (res && res.ok) {
+              success = true;
+            }
+          } else {
+            deferred = true;
+            console.log('⏳ Deferring REORDER_TODOS - some offline IDs not yet mapped');
           }
           break;
         case 'UPDATE':
