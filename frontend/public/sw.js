@@ -1,6 +1,6 @@
 // IMPORTANT: Always increment these versions when modifying this service worker file
 // This forces browsers to download and use the updated service worker
-const STATIC_CACHE = 'todo-static-v121';
+const STATIC_CACHE = 'todo-static-v122';
 
 const GLOBAL_DB_NAME = 'TodoGlobalDB';
 const USER_DB_PREFIX = 'TodoUserDB_';
@@ -743,6 +743,74 @@ const GET_CACHE_HANDLERS = {
   '/spaces': cacheGetSpaces,
 };
 
+// ── Cache write responses to IndexedDB ───────────────────────
+
+async function cacheWriteResponse(method, pathname, response) {
+  const authData = await getAuth();
+  if (!authData || !authData.userId) return;
+
+  let data;
+  try {
+    data = await response.json();
+  } catch {
+    return; // No JSON body (e.g. 204 No Content)
+  }
+
+  // Todos
+  if (pathname === '/todos' && method === 'POST' && data._id) {
+    await putTodo(data, authData.userId);
+    console.log(`💾 Cached new todo ${data._id} to IndexedDB`);
+  } else if (pathname.match(/^\/todos\/[^/]+$/) && method === 'PUT' && data._id) {
+    await putTodo(data, authData.userId);
+    console.log(`💾 Cached updated todo ${data._id} to IndexedDB`);
+  } else if (pathname.match(/^\/todos\/[^/]+$/) && method === 'DELETE') {
+    const id = pathname.split('/')[2];
+    await delTodo(id, authData.userId);
+    console.log(`💾 Removed deleted todo ${id} from IndexedDB`);
+  } else if (pathname.match(/^\/todos\/[^/]+\/complete$/) && method === 'PUT' && data._id) {
+    await putTodo(data, authData.userId);
+    console.log(`💾 Cached completed todo ${data._id} to IndexedDB`);
+  } else if (pathname === '/todos/reorder' && data.ok) {
+    // Reorder responses don't include todo data; IndexedDB was already
+    // updated optimistically by the frontend via individual todo PUTs
+    // or by the offline handler, so nothing to do here.
+  }
+
+  // Journals
+  else if (pathname === '/journals' && method === 'POST' && data._id) {
+    await putJournal(data, authData.userId);
+    console.log(`💾 Cached journal ${data._id} to IndexedDB`);
+  } else if (pathname.match(/^\/journals\/[^/]+$/) && method === 'DELETE') {
+    const id = pathname.split('/')[2];
+    await delJournal(id, authData.userId);
+    console.log(`💾 Removed deleted journal ${id} from IndexedDB`);
+  }
+
+  // Categories
+  else if (pathname === '/categories' && method === 'POST' && data.name) {
+    await putCategory(data, authData.userId);
+    console.log(`💾 Cached new category ${data.name} to IndexedDB`);
+  } else if (pathname.match(/^\/categories\//) && method === 'DELETE') {
+    const name = decodeURIComponent(pathname.split('/')[2]);
+    const spaceId = new URL('http://x' + pathname).searchParams.get('space_id');
+    await delCategory(name, authData.userId, spaceId);
+    console.log(`💾 Removed deleted category ${name} from IndexedDB`);
+  }
+
+  // Spaces
+  else if (pathname === '/spaces' && method === 'POST' && data._id) {
+    await putSpace(data, authData.userId);
+    console.log(`💾 Cached new space ${data._id} to IndexedDB`);
+  } else if (pathname.match(/^\/spaces\/[^/]+$/) && method === 'PUT' && data._id) {
+    await putSpace(data, authData.userId);
+    console.log(`💾 Cached updated space ${data._id} to IndexedDB`);
+  } else if (pathname.match(/^\/spaces\/[^/]+$/) && method === 'DELETE') {
+    const id = pathname.split('/')[2];
+    await delSpace(id, authData.userId);
+    console.log(`💾 Removed deleted space ${id} from IndexedDB`);
+  }
+}
+
 // ── Backend request construction ──────────────────────────────
 
 async function buildBackendRequest(request, url) {
@@ -801,6 +869,10 @@ async function handleApiRequest(request) {
       // Trigger sync for writes, and for reads if queue has pending ops
       if (response.ok) {
         if (request.method !== 'GET') {
+          // Cache write responses to IndexedDB so offline reads stay fresh
+          cacheWriteResponse(request.method, url.pathname, response.clone()).catch(
+            err => console.error('Failed to cache write response:', err)
+          );
           syncQueue();
         } else {
           getAuth().then(auth => {
