@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { Settings, ArrowUpDown } from "lucide-react";
+import { Settings, ArrowUpDown, Search, X } from "lucide-react";
 import TodoItem from "./TodoItem";
 import AgentChatbot from "./AgentChatbot";
 import { useAuth } from "../context/AuthContext";
@@ -103,6 +103,9 @@ export default function AIToDoListApp({
   const [newCat, setNewCat] = useState("");
   const [activeCat, setActiveCat] = useState("All");
   const [sortMode, setSortMode] = useState<SortMode>('auto');
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const [showAddCategoryModal, setShowAddCategoryModal] = useState(false);
   const [showEditCategoryModal, setShowEditCategoryModal] = useState(false);
   const [editCatName, setEditCatName] = useState("");
@@ -1125,7 +1128,8 @@ export default function AIToDoListApp({
   // Filter and sort todos by category
   const allFilteredTodos = (activeCat === "All"
     ? todos
-    : todos.filter(todo => todo.category === activeCat));
+    : todos.filter(todo => todo.category === activeCat))
+    .filter(todo => !searchQuery || todo.text.toLowerCase().includes(searchQuery.toLowerCase()));
 
   // Sort function based on current sort mode
   const sortTodos = (a: any, b: any) => {
@@ -1394,6 +1398,51 @@ export default function AIToDoListApp({
               >
                 All
               </button>
+              <button
+                onClick={() => {
+                  setSearchOpen(!searchOpen);
+                  if (searchOpen) {
+                    setSearchQuery("");
+                  } else {
+                    setTimeout(() => searchInputRef.current?.focus(), 50);
+                  }
+                }}
+                className={`p-2 rounded-xl text-base transition-colors flex-shrink-0 ${
+                  searchOpen
+                    ? 'bg-accent text-foreground shadow-lg'
+                    : 'bg-gray-900 text-gray-300 hover:bg-gray-800 border border-gray-800'
+                }`}
+                aria-label="Search tasks"
+              >
+                <Search size={18} />
+              </button>
+              {searchOpen && (
+                <div className="flex items-center gap-1 flex-shrink-0">
+                  <input
+                    ref={searchInputRef}
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Escape') {
+                        setSearchQuery("");
+                        setSearchOpen(false);
+                      }
+                    }}
+                    placeholder="Search tasks..."
+                    className="w-40 px-3 py-1.5 rounded-xl text-base bg-gray-900 text-gray-100 border border-gray-700 focus:border-accent focus:outline-none placeholder-gray-500"
+                  />
+                  {searchQuery && (
+                    <button
+                      onClick={() => setSearchQuery("")}
+                      className="p-1 text-gray-400 hover:text-gray-200"
+                      aria-label="Clear search"
+                    >
+                      <X size={16} />
+                    </button>
+                  )}
+                </div>
+              )}
               {categories
               .sort((a, b) => {
                 const aName = typeof a === 'string' ? a : a.name;

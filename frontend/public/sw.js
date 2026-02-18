@@ -41,12 +41,30 @@ const STATIC_FILES = [
   '/icon-512x512.png'
 ];
 
-// Open global database for auth data
+// Cached DB connection promises — avoids expensive open/close on every operation
+// We cache the promise (not the result) to prevent race conditions when
+// multiple operations call open concurrently before the first one resolves.
+let _globalDbPromise = null;
+const _userDbPromises = new Map();
+
+// Reset DB cache (for testing only — when fake-indexeddb is replaced between tests)
+function _resetDbCache() {
+  _globalDbPromise = null;
+  _userDbPromises.clear();
+}
+
+// Open global database for auth data (cached)
 function openGlobalDB() {
-  return new Promise((resolve, reject) => {
+  if (_globalDbPromise) return _globalDbPromise;
+  _globalDbPromise = new Promise((resolve, reject) => {
     const request = indexedDB.open(GLOBAL_DB_NAME, DB_VERSION);
-    request.onerror = () => reject(request.error);
-    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => { _globalDbPromise = null; reject(request.error); };
+    request.onsuccess = () => {
+      const db = request.result;
+      db.onclose = () => { _globalDbPromise = null; };
+      db.onversionchange = () => { db.close(); _globalDbPromise = null; };
+      resolve(db);
+    };
     request.onupgradeneeded = (event) => {
       const db = event.target.result;
       if (!db.objectStoreNames.contains(AUTH)) {
@@ -54,15 +72,22 @@ function openGlobalDB() {
       }
     };
   });
+  return _globalDbPromise;
 }
 
-// Open user-specific database for todos, categories, and queue
+// Open user-specific database for todos, categories, and queue (cached)
 function openUserDB(userId) {
   const dbName = userId ? `${USER_DB_PREFIX}${userId}` : `${USER_DB_PREFIX}guest`;
-  return new Promise((resolve, reject) => {
+  if (_userDbPromises.has(dbName)) return _userDbPromises.get(dbName);
+  const promise = new Promise((resolve, reject) => {
     const request = indexedDB.open(dbName, DB_VERSION);
-    request.onerror = () => reject(request.error);
-    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => { _userDbPromises.delete(dbName); reject(request.error); };
+    request.onsuccess = () => {
+      const db = request.result;
+      db.onclose = () => { _userDbPromises.delete(dbName); };
+      db.onversionchange = () => { db.close(); _userDbPromises.delete(dbName); };
+      resolve(db);
+    };
     request.onupgradeneeded = (event) => {
       const db = event.target.result;
       const oldVersion = event.oldVersion;
@@ -98,6 +123,8 @@ function openUserDB(userId) {
       }
     };
   });
+  _userDbPromises.set(dbName, promise);
+  return promise;
 }
 
 // Global database transaction for auth
@@ -107,8 +134,8 @@ async function globalDbTx(store, mode, fn) {
     const tx = db.transaction([store], mode);
     const st = tx.objectStore(store);
     const req = fn(st);
-    req.onsuccess = () => { db.close(); resolve(req.result); };
-    req.onerror = () => { db.close(); reject(req.error); };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
   });
 }
 
@@ -119,8 +146,8 @@ async function userDbTx(userId, store, mode, fn) {
     const tx = db.transaction([store], mode);
     const st = tx.objectStore(store);
     const req = fn(st);
-    req.onsuccess = () => { db.close(); resolve(req.result); };
-    req.onerror = () => { db.close(); reject(req.error); };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
   });
 }
 
@@ -1657,5 +1684,6 @@ if (typeof module !== 'undefined') {
     cacheGetCategories,
     cacheGetSpaces,
     generateInsights,
+    _resetDbCache,
   };
 }
