@@ -1,6 +1,6 @@
 // IMPORTANT: Always increment these versions when modifying this service worker file
 // This forces browsers to download and use the updated service worker
-const STATIC_CACHE = 'todo-static-v119';
+const STATIC_CACHE = 'todo-static-v120';
 
 const GLOBAL_DB_NAME = 'TodoGlobalDB';
 const USER_DB_PREFIX = 'TodoUserDB_';
@@ -41,12 +41,28 @@ const STATIC_FILES = [
   '/icon-512x512.png'
 ];
 
-// Open global database for auth data
+// Cached DB connections — avoids expensive open/close on every operation
+let _globalDbCache = null;
+const _userDbCache = new Map();
+
+// Reset DB cache (for testing only — when fake-indexeddb is replaced between tests)
+function _resetDbCache() {
+  _globalDbCache = null;
+  _userDbCache.clear();
+}
+
+// Open global database for auth data (cached)
 function openGlobalDB() {
+  if (_globalDbCache) return Promise.resolve(_globalDbCache);
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(GLOBAL_DB_NAME, DB_VERSION);
     request.onerror = () => reject(request.error);
-    request.onsuccess = () => resolve(request.result);
+    request.onsuccess = () => {
+      _globalDbCache = request.result;
+      _globalDbCache.onclose = () => { _globalDbCache = null; };
+      _globalDbCache.onversionchange = () => { _globalDbCache.close(); _globalDbCache = null; };
+      resolve(_globalDbCache);
+    };
     request.onupgradeneeded = (event) => {
       const db = event.target.result;
       if (!db.objectStoreNames.contains(AUTH)) {
@@ -56,13 +72,20 @@ function openGlobalDB() {
   });
 }
 
-// Open user-specific database for todos, categories, and queue
+// Open user-specific database for todos, categories, and queue (cached)
 function openUserDB(userId) {
   const dbName = userId ? `${USER_DB_PREFIX}${userId}` : `${USER_DB_PREFIX}guest`;
+  if (_userDbCache.has(dbName)) return Promise.resolve(_userDbCache.get(dbName));
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(dbName, DB_VERSION);
     request.onerror = () => reject(request.error);
-    request.onsuccess = () => resolve(request.result);
+    request.onsuccess = () => {
+      const db = request.result;
+      db.onclose = () => { _userDbCache.delete(dbName); };
+      db.onversionchange = () => { db.close(); _userDbCache.delete(dbName); };
+      _userDbCache.set(dbName, db);
+      resolve(db);
+    };
     request.onupgradeneeded = (event) => {
       const db = event.target.result;
       const oldVersion = event.oldVersion;
@@ -107,8 +130,8 @@ async function globalDbTx(store, mode, fn) {
     const tx = db.transaction([store], mode);
     const st = tx.objectStore(store);
     const req = fn(st);
-    req.onsuccess = () => { db.close(); resolve(req.result); };
-    req.onerror = () => { db.close(); reject(req.error); };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
   });
 }
 
@@ -119,8 +142,8 @@ async function userDbTx(userId, store, mode, fn) {
     const tx = db.transaction([store], mode);
     const st = tx.objectStore(store);
     const req = fn(st);
-    req.onsuccess = () => { db.close(); resolve(req.result); };
-    req.onerror = () => { db.close(); reject(req.error); };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
   });
 }
 
@@ -1623,5 +1646,6 @@ if (typeof module !== 'undefined') {
     cacheGetCategories,
     cacheGetSpaces,
     generateInsights,
+    _resetDbCache,
   };
 }
