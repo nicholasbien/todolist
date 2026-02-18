@@ -59,6 +59,7 @@ class Todo(BaseModel):
     priority: str = "Medium"
     dateAdded: str
     dueDate: Optional[str] = None
+    sortOrder: Optional[int] = None
     notes: Optional[str] = None
     completed: bool = False
     dateCompleted: Optional[str] = None
