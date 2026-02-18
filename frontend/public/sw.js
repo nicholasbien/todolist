@@ -1,6 +1,6 @@
 // IMPORTANT: Always increment these versions when modifying this service worker file
 // This forces browsers to download and use the updated service worker
-const STATIC_CACHE = 'todo-static-v121';
+const STATIC_CACHE = 'todo-static-v122';
 
 const GLOBAL_DB_NAME = 'TodoGlobalDB';
 const USER_DB_PREFIX = 'TodoUserDB_';
@@ -653,36 +653,22 @@ self.addEventListener('fetch', (event) => {
 
 async function cacheGetTodos(url, response, authData) {
   const spaceId = url.searchParams.get('space_id');
-  const queue = await readQueue(authData.userId);
-  const hasPendingTodos = queue.some(op =>
-    op.type === 'CREATE' || op.type === 'UPDATE' || op.type === 'DELETE'
-  );
-
-  if (syncInProgress || hasPendingTodos) {
-    console.log(`⏸️ BLOCKING todo server data - sync: ${syncInProgress}, pending: ${hasPendingTodos}`);
-    return; // Signal caller to return IndexedDB data instead
-  }
-
-  const serverTodos = await response.clone().json();
-  for (const todo of serverTodos) {
-    if (todo && todo._id) await putTodo(todo, authData.userId);
-  }
+  // Caller has already checked pending ops and passed response.clone(), so consume directly.
+  const serverTodos = await response.json();
+  await Promise.all(serverTodos.filter(t => t && t._id).map(t => putTodo(t, authData.userId)));
 
   // Remove stale local todos not in server response (preserve offline_ IDs, scope to space)
   const serverIdSet = new Set(serverTodos.map(t => t._id));
   const localTodos = await getTodos(authData.userId, spaceId);
-  for (const local of localTodos) {
-    if (!local._id.startsWith('offline_') && !serverIdSet.has(local._id)) {
-      await delTodo(local._id, authData.userId);
-    }
-  }
+  const stale = localTodos.filter(l => !l._id.startsWith('offline_') && !serverIdSet.has(l._id));
+  await Promise.all(stale.map(l => delTodo(l._id, authData.userId)));
   console.log(`✅ Cached ${serverTodos.length} todos to IndexedDB`);
   return 'cached';
 }
 
 async function cacheGetJournals(url, response, authData) {
   const spaceId = url.searchParams.get('space_id');
-  const serverResponse = await response.clone().json();
+  const serverResponse = await response.json();
   if (serverResponse === null) return 'cached';
 
   const queue = await readQueue(authData.userId);
@@ -695,20 +681,15 @@ async function cacheGetJournals(url, response, authData) {
     console.log(`⏸️ BLOCKING journal server data - sync: ${syncInProgress}, pending: ${hasPendingJournals}`);
   } else {
     const serverJournals = Array.isArray(serverResponse) ? serverResponse : [serverResponse];
-    for (const journal of serverJournals) {
-      if (journal && journal._id && journal.date) await putJournal(journal, authData.userId);
-    }
+    await Promise.all(serverJournals.filter(j => j && j._id && j.date).map(j => putJournal(j, authData.userId)));
 
     // Only run stale cleanup on unfiltered fetches (no date param)
     const dateParam = url.searchParams.get('date');
     if (!dateParam) {
       const serverJournalIdSet = new Set(serverJournals.filter(j => j && j._id).map(j => j._id));
       const localJournals = await getJournals(authData.userId, null, spaceId);
-      for (const local of localJournals) {
-        if (!local._id.startsWith('offline_journal_') && !serverJournalIdSet.has(local._id)) {
-          await delJournal(local._id, authData.userId);
-        }
-      }
+      const stale = localJournals.filter(l => !l._id.startsWith('offline_journal_') && !serverJournalIdSet.has(l._id));
+      await Promise.all(stale.map(l => delJournal(l._id, authData.userId)));
     }
   }
 
@@ -718,20 +699,18 @@ async function cacheGetJournals(url, response, authData) {
 }
 
 async function cacheGetCategories(url, response, authData) {
-  const categories = await response.clone().json();
+  const categories = await response.json();
   const spaceId = url.searchParams.get('space_id');
-  for (const categoryName of categories) {
-    await putCategory({ name: categoryName, space_id: spaceId }, authData.userId);
-  }
+  await Promise.all(categories.map(categoryName =>
+    putCategory({ name: categoryName, space_id: spaceId }, authData.userId)
+  ));
   console.log(`📂 Cached ${categories.length} categories for space ${spaceId || 'all'} to IndexedDB`);
   return 'cached';
 }
 
 async function cacheGetSpaces(url, response, authData) {
-  const spaces = await response.clone().json();
-  for (const space of spaces) {
-    if (space && space._id) await putSpace(space, authData.userId);
-  }
+  const spaces = await response.json();
+  await Promise.all(spaces.filter(s => s && s._id).map(s => putSpace(s, authData.userId)));
   console.log(`🏢 Cached ${spaces.length} spaces to IndexedDB`);
   return 'cached';
 }
@@ -784,16 +763,28 @@ async function handleApiRequest(request) {
         if (authData && authData.userId) {
           const handler = GET_CACHE_HANDLERS[url.pathname];
           if (handler) {
-            const result = await handler(url, response, authData);
-            // If cacheGetTodos blocked (pending ops), return IndexedDB data instead
-            if (!result && url.pathname === '/todos') {
-              const spaceId = url.searchParams.get('space_id');
-              const offlineTodos = await getTodos(authData.userId, spaceId);
-              return new Response(JSON.stringify(offlineTodos), {
-                status: 200,
-                headers: { 'Content-Type': 'application/json' }
-              });
+            // For /todos: check pending ops first to decide what to return to the UI.
+            // This must happen synchronously (before returning) so offline-created todos
+            // aren't lost when the server response doesn't include them yet.
+            if (url.pathname === '/todos') {
+              const queue = await readQueue(authData.userId);
+              const hasPendingTodos = queue.some(op =>
+                op.type === 'CREATE' || op.type === 'UPDATE' || op.type === 'DELETE'
+              );
+              if (syncInProgress || hasPendingTodos) {
+                const spaceId = url.searchParams.get('space_id');
+                const offlineTodos = await getTodos(authData.userId, spaceId);
+                return new Response(JSON.stringify(offlineTodos), {
+                  status: 200,
+                  headers: { 'Content-Type': 'application/json' }
+                });
+              }
             }
+            // Run caching in the background — don't block response delivery.
+            // Pass a clone so the original response body can still be returned to the page.
+            handler(url, response.clone(), authData).catch(err =>
+              console.error('Cache update failed:', err)
+            );
           }
         }
       }
