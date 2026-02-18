@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { Settings, ArrowUpDown, GripVertical } from "lucide-react";
+import { Settings, ArrowUpDown } from "lucide-react";
 import TodoItem from "./TodoItem";
 import AgentChatbot from "./AgentChatbot";
 import { useAuth } from "../context/AuthContext";
@@ -61,22 +61,14 @@ function SortableItem({ id, children, disabled }: { id: string; children: React.
   };
 
   return (
-    <div ref={setNodeRef} style={style}>
-      <div className="flex items-center gap-1">
-        {!disabled && (
-          <button
-            {...attributes}
-            {...listeners}
-            className="touch-none p-1 text-gray-500 hover:text-gray-300 cursor-grab active:cursor-grabbing flex-shrink-0"
-            aria-label="Drag to reorder"
-          >
-            <GripVertical size={18} />
-          </button>
-        )}
-        <div className="flex-1 min-w-0">
-          {children}
-        </div>
-      </div>
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...attributes}
+      {...listeners}
+      className={!disabled ? 'touch-none cursor-grab active:cursor-grabbing' : ''}
+    >
+      {children}
     </div>
   );
 }
@@ -1393,7 +1385,7 @@ export default function AIToDoListApp({
           {/* Sort mode selector */}
           <div className="flex items-center gap-2 px-3 mb-2">
             <ArrowUpDown size={14} className="text-gray-500 flex-shrink-0" />
-            {(['auto', 'date', 'dueDate', 'custom'] as SortMode[]).map((mode) => (
+            {(['auto', 'dueDate', 'date', 'custom'] as SortMode[]).map((mode) => (
               <button
                 key={mode}
                 onClick={() => handleSortModeChange(mode)}
@@ -1403,7 +1395,7 @@ export default function AIToDoListApp({
                     : 'text-gray-400 hover:text-gray-200'
                 }`}
               >
-                {mode === 'auto' ? 'Auto' : mode === 'date' ? 'Date' : mode === 'dueDate' ? 'Due Date' : 'Custom'}
+                {mode === 'auto' ? 'Auto' : mode === 'date' ? 'Date Added' : mode === 'dueDate' ? 'Due Date' : 'Custom'}
               </button>
             ))}
           </div>
