@@ -29,15 +29,20 @@ export default function TodoItem({
   const [isCompleting, setIsCompleting] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [shouldAnimate, setShouldAnimate] = useState(false);
+  const containerRef = React.useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setShouldAnimate(true);
   }, []);
 
   // Cleanup: Remove any lingering focus when component unmounts (mobile fix)
+  // Only blur if the focused element is inside this todo item, not a global input like the search bar
   useEffect(() => {
     return () => {
-      if (document.activeElement instanceof HTMLElement) {
+      if (
+        containerRef.current?.contains(document.activeElement) &&
+        document.activeElement instanceof HTMLElement
+      ) {
         document.activeElement.blur();
       }
     };
@@ -78,6 +83,7 @@ export default function TodoItem({
 
   return (
     <div
+      ref={containerRef}
       key={todo._id}
       onClick={() => onEdit(todo)}
       className={`p-4 border rounded-xl transition-all duration-300 ease-in-out ${
