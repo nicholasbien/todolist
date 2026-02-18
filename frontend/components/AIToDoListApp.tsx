@@ -1033,7 +1033,35 @@ export default function AIToDoListApp({
     setSortMode(mode);
     const spaceId = activeSpace?._id || 'default';
     localStorage.setItem(`sortMode_${spaceId}`, mode);
-  }, [activeSpace]);
+
+    // When switching to Custom, initialize sortOrder from Auto sort if not yet set
+    if (mode === 'custom') {
+      const uncompleted = todos.filter(t => !t.completed);
+      const needsInit = uncompleted.every(t => t.sortOrder == null);
+      if (needsInit && uncompleted.length > 0) {
+        // Sort by Auto order (priority then date)
+        const priorityOrder = { 'High': 3, 'Medium': 2, 'Low': 1 };
+        const sorted = [...uncompleted].sort((a, b) => {
+          const pd = (priorityOrder[b.priority] || 0) - (priorityOrder[a.priority] || 0);
+          if (pd !== 0) return pd;
+          return new Date(b.dateAdded).getTime() - new Date(a.dateAdded).getTime();
+        });
+        const ids = sorted.map(t => t._id);
+
+        setTodos(prev => prev.map(t => {
+          const idx = ids.indexOf(t._id);
+          if (idx !== -1) return { ...t, sortOrder: idx };
+          return t;
+        }));
+
+        authenticatedFetch('/todos/reorder', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ todoIds: ids }),
+        }).catch(err => console.error('Failed to initialize sort order:', err));
+      }
+    }
+  }, [activeSpace, todos, authenticatedFetch]);
 
   // Drag-and-drop sensors
   const pointerSensor = useSensor(PointerSensor, { activationConstraint: { distance: 8 } });
