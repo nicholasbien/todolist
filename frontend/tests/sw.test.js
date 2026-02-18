@@ -58,7 +58,8 @@ const {
   addQueue,
   readQueue,
   clearQueue,
-  handleRequest
+  handleRequest,
+  _resetDbCache
 } = require('../public/sw.js');
 
 describe('Service Worker Database Operations', () => {
@@ -68,6 +69,8 @@ describe('Service Worker Database Operations', () => {
   beforeEach(async () => {
     // Reset IndexedDB to clean state
     global.indexedDB = new FDBFactory();
+    // Clear cached DB connections so they pick up the new IndexedDB
+    _resetDbCache();
 
     // Reset fetch mock
     global.fetch.mockReset();
