@@ -55,3 +55,10 @@ body {
   overscroll-behavior-x: contain; /* prevent scroll from leaking to parent */
   touch-action: pan-x; /* only allow horizontal panning */
 }
+
+/* Prevent text selection/callout during long-press interactions on touch devices */
+.disable-longpress-select {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}

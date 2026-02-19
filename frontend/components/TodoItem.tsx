@@ -110,7 +110,7 @@ export default function TodoItem({
           longPressTimerRef.current = null;
         }
       }}
-      className={`p-4 border rounded-xl transition-all duration-300 ease-in-out ${
+      className={`disable-longpress-select p-4 border rounded-xl transition-all duration-300 ease-in-out ${
         shouldAnimate ? 'opacity-100 transform translate-y-0' : 'opacity-0 transform translate-y-2'
       } ${
         isDeleting

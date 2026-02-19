@@ -1402,7 +1402,7 @@ export default function AIToDoListApp({
               <div className="flex gap-2 pb-2 overflow-x-auto custom-scrollbar">
               <button
                 onClick={() => setActiveCat('All')}
-                className={`px-4 py-2 rounded-xl text-base transition-colors flex-shrink-0 ml-2 ${
+                className={`disable-longpress-select px-4 py-2 rounded-xl text-base transition-colors flex-shrink-0 ml-2 ${
                   activeCat === 'All'
                     ? 'bg-gray-900 text-accent border border-accent'
                     : 'bg-gray-900 text-gray-300 hover:bg-gray-800 border border-gray-800'
@@ -1456,7 +1456,7 @@ export default function AIToDoListApp({
                       longPressTimerRef.current = null;
                     }
                   }}
-                  className={`px-4 py-2 rounded-xl text-base transition-colors flex-shrink-0 ${
+                  className={`disable-longpress-select px-4 py-2 rounded-xl text-base transition-colors flex-shrink-0 ${
                     catName === activeCat
                       ? 'bg-gray-900 text-accent border border-accent'
                       : 'bg-gray-900 text-gray-300 hover:bg-gray-800 border border-gray-800'
@@ -1468,7 +1468,7 @@ export default function AIToDoListApp({
               })}
               <button
                 onClick={() => setShowAddCategoryModal(true)}
-                className="px-4 py-2 rounded-xl text-base bg-gray-900 text-gray-300 hover:bg-gray-800 hover:text-gray-100 border border-gray-700 transition-colors flex-shrink-0 mr-2"
+                className="disable-longpress-select px-4 py-2 rounded-xl text-base bg-gray-900 text-gray-300 hover:bg-gray-800 hover:text-gray-100 border border-gray-700 transition-colors flex-shrink-0 mr-2"
               >
                 +
               </button>
