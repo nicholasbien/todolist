@@ -111,6 +111,7 @@ export default function AIToDoListApp({
   const [sortMode, setSortMode] = useState<SortMode>('auto');
   const [searchQuery, setSearchQuery] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
+  const [sortOpen, setSortOpen] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [showAddCategoryModal, setShowAddCategoryModal] = useState(false);
   const [showEditCategoryModal, setShowEditCategoryModal] = useState(false);
@@ -1393,7 +1394,7 @@ export default function AIToDoListApp({
         >
             <div>
           {/* Categories - Horizontal scroll (full width) */}
-          <div className="mb-3 pt-4">
+          <div className="mb-1 pt-4">
             {loadingCategories && (
               <div className="text-gray-400 mb-2 px-4 text-center">Loading categories...</div>
             )}
@@ -1402,57 +1403,12 @@ export default function AIToDoListApp({
                 onClick={() => setActiveCat('All')}
                 className={`px-4 py-2 rounded-xl text-base transition-colors flex-shrink-0 ml-2 ${
                   activeCat === 'All'
-                    ? 'bg-accent text-foreground shadow-lg'
+                    ? 'bg-gray-900 text-accent border border-accent'
                     : 'bg-gray-900 text-gray-300 hover:bg-gray-800 border border-gray-800'
                 }`}
               >
                 All
               </button>
-              <button
-                onClick={() => {
-                  setSearchOpen(!searchOpen);
-                  if (searchOpen) {
-                    setSearchQuery("");
-                  } else {
-                    setTimeout(() => searchInputRef.current?.focus(), 50);
-                  }
-                }}
-                className={`p-2 rounded-xl text-base transition-colors flex-shrink-0 ${
-                  searchOpen
-                    ? 'bg-accent text-foreground shadow-lg'
-                    : 'bg-gray-900 text-gray-300 hover:bg-gray-800 border border-gray-800'
-                }`}
-                aria-label="Search tasks"
-              >
-                <Search size={18} />
-              </button>
-              {searchOpen && (
-                <div className="flex items-center gap-1 flex-shrink-0">
-                  <input
-                    ref={searchInputRef}
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Escape') {
-                        setSearchQuery("");
-                        setSearchOpen(false);
-                      }
-                    }}
-                    placeholder="Search tasks..."
-                    className="w-40 px-3 py-1.5 rounded-xl text-base bg-gray-900 text-gray-100 border border-gray-700 focus:border-accent focus:outline-none placeholder-gray-500"
-                  />
-                  {searchQuery && (
-                    <button
-                      onClick={() => setSearchQuery("")}
-                      className="p-1 text-gray-400 hover:text-gray-200"
-                      aria-label="Clear search"
-                    >
-                      <X size={16} />
-                    </button>
-                  )}
-                </div>
-              )}
               {categories
               .sort((a, b) => {
                 const aName = typeof a === 'string' ? a : a.name;
@@ -1501,7 +1457,7 @@ export default function AIToDoListApp({
                   }}
                   className={`px-4 py-2 rounded-xl text-base transition-colors flex-shrink-0 ${
                     catName === activeCat
-                      ? 'bg-accent text-foreground shadow-lg'
+                      ? 'bg-gray-900 text-accent border border-accent'
                       : 'bg-gray-900 text-gray-300 hover:bg-gray-800 border border-gray-800'
                   }`}
                 >
@@ -1511,29 +1467,80 @@ export default function AIToDoListApp({
               })}
               <button
                 onClick={() => setShowAddCategoryModal(true)}
-                className="px-4 py-2 rounded-xl text-base bg-gray-900 text-gray-300 hover:bg-gray-800 border border-gray-800 transition-colors flex-shrink-0 mr-2"
+                className="px-4 py-2 rounded-xl text-base bg-gray-900 text-accent hover:bg-gray-800 border border-accent transition-colors flex-shrink-0 mr-2"
               >
                 +
               </button>
             </div>
           </div>
 
-          {/* Sort mode selector */}
-          <div className="flex items-center gap-2 px-3 mb-2">
-            <ArrowUpDown size={14} className="text-gray-500 flex-shrink-0" />
-            {(['auto', 'dueDate', 'date', 'custom'] as SortMode[]).map((mode) => (
+          {/* Sort mode selector + search */}
+          <div className="flex items-center px-3 mb-2 overflow-x-auto">
+            <div className="flex items-center gap-2 flex-shrink-0 mr-4">
+              <div>
+                {searchOpen ? (
+                  <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-gray-900 border border-accent">
+                    <Search size={14} className="text-accent flex-shrink-0" />
+                    <input
+                      ref={searchInputRef}
+                      type="text"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Escape') {
+                          setSearchQuery("");
+                          setSearchOpen(false);
+                        }
+                      }}
+                      placeholder="Search..."
+                      className="w-20 bg-transparent text-xs text-gray-100 focus:outline-none placeholder-gray-500"
+                    />
+                    <button
+                      onClick={() => { setSearchQuery(""); setSearchOpen(false); }}
+                      className="text-gray-400 hover:text-gray-200 flex-shrink-0"
+                      aria-label="Close search"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => {
+                      setSearchOpen(true);
+                      setTimeout(() => searchInputRef.current?.focus(), 50);
+                    }}
+                    className="p-1 rounded-lg text-gray-400 hover:text-gray-200 transition-colors"
+                    aria-label="Search tasks"
+                  >
+                    <Search size={14} />
+                  </button>
+                )}
+              </div>
               <button
-                key={mode}
-                onClick={() => handleSortModeChange(mode)}
-                className={`px-2.5 py-1 rounded-lg text-xs transition-colors ${
-                  sortMode === mode
-                    ? 'bg-accent text-foreground'
-                    : 'text-gray-400 hover:text-gray-200'
-                }`}
+                onClick={() => setSortOpen(!sortOpen)}
+                className={`p-1 rounded-lg transition-colors ${sortOpen ? 'text-accent' : 'text-gray-400 hover:text-gray-200'}`}
+                aria-label="Sort options"
               >
-                {mode === 'auto' ? 'Auto' : mode === 'date' ? 'Date Added' : mode === 'dueDate' ? 'Due Date' : 'Custom'}
+                <ArrowUpDown size={14} />
               </button>
-            ))}
+            </div>
+            {sortOpen && (
+              <div className="flex items-center gap-8">
+                {(['auto', 'dueDate', 'date', 'custom'] as SortMode[]).map((mode) => (
+                  <button
+                    key={mode}
+                    onClick={() => handleSortModeChange(mode)}
+                    className={`py-1 text-xs whitespace-nowrap flex-shrink-0 transition-colors ${
+                      sortMode === mode
+                        ? 'text-accent'
+                        : 'text-gray-400 hover:text-gray-200'
+                    }`}
+                  >
+                    {mode === 'auto' ? 'Auto' : mode === 'date' ? 'Date Added' : mode === 'dueDate' ? 'Due Date' : 'Custom'}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Rest of content with padding */}
@@ -1554,7 +1561,7 @@ export default function AIToDoListApp({
           <button
             onClick={handleAddTodo}
             disabled={loading}
-              className="bg-accent text-foreground w-12 h-12 rounded-xl hover:bg-accent-light disabled:bg-accent-dark disabled:text-gray-400 flex items-center justify-center transition-colors shadow-lg"
+              className="bg-gray-900 text-accent w-12 h-12 rounded-xl border border-accent hover:bg-gray-800 disabled:border-gray-700 disabled:text-gray-400 flex items-center justify-center transition-colors"
           >
             {loading ? '...' : '+'}
           </button>
