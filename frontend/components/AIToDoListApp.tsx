@@ -1726,48 +1726,28 @@ export default function AIToDoListApp({
       {loadingTodos && (
         <div className="text-gray-400 mb-2 text-center">Loading tasks...</div>
       )}
-      {sortMode === 'custom' ? (
-        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-          <SortableContext items={uncompletedTodoIds} strategy={verticalListSortingStrategy}>
-            <div className="space-y-3">
-              {uncompletedTodos.map((todo) => (
-                <SortableItem key={todo._id} id={todo._id}>
-                  <TodoItem
-                    todo={todo}
-                    categories={categories}
-                    editingCategory={editingCategory}
-                    setEditingCategory={setEditingCategory}
-                    handleUpdateCategory={handleUpdateCategory}
-                    handleUpdatePriority={handleUpdatePriority}
-                    handleCompleteTodo={handleCompleteTodo}
-                    handleDeleteTodo={handleDeleteTodo}
-                    isCollaborative={(activeSpace?.member_ids?.length ?? 0) > 1}
-                    onEdit={handleEditTodo}
-                  />
-                </SortableItem>
-              ))}
-            </div>
-          </SortableContext>
-        </DndContext>
-      ) : (
-        <div className="space-y-3">
-          {uncompletedTodos.map((todo) => (
-            <TodoItem
-              key={todo._id}
-              todo={todo}
-              categories={categories}
-              editingCategory={editingCategory}
-              setEditingCategory={setEditingCategory}
-              handleUpdateCategory={handleUpdateCategory}
-              handleUpdatePriority={handleUpdatePriority}
-              handleCompleteTodo={handleCompleteTodo}
-              handleDeleteTodo={handleDeleteTodo}
-              isCollaborative={(activeSpace?.member_ids?.length ?? 0) > 1}
-              onEdit={handleEditTodo}
-            />
-          ))}
-        </div>
-      )}
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+        <SortableContext items={uncompletedTodoIds} strategy={verticalListSortingStrategy}>
+          <div className="space-y-3">
+            {uncompletedTodos.map((todo) => (
+              <SortableItem key={todo._id} id={todo._id} disabled={sortMode !== 'custom'}>
+                <TodoItem
+                  todo={todo}
+                  categories={categories}
+                  editingCategory={editingCategory}
+                  setEditingCategory={setEditingCategory}
+                  handleUpdateCategory={handleUpdateCategory}
+                  handleUpdatePriority={handleUpdatePriority}
+                  handleCompleteTodo={handleCompleteTodo}
+                  handleDeleteTodo={handleDeleteTodo}
+                  isCollaborative={(activeSpace?.member_ids?.length ?? 0) > 1}
+                  onEdit={handleEditTodo}
+                />
+              </SortableItem>
+            ))}
+          </div>
+        </SortableContext>
+      </DndContext>
 
       {/* Show/Hide Completed Toggle Button */}
       {completedTodos.length > 0 && (
