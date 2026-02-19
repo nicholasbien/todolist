@@ -112,6 +112,7 @@ export default function AIToDoListApp({
   const [searchQuery, setSearchQuery] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
   const [sortOpen, setSortOpen] = useState(false);
+  const isSortModeActive = sortOpen && sortMode === 'custom';
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [showAddCategoryModal, setShowAddCategoryModal] = useState(false);
   const [showEditCategoryModal, setShowEditCategoryModal] = useState(false);
@@ -1737,7 +1738,7 @@ export default function AIToDoListApp({
         <SortableContext items={uncompletedTodoIds} strategy={verticalListSortingStrategy}>
           <div className="space-y-3">
             {uncompletedTodos.map((todo) => (
-              <SortableItem key={todo._id} id={todo._id} disabled={sortMode !== 'custom'}>
+              <SortableItem key={todo._id} id={todo._id} disabled={!isSortModeActive}>
                 <TodoItem
                   todo={todo}
                   categories={categories}
