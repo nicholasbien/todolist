@@ -1474,7 +1474,7 @@ export default function AIToDoListApp({
           </div>
 
           {/* Sort mode selector + search */}
-          <div className="flex items-center gap-1.5 px-3 mb-4 overflow-x-auto">
+          <div className="flex items-center gap-8 px-3 mb-4 overflow-x-auto">
             <div className="flex-shrink-0">
               {searchOpen ? (
                 <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-gray-900 border border-accent">
@@ -1519,7 +1519,7 @@ export default function AIToDoListApp({
               <button
                 key={mode}
                 onClick={() => handleSortModeChange(mode)}
-                className={`min-w-[5.5rem] text-center px-2.5 py-1 rounded-lg text-xs whitespace-nowrap flex-shrink-0 transition-colors ${
+                className={`py-1 text-xs whitespace-nowrap flex-shrink-0 transition-colors ${
                   sortMode === mode
                     ? 'text-white underline'
                     : 'text-gray-400 hover:text-gray-200'
