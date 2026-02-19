@@ -1494,7 +1494,7 @@ export default function AIToDoListApp({
                         }
                       }}
                       placeholder="Search..."
-                      className="w-20 bg-transparent text-xs text-gray-100 focus:outline-none placeholder-gray-500"
+                      className="w-40 bg-transparent text-xs text-gray-100 focus:outline-none placeholder-gray-500"
                     />
                     <button
                       onClick={() => { setSearchQuery(""); setSearchOpen(false); }}
