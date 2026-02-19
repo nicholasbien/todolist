@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Check, RotateCcw, X } from "lucide-react";
 
 interface TodoItemProps {
@@ -30,6 +30,8 @@ export default function TodoItem({
   const [isDeleting, setIsDeleting] = useState(false);
   const [shouldAnimate, setShouldAnimate] = useState(false);
   const containerRef = React.useRef<HTMLDivElement>(null);
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressTriggeredRef = useRef(false);
 
   useEffect(() => {
     setShouldAnimate(true);
@@ -85,7 +87,29 @@ export default function TodoItem({
     <div
       ref={containerRef}
       key={todo._id}
-      onClick={() => onEdit(todo)}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        onEdit(todo);
+      }}
+      onTouchStart={() => {
+        longPressTriggeredRef.current = false;
+        longPressTimerRef.current = setTimeout(() => {
+          longPressTriggeredRef.current = true;
+          onEdit(todo);
+        }, 500);
+      }}
+      onTouchEnd={() => {
+        if (longPressTimerRef.current) {
+          clearTimeout(longPressTimerRef.current);
+          longPressTimerRef.current = null;
+        }
+      }}
+      onTouchMove={() => {
+        if (longPressTimerRef.current) {
+          clearTimeout(longPressTimerRef.current);
+          longPressTimerRef.current = null;
+        }
+      }}
       className={`p-4 border rounded-xl transition-all duration-300 ease-in-out ${
         shouldAnimate ? 'opacity-100 transform translate-y-0' : 'opacity-0 transform translate-y-2'
       } ${
@@ -119,7 +143,7 @@ export default function TodoItem({
           </p>
         </div>
 
-        <div className="flex items-center space-x-2 ml-3">
+        <div className="flex items-center space-x-2 ml-3" onTouchStart={(e) => e.stopPropagation()}>
           {!todo.completed ? (
             <button
               onClick={(e) => { e.stopPropagation(); handleCompleteClick(e); }}
@@ -157,7 +181,7 @@ export default function TodoItem({
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2 mt-2 text-sm">
+      <div className="flex flex-wrap items-center gap-2 mt-2 text-sm" onTouchStart={(e) => e.stopPropagation()}>
         {editingCategory === todo._id ? (
           <select
             value={todo.category}
