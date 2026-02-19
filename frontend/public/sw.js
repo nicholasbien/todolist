@@ -1,6 +1,6 @@
 // IMPORTANT: Always increment these versions when modifying this service worker file
 // This forces browsers to download and use the updated service worker
-const STATIC_CACHE = 'todo-static-v122';
+const STATIC_CACHE = 'todo-static-v123';
 
 const GLOBAL_DB_NAME = 'TodoGlobalDB';
 const USER_DB_PREFIX = 'TodoUserDB_';
@@ -657,12 +657,30 @@ async function cacheGetTodos(url, response, authData) {
   const serverTodos = await response.json();
   await Promise.all(serverTodos.filter(t => t && t._id).map(t => putTodo(t, authData.userId)));
 
-  // Remove stale local todos not in server response (preserve offline_ IDs, scope to space)
+  // Remove stale local todos not in server response (scope to space)
   const serverIdSet = new Set(serverTodos.map(t => t._id));
   const localTodos = await getTodos(authData.userId, spaceId);
-  const stale = localTodos.filter(l => !l._id.startsWith('offline_') && !serverIdSet.has(l._id));
+
+  // Check if any offline todos still have pending sync operations
+  const queue = await readQueue(authData.userId);
+  const pendingOfflineIds = new Set(
+    queue
+      .filter(op => op.type === 'CREATE' && op.data._id && op.data._id.startsWith('offline_'))
+      .map(op => op.data._id)
+  );
+
+  // Remove stale server-ID todos not in response, AND offline-prefixed todos
+  // that have no pending CREATE in the queue (i.e. they were already synced
+  // but not cleaned up, or their sync failed and was dropped).
+  const stale = localTodos.filter(l => {
+    if (l._id.startsWith('offline_')) {
+      // Only remove offline todos that have no pending CREATE operation
+      return !pendingOfflineIds.has(l._id);
+    }
+    return !serverIdSet.has(l._id);
+  });
   await Promise.all(stale.map(l => delTodo(l._id, authData.userId)));
-  console.log(`✅ Cached ${serverTodos.length} todos to IndexedDB`);
+  console.log(`✅ Cached ${serverTodos.length} todos to IndexedDB (removed ${stale.length} stale)`);
   return 'cached';
 }
 
