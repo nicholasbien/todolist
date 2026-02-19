@@ -1402,7 +1402,7 @@ export default function AIToDoListApp({
                 onClick={() => setActiveCat('All')}
                 className={`px-4 py-2 rounded-xl text-base transition-colors flex-shrink-0 ml-2 ${
                   activeCat === 'All'
-                    ? 'bg-accent text-foreground shadow-lg'
+                    ? 'bg-gray-900 text-accent border border-accent'
                     : 'bg-gray-900 text-gray-300 hover:bg-gray-800 border border-gray-800'
                 }`}
               >
@@ -1419,7 +1419,7 @@ export default function AIToDoListApp({
                 }}
                 className={`p-2 rounded-xl text-base transition-colors flex-shrink-0 ${
                   searchOpen
-                    ? 'bg-accent text-foreground shadow-lg'
+                    ? 'bg-gray-900 text-accent border border-accent'
                     : 'bg-gray-900 text-gray-300 hover:bg-gray-800 border border-gray-800'
                 }`}
                 aria-label="Search tasks"
@@ -1501,7 +1501,7 @@ export default function AIToDoListApp({
                   }}
                   className={`px-4 py-2 rounded-xl text-base transition-colors flex-shrink-0 ${
                     catName === activeCat
-                      ? 'bg-accent text-foreground shadow-lg'
+                      ? 'bg-gray-900 text-accent border border-accent'
                       : 'bg-gray-900 text-gray-300 hover:bg-gray-800 border border-gray-800'
                   }`}
                 >
@@ -1511,7 +1511,7 @@ export default function AIToDoListApp({
               })}
               <button
                 onClick={() => setShowAddCategoryModal(true)}
-                className="px-4 py-2 rounded-xl text-base bg-gray-900 text-gray-300 hover:bg-gray-800 border border-gray-800 transition-colors flex-shrink-0 mr-2"
+                className="px-4 py-2 rounded-xl text-base bg-gray-900 text-accent hover:bg-gray-800 border border-accent transition-colors flex-shrink-0 mr-2"
               >
                 +
               </button>
@@ -1527,7 +1527,7 @@ export default function AIToDoListApp({
                 onClick={() => handleSortModeChange(mode)}
                 className={`px-2.5 py-1 rounded-lg text-xs transition-colors ${
                   sortMode === mode
-                    ? 'bg-accent text-foreground'
+                    ? 'bg-gray-900 text-accent border border-accent'
                     : 'text-gray-400 hover:text-gray-200'
                 }`}
               >
@@ -1554,7 +1554,7 @@ export default function AIToDoListApp({
           <button
             onClick={handleAddTodo}
             disabled={loading}
-              className="bg-accent text-foreground w-12 h-12 rounded-xl hover:bg-accent-light disabled:bg-accent-dark disabled:text-gray-400 flex items-center justify-center transition-colors shadow-lg"
+              className="bg-gray-900 text-accent w-12 h-12 rounded-xl border border-accent hover:bg-gray-800 disabled:border-gray-700 disabled:text-gray-400 flex items-center justify-center transition-colors"
           >
             {loading ? '...' : '+'}
           </button>
