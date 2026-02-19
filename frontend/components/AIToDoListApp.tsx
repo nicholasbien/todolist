@@ -111,6 +111,7 @@ export default function AIToDoListApp({
   const [sortMode, setSortMode] = useState<SortMode>('auto');
   const [searchQuery, setSearchQuery] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
+  const [sortOpen, setSortOpen] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [showAddCategoryModal, setShowAddCategoryModal] = useState(false);
   const [showEditCategoryModal, setShowEditCategoryModal] = useState(false);
@@ -1393,7 +1394,7 @@ export default function AIToDoListApp({
         >
             <div>
           {/* Categories - Horizontal scroll (full width) */}
-          <div className="mb-3 pt-4">
+          <div className="mb-1 pt-4">
             {loadingCategories && (
               <div className="text-gray-400 mb-2 px-4 text-center">Loading categories...</div>
             )}
@@ -1474,60 +1475,72 @@ export default function AIToDoListApp({
           </div>
 
           {/* Sort mode selector + search */}
-          <div className="flex items-center gap-8 px-3 mb-4 overflow-x-auto">
-            <div className="flex-shrink-0">
-              {searchOpen ? (
-                <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-gray-900 border border-accent">
-                  <Search size={14} className="text-accent flex-shrink-0" />
-                  <input
-                    ref={searchInputRef}
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Escape') {
-                        setSearchQuery("");
-                        setSearchOpen(false);
-                      }
-                    }}
-                    placeholder="Search..."
-                    className="w-20 bg-transparent text-xs text-gray-100 focus:outline-none placeholder-gray-500"
-                  />
+          <div className="flex items-center px-3 mb-2 overflow-x-auto">
+            <div className="flex items-center gap-2 flex-shrink-0 mr-4">
+              <div>
+                {searchOpen ? (
+                  <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-gray-900 border border-accent">
+                    <Search size={14} className="text-accent flex-shrink-0" />
+                    <input
+                      ref={searchInputRef}
+                      type="text"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Escape') {
+                          setSearchQuery("");
+                          setSearchOpen(false);
+                        }
+                      }}
+                      placeholder="Search..."
+                      className="w-20 bg-transparent text-xs text-gray-100 focus:outline-none placeholder-gray-500"
+                    />
+                    <button
+                      onClick={() => { setSearchQuery(""); setSearchOpen(false); }}
+                      className="text-gray-400 hover:text-gray-200 flex-shrink-0"
+                      aria-label="Close search"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                ) : (
                   <button
-                    onClick={() => { setSearchQuery(""); setSearchOpen(false); }}
-                    className="text-gray-400 hover:text-gray-200 flex-shrink-0"
-                    aria-label="Close search"
+                    onClick={() => {
+                      setSearchOpen(true);
+                      setTimeout(() => searchInputRef.current?.focus(), 50);
+                    }}
+                    className="p-1 rounded-lg text-gray-400 hover:text-gray-200 transition-colors"
+                    aria-label="Search tasks"
                   >
-                    <X size={14} />
+                    <Search size={14} />
                   </button>
-                </div>
-              ) : (
-                <button
-                  onClick={() => {
-                    setSearchOpen(true);
-                    setTimeout(() => searchInputRef.current?.focus(), 50);
-                  }}
-                  className="p-1 rounded-lg text-gray-400 hover:text-gray-200 transition-colors"
-                  aria-label="Search tasks"
-                >
-                  <Search size={14} />
-                </button>
-              )}
-            </div>
-            <ArrowUpDown size={14} className="text-gray-500 flex-shrink-0" />
-            {(['auto', 'dueDate', 'date', 'custom'] as SortMode[]).map((mode) => (
+                )}
+              </div>
               <button
-                key={mode}
-                onClick={() => handleSortModeChange(mode)}
-                className={`py-1 text-xs whitespace-nowrap flex-shrink-0 transition-colors ${
-                  sortMode === mode
-                    ? 'text-white underline'
-                    : 'text-gray-400 hover:text-gray-200'
-                }`}
+                onClick={() => setSortOpen(!sortOpen)}
+                className={`p-1 rounded-lg transition-colors ${sortOpen ? 'text-accent' : 'text-gray-400 hover:text-gray-200'}`}
+                aria-label="Sort options"
               >
-                {mode === 'auto' ? 'Auto' : mode === 'date' ? 'Date Added' : mode === 'dueDate' ? 'Due Date' : 'Custom'}
+                <ArrowUpDown size={14} />
               </button>
-            ))}
+            </div>
+            {sortOpen && (
+              <div className="flex items-center gap-8">
+                {(['auto', 'dueDate', 'date', 'custom'] as SortMode[]).map((mode) => (
+                  <button
+                    key={mode}
+                    onClick={() => handleSortModeChange(mode)}
+                    className={`py-1 text-xs whitespace-nowrap flex-shrink-0 transition-colors ${
+                      sortMode === mode
+                        ? 'text-accent'
+                        : 'text-gray-400 hover:text-gray-200'
+                    }`}
+                  >
+                    {mode === 'auto' ? 'Auto' : mode === 'date' ? 'Date Added' : mode === 'dueDate' ? 'Due Date' : 'Custom'}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Rest of content with padding */}
