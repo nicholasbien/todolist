@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { Settings, ArrowUpDown, Search, X } from "lucide-react";
+import { Settings, ArrowUpDown, GripVertical, Search, X } from "lucide-react";
 import TodoItem from "./TodoItem";
 import AgentChatbot from "./AgentChatbot";
 import { useAuth } from "../context/AuthContext";
@@ -61,14 +61,20 @@ function SortableItem({ id, children, disabled }: { id: string; children: React.
   };
 
   return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      {...attributes}
-      {...listeners}
-      className={!disabled ? 'touch-none cursor-grab active:cursor-grabbing' : ''}
-    >
-      {children}
+    <div ref={setNodeRef} style={style} className="flex items-stretch">
+      {!disabled && (
+        <div
+          {...attributes}
+          {...listeners}
+          className="touch-none flex items-center px-1.5 cursor-grab active:cursor-grabbing text-gray-600 hover:text-gray-400"
+          aria-label="Drag to reorder"
+        >
+          <GripVertical size={16} />
+        </div>
+      )}
+      <div className="flex-1 min-w-0">
+        {children}
+      </div>
     </div>
   );
 }
@@ -1072,7 +1078,7 @@ export default function AIToDoListApp({
 
   // Drag-and-drop sensors
   const pointerSensor = useSensor(PointerSensor, { activationConstraint: { distance: 8 } });
-  const touchSensor = useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } });
+  const touchSensor = useSensor(TouchSensor, { activationConstraint: { delay: 300, tolerance: 8 } });
   const sensors = useSensors(pointerSensor, touchSensor);
 
   // Handle drag end for custom sort
