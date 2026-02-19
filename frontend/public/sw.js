@@ -706,7 +706,22 @@ async function cacheGetJournals(url, response, authData) {
     if (!dateParam) {
       const serverJournalIdSet = new Set(serverJournals.filter(j => j && j._id).map(j => j._id));
       const localJournals = await getJournals(authData.userId, null, spaceId);
-      const stale = localJournals.filter(l => !l._id.startsWith('offline_journal_') && !serverJournalIdSet.has(l._id));
+
+      // Check which offline journals still have pending sync operations
+      const journalQueue = await readQueue(authData.userId);
+      const pendingOfflineJournalIds = new Set(
+        journalQueue
+          .filter(op => op.type === 'CREATE_JOURNAL' && op.data._id && op.data._id.startsWith('offline_journal_'))
+          .map(op => op.data._id)
+      );
+
+      const stale = localJournals.filter(l => {
+        if (l._id.startsWith('offline_journal_')) {
+          // Only remove offline journals that have no pending CREATE_JOURNAL
+          return !pendingOfflineJournalIds.has(l._id);
+        }
+        return !serverJournalIdSet.has(l._id);
+      });
       await Promise.all(stale.map(l => delJournal(l._id, authData.userId)));
     }
   }
@@ -719,9 +734,43 @@ async function cacheGetJournals(url, response, authData) {
 async function cacheGetCategories(url, response, authData) {
   const categories = await response.json();
   const spaceId = url.searchParams.get('space_id');
-  await Promise.all(categories.map(categoryName =>
-    putCategory({ name: categoryName, space_id: spaceId }, authData.userId)
-  ));
+
+  if (spaceId) {
+    // Full reconciliation: categories use auto-increment IDs, so simply adding
+    // server categories would create duplicates. Instead, remove all local
+    // categories for this space first, then re-add server categories and
+    // preserve any with pending CREATE_CATEGORY operations.
+    const localCategories = await getCategories(authData.userId, spaceId);
+
+    // Check which categories still have pending sync operations
+    const queue = await readQueue(authData.userId);
+    const pendingCategoryNames = new Set(
+      queue
+        .filter(op => op.type === 'CREATE_CATEGORY' && op.data.space_id === spaceId)
+        .map(op => op.data.name)
+    );
+
+    const serverCategoryNames = new Set(categories);
+
+    // Delete all local categories that are NOT pending AND NOT in server response,
+    // plus duplicates of server categories (will be re-added fresh)
+    for (const local of localCategories) {
+      if (serverCategoryNames.has(local.name) || !pendingCategoryNames.has(local.name)) {
+        await delCategory(local.name, authData.userId, spaceId);
+      }
+    }
+
+    // Re-add server categories fresh
+    await Promise.all(categories.map(categoryName =>
+      putCategory({ name: categoryName, space_id: spaceId }, authData.userId)
+    ));
+  } else {
+    // No space_id: just cache without cleanup
+    await Promise.all(categories.map(categoryName =>
+      putCategory({ name: categoryName, space_id: spaceId }, authData.userId)
+    ));
+  }
+
   console.log(`📂 Cached ${categories.length} categories for space ${spaceId || 'all'} to IndexedDB`);
   return 'cached';
 }
@@ -729,7 +778,29 @@ async function cacheGetCategories(url, response, authData) {
 async function cacheGetSpaces(url, response, authData) {
   const spaces = await response.json();
   await Promise.all(spaces.filter(s => s && s._id).map(s => putSpace(s, authData.userId)));
-  console.log(`🏢 Cached ${spaces.length} spaces to IndexedDB`);
+
+  // Remove stale local spaces not in server response
+  const serverSpaceIds = new Set(spaces.filter(s => s && s._id).map(s => s._id));
+  const localSpaces = await getSpaces(authData.userId);
+
+  // Check which offline spaces still have pending sync operations
+  const queue = await readQueue(authData.userId);
+  const pendingOfflineSpaceIds = new Set(
+    queue
+      .filter(op => op.type === 'CREATE_SPACE' && op.data._id && op.data._id.startsWith('offline_space_'))
+      .map(op => op.data._id)
+  );
+
+  const stale = localSpaces.filter(l => {
+    if (l._id.startsWith('offline_space_')) {
+      // Only remove offline spaces that have no pending CREATE_SPACE
+      return !pendingOfflineSpaceIds.has(l._id);
+    }
+    return !serverSpaceIds.has(l._id);
+  });
+  await Promise.all(stale.map(l => delSpace(l._id, authData.userId)));
+
+  console.log(`🏢 Cached ${spaces.length} spaces to IndexedDB (removed ${stale.length} stale)`);
   return 'cached';
 }
 
