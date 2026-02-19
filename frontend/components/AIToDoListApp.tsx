@@ -1549,15 +1549,20 @@ export default function AIToDoListApp({
       {/* Add new todo */}
       <div className="mb-5">
         <div className="flex gap-2">
-          <input
-            type="text"
+          <textarea
             value={newTodo}
             onChange={(e) => setNewTodo(e.target.value)}
-            onKeyPress={(e) => e.key === 'Enter' && handleAddTodo()}
-            placeholder="Add a new task..."
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                handleAddTodo();
+              }
+            }}
+            placeholder="Add a new task... (Shift+Enter for a new line)"
             disabled={loading}
             aria-label="Add new task"
-            className="flex-1 p-3 border border-gray-800 rounded-xl bg-black text-gray-100 placeholder-gray-500 focus:border-accent focus:outline-none transition-colors"
+            rows={1}
+            className="flex-1 p-3 border border-gray-800 rounded-xl bg-black text-gray-100 placeholder-gray-500 focus:border-accent focus:outline-none transition-colors resize-y min-h-[48px]"
           />
           <button
             onClick={handleAddTodo}
