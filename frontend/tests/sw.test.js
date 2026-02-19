@@ -59,6 +59,7 @@ const {
   readQueue,
   clearQueue,
   removeQueueItem,
+  cacheGetTodos,
   cacheGetJournals,
   cacheGetCategories,
   cacheGetSpaces,
@@ -570,6 +571,128 @@ describe('Service Worker Regression Tests', () => {
     });
   });
 
+  describe('Offline Sync Duplicate Prevention', () => {
+    const testUserId = 'sync-dup-user';
+    const testSpaceId = 'space-dup';
+
+    beforeEach(async () => {
+      global.indexedDB = new FDBFactory();
+      _resetDbCache();
+      global.fetch.mockReset();
+    }, 10000);
+
+    test('cacheGetTodos removes orphaned offline todos with no pending CREATE', async () => {
+      // Simulate state after sync replaced offline todo with server todo
+      // but the offline entry wasn't cleaned up (race condition)
+      const offlineTodo = {
+        _id: 'offline_1700000000000',
+        text: 'Buy groceries',
+        space_id: testSpaceId,
+        category: 'General',
+        priority: 'Medium',
+        completed: false,
+        created_offline: true,
+      };
+      const serverTodo = {
+        _id: 'server_abc123',
+        text: 'Buy groceries',
+        space_id: testSpaceId,
+        category: 'General',
+        priority: 'Medium',
+        completed: false,
+      };
+
+      // Both exist in IDB (the bug scenario)
+      await putTodo(offlineTodo, testUserId);
+      await putTodo(serverTodo, testUserId);
+
+      // No pending CREATE ops in the queue (sync already processed it)
+      // Queue is empty
+
+      // Build a fake Response from server data
+      const fakeResponse = new Response(JSON.stringify([serverTodo]), {
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const fakeUrl = new URL(`http://localhost:3000/todos?space_id=${testSpaceId}`);
+      const authData = { userId: testUserId, token: 'tok' };
+
+      await cacheGetTodos(fakeUrl, fakeResponse, authData);
+
+      const remaining = await getTodos(testUserId, testSpaceId);
+      // Should only have the server todo — offline duplicate removed
+      expect(remaining).toHaveLength(1);
+      expect(remaining[0]._id).toBe('server_abc123');
+    });
+
+    test('cacheGetTodos preserves offline todos that still have pending CREATE', async () => {
+      const offlineTodo = {
+        _id: 'offline_1700000000001',
+        text: 'New offline task',
+        space_id: testSpaceId,
+        category: 'General',
+        priority: 'Medium',
+        completed: false,
+        created_offline: true,
+      };
+
+      await putTodo(offlineTodo, testUserId);
+
+      // Queue still has the pending CREATE for this offline todo
+      await addQueue(
+        { type: 'CREATE', data: { _id: offlineTodo._id, text: offlineTodo.text } },
+        testUserId
+      );
+
+      // Server returns an empty list (hasn't synced yet)
+      const fakeResponse = new Response(JSON.stringify([]), {
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const fakeUrl = new URL(`http://localhost:3000/todos?space_id=${testSpaceId}`);
+      const authData = { userId: testUserId, token: 'tok' };
+
+      await cacheGetTodos(fakeUrl, fakeResponse, authData);
+
+      const remaining = await getTodos(testUserId, testSpaceId);
+      // Offline todo should be preserved because its CREATE is still pending
+      expect(remaining).toHaveLength(1);
+      expect(remaining[0]._id).toBe('offline_1700000000001');
+    });
+
+    test('cacheGetTodos removes stale server todos not in response', async () => {
+      const staleTodo = {
+        _id: 'server_old',
+        text: 'Deleted on server',
+        space_id: testSpaceId,
+        category: 'General',
+        priority: 'Medium',
+        completed: false,
+      };
+      const currentTodo = {
+        _id: 'server_current',
+        text: 'Still exists',
+        space_id: testSpaceId,
+        category: 'General',
+        priority: 'Medium',
+        completed: false,
+      };
+
+      await putTodo(staleTodo, testUserId);
+      await putTodo(currentTodo, testUserId);
+
+      const fakeResponse = new Response(JSON.stringify([currentTodo]), {
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const fakeUrl = new URL(`http://localhost:3000/todos?space_id=${testSpaceId}`);
+      const authData = { userId: testUserId, token: 'tok' };
+
+      await cacheGetTodos(fakeUrl, fakeResponse, authData);
+
+      const remaining = await getTodos(testUserId, testSpaceId);
+      expect(remaining).toHaveLength(1);
+      expect(remaining[0]._id).toBe('server_current');
+    });
+  });
+
   describe('Offline Sync Duplicate Prevention - Journals', () => {
     const testUserId = 'sync-dup-journal-user';
     const testSpaceId = 'space-journal-dup';
@@ -581,8 +704,6 @@ describe('Service Worker Regression Tests', () => {
     }, 10000);
 
     test('cacheGetJournals removes orphaned offline journals with no pending CREATE_JOURNAL', async () => {
-      // Simulate state after sync replaced offline journal with server journal
-      // but the offline entry wasn't cleaned up (race condition)
       const offlineJournal = {
         _id: 'offline_journal_2024-01-15_1700000000000',
         date: '2024-01-15',
@@ -599,11 +720,8 @@ describe('Service Worker Regression Tests', () => {
         user_id: testUserId,
       };
 
-      // Both exist in IDB (the bug scenario)
       await putJournal(offlineJournal, testUserId);
       await putJournal(serverJournal, testUserId);
-
-      // No pending CREATE_JOURNAL ops in the queue (sync already processed it)
 
       const fakeResponse = new Response(JSON.stringify([serverJournal]), {
         headers: { 'Content-Type': 'application/json' },
@@ -614,7 +732,6 @@ describe('Service Worker Regression Tests', () => {
       await cacheGetJournals(fakeUrl, fakeResponse, authData);
 
       const remaining = await getJournals(testUserId, null, testSpaceId);
-      // Should only have the server journal — offline duplicate removed
       expect(remaining).toHaveLength(1);
       expect(remaining[0]._id).toBe('server_journal_abc123');
     });
@@ -631,13 +748,11 @@ describe('Service Worker Regression Tests', () => {
 
       await putJournal(offlineJournal, testUserId);
 
-      // Queue still has the pending CREATE_JOURNAL for this offline journal
       await addQueue(
         { type: 'CREATE_JOURNAL', data: { _id: offlineJournal._id, date: offlineJournal.date, text: offlineJournal.text } },
         testUserId
       );
 
-      // Server returns an empty list (hasn't synced yet)
       const fakeResponse = new Response(JSON.stringify([]), {
         headers: { 'Content-Type': 'application/json' },
       });
@@ -647,7 +762,6 @@ describe('Service Worker Regression Tests', () => {
       await cacheGetJournals(fakeUrl, fakeResponse, authData);
 
       const remaining = await getJournals(testUserId, null, testSpaceId);
-      // Offline journal should be preserved because its CREATE_JOURNAL is still pending
       expect(remaining).toHaveLength(1);
       expect(remaining[0]._id).toBe('offline_journal_2024-01-16_1700000000001');
     });
@@ -677,11 +791,8 @@ describe('Service Worker Regression Tests', () => {
         member_ids: [testUserId],
       };
 
-      // Both exist in IDB (the bug scenario)
       await putSpace(offlineSpace, testUserId);
       await putSpace(serverSpace, testUserId);
-
-      // No pending CREATE_SPACE ops
 
       const fakeResponse = new Response(JSON.stringify([serverSpace]), {
         headers: { 'Content-Type': 'application/json' },
@@ -707,7 +818,6 @@ describe('Service Worker Regression Tests', () => {
 
       await putSpace(offlineSpace, testUserId);
 
-      // Queue still has the pending CREATE_SPACE
       await addQueue(
         { type: 'CREATE_SPACE', data: { _id: offlineSpace._id, name: offlineSpace.name } },
         testUserId
@@ -768,12 +878,10 @@ describe('Service Worker Regression Tests', () => {
     }, 10000);
 
     test('cacheGetCategories removes stale local categories not in server response', async () => {
-      // Local has categories that were deleted on the server
       await putCategory({ name: 'Work', space_id: testSpaceId }, testUserId);
       await putCategory({ name: 'Personal', space_id: testSpaceId }, testUserId);
       await putCategory({ name: 'Deleted Category', space_id: testSpaceId }, testUserId);
 
-      // Server only has Work and Personal
       const fakeResponse = new Response(JSON.stringify(['Work', 'Personal']), {
         headers: { 'Content-Type': 'application/json' },
       });
@@ -791,13 +899,11 @@ describe('Service Worker Regression Tests', () => {
       await putCategory({ name: 'Existing', space_id: testSpaceId }, testUserId);
       await putCategory({ name: 'New Offline Category', space_id: testSpaceId }, testUserId);
 
-      // Queue has pending CREATE_CATEGORY for the new one
       await addQueue(
         { type: 'CREATE_CATEGORY', data: { name: 'New Offline Category', space_id: testSpaceId } },
         testUserId
       );
 
-      // Server only knows about Existing
       const fakeResponse = new Response(JSON.stringify(['Existing']), {
         headers: { 'Content-Type': 'application/json' },
       });
