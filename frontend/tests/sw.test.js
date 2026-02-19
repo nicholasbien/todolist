@@ -58,6 +58,10 @@ const {
   addQueue,
   readQueue,
   clearQueue,
+  removeQueueItem,
+  cacheGetJournals,
+  cacheGetCategories,
+  cacheGetSpaces,
   handleRequest,
   _resetDbCache
 } = require('../public/sw.js');
@@ -563,6 +567,248 @@ describe('Service Worker Regression Tests', () => {
       expect(getJournals).toBeDefined();
       expect(putJournal).toBeDefined();
       expect(delJournal).toBeDefined();
+    });
+  });
+
+  describe('Offline Sync Duplicate Prevention - Journals', () => {
+    const testUserId = 'sync-dup-journal-user';
+    const testSpaceId = 'space-journal-dup';
+
+    beforeEach(async () => {
+      global.indexedDB = new FDBFactory();
+      _resetDbCache();
+      global.fetch.mockReset();
+    }, 10000);
+
+    test('cacheGetJournals removes orphaned offline journals with no pending CREATE_JOURNAL', async () => {
+      // Simulate state after sync replaced offline journal with server journal
+      // but the offline entry wasn't cleaned up (race condition)
+      const offlineJournal = {
+        _id: 'offline_journal_2024-01-15_1700000000000',
+        date: '2024-01-15',
+        text: 'My offline journal entry',
+        space_id: testSpaceId,
+        user_id: testUserId,
+        created_offline: true,
+      };
+      const serverJournal = {
+        _id: 'server_journal_abc123',
+        date: '2024-01-15',
+        text: 'My offline journal entry',
+        space_id: testSpaceId,
+        user_id: testUserId,
+      };
+
+      // Both exist in IDB (the bug scenario)
+      await putJournal(offlineJournal, testUserId);
+      await putJournal(serverJournal, testUserId);
+
+      // No pending CREATE_JOURNAL ops in the queue (sync already processed it)
+
+      const fakeResponse = new Response(JSON.stringify([serverJournal]), {
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const fakeUrl = new URL(`http://localhost:3000/journals?space_id=${testSpaceId}`);
+      const authData = { userId: testUserId, token: 'tok' };
+
+      await cacheGetJournals(fakeUrl, fakeResponse, authData);
+
+      const remaining = await getJournals(testUserId, null, testSpaceId);
+      // Should only have the server journal — offline duplicate removed
+      expect(remaining).toHaveLength(1);
+      expect(remaining[0]._id).toBe('server_journal_abc123');
+    });
+
+    test('cacheGetJournals preserves offline journals that still have pending CREATE_JOURNAL', async () => {
+      const offlineJournal = {
+        _id: 'offline_journal_2024-01-16_1700000000001',
+        date: '2024-01-16',
+        text: 'Pending offline journal',
+        space_id: testSpaceId,
+        user_id: testUserId,
+        created_offline: true,
+      };
+
+      await putJournal(offlineJournal, testUserId);
+
+      // Queue still has the pending CREATE_JOURNAL for this offline journal
+      await addQueue(
+        { type: 'CREATE_JOURNAL', data: { _id: offlineJournal._id, date: offlineJournal.date, text: offlineJournal.text } },
+        testUserId
+      );
+
+      // Server returns an empty list (hasn't synced yet)
+      const fakeResponse = new Response(JSON.stringify([]), {
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const fakeUrl = new URL(`http://localhost:3000/journals?space_id=${testSpaceId}`);
+      const authData = { userId: testUserId, token: 'tok' };
+
+      await cacheGetJournals(fakeUrl, fakeResponse, authData);
+
+      const remaining = await getJournals(testUserId, null, testSpaceId);
+      // Offline journal should be preserved because its CREATE_JOURNAL is still pending
+      expect(remaining).toHaveLength(1);
+      expect(remaining[0]._id).toBe('offline_journal_2024-01-16_1700000000001');
+    });
+  });
+
+  describe('Offline Sync Duplicate Prevention - Spaces', () => {
+    const testUserId = 'sync-dup-space-user';
+
+    beforeEach(async () => {
+      global.indexedDB = new FDBFactory();
+      _resetDbCache();
+      global.fetch.mockReset();
+    }, 10000);
+
+    test('cacheGetSpaces removes orphaned offline spaces with no pending CREATE_SPACE', async () => {
+      const offlineSpace = {
+        _id: 'offline_space_1700000000000',
+        name: 'My Offline Space',
+        owner_id: testUserId,
+        member_ids: [testUserId],
+        created_offline: true,
+      };
+      const serverSpace = {
+        _id: 'server_space_abc123',
+        name: 'My Offline Space',
+        owner_id: testUserId,
+        member_ids: [testUserId],
+      };
+
+      // Both exist in IDB (the bug scenario)
+      await putSpace(offlineSpace, testUserId);
+      await putSpace(serverSpace, testUserId);
+
+      // No pending CREATE_SPACE ops
+
+      const fakeResponse = new Response(JSON.stringify([serverSpace]), {
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const fakeUrl = new URL('http://localhost:3000/spaces');
+      const authData = { userId: testUserId, token: 'tok' };
+
+      await cacheGetSpaces(fakeUrl, fakeResponse, authData);
+
+      const remaining = await getSpaces(testUserId);
+      expect(remaining).toHaveLength(1);
+      expect(remaining[0]._id).toBe('server_space_abc123');
+    });
+
+    test('cacheGetSpaces preserves offline spaces that still have pending CREATE_SPACE', async () => {
+      const offlineSpace = {
+        _id: 'offline_space_1700000000001',
+        name: 'Pending Space',
+        owner_id: testUserId,
+        member_ids: [testUserId],
+        created_offline: true,
+      };
+
+      await putSpace(offlineSpace, testUserId);
+
+      // Queue still has the pending CREATE_SPACE
+      await addQueue(
+        { type: 'CREATE_SPACE', data: { _id: offlineSpace._id, name: offlineSpace.name } },
+        testUserId
+      );
+
+      const fakeResponse = new Response(JSON.stringify([]), {
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const fakeUrl = new URL('http://localhost:3000/spaces');
+      const authData = { userId: testUserId, token: 'tok' };
+
+      await cacheGetSpaces(fakeUrl, fakeResponse, authData);
+
+      const remaining = await getSpaces(testUserId);
+      expect(remaining).toHaveLength(1);
+      expect(remaining[0]._id).toBe('offline_space_1700000000001');
+    });
+
+    test('cacheGetSpaces removes stale server spaces not in response', async () => {
+      const staleSpace = {
+        _id: 'server_space_old',
+        name: 'Deleted Space',
+        owner_id: testUserId,
+        member_ids: [testUserId],
+      };
+      const currentSpace = {
+        _id: 'server_space_current',
+        name: 'Active Space',
+        owner_id: testUserId,
+        member_ids: [testUserId],
+      };
+
+      await putSpace(staleSpace, testUserId);
+      await putSpace(currentSpace, testUserId);
+
+      const fakeResponse = new Response(JSON.stringify([currentSpace]), {
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const fakeUrl = new URL('http://localhost:3000/spaces');
+      const authData = { userId: testUserId, token: 'tok' };
+
+      await cacheGetSpaces(fakeUrl, fakeResponse, authData);
+
+      const remaining = await getSpaces(testUserId);
+      expect(remaining).toHaveLength(1);
+      expect(remaining[0]._id).toBe('server_space_current');
+    });
+  });
+
+  describe('Offline Sync Duplicate Prevention - Categories', () => {
+    const testUserId = 'sync-dup-cat-user';
+    const testSpaceId = 'space-cat-dup';
+
+    beforeEach(async () => {
+      global.indexedDB = new FDBFactory();
+      _resetDbCache();
+      global.fetch.mockReset();
+    }, 10000);
+
+    test('cacheGetCategories removes stale local categories not in server response', async () => {
+      // Local has categories that were deleted on the server
+      await putCategory({ name: 'Work', space_id: testSpaceId }, testUserId);
+      await putCategory({ name: 'Personal', space_id: testSpaceId }, testUserId);
+      await putCategory({ name: 'Deleted Category', space_id: testSpaceId }, testUserId);
+
+      // Server only has Work and Personal
+      const fakeResponse = new Response(JSON.stringify(['Work', 'Personal']), {
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const fakeUrl = new URL(`http://localhost:3000/categories?space_id=${testSpaceId}`);
+      const authData = { userId: testUserId, token: 'tok' };
+
+      await cacheGetCategories(fakeUrl, fakeResponse, authData);
+
+      const remaining = await getCategories(testUserId, testSpaceId);
+      const names = remaining.map(c => c.name).sort();
+      expect(names).toEqual(['Personal', 'Work']);
+    });
+
+    test('cacheGetCategories preserves categories with pending CREATE_CATEGORY', async () => {
+      await putCategory({ name: 'Existing', space_id: testSpaceId }, testUserId);
+      await putCategory({ name: 'New Offline Category', space_id: testSpaceId }, testUserId);
+
+      // Queue has pending CREATE_CATEGORY for the new one
+      await addQueue(
+        { type: 'CREATE_CATEGORY', data: { name: 'New Offline Category', space_id: testSpaceId } },
+        testUserId
+      );
+
+      // Server only knows about Existing
+      const fakeResponse = new Response(JSON.stringify(['Existing']), {
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const fakeUrl = new URL(`http://localhost:3000/categories?space_id=${testSpaceId}`);
+      const authData = { userId: testUserId, token: 'tok' };
+
+      await cacheGetCategories(fakeUrl, fakeResponse, authData);
+
+      const remaining = await getCategories(testUserId, testSpaceId);
+      const names = remaining.map(c => c.name).sort();
+      expect(names).toEqual(['Existing', 'New Offline Category']);
     });
   });
 
