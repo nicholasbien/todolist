@@ -1408,51 +1408,6 @@ export default function AIToDoListApp({
               >
                 All
               </button>
-              <button
-                onClick={() => {
-                  setSearchOpen(!searchOpen);
-                  if (searchOpen) {
-                    setSearchQuery("");
-                  } else {
-                    setTimeout(() => searchInputRef.current?.focus(), 50);
-                  }
-                }}
-                className={`p-2 rounded-xl text-base transition-colors flex-shrink-0 ${
-                  searchOpen
-                    ? 'bg-gray-900 text-accent border border-accent'
-                    : 'bg-gray-900 text-gray-300 hover:bg-gray-800 border border-gray-800'
-                }`}
-                aria-label="Search tasks"
-              >
-                <Search size={18} />
-              </button>
-              {searchOpen && (
-                <div className="flex items-center gap-1 flex-shrink-0">
-                  <input
-                    ref={searchInputRef}
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Escape') {
-                        setSearchQuery("");
-                        setSearchOpen(false);
-                      }
-                    }}
-                    placeholder="Search tasks..."
-                    className="w-40 px-3 py-1.5 rounded-xl text-base bg-gray-900 text-gray-100 border border-gray-700 focus:border-accent focus:outline-none placeholder-gray-500"
-                  />
-                  {searchQuery && (
-                    <button
-                      onClick={() => setSearchQuery("")}
-                      className="p-1 text-gray-400 hover:text-gray-200"
-                      aria-label="Clear search"
-                    >
-                      <X size={16} />
-                    </button>
-                  )}
-                </div>
-              )}
               {categories
               .sort((a, b) => {
                 const aName = typeof a === 'string' ? a : a.name;
@@ -1518,14 +1473,53 @@ export default function AIToDoListApp({
             </div>
           </div>
 
-          {/* Sort mode selector */}
-          <div className="flex items-center gap-2 px-3 mb-2">
+          {/* Sort mode selector + search */}
+          <div className="flex items-center gap-1.5 px-3 mb-4 overflow-x-auto">
+            <div className="flex-shrink-0">
+              {searchOpen ? (
+                <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-gray-900 border border-accent">
+                  <Search size={14} className="text-accent flex-shrink-0" />
+                  <input
+                    ref={searchInputRef}
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Escape') {
+                        setSearchQuery("");
+                        setSearchOpen(false);
+                      }
+                    }}
+                    placeholder="Search..."
+                    className="w-20 bg-transparent text-xs text-gray-100 focus:outline-none placeholder-gray-500"
+                  />
+                  <button
+                    onClick={() => { setSearchQuery(""); setSearchOpen(false); }}
+                    className="text-gray-400 hover:text-gray-200 flex-shrink-0"
+                    aria-label="Close search"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => {
+                    setSearchOpen(true);
+                    setTimeout(() => searchInputRef.current?.focus(), 50);
+                  }}
+                  className="p-1 rounded-lg text-gray-400 hover:text-gray-200 transition-colors"
+                  aria-label="Search tasks"
+                >
+                  <Search size={14} />
+                </button>
+              )}
+            </div>
             <ArrowUpDown size={14} className="text-gray-500 flex-shrink-0" />
             {(['auto', 'dueDate', 'date', 'custom'] as SortMode[]).map((mode) => (
               <button
                 key={mode}
                 onClick={() => handleSortModeChange(mode)}
-                className={`px-2.5 py-1 rounded-lg text-xs transition-colors ${
+                className={`min-w-[5.5rem] text-center px-2.5 py-1 rounded-lg text-xs whitespace-nowrap flex-shrink-0 transition-colors ${
                   sortMode === mode
                     ? 'bg-gray-900 text-accent border border-accent'
                     : 'text-gray-400 hover:text-gray-200'
