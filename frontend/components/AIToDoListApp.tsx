@@ -1558,7 +1558,7 @@ export default function AIToDoListApp({
                 handleAddTodo();
               }
             }}
-            placeholder="Add a new task... (Shift+Enter for a new line)"
+            placeholder="Add task(s)… (Shift+Enter for newline)"
             disabled={loading}
             aria-label="Add new task"
             rows={1}
