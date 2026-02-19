@@ -470,6 +470,35 @@ export default function AIToDoListApp({
     };
   }, [fetchTodos]);
 
+  // SWR: when the service worker finishes revalidating in the background,
+  // it posts fresh data here so we can update the UI without a full refetch.
+  useEffect(() => {
+    const handleSWRUpdate = (event: MessageEvent) => {
+      if (event.data?.type !== 'SWR_UPDATE') return;
+
+      const { endpoint, data, spaceId } = event.data;
+      const currentSpaceId = activeSpaceRef.current?._id;
+
+      if (endpoint === '/todos' && (!spaceId || spaceId === currentSpaceId)) {
+        console.log(`⚡ SWR update: ${data.length} todos`);
+        setTodos(data);
+        setLoadingTodos(false);
+      } else if (endpoint === '/categories' && (!spaceId || spaceId === currentSpaceId)) {
+        console.log(`⚡ SWR update: ${data.length} categories`);
+        setCategories(data);
+      } else if (endpoint === '/spaces') {
+        console.log(`⚡ SWR update: ${data.length} spaces`);
+        const sorted = sortSpaces(data);
+        setSpaces(sorted);
+      }
+    };
+
+    navigator.serviceWorker?.addEventListener('message', handleSWRUpdate);
+    return () => {
+      navigator.serviceWorker?.removeEventListener('message', handleSWRUpdate);
+    };
+  }, []);
+
   // Refresh data when navigating between main tabs
   useEffect(() => {
     if (activeTab === 'tasks') {

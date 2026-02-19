@@ -1,6 +1,6 @@
 // IMPORTANT: Always increment these versions when modifying this service worker file
 // This forces browsers to download and use the updated service worker
-const STATIC_CACHE = 'todo-static-v122';
+const STATIC_CACHE = 'todo-static-v123';
 
 const GLOBAL_DB_NAME = 'TodoGlobalDB';
 const USER_DB_PREFIX = 'TodoUserDB_';
@@ -637,6 +637,22 @@ self.addEventListener('fetch', (event) => {
   }
 
   if (isApi) {
+    // Stale-while-revalidate: for cacheable GET requests when online,
+    // return IndexedDB data instantly and refresh from the server in the background.
+    if (event.request.method === 'GET' && self.navigator.onLine) {
+      const apiPath = url.pathname.replace(/^\/api/, '');
+      const isSWR = SWR_ENDPOINTS.includes(apiPath) && !url.pathname.startsWith('/auth');
+
+      if (isSWR) {
+        let revalidateResolve;
+        const revalidatePromise = new Promise(resolve => { revalidateResolve = resolve; });
+
+        event.respondWith(handleSWRRequest(event.request, url, revalidateResolve));
+        event.waitUntil(revalidatePromise);
+        return;
+      }
+    }
+
     event.respondWith(handleApiRequest(event.request));
     return;
   }
@@ -721,6 +737,141 @@ const GET_CACHE_HANDLERS = {
   '/categories': cacheGetCategories,
   '/spaces': cacheGetSpaces,
 };
+
+// ── Stale-While-Revalidate (SWR) ─────────────────────────────
+// Returns cached data instantly from IndexedDB, then revalidates
+// from the network in the background and notifies the client.
+
+const SWR_ENDPOINTS = ['/todos', '/categories', '/spaces'];
+
+// Read cached data from IndexedDB for a given GET endpoint.
+// Returns the data array/object, or null if nothing is cached.
+async function getCachedApiResponse(url, authData) {
+  const apiPath = url.pathname.replace(/^\/api/, '');
+  const spaceId = url.searchParams.get('space_id');
+
+  if (apiPath === '/todos') {
+    const todos = await getTodos(authData.userId, spaceId);
+    return todos.length > 0 ? todos : null;
+  }
+
+  if (apiPath === '/categories') {
+    const categories = await getCategories(authData.userId, spaceId);
+    const names = categories.map(c => c.name || c);
+    return names.length > 0 ? names : null;
+  }
+
+  if (apiPath === '/spaces') {
+    const spaces = await getSpaces(authData.userId);
+    return spaces.length > 0 ? spaces : null;
+  }
+
+  return null;
+}
+
+// Fetch fresh data from the network, cache it, and notify clients.
+async function revalidateInBackground(request, url) {
+  try {
+    const authData = await getAuth();
+    if (!authData?.userId) return;
+
+    const apiPath = url.pathname.replace(/^\/api/, '');
+    const pathKey = SWR_ENDPOINTS.includes(apiPath) ? apiPath : url.pathname;
+
+    // For /todos, skip revalidation when there are pending write operations
+    // to avoid overwriting locally-created offline todos.
+    if (pathKey === '/todos') {
+      const queue = await readQueue(authData.userId);
+      const hasPendingTodos = queue.some(op =>
+        op.type === 'CREATE' || op.type === 'UPDATE' || op.type === 'DELETE'
+      );
+      if (syncInProgress || hasPendingTodos) {
+        console.log('⏸️ SWR: skipping /todos revalidation — pending operations');
+        return;
+      }
+    }
+
+    const { targetUrl, proxyRequest } = await buildBackendRequest(request, url);
+    console.log(`🔄 SWR revalidating: ${url.pathname}`);
+    const response = await fetch(proxyRequest);
+
+    if (!response.ok) return;
+
+    const handler = GET_CACHE_HANDLERS[pathKey];
+    if (!handler) return;
+
+    // Read fresh data for the client notification, clone for the cache handler
+    const freshData = await response.clone().json();
+    await handler(url, response, authData);
+
+    // Notify all open tabs/windows with the fresh data
+    const clients = await self.clients.matchAll();
+    clients.forEach(client => {
+      client.postMessage({
+        type: 'SWR_UPDATE',
+        endpoint: pathKey,
+        spaceId: url.searchParams.get('space_id'),
+        data: freshData
+      });
+    });
+    console.log(`✅ SWR: revalidated ${pathKey}, notified ${clients.length} client(s)`);
+
+    // Trigger sync if there are queued operations
+    getAuth().then(auth => {
+      if (!auth?.userId) return;
+      readQueue(auth.userId).then(q => {
+        if (q.length > 0) syncQueue();
+      });
+    }).catch(() => {});
+  } catch (err) {
+    console.log(`⚠️ SWR revalidation failed for ${url.pathname}:`, err.message);
+  }
+}
+
+// Return cached data immediately and kick off background revalidation.
+// Falls through to the normal network-first path when nothing is cached.
+async function handleSWRRequest(request, url, onRevalidateComplete) {
+  const authData = await getAuth();
+
+  if (authData?.userId) {
+    // For /todos with pending ops, skip SWR and let handleApiRequest manage it
+    const apiPath = url.pathname.replace(/^\/api/, '');
+    if (apiPath === '/todos') {
+      const queue = await readQueue(authData.userId);
+      const hasPendingTodos = queue.some(op =>
+        op.type === 'CREATE' || op.type === 'UPDATE' || op.type === 'DELETE'
+      );
+      if (syncInProgress || hasPendingTodos) {
+        onRevalidateComplete();
+        return handleApiRequest(request);
+      }
+    }
+
+    const cachedData = await getCachedApiResponse(url, authData);
+
+    if (cachedData !== null) {
+      console.log(`⚡ SWR: returning cached data for ${url.pathname}`);
+
+      // Revalidate in the background; resolve the waitUntil promise when done
+      revalidateInBackground(request, url)
+        .catch(err => console.error('SWR revalidation error:', err))
+        .finally(() => onRevalidateComplete());
+
+      return new Response(JSON.stringify(cachedData), {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/json',
+          'X-From-Cache': 'true'
+        }
+      });
+    }
+  }
+
+  // Nothing cached — use normal network-first flow
+  console.log(`🔗 SWR: no cache for ${url.pathname}, fetching from network`);
+  onRevalidateComplete();
+  return handleApiRequest(request);
+}
 
 // ── Backend request construction ──────────────────────────────
 
