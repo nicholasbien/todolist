@@ -1521,7 +1521,7 @@ export default function AIToDoListApp({
                 onClick={() => handleSortModeChange(mode)}
                 className={`min-w-[5.5rem] text-center px-2.5 py-1 rounded-lg text-xs whitespace-nowrap flex-shrink-0 transition-colors ${
                   sortMode === mode
-                    ? 'bg-gray-900 text-accent border border-accent'
+                    ? 'text-white underline'
                     : 'text-gray-400 hover:text-gray-200'
                 }`}
               >
