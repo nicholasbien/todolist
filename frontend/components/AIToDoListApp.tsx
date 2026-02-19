@@ -1467,7 +1467,7 @@ export default function AIToDoListApp({
               })}
               <button
                 onClick={() => setShowAddCategoryModal(true)}
-                className="px-4 py-2 rounded-xl text-base bg-gray-900 text-accent hover:bg-gray-800 border border-accent transition-colors flex-shrink-0 mr-2"
+                className="px-4 py-2 rounded-xl text-base bg-gray-900 text-gray-300 hover:bg-gray-800 hover:text-gray-100 border border-gray-700 transition-colors flex-shrink-0 mr-2"
               >
                 +
               </button>
@@ -1561,7 +1561,7 @@ export default function AIToDoListApp({
           <button
             onClick={handleAddTodo}
             disabled={loading}
-              className="bg-gray-900 text-accent w-12 h-12 rounded-xl border border-accent hover:bg-gray-800 disabled:border-gray-700 disabled:text-gray-400 flex items-center justify-center transition-colors"
+            className="bg-gray-900 text-gray-300 w-12 h-12 rounded-xl border border-gray-700 hover:bg-gray-800 hover:text-gray-100 disabled:border-gray-700 disabled:text-gray-500 flex items-center justify-center transition-colors"
           >
             {loading ? '...' : '+'}
           </button>
