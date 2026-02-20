@@ -26,6 +26,7 @@ import {
   arrayMove,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { Capacitor } from "@capacitor/core";
 
 interface Props {
   user: any;
@@ -120,6 +121,7 @@ export default function AIToDoListApp({
   const [sendingEmail, setSendingEmail] = useState(false);
   const [showCompleted, setShowCompleted] = useState(false);
   const [showUpdatePrompt, setShowUpdatePrompt] = useState(false);
+  const isIosCapacitorApp = useRef(false);
   const [emailTime, setEmailTime] = useState('09:00');
   const [savingSchedule, setSavingSchedule] = useState(false);
   const [emailInstructions, setEmailInstructions] = useState('');
@@ -150,6 +152,26 @@ export default function AIToDoListApp({
       localStorage.removeItem('active_space_id');
     }
   }, [activeSpace]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const nativePlatform = Capacitor.getPlatform();
+    isIosCapacitorApp.current = Capacitor.isNativePlatform() && nativePlatform === 'ios';
+  }, []);
+
+  useEffect(() => {
+    if (!isIosCapacitorApp.current || !('serviceWorker' in navigator)) return;
+
+    const handleControllerChange = () => {
+      window.location.reload();
+    };
+
+    navigator.serviceWorker.addEventListener('controllerchange', handleControllerChange);
+    return () => {
+      navigator.serviceWorker.removeEventListener('controllerchange', handleControllerChange);
+    };
+  }, []);
 
   const handleError = useCallback(
     (err: any, prefix?: string) => {
@@ -423,6 +445,10 @@ export default function AIToDoListApp({
         if (registration) {
           registration.update();
 
+          if (isIosCapacitorApp.current && registration.waiting) {
+            registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+          }
+
           registration.onupdatefound = () => {
             const newWorker = registration.installing;
             if (newWorker) {
@@ -431,6 +457,11 @@ export default function AIToDoListApp({
                   newWorker.state === 'installed' &&
                   navigator.serviceWorker.controller
                 ) {
+                  if (isIosCapacitorApp.current) {
+                    registration.waiting?.postMessage({ type: 'SKIP_WAITING' });
+                    return;
+                  }
+
                   setShowUpdatePrompt(true);
                 }
               };
