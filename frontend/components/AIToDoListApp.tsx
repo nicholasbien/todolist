@@ -8,6 +8,7 @@ import InsightsComponent from "./InsightsComponent";
 import JournalComponent from "./JournalComponent";
 import SpaceDropdown from "./SpaceDropdown";
 import { sortSpaces } from "../utils/spaceUtils";
+import { loadSortModePreference, saveSortModePreference, type SortMode } from "../utils/sortPreferences";
 import SwipeableViews from "react-swipeable-views-react-18-fix";
 import {
   DndContext,
@@ -41,8 +42,6 @@ interface Props {
   onShowAccountSettings?: () => void;
   isOffline?: boolean;
 }
-
-type SortMode = 'auto' | 'date' | 'dueDate' | 'custom';
 
 function SortableItem({ id, children, disabled }: { id: string; children: React.ReactNode; disabled?: boolean }) {
   const {
@@ -402,9 +401,8 @@ export default function AIToDoListApp({
     // Reset category filter when switching spaces
     setActiveCat('All');
     // Restore sort mode for this space
-    const spaceId = activeSpace?._id || 'default';
-    const saved = localStorage.getItem(`sortMode_${spaceId}`);
-    setSortMode((saved as SortMode) || 'auto');
+    const spaceId = activeSpace?._id;
+    setSortMode(loadSortModePreference(user, spaceId));
   }, [activeSpace, fetchSpaceData, token, user]);
 
   // Update email time when user info loads
@@ -1046,8 +1044,8 @@ export default function AIToDoListApp({
   // Sort mode handler — persist to localStorage
   const handleSortModeChange = useCallback((mode: SortMode) => {
     setSortMode(mode);
-    const spaceId = activeSpace?._id || 'default';
-    localStorage.setItem(`sortMode_${spaceId}`, mode);
+    const spaceId = activeSpace?._id;
+    saveSortModePreference(user, spaceId, mode);
 
     // When switching to Custom, initialize sortOrder from Auto sort if not yet set
     if (mode === 'custom') {
@@ -1076,7 +1074,7 @@ export default function AIToDoListApp({
         }).catch(err => console.error('Failed to initialize sort order:', err));
       }
     }
-  }, [activeSpace, todos, authenticatedFetch]);
+  }, [activeSpace, todos, authenticatedFetch, user]);
 
   // Drag-and-drop sensors
   const pointerSensor = useSensor(PointerSensor, { activationConstraint: { distance: 8 } });
