@@ -1,6 +1,6 @@
 // IMPORTANT: Always increment these versions when modifying this service worker file
 // This forces browsers to download and use the updated service worker
-const STATIC_CACHE = 'todo-static-v126';
+const STATIC_CACHE = 'todo-static-v127';
 
 const GLOBAL_DB_NAME = 'TodoGlobalDB';
 const USER_DB_PREFIX = 'TodoUserDB_';
@@ -692,12 +692,8 @@ async function cacheGetJournals(url, response, authData) {
   if (serverResponse === null) return 'cached';
 
   const queue = await readQueue(authData.userId);
-  // Conservative check: block caching if ANY journal operation is pending, regardless of space.
-  // The previous space-scoped check had a bug where fetching with no space_id (or a different
-  // space_id) would not block caching even when pending ops existed for a specific space,
-  // leading to silent data loss. This mirrors the conservative fix applied to /todos.
   const hasPendingJournals = queue.some(op =>
-    op.type === 'CREATE_JOURNAL' || op.type === 'UPDATE_JOURNAL'
+    (op.type === 'CREATE_JOURNAL' || op.type === 'UPDATE_JOURNAL') && op.data.space_id === spaceId
   );
 
   if (syncInProgress || hasPendingJournals) {
@@ -861,12 +857,12 @@ async function handleApiRequest(request) {
             // This must happen synchronously (before returning) so offline-created todos
             // aren't lost when the server response doesn't include them yet.
             if (url.pathname === '/todos') {
+              const spaceId = url.searchParams.get('space_id');
               const queue = await readQueue(authData.userId);
               const hasPendingTodos = queue.some(op =>
-                op.type === 'CREATE' || op.type === 'UPDATE' || op.type === 'DELETE'
+                (op.type === 'CREATE' || op.type === 'UPDATE') && op.data.space_id === spaceId
               );
               if (syncInProgress || hasPendingTodos) {
-                const spaceId = url.searchParams.get('space_id');
                 const offlineTodos = await getTodos(authData.userId, spaceId);
                 return new Response(JSON.stringify(offlineTodos), {
                   status: 200,
