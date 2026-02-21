@@ -1,6 +1,6 @@
 // IMPORTANT: Always increment these versions when modifying this service worker file
 // This forces browsers to download and use the updated service worker
-const STATIC_CACHE = 'todo-static-v125';
+const STATIC_CACHE = 'todo-static-v126';
 
 const GLOBAL_DB_NAME = 'TodoGlobalDB';
 const USER_DB_PREFIX = 'TodoUserDB_';
@@ -692,9 +692,12 @@ async function cacheGetJournals(url, response, authData) {
   if (serverResponse === null) return 'cached';
 
   const queue = await readQueue(authData.userId);
+  // Conservative check: block caching if ANY journal operation is pending, regardless of space.
+  // The previous space-scoped check had a bug where fetching with no space_id (or a different
+  // space_id) would not block caching even when pending ops existed for a specific space,
+  // leading to silent data loss. This mirrors the conservative fix applied to /todos.
   const hasPendingJournals = queue.some(op =>
-    (op.type === 'CREATE_JOURNAL' || op.type === 'UPDATE_JOURNAL') &&
-    (op.data.space_id === spaceId || (!spaceId && !op.data.space_id))
+    op.type === 'CREATE_JOURNAL' || op.type === 'UPDATE_JOURNAL'
   );
 
   if (syncInProgress || hasPendingJournals) {

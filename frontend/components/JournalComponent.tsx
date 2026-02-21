@@ -186,7 +186,7 @@ export default function JournalComponent({ token, activeSpace }: JournalProps) {
     if (saving) return 'Saving...';
     if (journalText !== lastSavedText) return 'Unsaved changes';
     if (currentEntry?.updated_offline) return isOffline ? 'Saved offline' : 'Syncing...';
-    if (lastSavedText || currentEntry) return 'Synced online';
+    if (lastSavedText || currentEntry) return isOffline ? 'Saved (offline mode)' : 'Synced online';
     return '';
   };
 
