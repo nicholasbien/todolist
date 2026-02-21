@@ -145,13 +145,13 @@ function drawNotebook(ctx, x, y, logoSize) {
 // Draw the notebook logo
 drawNotebook(ctx, logoX, logoY, logoSize);
 
-// Draw "todolist.nyc" text below the logo
+// Draw "todolist" text below the logo
 ctx.fillStyle = '#000000';  // Black text on orange background
 ctx.font = 'bold 80px Georgia, serif';  // Matching app's serif font
 ctx.textAlign = 'center';
 ctx.textBaseline = 'top';
 const textY = logoY + logoSize + 60;  // 60px below the logo
-ctx.fillText('todolist.nyc', size / 2, textY);
+ctx.fillText('todolist', size / 2, textY);
 
 // Convert to download
 setTimeout(() => {

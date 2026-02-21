@@ -4,10 +4,10 @@ export default function Document() {
   return (
     <Html lang="en">
       <Head>
-        <meta name="application-name" content="todolist.nyc" />
+        <meta name="application-name" content="todolist" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-        <meta name="apple-mobile-web-app-title" content="todolist.nyc" />
+        <meta name="apple-mobile-web-app-title" content="todolist" />
         <meta name="description" content="AI-powered task management app" />
         <meta name="format-detection" content="telephone=no" />
         <meta name="mobile-web-app-capable" content="yes" />
@@ -33,13 +33,13 @@ export default function Document() {
 
         <meta name="twitter:card" content="summary" />
         <meta name="twitter:url" content="https://yourdomain.com" />
-        <meta name="twitter:title" content="todolist.nyc" />
+        <meta name="twitter:title" content="todolist" />
         <meta name="twitter:description" content="AI-powered task management app" />
         <meta name="twitter:image" content="https://yourdomain.com/icon-192x192.png" />
         <meta property="og:type" content="website" />
-        <meta property="og:title" content="todolist.nyc" />
+        <meta property="og:title" content="todolist" />
         <meta property="og:description" content="AI-powered task management app" />
-        <meta property="og:site_name" content="todolist.nyc" />
+        <meta property="og:site_name" content="todolist" />
         <meta property="og:url" content="https://yourdomain.com" />
         <meta property="og:image" content="https://yourdomain.com/icon-192x192.png" />
       </Head>
