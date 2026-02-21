@@ -1,6 +1,6 @@
 // IMPORTANT: Always increment these versions when modifying this service worker file
 // This forces browsers to download and use the updated service worker
-const STATIC_CACHE = 'todo-static-v124';
+const STATIC_CACHE = 'todo-static-v125';
 
 const GLOBAL_DB_NAME = 'TodoGlobalDB';
 const USER_DB_PREFIX = 'TodoUserDB_';
@@ -573,10 +573,10 @@ self.addEventListener('install', (event) => {
     Promise.all([
       // Pre-cache static files with individual error handling
       cacheStaticFiles(),
-      openGlobalDB()
+      openGlobalDB(),
+      self.skipWaiting()
     ])
   );
-  self.skipWaiting();
 });
 
 // Helper function to cache static files with individual error handling
@@ -614,10 +614,12 @@ self.addEventListener('activate', (event) => {
         )
       ),
       // Sync server data to local database when service worker activates
-      syncServerDataToLocal()
+      syncServerDataToLocal(),
+      // Only claim clients after setup is complete so pages aren't served
+      // by a half-initialized SW (which causes stuck Loading... state)
+      self.clients.claim()
     ])
   );
-  self.clients.claim();
 });
 
 self.addEventListener('fetch', (event) => {
