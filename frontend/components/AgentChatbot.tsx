@@ -359,15 +359,15 @@ export default function AgentChatbot({ activeSpace, token, isActive = true }: Ch
 
         {messages.map((msg, idx) => (
           <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-            <div className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
+            <div className={`max-w-xs lg:max-w-md px-4 py-2 ${
               msg.role === 'user'
-                ? 'bg-accent text-foreground'
+                ? 'bg-gray-800 text-gray-100 border border-gray-700 rounded-lg'
                 : msg.role === 'system'
-                ? 'bg-blue-900/30 text-blue-200 border border-blue-700/50'
-                : 'bg-gray-800 text-gray-100 border border-gray-700'
+                ? 'bg-blue-900/30 text-blue-200 border border-blue-700/50 rounded-lg'
+                : 'text-gray-100'
             }`}>
               <div className="text-sm mb-1 opacity-75 flex justify-between items-center">
-                <span>{msg.role === 'user' ? 'You' : msg.role === 'system' ? 'Tool' : 'Assistant'}</span>
+                <span>{msg.role === 'system' ? 'Tool' : ''}</span>
                 {/* Temporarily disabled - tool step dropdown
                 {msg.role === 'system' && msg.toolData && (
                   <button
@@ -381,7 +381,7 @@ export default function AgentChatbot({ activeSpace, token, isActive = true }: Ch
                 */}
               </div>
               {msg.role === 'assistant' ? (
-                <MessageRenderer content={msg.content} className="text-sm" />
+                <MessageRenderer content={msg.content} className="text-base" />
               ) : (
                 <PlainTextRenderer content={msg.content} className="text-sm" />
               )}
@@ -408,8 +408,8 @@ export default function AgentChatbot({ activeSpace, token, isActive = true }: Ch
         ))}
         {loading && (
           <div className="flex justify-start">
-            <div className="bg-gray-800 text-gray-100 border border-gray-700 max-w-xs lg:max-w-md px-4 py-2 rounded-lg">
-              <div className="text-xs mb-1 opacity-75">Assistant</div>
+            <div className="text-gray-100 max-w-xs lg:max-w-md px-4 py-2">
+              <div className="text-xs mb-1 opacity-75"></div>
               <div className="text-sm">{`Thinking${'.'.repeat(thinkingDots)}`}</div>
             </div>
           </div>
@@ -435,7 +435,7 @@ export default function AgentChatbot({ activeSpace, token, isActive = true }: Ch
         <div className="flex-1 relative">
           <input
             type="text"
-            className={`w-full bg-gray-900 border border-gray-700 text-gray-100 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-accent ${
+            className={`w-full bg-gray-900 border border-gray-700 text-gray-100 rounded-lg p-3 focus:outline-none focus:border-accent ${
               !isOnline ? 'opacity-50 cursor-not-allowed' : ''
             }`}
             value={question}
@@ -459,7 +459,7 @@ export default function AgentChatbot({ activeSpace, token, isActive = true }: Ch
         <button
           onClick={handleAsk}
           disabled={loading || !question.trim() || !isOnline}
-          className="bg-accent text-foreground px-6 py-3 rounded-lg hover:bg-accent-light disabled:bg-accent-dark disabled:cursor-not-allowed transition-colors"
+          className="border border-accent text-accent px-6 py-3 rounded-lg hover:bg-accent/10 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           onMouseEnter={() => !isOnline && setShowOfflineMessage(true)}
           onMouseLeave={() => setShowOfflineMessage(false)}
         >
