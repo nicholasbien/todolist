@@ -182,7 +182,7 @@ function LoginForm({ onLogin }: LoginFormProps) {
         <div className="bg-black border border-gray-800 rounded-xl shadow-2xl p-8">
         <div className="text-center mb-8">
           <Link href="/home">
-            <h1 className="text-3xl font-bold text-gray-100 mb-2 hover:text-accent transition-colors cursor-pointer">todolist.nyc</h1>
+            <h1 className="text-3xl font-bold text-gray-100 mb-2 hover:text-accent transition-colors cursor-pointer">todolist</h1>
           </Link>
           <p className="text-gray-400">
             {step === 'email'
@@ -523,7 +523,7 @@ export default function Home() {
     return (
       <>
         <Head>
-          <title>todolist.nyc</title>
+          <title>todolist</title>
         </Head>
         <main className="min-h-screen bg-zinc-950 text-white flex items-center justify-center">
           <div className="animate-pulse text-center">Loading...</div>
@@ -536,7 +536,7 @@ export default function Home() {
     return (
       <>
         <Head>
-          <title>todolist.nyc</title>
+          <title>todolist</title>
         </Head>
         <LoginForm onLogin={handleLogin} />
       </>
@@ -546,7 +546,7 @@ export default function Home() {
   return (
     <>
       <Head>
-        <title>todolist.nyc</title>
+        <title>todolist</title>
       </Head>
       <main className="h-screen h-[100dvh] overflow-hidden bg-zinc-950 text-white">
         <AIToDoListApp

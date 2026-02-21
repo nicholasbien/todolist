@@ -1232,7 +1232,7 @@ export default function AIToDoListApp({
         >
           <h1 className="text-xl font-bold mr-4">
             <Link href="/home" className="hover:text-accent transition-colors">
-              todolist.nyc
+              todolist
             </Link>
           </h1>
           <div
