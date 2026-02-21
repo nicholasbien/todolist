@@ -263,7 +263,7 @@ export default function JournalComponent({ token, activeSpace }: JournalProps) {
               value={journalText}
               onChange={(e) => setJournalText(e.target.value)}
               placeholder={`Write about your day on ${formatDateForDisplay(selectedDate)}...`}
-              className="w-full h-full p-4 bg-gray-900 border border-gray-700 text-gray-100 placeholder-gray-500 rounded-xl focus:outline-none focus:ring-2 focus:ring-accent resize-none overflow-y-auto custom-scrollbar"
+              className="w-full h-full p-4 bg-gray-900 border border-gray-700 text-gray-100 placeholder-gray-500 rounded-xl focus:outline-none focus:border-accent resize-none overflow-y-auto custom-scrollbar"
               aria-label="Journal entry"
             />
           </div>
@@ -286,7 +286,7 @@ export default function JournalComponent({ token, activeSpace }: JournalProps) {
               <button
                 onClick={handleManualSave}
                 disabled={saving || journalText === lastSavedText}
-                className="bg-accent text-foreground px-6 py-3 rounded-lg hover:bg-accent-light disabled:bg-accent-dark disabled:text-gray-400 transition-colors"
+                className="border border-accent text-accent px-6 py-3 rounded-lg hover:bg-accent/10 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 {saving ? 'Saving...' : 'Save'}
               </button>
