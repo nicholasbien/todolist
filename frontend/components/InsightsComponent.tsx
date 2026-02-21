@@ -110,7 +110,7 @@ export default function InsightsComponent({ token, activeSpace }: InsightsProps)
         <p className="text-red-400">{error}</p>
         <button
           onClick={fetchInsights}
-          className="mt-4 px-4 py-2 bg-accent text-foreground rounded-lg hover:bg-accent-light transition-colors"
+          className="mt-4 px-4 py-2 border border-accent text-accent rounded-lg hover:bg-accent/10 transition-colors"
         >
           Retry
         </button>

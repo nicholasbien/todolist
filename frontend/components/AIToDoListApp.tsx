@@ -1362,7 +1362,7 @@ export default function AIToDoListApp({
           <span>🔄 A new version is available!</span>
           <button
             onClick={handleUpdate}
-            className="bg-accent text-foreground px-3 py-1 rounded-lg text-sm hover:bg-accent-light transition-colors"
+            className="border border-accent text-accent px-3 py-1 rounded-lg text-sm hover:bg-accent/10 transition-colors"
           >
             Reload
           </button>
@@ -1613,11 +1613,11 @@ export default function AIToDoListApp({
               value={newSpaceName}
               onChange={e => setNewSpaceName(e.target.value)}
               onKeyPress={e => e.key === 'Enter' && handleAddSpace()}
-              className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 placeholder-gray-500 text-base focus:outline-none focus:ring-2 focus:ring-accent"
+              className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 placeholder-gray-500 text-base focus:outline-none focus:border-accent"
               autoFocus
             />
             <div className="flex justify-center space-x-3">
-              <button onClick={handleAddSpace} className="bg-accent hover:bg-accent-light text-foreground px-6 py-2 rounded-lg transition-colors">Create</button>
+              <button onClick={handleAddSpace} className="border border-accent text-accent hover:bg-accent/10 px-6 py-2 rounded-lg transition-colors">Create</button>
               <button onClick={() => { setShowAddSpaceModal(false); setNewSpaceName(''); }} className="bg-gray-800 hover:bg-gray-700 text-gray-300 px-6 py-2 rounded-lg transition-colors">Cancel</button>
             </div>
           </div>
@@ -1634,7 +1634,7 @@ export default function AIToDoListApp({
                   type="text"
                   value={editSpaceName}
                   onChange={e => setEditSpaceName(e.target.value)}
-                  className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 text-base focus:outline-none focus:ring-2 focus:ring-accent"
+                  className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 text-base focus:outline-none focus:border-accent"
                 />
                 <label className="flex items-center space-x-2 text-gray-300">
                   <input
@@ -1657,7 +1657,7 @@ export default function AIToDoListApp({
                           updated[idx] = e.target.value;
                           setInviteEmails(updated);
                         }}
-                        className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 placeholder-gray-500 text-base focus:outline-none focus:ring-2 focus:ring-accent"
+                        className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 placeholder-gray-500 text-base focus:outline-none focus:border-accent"
                       />
                     ))}
                     <button
@@ -1670,7 +1670,7 @@ export default function AIToDoListApp({
                   </div>
                 )}
                 <div className="flex justify-center space-x-3">
-                  <button onClick={handleUpdateSpace} className="bg-accent hover:bg-accent-light text-foreground px-6 py-2 rounded-lg transition-colors">Save</button>
+                  <button onClick={handleUpdateSpace} className="border border-accent text-accent hover:bg-accent/10 px-6 py-2 rounded-lg transition-colors">Save</button>
                   {spaceToEdit && (
                     <button onClick={() => { handleDeleteSpace(spaceToEdit._id); setShowEditSpaceModal(false); }} className="bg-red-600 hover:bg-red-500 text-white px-6 py-2 rounded-lg transition-colors">Delete</button>
                   )}
@@ -1703,13 +1703,13 @@ export default function AIToDoListApp({
               value={newCat}
               onChange={e => setNewCat(e.target.value)}
               onKeyPress={e => e.key === 'Enter' && handleAddCategory()}
-              className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 placeholder-gray-500 text-base focus:outline-none focus:ring-2 focus:ring-accent"
+              className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 placeholder-gray-500 text-base focus:outline-none focus:border-accent"
               autoFocus
             />
             <div className="flex justify-center space-x-3">
               <button
                 onClick={handleAddCategory}
-                className="bg-accent hover:bg-accent-light text-foreground px-6 py-2 rounded-lg transition-colors"
+                className="border border-accent text-accent hover:bg-accent/10 px-6 py-2 rounded-lg transition-colors"
               >
                 Add
               </button>
@@ -1735,12 +1735,12 @@ export default function AIToDoListApp({
               type="text"
               value={editCatName}
               onChange={(e) => setEditCatName(e.target.value)}
-              className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 text-base focus:outline-none focus:ring-2 focus:ring-accent"
+              className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 text-base focus:outline-none focus:border-accent"
             />
             <div className="flex justify-center space-x-3">
               <button
                 onClick={handleRenameCategory}
-                className="bg-accent text-foreground px-6 py-2 rounded-lg hover:bg-accent-dark transition-colors"
+                className="border border-accent text-accent hover:bg-accent/10 px-6 py-2 rounded-lg transition-colors"
               >
                 Rename
               </button>
@@ -1832,13 +1832,13 @@ export default function AIToDoListApp({
               type="text"
               value={editText}
               onChange={(e) => setEditText(e.target.value)}
-              className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 text-base focus:outline-none focus:ring-2 focus:ring-accent"
+              className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 text-base focus:outline-none focus:border-accent"
             />
             <textarea
               value={editNotes}
               onChange={(e) => setEditNotes(e.target.value)}
               placeholder="Notes"
-              className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 text-base h-24 resize-none focus:outline-none focus:ring-2 focus:ring-accent"
+              className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 text-base h-24 resize-none focus:outline-none focus:border-accent"
             />
             <div>
               <label className="block text-sm text-gray-300 mb-2">Space</label>
@@ -1888,7 +1888,7 @@ export default function AIToDoListApp({
                 value={editDueDate}
                 onChange={(e) => setEditDueDate(e.target.value)}
                 placeholder="Select due date"
-                className="w-full p-3 pr-8 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 text-base focus:outline-none focus:ring-2 focus:ring-accent cursor-pointer"
+                className="w-full p-3 pr-8 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 text-base focus:outline-none focus:border-accent cursor-pointer"
                 style={{
                   colorScheme: 'dark',
                   position: 'relative'
@@ -1905,7 +1905,7 @@ export default function AIToDoListApp({
               )}
             </div>
             <div className="flex justify-center space-x-3">
-              <button onClick={handleSaveTodoEdit} className="bg-accent hover:bg-accent-light text-foreground px-6 py-2 rounded-lg transition-colors">Save</button>
+              <button onClick={handleSaveTodoEdit} className="border border-accent text-accent hover:bg-accent/10 px-6 py-2 rounded-lg transition-colors">Save</button>
               <button onClick={() => setShowEditTodoModal(false)} className="bg-gray-800 hover:bg-gray-700 text-gray-300 px-6 py-2 rounded-lg transition-colors">Cancel</button>
             </div>
           </div>
@@ -1996,7 +1996,7 @@ export default function AIToDoListApp({
                   type="time"
                   value={emailTime}
                   onChange={(e) => setEmailTime(e.target.value)}
-                  className="w-full bg-gray-900 border border-gray-700 text-gray-100 p-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full bg-gray-900 border border-gray-700 text-gray-100 p-2 rounded-lg focus:outline-none focus:border-accent disabled:opacity-50 disabled:cursor-not-allowed"
                   disabled={!emailEnabled}
                 />
               </div>
@@ -2006,7 +2006,7 @@ export default function AIToDoListApp({
                 <textarea
                   value={emailInstructions}
                   onChange={(e) => setEmailInstructions(e.target.value)}
-                  className="w-full bg-gray-900 border border-gray-700 text-gray-100 placeholder-gray-500 p-2 rounded-lg h-24 resize-none focus:outline-none focus:ring-2 focus:ring-accent disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full bg-gray-900 border border-gray-700 text-gray-100 placeholder-gray-500 p-2 rounded-lg h-24 resize-none focus:outline-none focus:border-accent disabled:opacity-50 disabled:cursor-not-allowed"
                   placeholder="Write like a Buddhist monk. Include a haiku at the end."
                   disabled={!emailEnabled}
                 />
@@ -2044,7 +2044,7 @@ export default function AIToDoListApp({
                 <button
                   onClick={handleUpdateSchedule}
                   disabled={savingSchedule}
-                  className="bg-accent hover:bg-accent-light disabled:bg-accent-dark disabled:text-gray-400 text-foreground px-6 py-2 rounded-lg transition-colors"
+                  className="border border-accent text-accent hover:bg-accent/10 disabled:opacity-50 disabled:cursor-not-allowed px-6 py-2 rounded-lg transition-colors"
                 >
                   {savingSchedule ? 'Saving...' : 'Save'}
                 </button>
