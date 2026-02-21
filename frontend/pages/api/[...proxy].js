@@ -17,9 +17,9 @@
  *
  * Do NOT remove this proxy - it ensures the app works even when the service worker fails.
  */
-const BACKEND_URL = process.env.NODE_ENV === 'production'
-  ? 'https://backend-production-e920.up.railway.app'
-  : 'http://localhost:8000';
+const BACKEND_URL = (
+  process.env.NODE_ENV === 'production' ? (process.env.BACKEND_URL || 'http://localhost:8000') : 'http://localhost:8000'
+).replace(/\/$/, '');
 
 export default async function handler(req, res) {
   const { proxy, ...queryParams } = req.query;
