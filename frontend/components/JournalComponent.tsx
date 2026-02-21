@@ -287,6 +287,7 @@ export default function JournalComponent({ token, activeSpace }: JournalProps) {
                 onClick={handleManualSave}
                 disabled={saving || journalText === lastSavedText}
                 className="bg-accent text-foreground px-6 py-3 rounded-lg hover:bg-accent-light disabled:bg-accent-dark disabled:text-gray-400 transition-colors"
+                title={journalText === lastSavedText ? "Changes are automatically saved" : ""}
               >
                 {saving ? 'Saving...' : 'Save'}
               </button>
