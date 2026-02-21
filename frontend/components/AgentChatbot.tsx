@@ -359,7 +359,7 @@ export default function AgentChatbot({ activeSpace, token, isActive = true }: Ch
 
         {messages.map((msg, idx) => (
           <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-            <div className={`max-w-xs lg:max-w-md px-4 py-2 ${
+            <div className={`${msg.role === 'assistant' ? 'w-full' : 'max-w-xs lg:max-w-md'} px-4 py-2 ${
               msg.role === 'user'
                 ? 'bg-gray-800 text-gray-100 border border-gray-700 rounded-lg'
                 : msg.role === 'system'
@@ -408,7 +408,7 @@ export default function AgentChatbot({ activeSpace, token, isActive = true }: Ch
         ))}
         {loading && (
           <div className="flex justify-start">
-            <div className="text-gray-100 max-w-xs lg:max-w-md px-4 py-2">
+            <div className="text-gray-100 w-full px-4 py-2">
               <div className="text-xs mb-1 opacity-75"></div>
               <div className="text-sm">{`Thinking${'.'.repeat(thinkingDots)}`}</div>
             </div>
