@@ -1,6 +1,6 @@
 // IMPORTANT: Always increment these versions when modifying this service worker file
 // This forces browsers to download and use the updated service worker
-const STATIC_CACHE = 'todo-static-v125';
+const STATIC_CACHE = 'todo-static-v126';
 
 const GLOBAL_DB_NAME = 'TodoGlobalDB';
 const USER_DB_PREFIX = 'TodoUserDB_';
@@ -8,10 +8,9 @@ const DB_VERSION = 13;
 
 // Configuration
 const CONFIG = {
-  PRODUCTION_BACKEND: 'https://backend-production-e920.up.railway.app',
-  LOCAL_BACKEND: 'http://localhost:8000',
-  PRODUCTION_DOMAIN: 'todolist.nyc'
+  API_PROXY_PATH: '/api'
 };
+
 const TODOS = 'todos';
 const CATEGORIES = 'categories';
 const SPACES = 'spaces';
@@ -1386,9 +1385,9 @@ function normalizePriority(p) {
 
 // Helper to get backend URL (module-level for use in sync and syncServerDataToLocal)
 function getBackendUrl() {
-  const isCapacitor = self.location?.protocol === 'file:';
-  const isProdHost = self.location?.hostname?.endsWith(CONFIG.PRODUCTION_DOMAIN);
-  return (isProdHost || isCapacitor) ? CONFIG.PRODUCTION_BACKEND : CONFIG.LOCAL_BACKEND;
+  // Route traffic through same-origin Next.js proxy.
+  // Proxy target is controlled by BACKEND_URL in server env.
+  return `${self.location.origin}${CONFIG.API_PROXY_PATH}`;
 }
 
 // Global sync lock to prevent concurrent syncing
