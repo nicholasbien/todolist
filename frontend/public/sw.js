@@ -1,6 +1,6 @@
 // IMPORTANT: Always increment these versions when modifying this service worker file
 // This forces browsers to download and use the updated service worker
-const STATIC_CACHE = 'todo-static-v127';
+const STATIC_CACHE = 'todo-static-v128';
 
 const GLOBAL_DB_NAME = 'TodoGlobalDB';
 const USER_DB_PREFIX = 'TodoUserDB_';
@@ -1659,6 +1659,76 @@ async function syncQueue() {
             success = true; // Skip unmapped offline IDs, remove from queue
           }
           break;
+        case 'CREATE_SPACE': {
+          const { _id: offlineSpaceId, created_offline, ...spacePayload } = op.data;
+          if (offlineSpaceId && offlineSpaceId.startsWith('offline_space_')) {
+            res = await fetch(`${backendUrl}/spaces`, {
+              method: 'POST',
+              headers,
+              body: JSON.stringify({ name: spacePayload.name }),
+            });
+            if (res && res.ok) {
+              const serverSpace = await res.json();
+              console.log(`🔄 Space Sync SUCCESS: Replacing offline space ${offlineSpaceId} with server space ${serverSpace._id}`);
+              idMap[offlineSpaceId] = serverSpace._id;
+              await putIdMap(idMap, authData.userId);
+              await delSpace(offlineSpaceId, authData.userId);
+              await putSpace(serverSpace, authData.userId);
+              console.log(`✅ Synced offline space ${offlineSpaceId} -> ${serverSpace._id}`);
+              success = true;
+            } else {
+              console.log(`❌ Space Sync FAILED: Offline space ${offlineSpaceId} will be preserved`);
+            }
+          } else {
+            success = true; // Non-offline CREATE_SPACE, just remove from queue
+          }
+          break;
+        }
+        case 'UPDATE_SPACE': {
+          let updateSpaceId = op.id || op.data._id;
+          if (updateSpaceId && updateSpaceId.startsWith('offline_space_') && idMap[updateSpaceId]) {
+            updateSpaceId = idMap[updateSpaceId];
+            console.log(`🗺️ Translating UPDATE_SPACE ID: ${op.id || op.data._id} -> ${updateSpaceId}`);
+          }
+          if (!updateSpaceId || updateSpaceId.startsWith('offline_space_')) {
+            deferred = true;
+            console.log(`⏳ Deferring UPDATE_SPACE for unmapped offline ID: ${op.id || op.data._id}`);
+          } else {
+            res = await fetch(`${backendUrl}/spaces/${updateSpaceId}`, {
+              method: 'PUT',
+              headers,
+              body: JSON.stringify({ name: op.data.name, collaborative: op.data.collaborative }),
+            });
+            if (res && res.ok) {
+              const serverSpace = await res.json();
+              await putSpace(serverSpace, authData.userId);
+              success = true;
+            }
+          }
+          break;
+        }
+        case 'DELETE_SPACE': {
+          let deleteSpaceId = op.id || op.data._id;
+          if (deleteSpaceId && deleteSpaceId.startsWith('offline_space_') && idMap[deleteSpaceId]) {
+            deleteSpaceId = idMap[deleteSpaceId];
+            console.log(`🗺️ Translating DELETE_SPACE ID: ${op.id || op.data._id} -> ${deleteSpaceId}`);
+          }
+          if (!deleteSpaceId || deleteSpaceId.startsWith('offline_space_')) {
+            // Space was never synced to server — nothing to delete remotely
+            success = true;
+            console.log(`⏭️ Skipping DELETE_SPACE for offline-only space: ${op.id || op.data._id}`);
+          } else {
+            res = await fetch(`${backendUrl}/spaces/${deleteSpaceId}`, {
+              method: 'DELETE',
+              headers,
+            });
+            if (res && res.ok) {
+              await delSpace(deleteSpaceId, authData.userId);
+              success = true;
+            }
+          }
+          break;
+        }
       }
 
       // Per-operation queue deletion (Bug 1 fix)
