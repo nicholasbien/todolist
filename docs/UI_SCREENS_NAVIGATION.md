@@ -1,6 +1,6 @@
 # UI Screens Navigation Guide
 
-Reference for Playwright-based UI validation workflows. Documents how to reach every key screen/modal in the app.
+Reference for Playwright-based UI validation workflows. Documents how to reach every screen, modal, and interactive element in the app.
 
 ## Prerequisites
 
@@ -15,74 +15,92 @@ cd frontend && npm run dev
 
 Navigate to `http://localhost:3000`. The app auto-logs in via stored session token.
 
----
-
-## Main Tabs
-
-All three tabs are always visible in the top nav.
-
-| Screen | How to reach |
-|--------|-------------|
-| Tasks tab | Click `button[name="Tasks"]` (tab nav) |
-| Assistant tab | Click `button[name="Assistant"]` (tab nav) |
-| Journal tab | Click `button[name="Journal"]` (tab nav) |
+**Test account**: email `test@example.com`, code `000000` — bypasses email sending, works on any server.
 
 ---
 
-## Tasks Tab Modals
+## Pages
 
-All task modals render **inline within the Tasks panel** (not fixed overlays), so you must have the Tasks tab active before screenshotting.
-
-| Modal | How to trigger |
-|-------|---------------|
-| **Add Category** | Click the `+` button at the end of the category pill row |
-| **Edit Category** | Right-click (or long-press on mobile) any non-"General" category pill |
-| **Edit Task** | Right-click (or long-press on mobile) any task row |
-| **Create Space** | Click the space name button (top-left) → click "New Space..." |
-| **Edit Space** | Click the space name button → click an existing space entry |
-
-> **Playwright tip**: Use `click({ button: 'right' })` for right-click triggers.
-> Tab must be active — call `page.getByRole('button', { name: 'Tasks', exact: true }).click()` first.
-
----
-
-## Settings Modals
-
-Open the settings dropdown first: click the gear icon (`button[name="Settings"]`) in the top-right.
-
-| Modal | Menu item to click |
-|-------|-------------------|
-| **Account Settings** | "Account" |
-| **Email Settings** | "Email Settings" |
-| **Insights** | "Insights" |
-| **Export Data** | "Export Data" |
-| **Contact** | "Contact" |
-
-Settings modals are **fixed overlays** — they render on top of whatever tab is active.
+| Page | URL | Notes |
+|------|-----|-------|
+| **App** (logged in) | `http://localhost:3000` | Auto-redirects from login if session is valid |
+| **Auth flow** (logged out) | `http://localhost:3000` | Clear localStorage/cookies to force logged-out state |
+| **Home / Marketing** | `http://localhost:3000/home` | Public landing page with features + screenshots section |
+| **Privacy Policy** | `http://localhost:3000/privacy` | Static page |
+| **Terms of Service** | `http://localhost:3000/terms` | Static page |
 
 ---
 
 ## Auth Flow (logged-out state)
 
-The auth flow is on the index page when no valid session exists.
+Trigger by logging out via Settings → Logout, or clearing session storage.
 
-| Screen | How to reach |
-|--------|-------------|
-| Email entry (step 1) | Clear session storage/cookies and navigate to `http://localhost:3000` |
-| Code entry (step 2) | Submit a valid email on step 1 |
-| Name entry (step 3) | Submit a valid code for a new user |
+| Step | Screen | How to reach |
+|------|--------|-------------|
+| 1 | **Email entry** | Navigate to `http://localhost:3000` with no session |
+| 2 | **Code entry** | Submit a valid email on step 1 |
+| 3 | **Name entry** | Submit a valid code for a brand-new user only |
 
-> **Test account**: email `test@example.com`, code `000000` — bypasses email sending.
+**Buttons on each step:**
+- Step 1: "Send Verification Code" (orange outline)
+- Step 2: "Sign In" (orange outline), "← Back to Email" (gray outline)
+- Step 3: "Continue" (orange outline), "← Back" (gray outline)
+
+> **Playwright tip**: To log out programmatically, click the gear icon → "Logout". To simulate a fresh user, clear `localStorage` and reload.
 
 ---
 
-## Journal Tab
+## Main App — Tab Navigation
+
+All three tabs are always visible in the top nav bar.
+
+| Tab | How to reach | Selector |
+|-----|-------------|---------|
+| **Tasks** | Click "Tasks" in top nav | `page.getByRole('button', { name: 'Tasks', exact: true })` |
+| **Assistant** | Click "Assistant" in top nav | `page.getByRole('button', { name: 'Assistant', exact: true })` |
+| **Journal** | Click "Journal" in top nav | `page.getByRole('button', { name: 'Journal', exact: true })` |
+
+> **Important**: Inline modals (task, category, space) render inside the Tasks panel. Always activate the Tasks tab before screenshotting these.
+
+---
+
+## Tasks Tab
+
+### Task List Elements
 
 | Element | Notes |
 |---------|-------|
-| Date picker | `<` / `>` buttons to navigate days; text input accepts `YYYY-MM-DD` |
-| Journal textarea | Focused border turns orange (`focus:border-accent`) |
-| Save button | Orange outline; disabled when content matches last saved |
+| Category pills | Scrollable row of filter pills; "All" is always first |
+| Active category pill | Highlighted with orange border + text (`border-accent text-accent`) |
+| Search button | Magnifying glass icon; expands a search input |
+| Sort button | Sort icon; opens sort options dropdown |
+| Add task input | `placeholder="Add task(s)… (Shift+Enter for newline)"` |
+| "+" add button | Submits the task input |
+| Task rows | Each shows text, complete (✓) and delete (✗) icons |
+| Category/priority dropdowns | Inline on each task row |
+| "Show Completed (N)" | Button at bottom; toggles visibility of completed tasks |
+
+### Task Tab Modals (inline — Tasks tab must be active)
+
+| Modal | How to trigger | Playwright |
+|-------|---------------|-----------|
+| **Add Category** | Click `+` at the end of the category pill row | `page.getByRole('button', { name: '+', exact: true }).click()` |
+| **Edit Category** | Right-click any non-"General" category pill | `page.getByRole('button', { name: 'Chores', exact: true }).click({ button: 'right' })` |
+| **Edit Task** | Right-click any task row | `page.locator('p').filter({ hasText: 'My task' }).click({ button: 'right' })` |
+| **Create Space** | Click space name button (top-left) → "New Space..." | Click space dropdown, then `New Space...` item |
+| **Edit Space** | Click space name button → click pencil icon next to a non-active space | See note below |
+
+> **Edit Space note**: The pencil "Edit space" button only appears next to spaces that are *not currently active*. You must have at least two spaces. Switch to the space you want to edit first, then open the dropdown and use the pencil on another space — or create a test space, then click the pencil next to it while on Personal.
+
+> **Edit Space — owner vs member**: Owners see Save / Delete / Cancel. Members see only Leave / Cancel.
+
+### Search Panel
+
+Click the magnifying glass icon to expand the search input. Type to filter tasks by text.
+
+### Sort Options
+
+Click the sort icon to open the sort dropdown. Options: Default, Due Date, Priority, Alphabetical.
 
 ---
 
@@ -90,21 +108,123 @@ The auth flow is on the index page when no valid session exists.
 
 | Element | Notes |
 |---------|-------|
+| Welcome screen | Shown when chat history is empty; lists capabilities |
 | Input | `placeholder="Ask a question..."` |
-| Send button | Orange outline; disabled when input is empty or offline |
-| Clear Chat button | Appears above messages once conversation starts |
+| Send button | Orange outline; disabled when input is empty or loading |
+| Clear Chat button | Gray outline; appears above messages once conversation starts |
+| User messages | Dark gray box (`bg-gray-800`) with white text |
+| Assistant messages | Plain text, no box |
+| Tool call messages | Blue-tinted box showing tool name, inputs, and result |
+
+---
+
+## Journal Tab
+
+| Element | Notes |
+|---------|-------|
+| Date picker | `<` / `>` arrow buttons navigate days; text input accepts `YYYY-MM-DD` |
+| Journal textarea | Focused border turns orange (`focus:border-accent`) |
+| Save button | Orange outline; disabled when content matches last saved |
+
+---
+
+## Settings Dropdown
+
+Open by clicking the gear icon (`button[name="Settings"]`) in the top-right.
+
+| Item | Opens |
+|------|-------|
+| Account | Account Settings modal |
+| Email Settings | Email Settings modal |
+| Insights | Insights modal |
+| Export Data | Export Data modal |
+| Contact | Contact modal |
+| Logout | Logs out and returns to auth flow |
+
+Settings modals are **fixed overlays** — they render on top of whatever tab is active.
+
+### Account Settings Modal
+
+| Element | Notes |
+|---------|-------|
+| Email field | Read-only, shows current email |
+| Name field + "Update Name" | Orange outline button; disabled until name changes |
+| "Delete Account" | Red outline button; expands confirmation step |
+| Confirmation step | Type `DELETE` in input, then "Confirm Delete" (red outline) or "Cancel" (gray outline) |
+| Close button | Gray outline; dismisses modal |
+
+### Email Settings Modal
+
+| Element | Notes |
+|---------|-------|
+| "Enable daily email summaries" | Checkbox; enables the rest of the form |
+| Daily Summary Time | Time input (disabled until email enabled) |
+| Custom Instructions | Textarea for AI prompt customization |
+| Spaces to Include | Checkboxes for each space |
+| Save / Cancel | Orange + gray outline buttons |
+| "Send Email Now" | Green outline button; sends a summary immediately |
+
+### Insights Modal
+
+Displays analytics for the active space (or all spaces if none selected).
+
+| Section | Notes |
+|---------|-------|
+| Overview stats | Total / Completed / Pending tasks + Completion rate |
+| Tasks Per Week chart | Bar chart; orange = created, green = completed |
+| Tasks by Category | Horizontal progress bars per category |
+| Tasks by Priority | Horizontal progress bars per priority (High/Medium/Low) |
+
+### Export Data Modal
+
+Button: "Download Export" (orange outline) — downloads a JSON file of all tasks.
+
+### Contact Modal
+
+Textarea for message + "Send Message" (orange outline) + "Cancel" (gray outline).
+
+---
+
+## Space Dropdown
+
+Click the space name button (top-left, shows current space name + folder icon) to open.
+
+| Element | Notes |
+|---------|-------|
+| Active space row | Highlighted; no edit button |
+| Other space rows | Each has a pencil icon to open Edit Space modal |
+| "New Space..." | Opens Create Space modal inline |
+
+---
+
+## Button Style Reference
+
+All interactive buttons follow a consistent outline pattern:
+
+| Color | Usage | Classes |
+|-------|-------|---------|
+| Orange outline | Primary actions (Save, Submit, Send, Create) | `border border-accent text-accent hover:bg-accent/10` |
+| Gray outline | Cancel / secondary actions | `border border-gray-600 text-gray-300 hover:bg-gray-800` |
+| Red outline | Destructive actions (Delete, Leave) | `border border-red-500 text-red-400 hover:bg-red-900/20` |
+| Green outline | Email send action | `border border-green-500 text-green-400 hover:bg-green-900/20` |
+
+Input focus: `focus:outline-none focus:border-accent` (orange border, no ring).
 
 ---
 
 ## Screenshotting Tips
 
 ```js
-// Always ensure correct tab is active for inline modals
+// Always activate the correct tab for inline modals
 await page.getByRole('button', { name: 'Tasks', exact: true }).click();
 
 // Right-click to open context-menu modals
 await page.locator('p').filter({ hasText: 'My task' }).click({ button: 'right' });
 await page.getByRole('button', { name: 'Chores', exact: true }).click({ button: 'right' });
+
+// Open Edit Space (pencil button next to non-active space)
+await page.getByRole('button', { name: 'Personal' }).click(); // open dropdown
+await page.getByRole('button', { name: 'Edit space' }).click(); // pencil icon
 
 // Wait for modal content before screenshotting
 await page.waitForSelector('text=Edit Task');
@@ -119,12 +239,13 @@ await page.screenshot({ path: 'screenshots/modal-edit-task.png', scale: 'css' })
 
 Current screenshots are in `screenshots/` at the repo root:
 
-| File | Modal |
-|------|-------|
+| File | Screen |
+|------|--------|
 | `modal-add-category.png` | Add New Category |
-| `modal-edit-category.png` | Edit Category (Rename/Delete/Cancel) |
+| `modal-edit-category.png` | Edit Category (Rename / Delete / Cancel) |
 | `modal-edit-todo.png` | Edit Task |
 | `modal-create-space.png` | Create Space |
+| `modal-edit-space.png` | Edit Space (Save / Delete / Cancel) |
 | `modal-email-settings.png` | Email Settings |
 | `modal-export.png` | Export Data |
 | `modal-contact.png` | Contact |

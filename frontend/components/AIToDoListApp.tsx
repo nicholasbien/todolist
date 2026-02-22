@@ -2090,10 +2090,7 @@ export default function AIToDoListApp({
                       <span>Sending...</span>
                     </>
                   ) : (
-                    <>
-                      <span>📧</span>
-                      <span>Send Email Now</span>
-                    </>
+                    'Send Email Now'
                   )}
                 </button>
               </div>
