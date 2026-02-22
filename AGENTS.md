@@ -1,7 +1,13 @@
 # AI Todo List App - Agent Instructions
 
+## Keeping This Document Up to Date
+
+**AGENTS.md is the single source of truth for this project.** When a PR introduces major new features, redesigns, new endpoints, new components, or architectural changes, update the relevant sections of this document as part of that PR. This ensures documentation stays accurate for all agents and contributors.
+
+---
+
 ## Overview
-This is an AI-powered todo list application with a React/Next.js frontend and FastAPI backend. It includes email verification auth, AI task classification, offline functionality, and daily email summaries.
+This is an AI-powered collaborative todo list application with a React/Next.js frontend and FastAPI backend. It supports multi-user spaces, email verification auth, AI task classification, offline-first PWA, AI agent with tool calling, journal entries, and daily email summaries.
 
 ## Quick Setup
 Run the setup script:
@@ -36,33 +42,45 @@ cd frontend
 npm install
 ```
 
+---
+
 ## Running the Application
 
 ### Development Mode
 
 **Backend (Terminal 1):**
 ```bash
-cd backend
-source venv/bin/activate
-python app.py
+cd backend && source venv/bin/activate && uvicorn app:app --host 0.0.0.0 --port 8000 --reload
 ```
 Backend runs on http://localhost:8000
 
+> Alternative (shows deprecation warning): `cd backend && source venv/bin/activate && python app.py`
+> If you see environment issues, activate the virtual environment: `source backend/venv/bin/activate`
+
 **Frontend (Terminal 2):**
 ```bash
-cd frontend
-npm run dev
+cd frontend && npm run dev
 ```
 Frontend runs on http://localhost:3000
 
 ### Production Mode
 
-**Frontend Build:**
+**Frontend Build (web):**
 ```bash
-cd frontend
-npm run build
-npm start
+cd frontend && npm run build && npm start
 ```
+
+**Frontend Build (iOS/Android Capacitor):**
+```bash
+cd frontend && npm run cap:build
+# Builds with CAPACITOR_BUILD=true (creates 'out' dir) AND syncs to iOS/Android.
+# After running, rebuild in Xcode / Android Studio.
+```
+
+### Updating Logo/Icons
+See the **"Updating Logo/Icons"** section in `README.md`.
+
+---
 
 ## Linting and Code Quality
 
@@ -103,18 +121,13 @@ npm run lint -- --fix
 cd backend
 source venv/bin/activate
 
-# Run linting
-flake8 .
-
-# Format code
-black .
-
-# Sort imports
-isort .
-
-# Type checking
-mypy .
+flake8 .    # Run linting
+black .     # Format code
+isort .     # Sort imports
+mypy .      # Type checking
 ```
+
+---
 
 ## Testing
 
@@ -124,7 +137,7 @@ The system includes a **built-in test account** that completely bypasses email v
 
 #### IMPORTANT: Agent Testing Protocol
 
-**🤖 FOR AI AGENTS: Use this exact flow - DO NOT check email**
+**FOR AI AGENTS: Use this exact flow - DO NOT check email**
 
 ```bash
 # Step 1: Direct login (skip signup entirely)
@@ -146,186 +159,131 @@ curl -H "Authorization: Bearer $TOKEN" http://localhost:8000/todos
 - **NO EMAIL IS SENT** - the code is hardcoded in the system
 - **NO SIGNUP REQUIRED** - login automatically creates the user
 
-#### Why This Works for Agents
-- ✅ **Zero email dependencies** - no SMTP, no email checking required
-- ✅ **Instant access** - login works immediately without waiting
-- ✅ **No environment setup** - works on any server without configuration
-- ✅ **Deterministic** - same credentials always work the same way
-- ✅ **Isolated testing** - each test gets a clean environment
-
-#### Agent Testing Best Practices
-
-**❌ DON'T DO THIS:**
-```bash
-# Don't call signup first - it's unnecessary
-curl -d '{"email": "test@example.com"}' http://localhost:8000/auth/signup
-# Don't check email - no email is actually sent
-# Don't wait for verification codes
-```
-
-**✅ DO THIS:**
-```bash
-# Go straight to login with the hardcoded test code
-curl -H "Content-Type: application/json" \
-     -d '{"email": "test@example.com", "code": "000000"}' \
-     http://localhost:8000/auth/login
-```
-
-#### Remote/Production Testing
-```bash
-# Same flow works on production - just change the URL
-curl -H "Content-Type: application/json" \
-     -d '{"email": "test@example.com", "code": "000000"}' \
-     https://backend-production-e920.up.railway.app/auth/login
-```
-
 #### Complete Testing Example
 ```bash
-# 1. Login and get token
 RESPONSE=$(curl -s -H "Content-Type: application/json" \
   -d '{"email": "test@example.com", "code": "000000"}' \
   http://localhost:8000/auth/login)
-
-# 2. Extract token (adjust based on your JSON parsing tools)
 TOKEN=$(echo $RESPONSE | grep -o '"token":"[^"]*' | cut -d'"' -f4)
 
-# 3. Test API endpoints
 curl -H "Authorization: Bearer $TOKEN" http://localhost:8000/todos
 curl -H "Authorization: Bearer $TOKEN" http://localhost:8000/spaces
 curl -H "Authorization: Bearer $TOKEN" http://localhost:8000/categories
-
-# 4. Add test data
-curl -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
-     -d '{"text": "Test todo from agent"}' http://localhost:8000/todos
 ```
 
 #### UI Testing Options
 
-**Option 1: ✅ PREFERRED - Direct UI Login**
-**For UI testing, this is the simplest and most reliable approach:**
-
-1. **Navigate to the UI:** `http://localhost:3000` (or production URL)
-2. **Enter email:** `test@example.com`
-3. **Click "Send Code"** *(no email will be sent - this is just UI flow)*
-4. **Enter code:** `000000` *(always use this hardcoded code)*
-5. **Click "Login"** - you're immediately logged in!
-
-**Why this is preferred for UI testing:**
-- ✅ **Simplest flow** - no token extraction or localStorage manipulation
-- ✅ **Tests the actual user experience** - same flow real users follow
-- ✅ **No technical browser console work** required
-- ✅ **Works reliably** - bypasses service worker routing issues
-- ✅ **Zero email dependencies** - completely self-contained
+**Option 1: PREFERRED - Direct UI Login**
+1. Navigate to `http://localhost:3000`
+2. Enter email: `test@example.com`
+3. Click "Send Code" *(no email sent)*
+4. Enter code: `000000`
+5. Click "Login"
 
 **Option 2: API → UI Bridge**
-**Alternative approach using API login first:**
+```javascript
+// In browser console after API login:
+localStorage.setItem('auth_token', 'YOUR_TOKEN_FROM_API');
+window.location.reload();
+```
 
-1. **Get your auth token from API login** (as shown above)
-2. **Open browser and navigate to** `http://localhost:3000` (or production URL)
-3. **Open browser developer console** (F12)
-4. **Set the auth token manually:**
-   ```javascript
-   // Paste this in browser console:
-   localStorage.setItem('auth_token', 'YOUR_TOKEN_FROM_API');
-   // Then refresh the page
-   window.location.reload();
-   ```
-5. **You're now logged into the UI** - can add todos, manage spaces, etc.
+Same test credentials work on production: `https://app.todolist.nyc`
 
-**For Production UI Testing:**
-- Same process works on production URLs
-- Use `https://app.todolist.nyc` instead of localhost
-- Same test credentials: `test@example.com` + `000000`
+---
+
+### Testing the AI Agent
+
+The AI agent (`/agent/stream`) supports sequential tool calling with personalization.
+
+#### Get User's Space ID
+```bash
+curl -H "Authorization: Bearer YOUR_TOKEN" http://localhost:8000/spaces
+# Note the "Personal" space _id
+```
+
+#### Test Agent Queries
+```bash
+# Weather query
+curl -N -H "Authorization: Bearer YOUR_TOKEN" \
+  "http://localhost:8000/agent/stream?q=What%27s%20the%20weather%20in%20New%20York?"
+
+# Task management
+curl -N -H "Authorization: Bearer YOUR_TOKEN" \
+  "http://localhost:8000/agent/stream?q=Add%20task%20to%20learn%20Python&space_id=SPACE_ID"
+
+# Multi-tool sequential call (list_tasks → search_content → recommendations)
+curl -N -H "Authorization: Bearer YOUR_TOKEN" \
+  "http://localhost:8000/agent/stream?q=Recommend%20books%20based%20on%20my%20current%20tasks&space_id=SPACE_ID"
+```
+
+#### Expected SSE Response Flow
+```
+event: ready
+data: {"ok": true, "tools": [...], "space_id": "..."}
+
+event: tool_result
+data: {"tool": "list_tasks", "data": {"ok": true, "tasks": [...]}}
+
+event: token
+data: {"token": "Here"}
+
+...more tokens...
+
+event: done
+data: {"ok": true}
+```
+
+#### Available Agent Tools
+- **Tasks**: `add_task`, `list_tasks`, `update_task`
+- **Journals**: `add_journal_entry`, `read_journal_entry`
+- **Search**: `search_content`
+- **Weather**: `get_current_weather`, `get_weather_forecast`
+- **Web**: `web_search` (Brave API), `web_scraping`
+- **External APIs**: `get_book_recommendations`, `get_inspirational_quotes`
+- **Email**: `send_email_to_user`
+
+---
 
 ### Frontend Tests
 ```bash
 cd frontend
 
-# Run all tests
-npm test
-
-# Run specific test suites
+npm test                                         # Run all tests
 npm test -- AppMain.test.tsx                     # Component tests
 npm test -- AuthForm.test.tsx                    # Auth form tests
 npm test -- ServiceWorkerSync.test.ts            # Service worker tests
-
-# Run tests with coverage
-npm test -- --coverage
-
-# Run tests in watch mode
-npm test -- --watch
+npm test -- --coverage                           # With coverage
 ```
 
 **Test Structure:**
 - `__tests__/AppMain.test.tsx` - Main app component tests
 - `__tests__/AuthForm.test.tsx` - Authentication form tests
-- `__tests__/ServiceWorkerSync.test.ts` - Comprehensive service worker tests (13 tests)
-- `docs/ServiceWorkerTests.md` - Detailed test documentation
+- `__tests__/ServiceWorkerSync.test.ts` - Service worker sync tests
+- `__tests__/ServiceWorkerRouteValidation.test.ts` - Route validation tests
+- Plus 19 additional test files covering offline ops, journals, email settings, account creation, etc.
 
-**Service Worker Tests Cover:**
-- Todo operations (CREATE, UPDATE, COMPLETE, DELETE)
-- Category operations (CREATE_CATEGORY, DELETE_CATEGORY)
-- User isolation (multi-account support)
-- Authentication & security
-- Error handling & resilience
-- Integration workflows
+---
 
 ### Backend Tests
 
-**✅ SIMPLIFIED**: Backend tests now run standalone with mock databases - no server startup required!
+Backend tests run standalone with mock databases - no server startup required.
 
 ```bash
-cd backend
-source venv/bin/activate
+cd backend && source venv/bin/activate
 
-# Install test dependencies first
-pip install -r requirements.txt
-
-# Run all pytest tests (automated with mock database)
-pytest
-
-# Run specific test files
-pytest tests/test_auth.py -v                     # Authentication tests
-pytest tests/conftest.py -v                      # Test configuration
-
-# Run specific test categories
-pytest tests/test_auth.py::TestAuthentication -v # Basic auth tests only
-
-# Run with coverage
-pytest --cov=. --cov-report=term-missing
-
-# Run with verbose output when tests fail
-pytest -v --tb=short
-
-# Run manual tests (require interactive input and real server)
-python manual_tests/auth_manual.py
-python manual_tests/email_manual.py  # Only if SMTP configured
+pytest                              # Run all tests
+pytest tests/test_auth.py -v        # Authentication tests
+pytest -v --tb=short                # Verbose output (good for agents)
+pytest --cov=. --cov-report=term-missing  # With coverage
 ```
 
 **Test Structure:**
-- `tests/test_auth.py` - Authentication system tests (11 tests covering signup, login, sessions)
+- `tests/test_auth.py` - Authentication system tests (11 tests)
 - `tests/conftest.py` - Pytest configuration with async fixtures and mock database setup
-- `manual_tests/auth_manual.py` - Manual authentication testing
-- `manual_tests/email_manual.py` - Manual email system testing
+- `manual_tests/` - **DO NOT RUN** - require interactive input or SMTP connections
 
-**Test Coverage:**
-- Email verification workflows (with mock SMTP in tests)
-- JWT token management and session handling
-- User authentication endpoints and error handling
-- User isolation (multi-tenant functionality)
-- Integration workflows with database operations
+---
 
-**Key Test Features:**
-- **Mock Database**: All tests use `AsyncMongoMockClient` for isolated, fast testing
-- **Async Support**: Proper `pytest-asyncio` fixtures with function-scoped event loops
-- **Event Loop Safety**: Database connections are reset per test to avoid event loop conflicts
-- **Email Mocking**: SMTP operations run in thread pools and are mocked for tests
-
-**⚠️ IMPORTANT FOR AI AGENTS**:
-- **DO NOT RUN** files in `manual_tests/` directory - they require interactive input or SMTP connections
-- Tests are fully automated and use mock databases - no external dependencies required
-- All 11 authentication tests should pass without any setup
-- Use `pytest --tb=short` for concise output in agent environments
 ## UI Changes — Screenshot Requirement
 
 **For every PR that touches UI components, you must run the screenshot script and commit updated screenshots.**
@@ -347,7 +305,7 @@ Any change to files in `frontend/components/`, `frontend/pages/index.tsx`, or `f
    ```bash
    node scripts/take-screenshots.js
    ```
-   Screenshots are saved to `screenshots/{branch-name}/` automatically (e.g. `screenshots/button-outline-redesign/`). Each PR gets its own subdirectory so other PRs' screenshots are never overwritten.
+   Screenshots are saved to `screenshots/{branch-name}/` automatically. Each PR gets its own subdirectory so other PRs' screenshots are never overwritten.
 
 3. **Commit the updated screenshots**:
    ```bash
@@ -355,7 +313,7 @@ Any change to files in `frontend/components/`, `frontend/pages/index.tsx`, or `f
    git commit -m "Update screenshots for UI changes"
    ```
 
-4. **Include screenshots in the PR description** using `raw.githubusercontent.com` links. Use the branch-specific path:
+4. **Include screenshots in the PR description** using `raw.githubusercontent.com` links:
    ```
    ![Modal name](https://raw.githubusercontent.com/nicholasbien/todolist/YOUR-BRANCH/screenshots/YOUR-BRANCH-NAME/modal-name.png)
    ```
@@ -374,123 +332,346 @@ Navigation reference for all screens: `docs/UI_SCREENS_NAVIGATION.md`
 
 ---
 
-## Architecture
+## Architecture Overview
 
-### Backend (FastAPI)
+### Frontend Architecture
+- **Framework**: Next.js 14 with React 18
+- **Styling**: Tailwind CSS
+- **Main Component**: `AIToDoListApp.tsx` - handles todo management, categories, and spaces
+- **API Communication**: Service worker intercepts requests; `pages/api/[...proxy].js` as fallback
+- **Service Worker**: Offline-first PWA with IndexedDB storage and intelligent sync
+- **State Management**: React useState hooks for local state
+
+**Key Frontend Files:**
+- `components/AIToDoListApp.tsx` - Main todo interface (tasks, categories, spaces, modals)
+- `components/AgentChatbot.tsx` - AI assistant chat UI
+- `components/InsightsComponent.tsx` - Analytics/insights display
+- `components/JournalComponent.tsx` - Journal entry management
+- `components/SpaceDropdown.tsx` - Space selection dropdown
+- `components/TodoItem.tsx` - Individual todo item display
+- `components/MessageRenderer.tsx` - Chat message rendering
+- `components/NoSwipeZone.tsx` - Touch gesture helper
+- `context/AuthContext.tsx` - Authentication state management
+- `context/OfflineContext.tsx` - Online/offline status tracking
+- `pages/index.tsx` - Main page (includes login form + app)
+- `pages/home.tsx` - Marketing/landing page
+- `pages/privacy.tsx` - Privacy policy
+- `pages/terms.tsx` - Terms of service
+- `pages/api/[...proxy].js` - Next.js API proxy to backend
+- `public/sw.js` - Service worker for offline functionality
+- `utils/api.ts` - API request layer with Capacitor/web detection
+- `hooks/useCapacitor.ts` - Capacitor integration hook
+
+### Backend Architecture
 - **Framework**: FastAPI with async support
 - **Database**: MongoDB with Motor (async driver)
-- **AI Integration**: OpenAI GPT-4o-mini for task classification
-- **Authentication**: JWT tokens with email verification
-- **Email**: SMTP for verification codes and daily summaries
-- **Scheduling**: APScheduler for daily emails at 9 AM Eastern
+- **AI Integration**: OpenAI API with gpt-4.1-nano (task classification), gpt-5.2 (AI agent, email summaries)
+- **Authentication**: JWT-based session management with email verification
 
-**Key Files:**
-- `app.py` - Main FastAPI application
+**Key Backend Files:**
+- `app.py` - Main FastAPI application with CORS and all route definitions
+- `db.py` - MongoDB connection manager and collections wrapper
 - `todos.py` - Todo CRUD operations
-- `auth.py` - Authentication and user management
-- `classify.py` - OpenAI task classification
-- `categories.py` - Category management
-- `email_summary.py` - Daily email summaries
-- `scheduler.py` - Background job scheduling
+- `categories.py` - Space-aware category management
+- `spaces.py` - Multi-user space collaboration system
+- `auth.py` - User authentication and session management
+- `journals.py` - Journal entry CRUD operations
+- `chats.py` - Chat conversation history storage
+- `classify.py` - OpenAI API integration for task categorization
+- `insights_utils.py` - Analytics/insights computation
+- `email_summary.py` - Daily email summaries and contact messages
+- `scheduler.py` - APScheduler for daily emails at 9 AM Eastern
+- `dateparse.py` - Date parsing utilities
+- `agent/` - AI agent module:
+  - `agent.py` - Streaming SSE endpoint with OpenAI function calling
+  - `tools.py` - 13 tool implementations (tasks, journals, weather, web, email, etc.)
+  - `schemas.py` - Pydantic request/response schemas
 
-### Frontend (Next.js/React)
-- **Framework**: Next.js 14 with React 18 (CSR mode)
-- **Styling**: Tailwind CSS
-- **State Management**: React useState/useContext
-- **Authentication**: JWT tokens in localStorage
-- **Offline Support**: Service Worker with IndexedDB
+### AI Agent Architecture
+- **Streaming SSE Endpoint**: `/agent/stream` provides real-time responses with Server-Sent Events
+- **Direct Tool Integration**: Tools directly call existing backend functions (no IPC overhead)
+- **Conversation History**: Stored in `chats` collection, space-aware, max 10 messages in context
+- **Cross-Platform**: Works on web (via service worker) and mobile (Capacitor direct calls)
 
-**Key Files:**
-- `components/AIToDoListApp.jsx` - Main todo interface
-- `components/AuthForm.jsx` - Login/signup form
-- `context/AuthContext.js` - Authentication state management
-- `public/sw.js` - Service worker for offline functionality
+### Spaces System
+- **Default Spaces**: Every user gets a personal "Default" space automatically
+- **Collaborative Spaces**: Users can create shared spaces and invite others by email
+- **Access Control**: Space ownership and membership validation on all operations
+- **Isolation**: Todos, categories, journals, and chat history are isolated between spaces
+- **Email Invitations**: Support for inviting both existing and new users; pending invites tracked
 
-## Environment Variables
+### Service Worker Routing Architecture
+
+The app uses an **offline-first service worker proxy** for all API communication.
+
+#### Request Flow
+1. **Frontend API Layer** (`utils/api.ts`):
+   - Detects environment (Capacitor native vs web)
+   - Routes Capacitor directly to production backend
+   - Routes web requests through relative URLs for service worker interception
+
+2. **Service Worker Proxy** (`public/sw.js`):
+   - Intercepts all same-origin API requests matching `API_ROUTES`
+   - Routes to appropriate backend based on environment:
+     - **Production**: `https://backend-production-e920.up.railway.app`
+     - **Local Development**: `http://localhost:8000`
+     - **Capacitor**: Direct to production backend (bypasses service worker)
+
+3. **Offline-First Functionality**:
+   - **Online**: Forwards requests to backend, caches responses in IndexedDB
+   - **Offline**: Serves from IndexedDB, queues write operations for later sync
+   - **Sync**: Automatically syncs queued operations when back online
+
+#### Service Worker API_ROUTES
+```javascript
+const API_ROUTES = [
+  '/todos', '/categories', '/spaces', '/journals', '/insights',
+  '/agent', '/auth', '/email', '/contact', '/export', '/health'
+];
+```
+
+### Data Flow
+1. User selects or creates a space in the frontend
+2. User adds a task within the active space context
+3. Frontend calls `apiRequest('/todos')` with space_id
+4. Service Worker intercepts request and routes to backend
+5. Backend classifies task using space-specific categories and stores in MongoDB
+6. Service Worker caches response in IndexedDB for offline access
+7. Frontend displays updated todo list filtered by active space
+
+### Database Schema
+
+**Users Collection:**
+`{_id, email, first_name, is_verified, verification_code, code_expires_at, created_at, last_login, email_enabled, summary_hour, summary_minute, email_instructions, timezone, email_spaces}`
+
+**Sessions Collection:**
+`{_id, user_id, token, created_at, expires_at, is_active}`
+
+**Spaces Collection:**
+`{_id, name, owner_id, member_ids, pending_emails, is_default}`
+
+**Todos Collection:**
+`{_id, text, link, category, priority, dateAdded, dueDate, sortOrder, notes, completed, dateCompleted, user_id, space_id, created_offline}`
+
+**Categories Collection:**
+`{name, space_id}` with compound unique index on (space_id, name)
+
+**Journals Collection:**
+`{_id, user_id, space_id, date, text, created_at, updated_at}` with indexes on (user_id, date) and (user_id, space_id, date)
+
+**Chats Collection:**
+`{_id, user_id, role, content, space_id, created_at}` with index on (user_id, space_id, created_at)
+
+---
+
+## Environment Setup
+
+See `docs/ENVIRONMENT_SETUP.md` for complete environment variable documentation.
+
+Quick setup:
+- Backend: Copy `backend/.env.example` to `backend/.env` and fill in your API keys
+- Frontend: Create `frontend/.env.local` with `OPENAI_API_KEY` and optionally `NEXT_PUBLIC_API_URL`
 
 ### Backend (.env)
 ```
 MONGODB_URL=mongodb://localhost:27017
 OPENAI_API_KEY=your_openai_api_key
-SMTP_SERVER=smtp.gmail.com
+JWT_SECRET=your-secret-key
+OPENWEATHER_API_KEY=your_openweather_key       # Required for weather tools
+BRAVE_API_KEY=your_brave_api_key               # Optional, for web search tool
+SMTP_SERVER=smtp.gmail.com                     # Optional, for email features
 SMTP_PORT=587
 FROM_EMAIL=your_email@gmail.com
 SMTP_PASSWORD=your_app_password
 ADMIN_EMAIL=your_email@gmail.com
-JWT_SECRET=your-secret-key
 ```
 
 ### Frontend (.env.local)
 ```
 OPENAI_API_KEY=your_openai_api_key
-NEXT_PUBLIC_API_URL=http://localhost:8000
+# NEXT_PUBLIC_API_URL is intentionally NOT set for local dev (defaults to localhost:8000 via service worker)
 ```
 
-## Key Features
+---
 
-### Authentication
-- Email-based signup/login with verification codes
-- JWT session management
-- User profile management
+## Development Workflow
 
-### Todo Management
-- AI-powered task classification (category/priority)
-- Real-time CRUD operations
-- Category management
-- Priority-based sorting
+1. Start MongoDB (if not using cloud MongoDB)
+2. Start backend: `cd backend && source venv/bin/activate && uvicorn app:app --host 0.0.0.0 --port 8000 --reload`
+3. Start frontend: `cd frontend && npm run dev`
+4. Frontend: http://localhost:3000, backend: http://localhost:8000
 
-### Email System
-- Verification codes for auth
-- Daily summary emails (admin only by default)
-- Manual summary trigger button
+---
 
-### Offline Support
-- Service worker caches API requests
-- IndexedDB for offline data storage
-- Sync queue for offline operations
+## Key Implementation Details
+
+- **Service Worker Offline-First**: PWA with IndexedDB storage, request interception, and intelligent sync
+- **Space-Aware Operations**: All todo, category, and journal operations include space context
+- **Legacy Data Migration**: Automatic migration of data without space_id to default space on startup
+- **Access Control**: Membership validation on all space-related operations
+- **AI Classification**: Task classification uses space-specific categories for better accuracy
+- **Auto-save Optimization**: Journal entries use queue optimization to prevent duplicate operations
+- **Immediate Replacement**: Offline todos are immediately replaced with server versions upon successful sync
+- **Chat Persistence**: Agent conversations stored in DB with space isolation, 10-message context window
+
+---
 
 ## API Endpoints
 
-### Authentication
-- `POST /auth/signup` - Send verification code
-- `POST /auth/login` - Verify code and login
-- `POST /auth/logout` - Logout user
-- `GET /auth/me` - Get current user
-- `POST /auth/update-name` - Update user name
+**Note**: All frontend requests use direct paths (e.g., `/todos`, `/auth/signup`) intercepted by the service worker and routed to the backend.
 
-### Todos
-- `GET /todos` - Get user's todos
-- `POST /todos` - Create todo
+### AI Agent
+- `GET /agent/stream?q={query}&space_id={id}` - Streaming AI agent with tool calling
+- `DELETE /agent/history?space_id={id}` - Clear chat history for space
+
+### Authentication
+- `POST /auth/signup` - Send verification code (no auth required)
+- `POST /auth/login` - Verify code and login (no auth required)
+- `POST /auth/logout` - Logout and invalidate session
+- `GET /auth/me` - Get current user info
+- `POST /auth/update-name` - Update user's display name
+- `DELETE /auth/me` - Delete user account
+
+### Spaces
+- `GET /spaces` - List user's accessible spaces
+- `POST /spaces` - Create new space
+- `PUT /spaces/{id}` - Rename space (owner only)
+- `DELETE /spaces/{id}` - Delete space (owner only)
+- `POST /spaces/{id}/invite` - Invite users to space
+- `GET /spaces/{id}/members` - List space members
+- `POST /spaces/{id}/leave` - Leave a space
+
+### Todos (Space-Aware)
+- `GET /todos?space_id={id}` - Get todos for specific space
+- `POST /todos` - Create todo with space_id
 - `PUT /todos/{id}` - Update todo
 - `PUT /todos/{id}/complete` - Toggle completion
+- `PUT /todos/reorder` - Reorder todos
 - `DELETE /todos/{id}` - Delete todo
 
-### Categories
-- `GET /categories` - Get all categories
-- `POST /categories` - Add category
-- `DELETE /categories/{name}` - Delete category
+### Categories (Space-Aware)
+- `GET /categories?space_id={id}` - Get categories for space
+- `POST /categories` - Add category to space
+- `PUT /categories/{name}?space_id={id}` - Rename category
+- `DELETE /categories/{name}?space_id={id}` - Delete category
 
-### AI Classification
-- `POST /classify` - Classify task text
+### Journals
+- `GET /journals?date={date}&space_id={id}` - Get journal entries
+- `POST /journals` - Create/update journal entry with space_id
+- `DELETE /journals/{id}` - Delete journal entry
+
+### Insights
+- `GET /insights?space_id={id}` - Get analytics/insights for specific space
 
 ### Email
 - `POST /email/send-summary` - Send summary to current user
 - `GET /email/scheduler-status` - Check scheduler status
+- `POST /email/update-schedule` - Update email schedule time
+- `POST /email/update-instructions` - Update custom email instructions
+- `POST /email/update-spaces` - Update which spaces are included in emails
 
-## Development Notes
+### Other
+- `GET /export` - Export user data (CSV or JSON)
+- `POST /contact` - Contact form submission
+- `GET /health` - Health check
 
-### Database Schema
-- **todos**: `{_id, text, category, priority, dateAdded, completed, user_id}`
-- **users**: `{_id, email, first_name, is_verified, verification_code, code_expires_at}`
-- **sessions**: `{_id, user_id, token, expires_at}`
-- **categories**: `{name}`
+---
 
-### Security Features
-- CORS configured for development
-- JWT token authentication
-- Email verification required
-- Sanitized error logging (no SMTP credential exposure)
-- Admin-only endpoints for bulk operations
+## Service Worker Architecture
+
+### Overview
+The app uses an offline-first PWA architecture with a sophisticated service worker that:
+- **Intercepts API requests** matching whitelisted routes for offline capability
+- **Stores data in IndexedDB** for offline access
+- **Syncs queued operations** when back online
+- **Immediately replaces offline IDs** with server IDs upon successful sync
+
+### Key Features
+- **Offline Storage**: Todos, journals, categories stored in user-isolated IndexedDB stores
+- **Sync Queue**: Failed operations queued for retry when online
+- **Auto-save Optimization**: Journal entries update existing queue entries to prevent duplicates
+- **ID Mapping**: Offline IDs (`offline_*`) are immediately replaced with server IDs after sync
+- **User Isolation**: All data strictly isolated by `user_id` in separate IndexedDB stores
+
+### CRITICAL: Service Worker Version Bumps
+
+**Always bump cache versions when modifying `public/sw.js`:**
+- Increment `STATIC_CACHE` version (currently `todo-static-v126`)
+- Increment `DB_VERSION` if changing IndexedDB schema (currently `13`)
+
+Without version bumps, browsers continue using the old cached service worker and changes won't take effect in production.
+
+### Request Flow
+1. Frontend makes request to `/todos`
+2. Service Worker intercepts same-origin request
+3. If online: Forward to backend (production or localhost)
+4. If offline: Serve from IndexedDB with offline ID generation
+5. Queue failed operations for sync when back online
+6. On successful sync: Immediately replace offline data with server data
+
+---
+
+## Common Issues
+
+### iOS Safe Area Padding (SOLVED)
+
+**Problem**: Header overlaps with iPhone notch/status bar, or unwanted scrolling in Capacitor iOS app.
+
+**Solution**: Use padding approach with `contentInset: 'never'`
+
+```tsx
+<div
+  className="flex flex-col max-w-md mx-auto overflow-hidden"
+  style={{
+    height: '100dvh',
+    paddingTop: 'env(safe-area-inset-top)',
+    paddingBottom: 'env(safe-area-inset-bottom)'
+  }}
+>
+```
+
+**Key Points:**
+- Use `height: 100dvh` (don't subtract safe area)
+- Use `padding-top/bottom: env(safe-area-inset-*)` to push content into safe area
+- DON'T use `calc(100dvh - env(...))` - over-shrinks on iOS Safari
+
+See `docs/IOS_SAFE_AREA_INVESTIGATION.md` for complete debugging history.
+
+### Field Serialization Bug: `_id` vs `id`
+
+**Problem**: Service worker expects `_id` fields for IndexedDB storage, but inconsistent backend serialization can return `id` instead.
+
+**Symptoms**: Data cached successfully online, but "Found 0 items" when retrieving offline.
+
+**Solution**: Always use `response_model` in FastAPI endpoints or `model.dict(by_alias=True)`.
+
+---
+
+## API Routing Maintenance
+
+### CRITICAL: When Adding New Backend Endpoints
+
+**THE #1 CAUSE OF 404 ERRORS**: New backend endpoints added without updating service worker routes.
+
+**Problem**: Service worker only intercepts whitelisted paths in `API_ROUTES`. New endpoints fall through to Next.js and return 404.
+
+**Solution**: Always follow these steps when adding backend endpoints:
+
+1. **Add endpoint to backend** (`backend/app.py`)
+2. **Add route to `API_ROUTES`** in `public/sw.js`
+3. **Increment `STATIC_CACHE` version**
+4. **Test both routes**: Service worker + proxy fallback
+
+Automated testing: `__tests__/ServiceWorkerRouteValidation.test.ts` catches missing routes.
+
+---
+
+## Scripts
+
+- `scripts/take-screenshots.js` - Captures all modal screenshots for UI PRs (see Screenshot Requirement section)
+- `scripts/populate_sample_data.py` - Populates sample data for testing
+
+---
 
 ## Deployment
 
@@ -502,59 +683,9 @@ A deployment script is available but should **NOT** be run by AI agents:
 ./deploy.sh
 ```
 
-The script deploys both backend and frontend services to Railway. Manual deployment steps:
-
-1. Ensure Railway CLI is installed and authenticated
-2. Configure environment variables in Railway dashboard
-3. Run deployment script from project root
-
 ### Deployment Considerations
 - Environment variables must be configured in Railway dashboard
 - MongoDB connection required
 - SMTP credentials needed for email functionality
 - Daily email scheduler runs automatically at 9 AM Eastern
 - Backend has restart policy ON_FAILURE for automatic recovery
-
-## Agent Definitions
-
-### pwa-app-store-converter
-
-**Purpose**: Converts existing Next.js/React PWA applications to native app store packages for iOS and Android distribution.
-
-**Description**: This agent specializes in transforming Progressive Web Apps (PWAs) into native app store packages without requiring code rewrites. It uses TWA (Trusted Web Activity) for Android Play Store deployment and Capacitor wrapper for iOS App Store deployment, providing a fast path to native app distribution.
-
-**Key Capabilities**:
-- **PWA Assessment**: Audits existing PWAs for app store readiness using Lighthouse and PWA quality criteria
-- **Android TWA Packaging**: Implements Trusted Web Activity wrapper for Google Play Store deployment
-- **iOS Capacitor Wrapping**: Creates Capacitor-based iOS app bundles for App Store submission
-- **Store Asset Generation**: Creates required icons, screenshots, and metadata for both app stores
-- **Performance Optimization**: Enhances PWAs for mobile app experience with caching strategies and mobile-specific optimizations
-- **App Store Submission**: Guides through Google Play Console and App Store Connect submission processes
-
-**Technical Stack**:
-- **Android**: Trusted Web Activity (TWA) with Bubblewrap CLI
-- **iOS**: Capacitor framework for native wrapper
-- **PWA Tools**: Lighthouse auditing, Workbox for service workers
-- **Build Tools**: Android Studio/Gradle for APK/AAB, Xcode for iOS archives
-
-**Advantages Over Native Development**:
-- **Zero Code Rewrite**: 100% code reuse from existing PWA
-- **Fast Implementation**: 3-4 weeks vs 10-16 weeks for React Native conversion
-- **Single Codebase Maintenance**: Web updates automatically reflect in mobile apps
-- **Lower Development Cost**: Minimal resources required for native presence
-- **Instant Updates**: No app store approval needed for web functionality updates
-
-**Use Cases**:
-- Converting existing PWAs to native app store presence
-- Rapid mobile app deployment for web-first applications
-- Maintaining web development velocity while gaining native distribution
-- Teams wanting app store presence without native development complexity
-
-**Deliverables**:
-- App store-ready Android APK/AAB packages
-- iOS app archives ready for App Store Connect
-- Store listing assets (icons, screenshots, descriptions)
-- PWA optimization recommendations and implementations
-- Submission guidance and app store compliance verification
-
-**Timeline**: Typically 3-4 weeks from PWA assessment to app store submission, significantly faster than traditional native development approaches.
