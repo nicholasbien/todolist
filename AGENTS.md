@@ -326,6 +326,53 @@ python manual_tests/email_manual.py  # Only if SMTP configured
 - Tests are fully automated and use mock databases - no external dependencies required
 - All 11 authentication tests should pass without any setup
 - Use `pytest --tb=short` for concise output in agent environments
+## UI Changes — Screenshot Requirement
+
+**For every PR that touches UI components, you must run the screenshot script and commit updated screenshots.**
+
+### When this applies
+Any change to files in `frontend/components/`, `frontend/pages/index.tsx`, or `frontend/pages/home.tsx` that affects visible UI (buttons, modals, layouts, colors, text).
+
+### Steps
+
+1. **Start both servers** (if not already running):
+   ```bash
+   # Terminal 1
+   cd backend && source venv/bin/activate && uvicorn app:app --host 0.0.0.0 --port 8000 --reload
+   # Terminal 2
+   cd frontend && npm run dev
+   ```
+
+2. **Run the screenshot script** from the repo root:
+   ```bash
+   node scripts/take-screenshots.js
+   ```
+
+3. **Commit the updated screenshots**:
+   ```bash
+   git add screenshots/
+   git commit -m "Update screenshots for UI changes"
+   ```
+
+4. **Include screenshots in the PR description** using `raw.githubusercontent.com` links pointing to the branch (not main):
+   ```
+   ![Modal name](https://raw.githubusercontent.com/nicholasbien/todolist/YOUR-BRANCH/screenshots/modal-name.png)
+   ```
+
+### Keeping the script up to date
+
+When adding a **new modal, drawer, or full-screen view**:
+
+1. Add a screenshot step to `scripts/take-screenshots.js`
+2. Add the modal's close button to the table in `docs/SCREENSHOT_WORKFLOW.md`
+3. Add a row to the Screenshots Reference table in both `docs/SCREENSHOT_WORKFLOW.md` and `docs/UI_SCREENS_NAVIGATION.md`
+4. Add navigation instructions for the new screen to `docs/UI_SCREENS_NAVIGATION.md`
+
+Full workflow documentation and Playwright patterns: `docs/SCREENSHOT_WORKFLOW.md`
+Navigation reference for all screens: `docs/UI_SCREENS_NAVIGATION.md`
+
+---
+
 ## Architecture
 
 ### Backend (FastAPI)
