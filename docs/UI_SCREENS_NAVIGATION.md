@@ -212,26 +212,63 @@ Input focus: `focus:outline-none focus:border-accent` (orange border, no ring).
 
 ---
 
-## Screenshotting Tips
+## Automated Screenshot Script
 
-```js
-// Always activate the correct tab for inline modals
-await page.getByRole('button', { name: 'Tasks', exact: true }).click();
+A fully working script lives at `scripts/take-screenshots.js`. It opens all 10 modals in sequence and saves screenshots to `screenshots/`. Run from the repo root after starting both servers:
 
-// Right-click to open context-menu modals
-await page.locator('p').filter({ hasText: 'My task' }).click({ button: 'right' });
-await page.getByRole('button', { name: 'Chores', exact: true }).click({ button: 'right' });
-
-// Open Edit Space (pencil button next to non-active space)
-await page.getByRole('button', { name: 'Personal' }).click(); // open dropdown
-await page.getByRole('button', { name: 'Edit space' }).click(); // pencil icon
-
-// Wait for modal content before screenshotting
-await page.waitForSelector('text=Edit Task');
-await page.screenshot({ path: 'screenshots/modal-edit-task.png', scale: 'css' });
-
-// Save screenshots to screenshots/ in repo root (committed to repo)
+```bash
+node scripts/take-screenshots.js
 ```
+
+### Key patterns for Playwright automation
+
+**Tab navigation** — use `.nth(0)` to avoid strict mode violations if the name appears in multiple elements:
+```js
+await page.getByRole('button', { name: 'Tasks', exact: true }).nth(0).click();
+```
+
+**Add Category `+`** — scoped to category pill row (avoids hitting the task-input `+`):
+```js
+await page.locator('button[class*="rounded-xl"]').filter({ hasText: /^\+$/ }).first().click();
+```
+
+**Right-click modals** (Edit Category, Edit Task):
+```js
+await page.getByRole('button', { name: 'Chores', exact: true }).click({ button: 'right' });
+await page.locator('p').first().click({ button: 'right' });
+```
+
+**Edit Space** — click space dropdown, then pencil icon next to non-active space:
+```js
+await page.locator('button').filter({ hasText: /Personal|Test Space/ }).nth(0).click();
+await page.getByRole('button', { name: 'Edit space' }).nth(0).click();
+```
+
+**Closing modals** — each modal has a different close button. Use the exact name per modal:
+
+| Modal | Close selector |
+|-------|---------------|
+| Add Category | `getByRole('button', { name: 'Cancel', exact: true })` |
+| Edit Category | `getByRole('button', { name: 'Cancel', exact: true })` |
+| Edit Task | `getByRole('button', { name: 'Cancel', exact: true })` |
+| Create Space | `getByRole('button', { name: 'Cancel', exact: true })` |
+| Edit Space | `getByRole('button', { name: 'Cancel', exact: true })` |
+| Account Settings | `getByRole('button', { name: 'Close', exact: true })` |
+| Email Settings | `getByRole('button', { name: 'Cancel', exact: true })` |
+| Insights | `getByRole('button', { name: 'Close insights' })` ← aria-label, not text |
+| Export Data | `getByRole('button', { name: 'Cancel', exact: true })` |
+| Contact | `getByRole('button', { name: 'Cancel', exact: true })` |
+
+**Wait for backdrop to clear** after closing — the backdrop `div` lingers briefly in the DOM after React state updates. Always wait before opening the next modal:
+```js
+await page.waitForFunction(
+  () => !document.querySelector('[class*="fixed"][class*="inset-0"]'),
+  { timeout: 4000 }
+).catch(() => {});
+await page.waitForTimeout(200);
+```
+
+> **Do not** use `page.evaluate()` to remove overlay DOM nodes directly — that corrupts React state (the modal re-renders on next tick).
 
 ---
 
@@ -249,4 +286,5 @@ Current screenshots are in `screenshots/` at the repo root:
 | `modal-email-settings.png` | Email Settings |
 | `modal-export.png` | Export Data |
 | `modal-contact.png` | Contact |
+| `modal-insights.png` | Insights |
 | `modal-account-settings.png` | Account Settings |
