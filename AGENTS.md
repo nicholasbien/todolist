@@ -284,6 +284,60 @@ pytest --cov=. --cov-report=term-missing  # With coverage
 
 ---
 
+## Offline/Online Sync — E2E Testing
+
+The Jest unit tests in `__tests__/` cover service worker internals (IndexedDB ops, queue logic, sync deduplication) with mocked fetch and fake-indexeddb. The Playwright E2E script covers the full browser flow that Jest cannot: real service worker registration, real IndexedDB, real network toggling, and UI reflecting correct state after sync.
+
+### Run offline sync tests
+
+Both servers must be running (same as screenshots):
+
+```bash
+node scripts/test-offline-sync.js
+```
+
+### What it tests
+
+| Test | Scenario |
+|------|----------|
+| 1 | Create task while offline → go online → task has real server ID |
+| 2 | Update task text offline → sync → server reflects new text |
+| 3 | Delete task offline → sync → task gone from server |
+| 4 | Complete task offline → sync → visible in "Show Completed" |
+| 5 | Write journal offline → sync → server has correct entry text |
+| 6 | Data created online still accessible after going offline (IndexedDB cache) |
+| 7 | Multiple offline ops (update + delete + create) all sync in one batch |
+
+### How sync works (reference)
+
+1. Browser goes offline → `navigator.onLine = false` → SW routes all API requests to IndexedDB
+2. Mutations are queued in IndexedDB (`queue` object store) with types `CREATE`, `UPDATE`, `DELETE`, etc.
+3. Browser comes back online → `online` event fires → `OfflineContext` sends `SYNC_WHEN_ONLINE` to SW
+4. SW runs `syncQueue()` → processes every queued op against the real backend → sends `SYNC_COMPLETE` postMessage to all tabs
+5. App receives `SYNC_COMPLETE` → refreshes task list from server
+
+### Playwright patterns used
+
+```js
+// Simulate offline/online
+await context.setOffline(true);   // navigator.onLine → false
+await context.setOffline(false);  // fires 'online' event → triggers sync
+
+// Wait for SYNC_COMPLETE before going online to avoid race
+const syncPromise = waitForSync(page, 10000);
+await context.setOffline(false);
+await syncPromise;
+
+// Verify server state from the page (goes through SW auth proxy)
+const todos = await page.evaluate(() => fetch('/todos').then(r => r.json()));
+```
+
+### Cleanup note
+
+Test tasks are prefixed with `[E2E]` and left in the test account after the run. Delete them manually via the app if needed.
+
+---
+
 ## UI Changes — Screenshot Requirement
 
 **For every PR that touches UI components, you must run the screenshot script and commit updated screenshots.**
@@ -670,6 +724,7 @@ Automated testing: `__tests__/ServiceWorkerRouteValidation.test.ts` catches miss
 ## Scripts
 
 - `scripts/take-screenshots.js` - Captures all modal screenshots for UI PRs (see Screenshot Requirement section)
+- `scripts/test-offline-sync.js` - Playwright E2E tests for offline/online sync flows (see Offline Testing section below)
 - `scripts/populate_sample_data.py` - Populates sample data for testing
 
 ---
