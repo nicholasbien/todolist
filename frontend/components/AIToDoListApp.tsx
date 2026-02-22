@@ -1618,7 +1618,7 @@ export default function AIToDoListApp({
             />
             <div className="flex justify-center space-x-3">
               <button onClick={handleAddSpace} className="border border-accent text-accent hover:bg-accent/10 px-6 py-2 rounded-lg transition-colors">Create</button>
-              <button onClick={() => { setShowAddSpaceModal(false); setNewSpaceName(''); }} className="bg-gray-800 hover:bg-gray-700 text-gray-300 px-6 py-2 rounded-lg transition-colors">Cancel</button>
+              <button onClick={() => { setShowAddSpaceModal(false); setNewSpaceName(''); }} className="border border-gray-600 text-gray-300 hover:bg-gray-800 px-6 py-2 rounded-lg transition-colors">Cancel</button>
             </div>
           </div>
         </div>
@@ -1674,7 +1674,7 @@ export default function AIToDoListApp({
                   {spaceToEdit && (
                     <button onClick={() => { handleDeleteSpace(spaceToEdit._id); setShowEditSpaceModal(false); }} className="bg-red-600 hover:bg-red-500 text-white px-6 py-2 rounded-lg transition-colors">Delete</button>
                   )}
-                  <button onClick={() => setShowEditSpaceModal(false)} className="bg-gray-800 hover:bg-gray-700 text-gray-300 px-6 py-2 rounded-lg transition-colors">Cancel</button>
+                  <button onClick={() => setShowEditSpaceModal(false)} className="border border-gray-600 text-gray-300 hover:bg-gray-800 px-6 py-2 rounded-lg transition-colors">Cancel</button>
                 </div>
               </>
             ) : (
@@ -1684,7 +1684,7 @@ export default function AIToDoListApp({
                   {spaceToEdit && (
                     <button onClick={() => { handleLeaveSpace(spaceToEdit._id); setShowEditSpaceModal(false); }} className="bg-red-600 hover:bg-red-500 text-white px-6 py-2 rounded-lg transition-colors">Leave</button>
                   )}
-                  <button onClick={() => setShowEditSpaceModal(false)} className="bg-gray-800 hover:bg-gray-700 text-gray-300 px-6 py-2 rounded-lg transition-colors">Cancel</button>
+                  <button onClick={() => setShowEditSpaceModal(false)} className="border border-gray-600 text-gray-300 hover:bg-gray-800 px-6 py-2 rounded-lg transition-colors">Cancel</button>
                 </div>
               </>
             )}
@@ -1718,7 +1718,7 @@ export default function AIToDoListApp({
                   setShowAddCategoryModal(false);
                   setNewCat("");
                 }}
-                className="bg-gray-800 hover:bg-gray-700 text-gray-300 px-6 py-2 rounded-lg transition-colors"
+                className="border border-gray-600 text-gray-300 hover:bg-gray-800 px-6 py-2 rounded-lg transition-colors"
               >
                 Cancel
               </button>
@@ -1755,7 +1755,7 @@ export default function AIToDoListApp({
               </button>
               <button
                 onClick={() => setShowEditCategoryModal(false)}
-                className="bg-gray-800 text-gray-300 px-6 py-2 rounded-lg hover:bg-gray-700 transition-colors"
+                className="border border-gray-600 text-gray-300 hover:bg-gray-800 px-6 py-2 rounded-lg transition-colors"
               >
                 Cancel
               </button>
@@ -1906,7 +1906,7 @@ export default function AIToDoListApp({
             </div>
             <div className="flex justify-center space-x-3">
               <button onClick={handleSaveTodoEdit} className="border border-accent text-accent hover:bg-accent/10 px-6 py-2 rounded-lg transition-colors">Save</button>
-              <button onClick={() => setShowEditTodoModal(false)} className="bg-gray-800 hover:bg-gray-700 text-gray-300 px-6 py-2 rounded-lg transition-colors">Cancel</button>
+              <button onClick={() => setShowEditTodoModal(false)} className="border border-gray-600 text-gray-300 hover:bg-gray-800 px-6 py-2 rounded-lg transition-colors">Cancel</button>
             </div>
           </div>
         </div>
@@ -2072,7 +2072,7 @@ export default function AIToDoListApp({
                     }
                     onCloseEmailSettings?.();
                   }}
-                  className="bg-gray-800 hover:bg-gray-700 text-gray-300 px-6 py-2 rounded-lg transition-colors"
+                  className="border border-gray-600 text-gray-300 hover:bg-gray-800 px-6 py-2 rounded-lg transition-colors"
                 >
                   Cancel
                 </button>

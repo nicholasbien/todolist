@@ -265,7 +265,7 @@ function LoginForm({ onLogin }: LoginFormProps) {
             <button
               type="button"
               onClick={handleBackToEmail}
-              className="w-full bg-gray-100 text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-200 transition-colors"
+              className="w-full border border-gray-600 text-gray-300 py-2 px-4 rounded-lg hover:bg-gray-800 transition-colors"
             >
               ← Back to Email
             </button>
@@ -620,7 +620,7 @@ export default function Home() {
                 </button>
                 <button
                   onClick={() => setShowExportModal(false)}
-                  className="bg-gray-800 hover:bg-gray-700 text-gray-300 px-6 py-2 rounded-lg transition-colors"
+                  className="border border-gray-600 text-gray-300 hover:bg-gray-800 px-6 py-2 rounded-lg transition-colors"
                 >
                   Cancel
                 </button>
@@ -653,7 +653,7 @@ export default function Home() {
                     setShowContactModal(false);
                     setContactMessage('');
                   }}
-                  className="bg-gray-800 hover:bg-gray-700 text-gray-300 px-6 py-2 rounded-lg transition-colors"
+                  className="border border-gray-600 text-gray-300 hover:bg-gray-800 px-6 py-2 rounded-lg transition-colors"
                 >
                   Cancel
                 </button>
@@ -725,7 +725,7 @@ export default function Home() {
                           setShowDeleteConfirmation(false);
                           setDeleteConfirmation('');
                         }}
-                        className="flex-1 bg-gray-800 hover:bg-gray-700 text-gray-300 px-4 py-2 rounded-lg transition-colors"
+                        className="flex-1 border border-gray-600 text-gray-300 hover:bg-gray-800 px-4 py-2 rounded-lg transition-colors"
                       >
                         Cancel
                       </button>
@@ -749,7 +749,7 @@ export default function Home() {
                     setShowDeleteConfirmation(false);
                     setDeleteConfirmation('');
                   }}
-                  className="bg-gray-800 hover:bg-gray-700 text-gray-300 px-6 py-2 rounded-lg transition-colors"
+                  className="border border-gray-600 text-gray-300 hover:bg-gray-800 px-6 py-2 rounded-lg transition-colors"
                 >
                   Close
                 </button>
