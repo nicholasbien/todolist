@@ -449,6 +449,7 @@ const API_ROUTES = [
 
 **Spaces Collection:**
 `{_id, name, owner_id, member_ids, pending_emails, is_default}`
+> `collaborative` is a derived concept (not a stored field): a space is collaborative when `member_ids.length > 1` or `pending_emails.length > 0`. Sending `collaborative: false` on PUT clears `member_ids` to owner-only and wipes `pending_emails`. Sending `collaborative: true` is a backend no-op.
 
 **Todos Collection:**
 `{_id, text, link, category, priority, dateAdded, dueDate, sortOrder, notes, completed, dateCompleted, user_id, space_id, created_offline}`
