@@ -22,7 +22,7 @@ export default function HomePage() {
             </p>
             <Link
               href="/"
-              className="inline-block bg-accent text-white px-8 py-4 rounded-full text-lg font-semibold hover:bg-accent-light transition-all transform hover:scale-105 shadow-xl"
+              className="inline-block border border-accent text-accent px-8 py-4 rounded-full text-lg font-semibold hover:bg-accent/10 transition-all transform hover:scale-105 shadow-xl"
             >
               Get Started
             </Link>

@@ -217,7 +217,7 @@ function LoginForm({ onLogin }: LoginFormProps) {
                 id="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-700 rounded-lg focus:ring-2 focus:ring-accent focus:border-accent outline-none bg-gray-900 text-gray-100 placeholder-gray-500"
+                className="w-full px-4 py-2 border border-gray-700 rounded-lg focus:border-accent focus:border-accent outline-none bg-gray-900 text-gray-100 placeholder-gray-500"
                 placeholder="Enter your email"
                 disabled={loading}
                 required
@@ -227,7 +227,7 @@ function LoginForm({ onLogin }: LoginFormProps) {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-accent text-white py-2 px-4 rounded-lg hover:bg-accent-dark focus:ring-2 focus:ring-accent focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="w-full border border-accent text-accent py-2 px-4 rounded-lg hover:bg-accent/10 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {loading ? 'Sending Code...' : 'Send Verification Code'}
             </button>
@@ -257,7 +257,7 @@ function LoginForm({ onLogin }: LoginFormProps) {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-accent text-white py-2 px-4 rounded-lg hover:bg-accent-dark focus:ring-2 focus:ring-accent focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="w-full border border-accent text-accent py-2 px-4 rounded-lg hover:bg-accent/10 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {loading ? 'Verifying...' : 'Sign In'}
             </button>
@@ -265,7 +265,7 @@ function LoginForm({ onLogin }: LoginFormProps) {
             <button
               type="button"
               onClick={handleBackToEmail}
-              className="w-full bg-gray-100 text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-200 transition-colors"
+              className="w-full border border-gray-600 text-gray-300 py-2 px-4 rounded-lg hover:bg-gray-800 transition-colors"
             >
               ← Back to Email
             </button>
@@ -281,7 +281,7 @@ function LoginForm({ onLogin }: LoginFormProps) {
                 id="firstName"
                 value={firstName}
                 onChange={(e) => setFirstName(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent focus:border-accent outline-none text-gray-900 placeholder-gray-500"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:border-accent focus:border-accent outline-none text-gray-900 placeholder-gray-500"
                 placeholder="Enter your first name"
                 disabled={loading}
                 required
@@ -291,7 +291,7 @@ function LoginForm({ onLogin }: LoginFormProps) {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-accent text-white py-2 px-4 rounded-lg hover:bg-accent-dark focus:ring-2 focus:ring-accent focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="w-full border border-accent text-accent py-2 px-4 rounded-lg hover:bg-accent/10 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {loading ? 'Saving...' : 'Continue'}
             </button>
@@ -579,7 +579,7 @@ export default function Home() {
                 <select
                   value={exportType}
                   onChange={(e) => setExportType(e.target.value as 'todos' | 'journals')}
-                  className="w-full bg-gray-900 border border-gray-700 text-gray-100 p-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent"
+                  className="w-full bg-gray-900 border border-gray-700 text-gray-100 p-2 rounded-lg focus:outline-none focus:border-accent"
                 >
                   <option value="todos">Tasks</option>
                   <option value="journals">Journal Entries</option>
@@ -590,7 +590,7 @@ export default function Home() {
                 <select
                   value={exportFormat}
                   onChange={(e) => setExportFormat(e.target.value as 'json' | 'csv')}
-                  className="w-full bg-gray-900 border border-gray-700 text-gray-100 p-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent"
+                  className="w-full bg-gray-900 border border-gray-700 text-gray-100 p-2 rounded-lg focus:outline-none focus:border-accent"
                 >
                   <option value="csv">CSV</option>
                   <option value="json">JSON</option>
@@ -601,7 +601,7 @@ export default function Home() {
                 <select
                   value={exportSpaceId}
                   onChange={(e) => setExportSpaceId(e.target.value)}
-                  className="w-full bg-gray-900 border border-gray-700 text-gray-100 p-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent"
+                  className="w-full bg-gray-900 border border-gray-700 text-gray-100 p-2 rounded-lg focus:outline-none focus:border-accent"
                 >
                   {exportSpaces.map((space) => (
                     <option key={space._id} value={space._id}>
@@ -614,13 +614,13 @@ export default function Home() {
                 <button
                   onClick={handleExportData}
                   disabled={exporting || !exportSpaceId}
-                  className="bg-accent hover:bg-accent-light disabled:bg-accent-dark disabled:text-gray-400 text-white px-6 py-2 rounded-lg transition-colors"
+                  className="border border-accent text-accent hover:bg-accent/10 disabled:opacity-50 disabled:cursor-not-allowed px-6 py-2 rounded-lg transition-colors"
                 >
                   {exporting ? 'Exporting...' : 'Download'}
                 </button>
                 <button
                   onClick={() => setShowExportModal(false)}
-                  className="bg-gray-800 hover:bg-gray-700 text-gray-300 px-6 py-2 rounded-lg transition-colors"
+                  className="border border-gray-600 text-gray-300 hover:bg-gray-800 px-6 py-2 rounded-lg transition-colors"
                 >
                   Cancel
                 </button>
@@ -638,13 +638,13 @@ export default function Home() {
                 value={contactMessage}
                 onChange={(e) => setContactMessage(e.target.value)}
                 placeholder="Ask for a new feature... Report a bug... Say hi!"
-                className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 placeholder-gray-500 h-32 resize-none focus:outline-none focus:ring-2 focus:ring-accent"
+                className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 placeholder-gray-500 h-32 resize-none focus:outline-none focus:border-accent"
               />
               <div className="flex justify-center space-x-3">
                 <button
                   onClick={handleSendContact}
                   disabled={sendingContact || !contactMessage.trim()}
-                  className="bg-accent hover:bg-accent-light disabled:bg-accent-dark disabled:text-gray-400 text-white px-6 py-2 rounded-lg transition-colors"
+                  className="border border-accent text-accent hover:bg-accent/10 disabled:opacity-50 disabled:cursor-not-allowed px-6 py-2 rounded-lg transition-colors"
                 >
                   {sendingContact ? 'Sending...' : 'Send'}
                 </button>
@@ -653,7 +653,7 @@ export default function Home() {
                     setShowContactModal(false);
                     setContactMessage('');
                   }}
-                  className="bg-gray-800 hover:bg-gray-700 text-gray-300 px-6 py-2 rounded-lg transition-colors"
+                  className="border border-gray-600 text-gray-300 hover:bg-gray-800 px-6 py-2 rounded-lg transition-colors"
                 >
                   Cancel
                 </button>
@@ -684,12 +684,12 @@ export default function Home() {
                   value={accountName}
                   onChange={(e) => setAccountName(e.target.value)}
                   placeholder="Enter your name"
-                  className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-accent"
+                  className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 placeholder-gray-500 focus:outline-none focus:border-accent"
                 />
                 <button
                   onClick={handleUpdateName}
                   disabled={updatingName || !accountName.trim() || accountName === user?.first_name}
-                  className="mt-2 bg-accent hover:bg-accent-light disabled:bg-accent-dark disabled:text-gray-400 text-white px-4 py-2 rounded-lg transition-colors text-sm"
+                  className="mt-2 border border-accent text-accent hover:bg-accent/10 disabled:opacity-50 disabled:cursor-not-allowed px-4 py-2 rounded-lg transition-colors text-sm"
                 >
                   {updatingName ? 'Updating...' : 'Update Name'}
                 </button>
@@ -700,7 +700,7 @@ export default function Home() {
                 {!showDeleteConfirmation ? (
                   <button
                     onClick={handleDeleteAccount}
-                    className="w-full bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg transition-colors font-semibold"
+                    className="w-full border border-red-500 text-red-400 hover:bg-red-900/20 px-4 py-2 rounded-lg transition-colors font-semibold"
                   >
                     Delete Account
                   </button>
@@ -725,14 +725,14 @@ export default function Home() {
                           setShowDeleteConfirmation(false);
                           setDeleteConfirmation('');
                         }}
-                        className="flex-1 bg-gray-800 hover:bg-gray-700 text-gray-300 px-4 py-2 rounded-lg transition-colors"
+                        className="flex-1 border border-gray-600 text-gray-300 hover:bg-gray-800 px-4 py-2 rounded-lg transition-colors"
                       >
                         Cancel
                       </button>
                       <button
                         onClick={handleDeleteAccount}
                         disabled={deletingAccount || deleteConfirmation !== 'DELETE'}
-                        className="flex-1 bg-red-600 hover:bg-red-700 disabled:bg-red-900 disabled:text-gray-500 text-white px-4 py-2 rounded-lg transition-colors font-semibold"
+                        className="flex-1 border border-red-500 text-red-400 hover:bg-red-900/20 disabled:opacity-50 disabled:cursor-not-allowed px-4 py-2 rounded-lg transition-colors font-semibold"
                       >
                         {deletingAccount ? 'Deleting...' : 'Confirm Delete'}
                       </button>
@@ -749,7 +749,7 @@ export default function Home() {
                     setShowDeleteConfirmation(false);
                     setDeleteConfirmation('');
                   }}
-                  className="bg-gray-800 hover:bg-gray-700 text-gray-300 px-6 py-2 rounded-lg transition-colors"
+                  className="border border-gray-600 text-gray-300 hover:bg-gray-800 px-6 py-2 rounded-lg transition-colors"
                 >
                   Close
                 </button>
