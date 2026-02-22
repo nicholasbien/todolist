@@ -1127,3 +1127,120 @@ describe('Journal Operations', () => {
     expect(responseData[0].text).toBe('Offline todo 1');
   });
 });
+
+describe('Space Sync Operations', () => {
+  test('syncQueue syncs CREATE_SPACE: replaces offline space with server space', async () => {
+    const sw = require('../public/sw.js');
+    await sw.putAuth('token123', 'user1');
+
+    const offlineSpace = {
+      _id: 'offline_space_123',
+      name: 'My Offline Space',
+      owner_id: 'user1',
+      member_ids: ['user1'],
+      created_offline: true,
+    };
+    await sw.putSpace(offlineSpace, 'user1');
+    await sw.addQueue({ type: 'CREATE_SPACE', data: offlineSpace }, 'user1');
+
+    const serverSpace = { _id: 'server_space_abc', name: 'My Offline Space', owner_id: 'user1', member_ids: ['user1'] };
+    global.fetch = jest.fn().mockResolvedValue({ ok: true, json: async () => serverSpace });
+
+    await sw.syncQueue();
+
+    expect(fetch).toHaveBeenCalledWith(
+      'http://localhost:8000/spaces',
+      expect.objectContaining({ method: 'POST', body: JSON.stringify({ name: 'My Offline Space' }) })
+    );
+
+    const queue = await sw.readQueue('user1');
+    expect(queue).toHaveLength(0);
+
+    const spaces = await sw.getSpaces('user1');
+    expect(spaces.some((s: any) => s._id === 'server_space_abc')).toBe(true);
+    expect(spaces.some((s: any) => s._id === 'offline_space_123')).toBe(false);
+  });
+
+  test('syncQueue syncs UPDATE_SPACE: PUTs to backend and updates IndexedDB', async () => {
+    const sw = require('../public/sw.js');
+    await sw.putAuth('token123', 'user1');
+
+    const space = { _id: 'space_real_456', name: 'Renamed Space', owner_id: 'user1', member_ids: ['user1'] };
+    await sw.putSpace(space, 'user1');
+    await sw.addQueue({ type: 'UPDATE_SPACE', id: 'space_real_456', data: space }, 'user1');
+
+    const serverSpace = { ...space, name: 'Renamed Space' };
+    global.fetch = jest.fn().mockResolvedValue({ ok: true, json: async () => serverSpace });
+
+    await sw.syncQueue();
+
+    expect(fetch).toHaveBeenCalledWith(
+      'http://localhost:8000/spaces/space_real_456',
+      expect.objectContaining({ method: 'PUT' })
+    );
+
+    const queue = await sw.readQueue('user1');
+    expect(queue).toHaveLength(0);
+  });
+
+  test('syncQueue syncs UPDATE_SPACE: defers if offline ID not yet mapped', async () => {
+    const sw = require('../public/sw.js');
+    await sw.putAuth('token123', 'user1');
+
+    const offlineSpace = { _id: 'offline_space_999', name: 'Draft', owner_id: 'user1', member_ids: ['user1'] };
+    await sw.addQueue({ type: 'UPDATE_SPACE', id: 'offline_space_999', data: offlineSpace }, 'user1');
+
+    global.fetch = jest.fn();
+
+    await sw.syncQueue();
+
+    // fetch should NOT be called — operation was deferred
+    expect(fetch).not.toHaveBeenCalled();
+
+    // Queue entry should still be present (deferred, not retried)
+    const queue = await sw.readQueue('user1');
+    expect(queue.some((op: any) => op.type === 'UPDATE_SPACE')).toBe(true);
+  });
+
+  test('syncQueue syncs DELETE_SPACE: DELETEs from backend and IndexedDB', async () => {
+    const sw = require('../public/sw.js');
+    await sw.putAuth('token123', 'user1');
+
+    const space = { _id: 'space_to_delete_789', name: 'Bye Space', owner_id: 'user1', member_ids: ['user1'] };
+    await sw.putSpace(space, 'user1');
+    await sw.addQueue({ type: 'DELETE_SPACE', id: 'space_to_delete_789', data: space }, 'user1');
+
+    global.fetch = jest.fn().mockResolvedValue({ ok: true, json: async () => ({}) });
+
+    await sw.syncQueue();
+
+    expect(fetch).toHaveBeenCalledWith(
+      'http://localhost:8000/spaces/space_to_delete_789',
+      expect.objectContaining({ method: 'DELETE' })
+    );
+
+    const queue = await sw.readQueue('user1');
+    expect(queue).toHaveLength(0);
+
+    const spaces = await sw.getSpaces('user1');
+    expect(spaces.some((s: any) => s._id === 'space_to_delete_789')).toBe(false);
+  });
+
+  test('syncQueue syncs DELETE_SPACE: succeeds without network call for offline-only space', async () => {
+    const sw = require('../public/sw.js');
+    await sw.putAuth('token123', 'user1');
+
+    const offlineSpace = { _id: 'offline_space_never_synced', name: 'Temp', owner_id: 'user1', member_ids: ['user1'] };
+    await sw.addQueue({ type: 'DELETE_SPACE', id: 'offline_space_never_synced', data: offlineSpace }, 'user1');
+
+    global.fetch = jest.fn();
+
+    await sw.syncQueue();
+
+    // No network call needed for a space that never reached the server
+    expect(fetch).not.toHaveBeenCalled();
+
+    const queue = await sw.readQueue('user1');
+    expect(queue).toHaveLength(0);
+  });
+});

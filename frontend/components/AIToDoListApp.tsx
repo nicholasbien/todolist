@@ -629,7 +629,7 @@ export default function AIToDoListApp({
     try {
       await authenticatedFetch(`/spaces/${spaceToEdit._id}`, {
         method: 'PUT',
-        body: JSON.stringify({ name: trimmedName || spaceToEdit.name, collaborative: editSpaceCollaborative })
+        body: JSON.stringify({ name: trimmedName || spaceToEdit.name, ...(!editSpaceCollaborative && { collaborative: false }) })
       });
       const emails = inviteEmails.map(e => e.trim()).filter(e => e);
       if (emails.length) {

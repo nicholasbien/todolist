@@ -300,7 +300,7 @@ describe('Online Transition Race Condition', () => {
     // NOT empty array from server
   });
 
-  test('Pending operations block caching for all spaces (conservative approach)', async () => {
+  test('Pending operations in spaceA do NOT block caching for spaceB (space-specific approach)', async () => {
     const sw = require('../public/sw.js');
 
     const testUserId = 'user999';
@@ -321,13 +321,23 @@ describe('Online Transition Race Condition', () => {
       { _id: 'server1', text: 'Space B todo', completed: false, space_id: spaceB }
     ];
 
-    global.fetch = jest.fn().mockResolvedValue({
+    const mockResponse = {
       ok: true,
-      clone: () => ({
-        json: jest.fn().mockResolvedValue(serverTodos)
-      }),
-      json: jest.fn().mockResolvedValue(serverTodos)
-    });
+      status: 200,
+      statusText: 'OK',
+      headers: new Headers({ 'Content-Type': 'application/json' }),
+      clone: function() {
+        return {
+          json: async () => serverTodos,
+          text: async () => JSON.stringify(serverTodos),
+          blob: async () => new Blob([JSON.stringify(serverTodos)]),
+          clone: () => this.clone()
+        };
+      },
+      json: async () => serverTodos,
+      text: async () => JSON.stringify(serverTodos)
+    };
+    global.fetch = jest.fn().mockResolvedValue(mockResponse);
 
     const request = new Request(`http://localhost:3000/todos?space_id=${spaceB}`, {
       method: 'GET',
@@ -336,15 +346,11 @@ describe('Online Transition Race Condition', () => {
 
     const response = await sw.handleApiRequest(request);
 
-    // KEY TEST: With conservative approach (Option A), ANY pending operation blocks ALL caching
-    // This prevents data loss at the cost of being slightly over-protective
-    // Response should be IndexedDB data (empty for spaceB), not server data
+    // KEY TEST: With space-specific approach, a pending op in spaceA does NOT block spaceB.
+    // The server response is passed through directly (no early IndexedDB return).
     expect(response.status).toBe(200);
     const responseTodos = await response.json();
-    expect(responseTodos.length).toBe(0); // spaceB has no todos in IndexedDB
-
-    // Verify spaceB IndexedDB is still empty (server data was blocked)
-    const todosSpaceB = await sw.getTodos(testUserId, spaceB);
-    expect(todosSpaceB.length).toBe(0); // Not cached due to pending spaceA operation
+    expect(responseTodos.length).toBe(1); // spaceB server data IS returned
+    expect(responseTodos[0].text).toBe('Space B todo');
   });
 });

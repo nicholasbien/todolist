@@ -186,7 +186,7 @@ export default function JournalComponent({ token, activeSpace }: JournalProps) {
     if (saving) return 'Saving...';
     if (journalText !== lastSavedText) return 'Unsaved changes';
     if (currentEntry?.updated_offline) return isOffline ? 'Saved offline' : 'Syncing...';
-    if (lastSavedText || currentEntry) return 'Synced online';
+    if (lastSavedText || currentEntry) return isOffline ? 'Saved (offline mode)' : 'Synced online';
     return '';
   };
 
@@ -287,6 +287,7 @@ export default function JournalComponent({ token, activeSpace }: JournalProps) {
                 onClick={handleManualSave}
                 disabled={saving || journalText === lastSavedText}
                 className="border border-accent text-accent px-6 py-3 rounded-lg hover:bg-accent/10 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                title={journalText === lastSavedText ? "Changes are automatically saved" : ""}
               >
                 {saving ? 'Saving...' : 'Save'}
               </button>
