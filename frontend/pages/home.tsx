@@ -6,7 +6,7 @@ export default function HomePage() {
   return (
     <>
       <Head>
-        <title>todolist.nyc - AI-Powered Collaborative Task Management</title>
+        <title>todolist - AI-Powered Collaborative Task Management</title>
         <meta name="description" content="Smart task management with AI categorization, collaborative spaces, and offline-first PWA." />
       </Head>
 
@@ -15,14 +15,14 @@ export default function HomePage() {
           {/* Header */}
           <header className="text-center pt-20 pb-16">
             <h1 className="text-4xl sm:text-5xl font-bold text-gray-100 mb-6">
-              todolist.nyc
+              todolist
             </h1>
             <p className="text-lg sm:text-xl text-gray-400 mb-10 max-w-2xl mx-auto">
               AI-powered task management
             </p>
             <Link
               href="/"
-              className="inline-block bg-accent text-white px-8 py-4 rounded-full text-lg font-semibold hover:bg-accent-light transition-all transform hover:scale-105 shadow-xl"
+              className="inline-block border border-accent text-accent px-8 py-4 rounded-full text-lg font-semibold hover:bg-accent/10 transition-all transform hover:scale-105 shadow-xl"
             >
               Get Started
             </Link>

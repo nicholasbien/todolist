@@ -169,7 +169,9 @@ FORMATTING GUIDELINES:
 
 Available tools:
 - add_task: create new tasks
-- list_tasks: show existing tasks (call liberally to understand user's current work)
+- list_tasks: show existing tasks (call liberally to understand user's current work;
+  always use completed=false by default — only use completed=true when user asks about
+  past accomplishments, finished tasks, or wants to revisit/undo a completed task)
 - update_task: modify or complete tasks
 - add_journal_entry: save journal entries
 - read_journal_entry: read journal entries for specific dates or recent entries

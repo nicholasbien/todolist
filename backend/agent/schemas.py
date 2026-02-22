@@ -196,7 +196,7 @@ OPENAI_TOOL_SCHEMAS = {
     "list_tasks": {
         "type": "function",
         "name": "list_tasks",
-        "description": "List tasks in the current space. Call when user asks to see, list, show, or view their tasks or todos.",  # noqa: E501
+        "description": "List tasks in the current space. Call when user asks to see, list, show, or view their tasks or todos. By default always pass completed=false to show only incomplete tasks. Only pass completed=true when the user explicitly asks about completed tasks, past accomplishments, what they have done/finished, or wants to revisit/undo a completed task.",  # noqa: E501
         "parameters": get_openai_tool_schema(TaskListRequest),
     },
     "update_task": {

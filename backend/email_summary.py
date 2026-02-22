@@ -565,7 +565,7 @@ async def send_contact_message(sender_email: str, sender_name: str, message: str
         email_body = f"""
 Hello,
 
-You have received a new contact form message from your todolist.nyc application.
+You have received a new contact form message from your todolist application.
 
 **From:** {sender_name or 'User'} ({sender_email})
 **Sent:** {datetime.now().strftime('%B %d, %Y at %I:%M %p')}
@@ -574,7 +574,7 @@ You have received a new contact form message from your todolist.nyc application.
 {message}
 
 ---
-This message was sent from the contact form on todolist.nyc
+This message was sent from the contact form on todolist
         """.strip()
 
         # Send email to the admin (FROM_EMAIL)
