@@ -296,7 +296,7 @@ export default function AgentChatbot({ activeSpace, token, isActive = true }: Ch
           <button
             onClick={handleClear}
             disabled={loading}
-            className="bg-gray-700 text-gray-200 px-3 py-1 rounded text-sm hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="border border-gray-600 text-gray-300 px-3 py-1 rounded text-sm hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             Clear Chat
           </button>
