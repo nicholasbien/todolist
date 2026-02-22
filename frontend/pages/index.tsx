@@ -700,7 +700,7 @@ export default function Home() {
                 {!showDeleteConfirmation ? (
                   <button
                     onClick={handleDeleteAccount}
-                    className="w-full bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg transition-colors font-semibold"
+                    className="w-full border border-red-500 text-red-400 hover:bg-red-900/20 px-4 py-2 rounded-lg transition-colors font-semibold"
                   >
                     Delete Account
                   </button>
@@ -732,7 +732,7 @@ export default function Home() {
                       <button
                         onClick={handleDeleteAccount}
                         disabled={deletingAccount || deleteConfirmation !== 'DELETE'}
-                        className="flex-1 bg-red-600 hover:bg-red-700 disabled:bg-red-900 disabled:text-gray-500 text-white px-4 py-2 rounded-lg transition-colors font-semibold"
+                        className="flex-1 border border-red-500 text-red-400 hover:bg-red-900/20 disabled:opacity-50 disabled:cursor-not-allowed px-4 py-2 rounded-lg transition-colors font-semibold"
                       >
                         {deletingAccount ? 'Deleting...' : 'Confirm Delete'}
                       </button>

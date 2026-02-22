@@ -1672,7 +1672,7 @@ export default function AIToDoListApp({
                 <div className="flex justify-center space-x-3">
                   <button onClick={handleUpdateSpace} className="border border-accent text-accent hover:bg-accent/10 px-6 py-2 rounded-lg transition-colors">Save</button>
                   {spaceToEdit && (
-                    <button onClick={() => { handleDeleteSpace(spaceToEdit._id); setShowEditSpaceModal(false); }} className="bg-red-600 hover:bg-red-500 text-white px-6 py-2 rounded-lg transition-colors">Delete</button>
+                    <button onClick={() => { handleDeleteSpace(spaceToEdit._id); setShowEditSpaceModal(false); }} className="border border-red-500 text-red-400 hover:bg-red-900/20 px-6 py-2 rounded-lg transition-colors">Delete</button>
                   )}
                   <button onClick={() => setShowEditSpaceModal(false)} className="border border-gray-600 text-gray-300 hover:bg-gray-800 px-6 py-2 rounded-lg transition-colors">Cancel</button>
                 </div>
@@ -1682,7 +1682,7 @@ export default function AIToDoListApp({
                 <h3 className="text-gray-100 text-lg font-bold mb-2">Space Options</h3>
                 <div className="flex justify-center space-x-3">
                   {spaceToEdit && (
-                    <button onClick={() => { handleLeaveSpace(spaceToEdit._id); setShowEditSpaceModal(false); }} className="bg-red-600 hover:bg-red-500 text-white px-6 py-2 rounded-lg transition-colors">Leave</button>
+                    <button onClick={() => { handleLeaveSpace(spaceToEdit._id); setShowEditSpaceModal(false); }} className="border border-red-500 text-red-400 hover:bg-red-900/20 px-6 py-2 rounded-lg transition-colors">Leave</button>
                   )}
                   <button onClick={() => setShowEditSpaceModal(false)} className="border border-gray-600 text-gray-300 hover:bg-gray-800 px-6 py-2 rounded-lg transition-colors">Cancel</button>
                 </div>
@@ -1749,7 +1749,7 @@ export default function AIToDoListApp({
                   handleDeleteCategory(activeCat);
                   setShowEditCategoryModal(false);
                 }}
-                className="bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-red-700 transition-colors"
+                className="border border-red-500 text-red-400 px-6 py-2 rounded-lg hover:bg-red-900/20 transition-colors"
               >
                 Delete
               </button>
@@ -2082,7 +2082,7 @@ export default function AIToDoListApp({
                 <button
                   onClick={handleSendEmailSummary}
                   disabled={sendingEmail}
-                  className="bg-green-600 hover:bg-green-500 disabled:bg-green-800 disabled:text-gray-400 text-white px-6 py-2 rounded-lg transition-colors flex items-center space-x-2"
+                  className="border border-green-500 text-green-400 hover:bg-green-900/20 disabled:opacity-50 disabled:cursor-not-allowed px-6 py-2 rounded-lg transition-colors flex items-center space-x-2"
                 >
                   {sendingEmail ? (
                     <>
