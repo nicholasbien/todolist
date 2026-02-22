@@ -347,6 +347,7 @@ Any change to files in `frontend/components/`, `frontend/pages/index.tsx`, or `f
    ```bash
    node scripts/take-screenshots.js
    ```
+   Screenshots are saved to `screenshots/{branch-name}/` automatically (e.g. `screenshots/button-outline-redesign/`). Each PR gets its own subdirectory so other PRs' screenshots are never overwritten.
 
 3. **Commit the updated screenshots**:
    ```bash
@@ -354,9 +355,9 @@ Any change to files in `frontend/components/`, `frontend/pages/index.tsx`, or `f
    git commit -m "Update screenshots for UI changes"
    ```
 
-4. **Include screenshots in the PR description** using `raw.githubusercontent.com` links pointing to the branch (not main):
+4. **Include screenshots in the PR description** using `raw.githubusercontent.com` links. Use the branch-specific path:
    ```
-   ![Modal name](https://raw.githubusercontent.com/nicholasbien/todolist/YOUR-BRANCH/screenshots/modal-name.png)
+   ![Modal name](https://raw.githubusercontent.com/nicholasbien/todolist/YOUR-BRANCH/screenshots/YOUR-BRANCH-NAME/modal-name.png)
    ```
 
 ### Keeping the script up to date

@@ -274,7 +274,7 @@ await page.waitForTimeout(200);
 
 ## Screenshots Reference
 
-Current screenshots are in `screenshots/` at the repo root:
+Screenshots are in `screenshots/{branch-name}/` — each PR has its own subdirectory. Run `node scripts/take-screenshots.js` to regenerate for the current branch.
 
 | File | Screen |
 |------|--------|

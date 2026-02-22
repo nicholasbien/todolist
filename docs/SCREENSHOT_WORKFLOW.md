@@ -12,7 +12,22 @@ Make sure both servers are running, then:
 node scripts/take-screenshots.js
 ```
 
-This captures all 10 modals in one pass and overwrites `screenshots/` with fresh files. Commit the results.
+Screenshots are saved to `screenshots/{branch-name}/` — each PR gets its own subdirectory, so you never overwrite another PR's screenshots. The directory is created automatically from the current git branch name.
+
+```
+screenshots/
+  button-outline-redesign/    ← current PR
+    modal-add-category.png
+    modal-edit-category.png
+    ...
+  some-other-pr/              ← different PR's screenshots stay intact
+    ...
+```
+
+You can also pass an explicit name:
+```bash
+node scripts/take-screenshots.js my-feature-name
+```
 
 ### Prerequisites
 
@@ -269,16 +284,16 @@ The pencil "Edit space" button only appears for spaces that are not currently ac
 When a new modal, drawer, or full-screen view is added to the app:
 
 1. **Add a screenshot step** to `scripts/take-screenshots.js` following the pattern above
-2. **Add the close button** to the table in this doc (section 4 of Gotchas)
-3. **Add a row** to the Screenshots Reference table in `docs/UI_SCREENS_NAVIGATION.md`
+2. **Add the close button** to the table in this doc (Gotcha #4)
+3. **Add a row** to the Screenshots Reference table below and in `docs/UI_SCREENS_NAVIGATION.md`
 4. **Add navigation instructions** for the new screen to `docs/UI_SCREENS_NAVIGATION.md`
-5. **Run the script** and commit the new screenshot file
+5. **Run the script** and commit the new screenshot
 
 ---
 
 ## Screenshots Reference
 
-All files live in `screenshots/` at the repo root:
+Screenshots live in `screenshots/{branch-name}/` — each PR has its own subdirectory.
 
 | File | Modal |
 |------|-------|
