@@ -20,7 +20,10 @@
  * See docs/SCREENSHOT_WORKFLOW.md for patterns, gotchas, and how to add new modals.
  */
 
-const { chromium } = require('playwright');
+// Playwright lives in frontend/node_modules — resolve from there
+const { chromium } = require(
+  require.resolve('playwright', { paths: [require('path').join(__dirname, '..', 'frontend')] })
+);
 const { execSync } = require('child_process');
 const path = require('path');
 const fs = require('fs');
