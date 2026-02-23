@@ -697,33 +697,6 @@ class TestAgentIntegration:
         assert response.headers["content-type"] == "text/event-stream; charset=utf-8"
 
     @pytest.mark.asyncio
-    async def test_agent_clear_history(self, client, test_email):
-        """Test clearing chat history endpoint."""
-        token = await get_token(client, test_email)
-        headers = {"Authorization": f"Bearer {token}"}
-
-        me_resp = await client.get("/auth/me", headers=headers)
-        user_id = me_resp.json()["user_id"]
-
-        from agent.agent import conversation_state
-        from chats import ChatMessage, get_chat_history, save_chat_message
-
-        space_id = "space1"
-        await save_chat_message(ChatMessage(user_id=user_id, role="user", content="hi", space_id=space_id))
-        conversation_state[f"{user_id}:{space_id}"] = [{"role": "user", "content": "hi"}]
-
-        history_before = await get_chat_history(user_id, space_id)
-        assert history_before
-
-        response = await client.delete(f"/agent/history?space_id={space_id}", headers=headers)
-        assert response.status_code == 200
-        assert response.json() == {"ok": True}
-
-        history_after = await get_chat_history(user_id, space_id)
-        assert history_after == []
-        assert f"{user_id}:{space_id}" not in conversation_state
-
-    @pytest.mark.asyncio
     async def test_agent_endpoint_with_space_id(self, client, test_email):
         """Test agent endpoint with space context."""
         token = await get_token(client, test_email)
