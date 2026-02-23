@@ -27,7 +27,10 @@
  * See docs/SCREENSHOT_WORKFLOW.md for related Playwright patterns.
  */
 
-const { chromium } = require('playwright');
+// Playwright lives in frontend/node_modules — resolve from there
+const { chromium } = require(
+  require.resolve('playwright', { paths: [require('path').join(__dirname, '..', 'frontend')] })
+);
 
 const APP_URL = 'http://localhost:3000';
 
@@ -93,13 +96,15 @@ async function goOnlineAndSync(page, context) {
 // ── Server verification ──────────────────────────────────────────────────────
 
 /**
- * Fetches todos via the service worker proxy (which adds auth headers and
- * hits the real backend when online). Returns the array or null on error.
+ * Fetches todos from the server for the currently active space.
+ * Mirrors how the app constructs its fetch URL: includes space_id when one is active.
  */
 function fetchTodosFromServer(page) {
   return page.evaluate(async () => {
     try {
-      const resp = await fetch('/todos');
+      const spaceId = localStorage.getItem('active_space_id');
+      const url = spaceId ? `/todos?space_id=${encodeURIComponent(spaceId)}` : '/todos';
+      const resp = await fetch(url);
       return resp.ok ? resp.json() : null;
     } catch { return null; }
   });
@@ -117,7 +122,10 @@ async function addTask(page, text) {
   await input.click();
   await input.fill(text);
   await page.keyboard.press('Enter');
-  await page.waitForTimeout(600);
+  // Wait for the add-task loading state to clear (textarea becomes enabled again).
+  // The POST + fetchTodos cycle can take >600ms under load, so a fixed wait is fragile.
+  await input.waitFor({ state: 'enabled', timeout: 8000 }).catch(() => {});
+  await page.waitForTimeout(300);
 }
 
 /**
@@ -140,11 +148,18 @@ async function deleteTask(page, text) {
 }
 
 /**
- * Right-click on a task <p> to open the Edit Task modal, change text, save.
+ * Right-click on a task row to open the Edit Task modal, change text, save.
+ * The onContextMenu handler lives on the row div (not the inner <p>).
+ * Uses coordinate-based mouse click after scrollIntoViewIfNeeded to ensure
+ * the click hits the element at its real on-screen position.
  */
 async function updateTaskText(page, oldText, newText) {
-  await page.locator('p', { hasText: oldText }).first().click({ button: 'right' });
-  await page.waitForSelector('text=Edit Task');
+  const row = taskRow(page, oldText);
+  await row.scrollIntoViewIfNeeded();
+  await page.waitForTimeout(150); // let layout settle after scroll
+  const box = await row.boundingBox();
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2, { button: 'right' });
+  await page.waitForSelector('text=Edit Task', { timeout: 10000 });
   const input = page.locator('input[type="text"]').first();
   await input.fill(newText);
   await page.getByRole('button', { name: 'Save', exact: true }).click();
@@ -166,11 +181,68 @@ async function isVisible(page, text) {
   const context = await browser.newContext();
   const page = await context.newPage();
 
+  // Capture page console errors
+  page.on('console', msg => {
+    if (msg.type() === 'error') console.log(`   [page error] ${msg.text()}`);
+  });
+
+
   try {
-    // ── Setup: navigate and wait for app + service worker ──────────────
+    // ── Setup: navigate and log in if needed ───────────────────────────
     await page.goto(APP_URL);
+
+    // If we land on the login screen, authenticate with the test account
+    const emailInput = page.locator('input[placeholder="Enter your email"]');
+    if (await emailInput.isVisible({ timeout: 3000 }).catch(() => false)) {
+      console.log('   Logging in as test@example.com...');
+      await emailInput.fill('test@example.com');
+      await page.getByRole('button', { name: /Send Verification Code/i }).click();
+      await page.waitForSelector('input[placeholder="000000"]', { timeout: 10000 });
+      await page.locator('input[placeholder="000000"]').fill('000000');
+      await page.getByRole('button', { name: /Sign In/i }).click();
+      await page.waitForSelector('button[title="Settings"]', { timeout: 15000 });
+    } else {
+      await page.waitForSelector('button[title="Settings"]', { timeout: 15000 });
+    }
+
+    // ── Ensure the service worker has the auth token ──────────────────
+    // On first install, navigator.serviceWorker.controller is null when the
+    // app's useEffect fires SET_AUTH, so the SW has no credentials and every
+    // sync attempt fails with 401. A single reload after the SW claims clients
+    // lets SET_AUTH re-fire with a non-null controller.
+    const swControlling = await page.evaluate(async () => {
+      await navigator.serviceWorker.ready;
+      return !!navigator.serviceWorker.controller;
+    });
+    if (!swControlling) {
+      console.log('   SW not yet controlling — waiting for controllerchange...');
+      await page.evaluate(() => new Promise(resolve =>
+        navigator.serviceWorker.addEventListener('controllerchange', resolve, { once: true })
+      ));
+    }
+    console.log('   Reloading so the app sends SET_AUTH to the active SW...');
+    await page.reload();
     await page.waitForSelector('button[title="Settings"]', { timeout: 15000 });
-    await page.waitForTimeout(1500); // let the service worker fully activate
+    // Allow SET_AUTH to propagate and initial sync to complete
+    await page.waitForTimeout(2000);
+
+    // ── Verify SW auth is working before proceeding ───────────────────
+    const swAuthStatus = await page.evaluate(async () => {
+      try {
+        const resp = await fetch('/todos');
+        return { ok: resp.ok, status: resp.status };
+      } catch (e) {
+        return { ok: false, status: -1, error: e.message };
+      }
+    });
+    if (!swAuthStatus.ok) {
+      console.warn(`   ⚠️  SW auth check failed (${swAuthStatus.status}) — sync tests may fail`);
+      // Try once more after additional wait
+      await page.waitForTimeout(2000);
+    } else {
+      console.log(`   ✅ SW auth verified (GET /todos → ${swAuthStatus.status})`);
+    }
+
     await goToTasks(page);
 
     const ts = Date.now(); // unique suffix prevents collisions with real data
@@ -210,12 +282,22 @@ async function isVisible(page, text) {
     // ──────────────────────────────────────────────────────────────────
     console.log('✏️  Test 2: Update task offline → sync online');
     try {
-      const t2 = `[E2E] Update me ${ts}`;
-      const t2v2 = `[E2E] Updated ${ts}`;
+      const t2 = `[E2E] Rename-target ${ts}`;
+      const t2v2 = `[E2E] Renamed-result ${ts}`;
 
       // Create online first so it has a real server ID before going offline
       await context.setOffline(false);
+      await goToTasks(page);
+      const afterAddT2Sync = waitForSync(page, 5000);
       await addTask(page, t2);
+      // Wait for SW's post-POST syncQueue to finish (ensures syncInProgress=false before fetchTodos)
+      await afterAddT2Sync;
+      // Navigate away and back to trigger a fresh fetchTodos via activeTab useEffect
+      await page.getByRole('button', { name: 'Journal', exact: true }).nth(0).click();
+      await page.waitForTimeout(200);
+      await goToTasks(page);
+      // Wait for task to appear and for SW to cache the updated todo list
+      await page.waitForSelector(`p:has-text("${t2}")`, { timeout: 8000 });
       await page.waitForTimeout(1000);
 
       await context.setOffline(true);
@@ -248,7 +330,9 @@ async function isVisible(page, text) {
 
       // Create online so there's a server record to delete
       await context.setOffline(false);
+      await goToTasks(page);
       await addTask(page, t3);
+      await page.waitForSelector(`p:has-text("${t3}")`, { timeout: 8000 });
       await page.waitForTimeout(1000);
 
       await context.setOffline(true);
@@ -275,10 +359,19 @@ async function isVisible(page, text) {
     // ──────────────────────────────────────────────────────────────────
     console.log('✓  Test 4: Complete task offline → sync online');
     try {
-      const t4 = `[E2E] Complete me ${ts}`;
+      const t4 = `[E2E] Mark-done ${ts}`;
 
       await context.setOffline(false);
+      await goToTasks(page);
+      const afterAddT4Sync = waitForSync(page, 5000);
       await addTask(page, t4);
+      // Wait for SW's post-POST syncQueue to finish (ensures syncInProgress=false before fetchTodos)
+      await afterAddT4Sync;
+      // Navigate away and back to trigger a fresh fetchTodos via activeTab useEffect
+      await page.getByRole('button', { name: 'Journal', exact: true }).nth(0).click();
+      await page.waitForTimeout(200);
+      await goToTasks(page);
+      await page.waitForSelector(`p:has-text("${t4}")`, { timeout: 8000 });
       await page.waitForTimeout(1000);
 
       await context.setOffline(true);
@@ -340,7 +433,11 @@ async function isVisible(page, text) {
 
       const journalSynced = await page.evaluate(async ({ date, text }) => {
         try {
-          const resp = await fetch(`/journals?date=${date}`);
+          const spaceId = localStorage.getItem('active_space_id');
+          const url = spaceId
+            ? `/journals?date=${date}&space_id=${encodeURIComponent(spaceId)}`
+            : `/journals?date=${date}`;
+          const resp = await fetch(url);
           if (!resp.ok) return false;
           const entry = await resp.json();
           return entry?.text === text;
@@ -387,6 +484,12 @@ async function isVisible(page, text) {
     try {
       await goToTasks(page);
       await context.setOffline(false);
+      // Close "Show Completed" section if still open from Test 4
+      const hideBtn = page.getByRole('button', { name: /Hide Completed/ });
+      if (await hideBtn.count() > 0) {
+        await hideBtn.click();
+        await page.waitForTimeout(300);
+      }
       await page.waitForTimeout(500);
 
       const t7a    = `[E2E] Multi-A ${ts}`;
@@ -397,6 +500,7 @@ async function isVisible(page, text) {
       // Two tasks online to start
       await addTask(page, t7a);
       await addTask(page, t7b);
+      await page.waitForSelector(`p:has-text("${t7b}")`, { timeout: 8000 });
       await page.waitForTimeout(1000);
 
       // Go offline: update A, delete B, create C
