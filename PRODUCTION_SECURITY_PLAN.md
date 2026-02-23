@@ -46,7 +46,6 @@ This comprehensive production readiness plan addresses critical security vulnera
 
    - **Frontend Environment Variables** (Railway/Production):
      ```
-     NEXT_PUBLIC_API_URL=https://your-backend-domain.railway.app
      OPENAI_API_KEY=<secure_key_for_frontend_ai_features>
      ```
 

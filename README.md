@@ -216,8 +216,7 @@ This application is configured as a PWA and can be installed on mobile devices l
    npx localtunnel --port 3000  # Frontend tunnel
    npx localtunnel --port 8000  # Backend tunnel
 
-   # Update frontend/.env.local with backend tunnel URL:
-   NEXT_PUBLIC_API_URL=https://your-backend-tunnel.loca.lt
+   # Use the frontend tunnel URL in Safari; API requests continue to route via service worker/proxy.
    ```
 
 2. **On iPhone**: Open Safari → Go to your HTTPS URL
@@ -363,14 +362,8 @@ WEBSITE_URL=https://your-site-url.com
 # Local development - OpenAI key for client-side features
 OPENAI_API_KEY=your_openai_api_key
 
-# API URL Configuration (Environment-Aware)
-# ⚠️ LEAVE UNSET FOR DEVELOPMENT: This enables offline functionality
-# When unset: Uses relative URLs (/todos, /chat) → Service Worker can intercept and cache
-# When set: Uses absolute URLs → Direct server calls, no offline caching
-#
-# Development: Leave commented out for full offline PWA functionality
-# Production/Testing: Uncomment and set to your deployed backend URL
-# NEXT_PUBLIC_API_URL=https://your-backend-url.com
+# API URL routing is handled by relative paths + service worker/proxy.
+# No public API base URL environment variable is required.
 ```
 
 ### Generating JWT Secret
