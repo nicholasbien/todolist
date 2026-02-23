@@ -1,7 +1,7 @@
 # Production Readiness Plan
 
 - **Configuration & Secrets**
-  - Enforce required env vars: `JWT_SECRET`, `MONGODB_URL`, `OPENAI_API_KEY`, SMTP creds, `NEXT_PUBLIC_API_URL`, CORS origins.
+  - Enforce required env vars: `JWT_SECRET`, `MONGODB_URL`, `OPENAI_API_KEY`, SMTP creds, CORS origins.
   - Separate `.env` templates for dev/stage/prod; store secrets in managed vault (Railway/Render/Vercel/1Password).
   - Lock CORS to trusted origins only.
 

@@ -563,7 +563,7 @@ See `docs/ENVIRONMENT_SETUP.md` for complete environment variable documentation.
 
 Quick setup:
 - Backend: Copy `backend/.env.example` to `backend/.env` and fill in your API keys
-- Frontend: Create `frontend/.env.local` with `OPENAI_API_KEY` and optionally `NEXT_PUBLIC_API_URL`
+- Frontend: Create `frontend/.env.local` with `OPENAI_API_KEY`
 
 ### Backend (.env)
 ```
@@ -582,7 +582,6 @@ ADMIN_EMAIL=your_email@gmail.com
 ### Frontend (.env.local)
 ```
 OPENAI_API_KEY=your_openai_api_key
-# NEXT_PUBLIC_API_URL is intentionally NOT set for local dev (defaults to localhost:8000 via service worker)
 ```
 
 ---
