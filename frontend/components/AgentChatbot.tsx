@@ -195,26 +195,13 @@ export default function AgentChatbot({ activeSpace, token, isActive = true }: Ch
   };
 
   // -----------------------------------------------------------------------
-  // Clear chat (legacy)
+  // Delete current chat session from DB and clear UI
   // -----------------------------------------------------------------------
-  const handleClear = async () => {
-    setMessages([]);
-    setCurrentSessionId(null);
-
-    try {
-      const params = new URLSearchParams();
-      if (activeSpace?._id) {
-        params.append('space_id', activeSpace._id);
-      }
-      const clearUrl = `/agent/history?${params.toString()}`;
-
-      const headers: Record<string, string> = {};
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
-      await fetch(clearUrl, { method: 'DELETE', headers });
-    } catch {
-      // Ignore network errors
+  const handleDeleteChat = async () => {
+    if (currentSessionId) {
+      await deleteSession(currentSessionId, { stopPropagation: () => {} } as React.MouseEvent);
+    } else {
+      setMessages([]);
     }
   };
 
@@ -444,14 +431,14 @@ export default function AgentChatbot({ activeSpace, token, isActive = true }: Ch
           </button>
         )}
 
-        {/* Clear Chat (push to right) */}
+        {/* Delete Chat (push to right) */}
         {messages.length > 0 && (
           <button
-            onClick={handleClear}
+            onClick={handleDeleteChat}
             disabled={loading}
             className="ml-auto bg-gray-700 text-gray-200 px-3 py-1 rounded text-sm hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
-            Clear Chat
+            Delete Chat
           </button>
         )}
       </div>
