@@ -296,6 +296,42 @@ def _format_tool_display(tool_name: str, args: dict, result: dict) -> str:
     return f"🔧 {tool_name}{fmt_args(args)}: {fmt_result(result)}"
 
 
+async def _persist_turn(
+    session_id: str,
+    user_id: str,
+    space_id: Optional[str],
+    user_message: str,
+    content_parts: List[str],
+    input_messages: List[Dict[str, Any]],
+    display_messages: List[Dict[str, Any]],
+) -> None:
+    """Save trajectory, display messages, and legacy chat entries after a turn."""
+    assistant_text = "".join(content_parts)
+    if assistant_text:
+        display_messages.append({"role": "assistant", "content": assistant_text})
+
+    # Save to new session storage
+    await save_trajectory(session_id, user_id, input_messages, display_messages)
+    _cache_put(session_id, input_messages, display_messages)
+
+    # Also save to legacy chats collection for backward compatibility
+    user_entry = ChatMessage(user_id=user_id, space_id=space_id, role="user", content=user_message)
+    assistant_entry = ChatMessage(user_id=user_id, space_id=space_id, role="assistant", content=assistant_text)
+    await save_chat_message(user_entry)
+    await save_chat_message(assistant_entry)
+
+    # Update legacy in-memory state
+    key = f"{user_id}:{space_id}" if space_id else user_id
+    history = conversation_state.get(key, [])
+    history.extend(
+        [
+            {"role": "user", "content": user_message},
+            {"role": "assistant", "content": assistant_text},
+        ]
+    )
+    conversation_state[key] = history[-10:]
+
+
 async def stream_agent_response(
     user_message: str,
     user_id: str,
@@ -612,6 +648,13 @@ When adding new tasks, choose a category from this list, or use "General" if non
                 f"Total tokens: {total_input_tokens + total_output_tokens}"
             )
 
+            # Persist BEFORE yielding done — the client closes the connection
+            # on "done", which can cancel the generator before post-yield code runs.
+            await _persist_turn(
+                session_id, user_id, space_id, user_message,
+                content_parts, input_messages, display_messages,
+            )
+
             yield format_sse_message("done", {"ok": True})
             break
 
@@ -663,35 +706,13 @@ When adding new tasks, choose a category from this list, or use "General" if non
                     except Exception as e:
                         logger.error(f"Error accessing usage data in final response: {e}", exc_info=True)
 
+            # Persist before yielding done
+            await _persist_turn(
+                session_id, user_id, space_id, user_message,
+                content_parts, input_messages, display_messages,
+            )
+
             yield format_sse_message("done", {"ok": True, "info": f"Reached maximum of {MAX_AGENT_STEPS} agent steps"})
-
-        # -----------------------------------------------------------------------
-        # Persist: add assistant display message, save trajectory + display_messages
-        # -----------------------------------------------------------------------
-        assistant_text = "".join(content_parts)
-        if assistant_text:
-            display_messages.append({"role": "assistant", "content": assistant_text})
-
-        # Save to DB and update in-memory cache
-        await save_trajectory(session_id, user_id, input_messages, display_messages)
-        _cache_put(session_id, input_messages, display_messages)
-
-        # Also save to legacy chats collection for backward compatibility
-        user_entry = ChatMessage(user_id=user_id, space_id=space_id, role="user", content=user_message)
-        assistant_entry = ChatMessage(user_id=user_id, space_id=space_id, role="assistant", content=assistant_text)
-        await save_chat_message(user_entry)
-        await save_chat_message(assistant_entry)
-
-        # Update legacy in-memory state
-        key = f"{user_id}:{space_id}" if space_id else user_id
-        history = conversation_state.get(key, [])
-        history.extend(
-            [
-                {"role": "user", "content": user_message},
-                {"role": "assistant", "content": assistant_text},
-            ]
-        )
-        conversation_state[key] = history[-10:]
 
     except Exception as e:
         error_msg = str(e)
