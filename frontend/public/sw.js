@@ -1,6 +1,6 @@
 // IMPORTANT: Always increment these versions when modifying this service worker file
 // This forces browsers to download and use the updated service worker
-const STATIC_CACHE = 'todo-static-v128';
+const STATIC_CACHE = 'todo-static-v129';
 
 const GLOBAL_DB_NAME = 'TodoGlobalDB';
 const USER_DB_PREFIX = 'TodoUserDB_';
@@ -393,9 +393,9 @@ function generateInsights(todos) {
       if (todo.dateAdded) {
         const dateAdded = new Date(todo.dateAdded.replace('Z', '+00:00'));
         if (!isNaN(dateAdded.getTime())) {
-          // Get Monday of the week (ISO week)
+          // Get Monday of the week (ISO week) — use UTC to avoid timezone shifts
           const weekStart = new Date(dateAdded);
-          weekStart.setDate(dateAdded.getDate() - dateAdded.getDay() + (dateAdded.getDay() === 0 ? -6 : 1));
+          weekStart.setUTCDate(dateAdded.getUTCDate() - dateAdded.getUTCDay() + (dateAdded.getUTCDay() === 0 ? -6 : 1));
           const weekKey = weekStart.toISOString().split('T')[0];
 
           if (!weeklyStats[weekKey]) {
@@ -414,7 +414,7 @@ function generateInsights(todos) {
         const dateCompleted = new Date(todo.dateCompleted.replace('Z', '+00:00'));
         if (!isNaN(dateCompleted.getTime())) {
           const weekStart = new Date(dateCompleted);
-          weekStart.setDate(dateCompleted.getDate() - dateCompleted.getDay() + (dateCompleted.getDay() === 0 ? -6 : 1));
+          weekStart.setUTCDate(dateCompleted.getUTCDate() - dateCompleted.getUTCDay() + (dateCompleted.getUTCDay() === 0 ? -6 : 1));
           const weekKey = weekStart.toISOString().split('T')[0];
 
           if (!weeklyStats[weekKey]) {
@@ -881,12 +881,12 @@ async function handleApiRequest(request) {
       // Trigger sync for writes, and for reads if queue has pending ops
       if (response.ok) {
         if (request.method !== 'GET') {
-          syncQueue();
+          syncQueue().catch(err => console.error('Sync error after write:', err));
         } else {
           getAuth().then(auth => {
             if (!auth?.userId) return;
             readQueue(auth.userId).then(q => {
-              if (q.length > 0) syncQueue();
+              if (q.length > 0) syncQueue().catch(err => console.error('Sync error after read:', err));
             });
           }).catch(() => {});
         }
@@ -1775,7 +1775,7 @@ async function syncQueue() {
     // If a sync was requested while we were busy, run one follow-up (Bug 7 fix)
     if (syncPending) {
       syncPending = false;
-      syncQueue();
+      syncQueue().catch(err => console.error('Sync error on follow-up:', err));
     }
   }
 }

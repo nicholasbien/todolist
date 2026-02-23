@@ -39,7 +39,7 @@ describe('Todo Operations', () => {
 
     await sw.syncQueue();
 
-    expect(fetch).toHaveBeenCalledWith('http://localhost:8000/todos', expect.objectContaining({ method: 'POST' }));
+    expect(fetch).toHaveBeenCalledWith('http://localhost/api/todos', expect.objectContaining({ method: 'POST' }));
     const queue = await sw.readQueue('user1');
     expect(queue.length).toBe(0);
     const todos = await sw.getTodos('user1');
@@ -62,7 +62,7 @@ describe('Todo Operations', () => {
     await sw.addQueue({ type: 'UPDATE', data: todo }, 'user1');
     await sw.syncQueue();
 
-    expect(fetch).toHaveBeenCalledWith('http://localhost:8000/todos/todo123', {
+    expect(fetch).toHaveBeenCalledWith('http://localhost/api/todos/todo123', {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -82,7 +82,7 @@ describe('Todo Operations', () => {
     await sw.addQueue({ type: 'COMPLETE', data: completeData }, 'user1');
     await sw.syncQueue();
 
-    expect(fetch).toHaveBeenCalledWith('http://localhost:8000/todos/todo123/complete', {
+    expect(fetch).toHaveBeenCalledWith('http://localhost/api/todos/todo123/complete', {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -101,7 +101,7 @@ describe('Todo Operations', () => {
     await sw.addQueue({ type: 'DELETE', data: deleteData }, 'user1');
     await sw.syncQueue();
 
-    expect(fetch).toHaveBeenCalledWith('http://localhost:8000/todos/todo123', {
+    expect(fetch).toHaveBeenCalledWith('http://localhost/api/todos/todo123', {
       method: 'DELETE',
       headers: {
         'Content-Type': 'application/json',
@@ -150,7 +150,7 @@ describe('Category Operations', () => {
     await sw.addQueue({ type: 'CREATE_CATEGORY', data: category }, 'user1');
     await sw.syncQueue();
 
-    expect(fetch).toHaveBeenCalledWith('http://localhost:8000/categories', {
+    expect(fetch).toHaveBeenCalledWith('http://localhost/api/categories', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -170,7 +170,7 @@ describe('Category Operations', () => {
     await sw.addQueue({ type: 'DELETE_CATEGORY', data: deleteData }, 'user1');
     await sw.syncQueue();
 
-    expect(fetch).toHaveBeenCalledWith('http://localhost:8000/categories/Old%20Category', {
+    expect(fetch).toHaveBeenCalledWith('http://localhost/api/categories/Old%20Category', {
       method: 'DELETE',
       headers: {
         'Content-Type': 'application/json',
@@ -189,7 +189,7 @@ describe('Category Operations', () => {
     await sw.addQueue({ type: 'RENAME_CATEGORY', data: renameData }, 'user1');
     await sw.syncQueue();
 
-    expect(fetch).toHaveBeenCalledWith('http://localhost:8000/categories/Old', {
+    expect(fetch).toHaveBeenCalledWith('http://localhost/api/categories/Old', {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -589,11 +589,11 @@ describe('ID Remapping and Cleanup', () => {
     await sw.syncQueue();
 
     // First call should be POST creating the todo
-    expect(fetch).toHaveBeenNthCalledWith(1, 'http://localhost:8000/todos', expect.any(Object));
+    expect(fetch).toHaveBeenNthCalledWith(1, 'http://localhost/api/todos', expect.any(Object));
     // Second call should be PUT using remapped server ID (absolute URL)
-    expect(fetch).toHaveBeenNthCalledWith(2, 'http://localhost:8000/todos/server_xyz', expect.objectContaining({ method: 'PUT' }));
+    expect(fetch).toHaveBeenNthCalledWith(2, 'http://localhost/api/todos/server_xyz', expect.objectContaining({ method: 'PUT' }));
     // Third call should be DELETE using same server ID (absolute URL)
-    expect(fetch).toHaveBeenNthCalledWith(3, 'http://localhost:8000/todos/server_xyz', expect.objectContaining({ method: 'DELETE' }));
+    expect(fetch).toHaveBeenNthCalledWith(3, 'http://localhost/api/todos/server_xyz', expect.objectContaining({ method: 'DELETE' }));
   });
 
   test('offline create then complete syncs both operations', async () => {
@@ -616,8 +616,8 @@ describe('ID Remapping and Cleanup', () => {
 
     await sw.syncQueue();
 
-    expect(fetch).toHaveBeenNthCalledWith(1, 'http://localhost:8000/todos', expect.objectContaining({ method: 'POST' }));
-    expect(fetch).toHaveBeenNthCalledWith(2, 'http://localhost:8000/todos/server_new/complete', expect.objectContaining({ method: 'PUT' }));
+    expect(fetch).toHaveBeenNthCalledWith(1, 'http://localhost/api/todos', expect.objectContaining({ method: 'POST' }));
+    expect(fetch).toHaveBeenNthCalledWith(2, 'http://localhost/api/todos/server_new/complete', expect.objectContaining({ method: 'PUT' }));
 
     const todos = await sw.getTodos('user1');
     expect(todos).toHaveLength(1);
@@ -698,12 +698,12 @@ describe('ID Remapping and Cleanup', () => {
 
     expect(fetch).toHaveBeenNthCalledWith(
       1,
-      'http://localhost:8000/todos',
+      'http://localhost/api/todos',
       expect.any(Object)
     );
     expect(fetch).toHaveBeenNthCalledWith(
       2,
-      'http://localhost:8000/todos/server_map',
+      'http://localhost/api/todos/server_map',
       expect.objectContaining({ method: 'PUT' })
     );
   });
@@ -738,7 +738,7 @@ describe('Journal Operations', () => {
 
     // Service worker should strip offline _id before sending to server
     const { _id: offlineId, ...expectedPayload } = journalData;
-    expect(fetch).toHaveBeenCalledWith('http://localhost:8000/journals', expect.objectContaining({
+    expect(fetch).toHaveBeenCalledWith('http://localhost/api/journals', expect.objectContaining({
       method: 'POST',
       body: JSON.stringify(expectedPayload),
     }));
@@ -760,7 +760,7 @@ describe('Journal Operations', () => {
 
     await sw.syncQueue();
 
-    expect(fetch).toHaveBeenCalledWith(`http://localhost:8000/journals/${journalId}`, expect.objectContaining({
+    expect(fetch).toHaveBeenCalledWith(`http://localhost/api/journals/${journalId}`, expect.objectContaining({
       method: 'DELETE',
     }));
   });
@@ -900,7 +900,8 @@ describe('Journal Operations', () => {
     // Mock self.location for development environment detection
     global.self = global.self || {};
     global.self.location = {
-      hostname: 'localhost'
+      hostname: 'localhost',
+      origin: 'http://localhost'
     };
 
     // Test GET /journals request through handleApiRequest
@@ -908,6 +909,9 @@ describe('Journal Operations', () => {
       method: 'GET'
     });
     const response = await sw.handleApiRequest(request);
+    // fake-indexeddb uses setImmediate macrotasks for IDB ops; wait enough for
+    // the background cacheGetJournals + syncQueue chain to complete
+    await new Promise(resolve => setTimeout(resolve, 100));
 
     // Verify fetch was called correctly (service worker forwards the /api/* request)
     expect(fetch).toHaveBeenCalledWith(expect.objectContaining({
@@ -959,7 +963,7 @@ describe('Journal Operations', () => {
     // Set up environment
     Object.defineProperty(global.navigator, 'onLine', { writable: true, value: true });
     global.self = global.self || {};
-    global.self.location = { hostname: 'localhost' };
+    global.self.location = { hostname: 'localhost', origin: 'http://localhost' };
 
     // Process GET request - should be blocked due to pending operations
     const response = await sw.handleApiRequest(new Request('/journals?space_id=space1', { method: 'GET' }));
@@ -1012,7 +1016,7 @@ describe('Journal Operations', () => {
     await sw.syncQueue();
 
     // Verify sync completed
-    expect(fetch).toHaveBeenCalledWith('http://localhost:8000/journals', expect.objectContaining({
+    expect(fetch).toHaveBeenCalledWith('http://localhost/api/journals', expect.objectContaining({
       method: 'POST'
     }));
 
@@ -1065,7 +1069,8 @@ describe('Journal Operations', () => {
     // Mock self.location for development environment detection
     global.self = global.self || {};
     global.self.location = {
-      hostname: 'localhost'
+      hostname: 'localhost',
+      origin: 'http://localhost'
     };
 
     // Test GET /todos request through handleApiRequest
@@ -1149,7 +1154,7 @@ describe('Space Sync Operations', () => {
     await sw.syncQueue();
 
     expect(fetch).toHaveBeenCalledWith(
-      'http://localhost:8000/spaces',
+      'http://localhost/api/spaces',
       expect.objectContaining({ method: 'POST', body: JSON.stringify({ name: 'My Offline Space' }) })
     );
 
@@ -1175,7 +1180,7 @@ describe('Space Sync Operations', () => {
     await sw.syncQueue();
 
     expect(fetch).toHaveBeenCalledWith(
-      'http://localhost:8000/spaces/space_real_456',
+      'http://localhost/api/spaces/space_real_456',
       expect.objectContaining({ method: 'PUT' })
     );
 
@@ -1215,7 +1220,7 @@ describe('Space Sync Operations', () => {
     await sw.syncQueue();
 
     expect(fetch).toHaveBeenCalledWith(
-      'http://localhost:8000/spaces/space_to_delete_789',
+      'http://localhost/api/spaces/space_to_delete_789',
       expect.objectContaining({ method: 'DELETE' })
     );
 

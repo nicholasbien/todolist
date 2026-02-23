@@ -245,22 +245,48 @@ data: {"ok": true}
 ---
 
 ### Frontend Tests
+
+**Run after any change to frontend TypeScript/JavaScript code.** No server required — Jest runs with mocks.
+
 ```bash
 cd frontend
 
-npm test                                         # Run all tests
-npm test -- AppMain.test.tsx                     # Component tests
-npm test -- AuthForm.test.tsx                    # Auth form tests
-npm test -- ServiceWorkerSync.test.ts            # Service worker tests
-npm test -- --coverage                           # With coverage
+npm test                                                    # Run all 221 tests (default)
+npm test -- --no-coverage                                   # Faster (skip coverage report)
+npm test -- ServiceWorkerSync.test.ts                       # Single file
+npm test -- --testPathPattern="ServiceWorker"               # All SW tests
+npm test -- --coverage                                      # With coverage report
 ```
 
-**Test Structure:**
-- `__tests__/AppMain.test.tsx` - Main app component tests
-- `__tests__/AuthForm.test.tsx` - Authentication form tests
-- `__tests__/ServiceWorkerSync.test.ts` - Service worker sync tests
-- `__tests__/ServiceWorkerRouteValidation.test.ts` - Route validation tests
-- Plus 19 additional test files covering offline ops, journals, email settings, account creation, etc.
+#### When to run which tests
+
+| Change you made | Tests to run |
+|---|---|
+| Any frontend JS/TS file | `npm test` (run all) |
+| `public/sw.js` | `npm test` — especially `ServiceWorkerSync`, `ServiceWorkerSyncBugFixes`, `ServiceWorkerRoutingCaching` |
+| `components/AIToDoListApp.tsx` | `npm test` — especially `AppMain`, `TodoSpaceChangeModal` |
+| Auth/login flows | `npm test -- AuthForm.test.tsx AccountCreationFlow.test.tsx` |
+| Journal feature | `npm test -- OfflineJournal.test.ts` |
+| Category/space logic | `npm test -- TodoSpaceChangeModal.test.tsx` |
+| Email/notification settings | `npm test -- EmailSettings.test.tsx` |
+
+#### Test file map (24 suites, 221 tests)
+
+**Service worker / offline sync:**
+- `tests/sw.test.js` — core SW primitives (IDB read/write, queue ops, ID mapping, sync logic)
+- `__tests__/ServiceWorkerSync.test.ts` — `handleApiRequest` end-to-end, online/offline routing, caching
+- `__tests__/ServiceWorkerSyncBugFixes.test.ts` — regression tests for sync bugs 1-9
+- `__tests__/ServiceWorkerRoutingCaching.test.ts` — `API_ROUTES`, `isApiPath`, `buildBackendRequest`, `GET_CACHE_HANDLERS`
+- `__tests__/ServiceWorkerRouteValidation.test.ts` — route allow/deny list validation
+- `__tests__/OfflineJournal.test.ts` — journal offline create/update flows
+
+**UI components:**
+- `__tests__/AppMain.test.tsx` — main app renders, tab switching, todo CRUD
+- `__tests__/AuthForm.test.tsx` — login/signup form behavior
+- `__tests__/TodoSpaceChangeModal.test.tsx` — moving todos between spaces in edit modal
+- `__tests__/AccountCreationFlow.test.tsx` — account creation edge cases
+- `__tests__/EmailSettings.test.tsx` — email notification preferences
+- `__tests__/OfflineInsights.test.ts` — insights generation (timezone-safe week bucketing)
 
 ---
 
@@ -276,6 +302,8 @@ pytest tests/test_auth.py -v        # Authentication tests
 pytest -v --tb=short                # Verbose output (good for agents)
 pytest --cov=. --cov-report=term-missing  # With coverage
 ```
+
+**When to run:** After any change to Python backend files (`backend/app.py`, `backend/routers/`, etc.).
 
 **Test Structure:**
 - `tests/test_auth.py` - Authentication system tests (11 tests)
