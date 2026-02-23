@@ -97,6 +97,7 @@ async def lifespan(app: FastAPI):
         # Import initialization functions
         from auth import cleanup_expired_sessions, init_auth_indexes
         from categories import init_category_indexes
+        from chat_sessions import init_chat_session_indexes
         from chats import init_chat_indexes
 
         # Test database connection first
@@ -120,6 +121,7 @@ async def lifespan(app: FastAPI):
             ("init_category_indexes", init_category_indexes),
             ("init_journal_indexes", init_journal_indexes),
             ("init_chat_indexes", init_chat_indexes),
+            ("init_chat_session_indexes", init_chat_session_indexes),
             ("init_default_categories", init_default_categories),
             ("cleanup_expired_sessions", cleanup_expired_sessions),
         ]

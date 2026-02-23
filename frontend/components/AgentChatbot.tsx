@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { MessageRenderer, PlainTextRenderer } from './MessageRenderer';
@@ -9,39 +9,91 @@ interface ChatbotProps {
   isActive?: boolean;
 }
 
+interface SessionMeta {
+  _id: string;
+  title: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export default function AgentChatbot({ activeSpace, token, isActive = true }: ChatbotProps) {
   const [question, setQuestion] = useState('');
   const [expandedTools, setExpandedTools] = useState<Set<number>>(new Set());
-  const [messages, setMessages] = useState<{ role: string; content: string; toolData?: any }[]>(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const spaceKey = `agent_chat_messages_${activeSpace?._id || 'default'}`;
-        const stored = sessionStorage.getItem(spaceKey);
-        return stored ? JSON.parse(stored) : [];
-      } catch {
-        return [];
-      }
-    }
-    return [];
-  });
+  const [messages, setMessages] = useState<{ role: string; content: string; toolData?: any }[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [thinkingDots, setThinkingDots] = useState(0);
   const [isOnline, setIsOnline] = useState(true);
   const [showOfflineMessage, setShowOfflineMessage] = useState(false);
+
+  // Session state
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+  const [sessions, setSessions] = useState<SessionMeta[]>([]);
+  const [sessionsLoading, setSessionsLoading] = useState(false);
+  const [showSessionDropdown, setShowSessionDropdown] = useState(false);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const shouldAutoScrollRef = useRef(true);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
+  // -----------------------------------------------------------------------
+  // Fetch sessions list
+  // -----------------------------------------------------------------------
+  const fetchSessions = useCallback(async () => {
+    if (!token) return;
+    setSessionsLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (activeSpace?._id) {
+        params.append('space_id', activeSpace._id);
+      }
+      const res = await fetch(`/agent/sessions?${params.toString()}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setSessions(data);
+      }
+    } catch {
+      // Silently ignore fetch errors
+    } finally {
+      setSessionsLoading(false);
+    }
+  }, [token, activeSpace?._id]);
+
+  // Fetch sessions on mount and when space changes
+  useEffect(() => {
+    setCurrentSessionId(null);
+    setMessages([]);
+    fetchSessions();
+  }, [fetchSessions]);
+
+  // -----------------------------------------------------------------------
+  // Close dropdown when clicking outside
+  // -----------------------------------------------------------------------
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setShowSessionDropdown(false);
+      }
+    };
+    if (showSessionDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showSessionDropdown]);
+
+  // -----------------------------------------------------------------------
+  // Scroll helpers
+  // -----------------------------------------------------------------------
   const checkIfAtBottom = () => {
     if (!chatContainerRef.current) return true;
     const { scrollTop, scrollHeight, clientHeight } = chatContainerRef.current;
-    // TODO: simplify the scrolling logic
-    return scrollTop + clientHeight >= scrollHeight - 50; // 50px threshold for "at bottom"
+    return scrollTop + clientHeight >= scrollHeight - 50;
   };
 
   const handleScroll = () => {
-    // Update whether we should auto-scroll based on current position
     shouldAutoScrollRef.current = checkIfAtBottom();
   };
 
@@ -52,26 +104,15 @@ export default function AgentChatbot({ activeSpace, token, isActive = true }: Ch
   };
 
   useEffect(() => {
-    // Only auto-scroll if we were at the bottom before the update AND tab is active AND we have messages
-    // Don't auto-scroll when showing blank state (messages.length === 0)
     if (shouldAutoScrollRef.current && isActive && messages.length > 0) {
-      // Small delay to ensure DOM updates are complete
       setTimeout(() => {
         scrollToBottom();
-        // After scrolling, we're at the bottom again
         shouldAutoScrollRef.current = true;
       }, 10);
     }
-    if (typeof window !== 'undefined') {
-      try {
-        const spaceKey = `agent_chat_messages_${activeSpace?._id || 'default'}`;
-        sessionStorage.setItem(spaceKey, JSON.stringify(messages));
-      } catch {
-        // Ignore write errors
-      }
-    }
-  }, [messages, activeSpace, isActive]);
+  }, [messages, isActive]);
 
+  // Thinking dots animation
   useEffect(() => {
     let interval: ReturnType<typeof setInterval>;
     if (loading) {
@@ -91,50 +132,80 @@ export default function AgentChatbot({ activeSpace, token, isActive = true }: Ch
     const updateOnlineStatus = () => {
       setIsOnline(navigator.onLine);
     };
-
-    // Set initial status
     updateOnlineStatus();
-
-    // Listen for online/offline events
     window.addEventListener('online', updateOnlineStatus);
     window.addEventListener('offline', updateOnlineStatus);
-
     return () => {
       window.removeEventListener('online', updateOnlineStatus);
       window.removeEventListener('offline', updateOnlineStatus);
     };
   }, []);
 
-  // Clear messages when space changes
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const spaceKey = `agent_chat_messages_${activeSpace?._id || 'default'}`;
-        const stored = sessionStorage.getItem(spaceKey);
-        setMessages(stored ? JSON.parse(stored) : []);
-      } catch {
+  // -----------------------------------------------------------------------
+  // Load a past session
+  // -----------------------------------------------------------------------
+  const loadSession = async (sessionId: string) => {
+    if (!token) return;
+    setShowSessionDropdown(false);
+    setLoading(true);
+    setError('');
+    try {
+      const res = await fetch(`/agent/sessions/${sessionId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error('Failed to load session');
+      const data = await res.json();
+      setMessages(data.display_messages || []);
+      setCurrentSessionId(sessionId);
+    } catch (err: any) {
+      setError(err.message || 'Failed to load chat');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // -----------------------------------------------------------------------
+  // Delete a session
+  // -----------------------------------------------------------------------
+  const deleteSession = async (sessionId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!token) return;
+    try {
+      await fetch(`/agent/sessions/${sessionId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setSessions((prev) => prev.filter((s) => s._id !== sessionId));
+      if (currentSessionId === sessionId) {
+        setCurrentSessionId(null);
         setMessages([]);
       }
+    } catch {
+      // Ignore delete errors
     }
-  }, [activeSpace]);
+  };
 
+  // -----------------------------------------------------------------------
+  // Start a new chat
+  // -----------------------------------------------------------------------
+  const handleNewChat = () => {
+    setCurrentSessionId(null);
+    setMessages([]);
+    setShowSessionDropdown(false);
+  };
+
+  // -----------------------------------------------------------------------
+  // Clear chat (legacy)
+  // -----------------------------------------------------------------------
   const handleClear = async () => {
     setMessages([]);
-    if (typeof window !== 'undefined') {
-      try {
-        const spaceKey = `agent_chat_messages_${activeSpace?._id || 'default'}`;
-        sessionStorage.removeItem(spaceKey);
-      } catch {
-        // Ignore storage errors
-      }
-    }
+    setCurrentSessionId(null);
 
     try {
       const params = new URLSearchParams();
       if (activeSpace?._id) {
         params.append('space_id', activeSpace._id);
       }
-      // Always use relative URL so service worker can intercept (for offline support)
       const clearUrl = `/agent/history?${params.toString()}`;
 
       const headers: Record<string, string> = {};
@@ -147,6 +218,9 @@ export default function AgentChatbot({ activeSpace, token, isActive = true }: Ch
     }
   };
 
+  // -----------------------------------------------------------------------
+  // Send a message
+  // -----------------------------------------------------------------------
   const handleAsk = async () => {
     if (!question.trim()) return;
 
@@ -156,7 +230,6 @@ export default function AgentChatbot({ activeSpace, token, isActive = true }: Ch
     setLoading(true);
     setError('');
 
-    // When user sends a message, they want to see the response, so scroll to bottom
     shouldAutoScrollRef.current = true;
 
     let assistantResponse = { role: 'assistant', content: '' };
@@ -168,27 +241,32 @@ export default function AgentChatbot({ activeSpace, token, isActive = true }: Ch
       if (activeSpace?._id) {
         params.append('space_id', activeSpace._id);
       }
+      if (currentSessionId) {
+        params.append('session_id', currentSessionId);
+      }
       if (token) {
         params.append('token', token);
       }
 
-      // Always use relative URL so service worker can intercept (for offline support)
-      // Service worker will route to correct backend based on environment
       const agentUrl = `/agent/stream?${params.toString()}`;
-
       const es = new EventSource(agentUrl);
+
+      es.addEventListener('ready', (e) => {
+        const data = JSON.parse((e as MessageEvent).data);
+        if (data.session_id && !currentSessionId) {
+          setCurrentSessionId(data.session_id);
+        }
+      });
 
       es.addEventListener('token', (e) => {
         const { token: responseToken } = JSON.parse((e as MessageEvent).data);
         assistantResponse.content += responseToken;
 
         if (!assistantMessageAdded) {
-          // First token - add assistant message to the conversation and stop loading
           setMessages((prev) => [...prev, { ...assistantResponse }]);
           setLoading(false);
           assistantMessageAdded = true;
         } else {
-          // Update existing assistant message
           setMessages((prev) => [...prev.slice(0, -1), { ...assistantResponse }]);
         }
       });
@@ -196,7 +274,6 @@ export default function AgentChatbot({ activeSpace, token, isActive = true }: Ch
       es.addEventListener('tool_result', (e) => {
         const { tool, args, data } = JSON.parse((e as MessageEvent).data);
 
-        // Format tool inputs in a readable way
         const formatArgs = (args: any) => {
           if (!args || Object.keys(args).length === 0) return '';
           const readable = Object.entries(args)
@@ -205,7 +282,6 @@ export default function AgentChatbot({ activeSpace, token, isActive = true }: Ch
           return `(${readable})`;
         };
 
-        // Format tool results more concisely
         const formatResult = (data: any) => {
           if (data.ok === false) return `❌ ${data.error}`;
           if (data.tasks) return `✅ Found ${data.tasks.length} tasks`;
@@ -219,12 +295,13 @@ export default function AgentChatbot({ activeSpace, token, isActive = true }: Ch
         };
 
         const toolMessage = `🔧 ${tool}${formatArgs(args)}: ${formatResult(data)}`;
-
         setMessages((prev) => [...prev, { role: 'system', content: toolMessage, toolData: { tool, args, data } }]);
       });
 
       es.addEventListener('done', () => {
         es.close();
+        // Refresh sessions list after conversation completes
+        fetchSessions();
       });
 
       es.addEventListener('error', () => {
@@ -260,7 +337,6 @@ export default function AgentChatbot({ activeSpace, token, isActive = true }: Ch
   const handleOfflineClick = () => {
     if (!isOnline) {
       setShowOfflineMessage(true);
-      // Auto-hide after 3 seconds on mobile
       setTimeout(() => {
         setShowOfflineMessage(false);
       }, 3000);
@@ -278,7 +354,6 @@ export default function AgentChatbot({ activeSpace, token, isActive = true }: Ch
 
     const sanitized: any = {};
     for (const [key, value] of Object.entries(data)) {
-      // Skip sensitive ID fields and user identifiers
       const sensitiveFields = ['_id', 'id', 'user_id', 'space_id', 'owner_id', 'member_ids', 'pending_emails'];
       if (sensitiveFields.includes(key)) {
         continue;
@@ -288,20 +363,98 @@ export default function AgentChatbot({ activeSpace, token, isActive = true }: Ch
     return sanitized;
   };
 
+  // Format date for session list
+  const formatSessionDate = (dateStr: string) => {
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+    if (diffDays === 0) return 'Today';
+    if (diffDays === 1) return 'Yesterday';
+    if (diffDays < 7) return `${diffDays}d ago`;
+
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  };
+
   return (
     <div className="flex flex-col h-full">
-      {/* Clear button at top */}
-      {messages.length > 0 && (
-        <div className="mb-2 flex justify-end flex-shrink-0">
+      {/* Top bar: session dropdown + new chat + clear */}
+      <div className="mb-2 flex items-center gap-2 flex-shrink-0">
+        {/* Past Chats dropdown */}
+        <div className="relative" ref={dropdownRef}>
           <button
-            onClick={handleClear}
+            onClick={() => setShowSessionDropdown(!showSessionDropdown)}
+            disabled={sessionsLoading}
+            className="bg-gray-700 text-gray-200 px-3 py-1 rounded text-sm hover:bg-gray-600 disabled:opacity-50 transition-colors flex items-center gap-1"
+          >
+            Past Chats
+            <ChevronDown className={`w-3 h-3 transition-transform ${showSessionDropdown ? 'rotate-180' : ''}`} />
+          </button>
+
+          {showSessionDropdown && (
+            <div className="absolute left-0 top-full mt-1 w-72 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-20 max-h-80 overflow-y-auto custom-scrollbar">
+              {/* New Chat option at top */}
+              <button
+                onClick={handleNewChat}
+                className="w-full text-left px-3 py-2 text-sm text-accent hover:bg-gray-700 border-b border-gray-700 transition-colors"
+              >
+                + New Chat
+              </button>
+
+              {sessions.length === 0 && !sessionsLoading && (
+                <div className="px-3 py-3 text-sm text-gray-500 text-center">
+                  No past chats
+                </div>
+              )}
+
+              {sessions.map((session) => (
+                <div
+                  key={session._id}
+                  onClick={() => loadSession(session._id)}
+                  className={`flex items-center justify-between px-3 py-2 text-sm cursor-pointer hover:bg-gray-700 transition-colors ${
+                    currentSessionId === session._id ? 'bg-gray-700/50 border-l-2 border-accent' : ''
+                  }`}
+                >
+                  <div className="flex-1 min-w-0 mr-2">
+                    <p className="text-gray-200 truncate">{session.title}</p>
+                    <p className="text-gray-500 text-xs">{formatSessionDate(session.updated_at)}</p>
+                  </div>
+                  <button
+                    onClick={(e) => deleteSession(session._id, e)}
+                    className="text-gray-500 hover:text-red-400 flex-shrink-0 text-xs px-1 transition-colors"
+                    aria-label="Delete session"
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* New Chat button */}
+        {(messages.length > 0 || currentSessionId) && (
+          <button
+            onClick={handleNewChat}
             disabled={loading}
             className="border border-gray-600 text-gray-300 px-3 py-1 rounded text-sm hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
+            New Chat
+          </button>
+        )}
+
+        {/* Clear Chat (push to right) */}
+        {messages.length > 0 && (
+          <button
+            onClick={handleClear}
+            disabled={loading}
+            className="ml-auto bg-gray-700 text-gray-200 px-3 py-1 rounded text-sm hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
             Clear Chat
           </button>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Messages container */}
       <div

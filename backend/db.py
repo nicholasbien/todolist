@@ -118,5 +118,13 @@ class Collections:
     def chats(self):
         return db.chats
 
+    @property
+    def chat_sessions(self):
+        return db.chat_sessions
+
+    @property
+    def chat_trajectories(self):
+        return db.chat_trajectories
+
 
 collections = Collections()

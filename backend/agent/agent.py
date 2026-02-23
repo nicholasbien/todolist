@@ -4,6 +4,8 @@ import json
 import logging
 import os
 import sys
+import time
+from collections import OrderedDict
 from typing import Any, AsyncGenerator, Dict, List, Optional
 
 from mcp import ClientSession, StdioServerParameters
@@ -17,6 +19,13 @@ logger = logging.getLogger(__name__)
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
 from auth import verify_session  # noqa: E402
+from chat_sessions import (  # noqa: E402
+    create_session,
+    delete_session,
+    get_session_trajectory,
+    list_sessions,
+    save_trajectory,
+)
 from chats import ChatMessage, delete_chat_history, get_chat_history, save_chat_message  # noqa: E402
 from fastapi import APIRouter, Depends, Header, HTTPException, Query  # noqa: E402
 from fastapi.responses import StreamingResponse  # noqa: E402
@@ -86,7 +95,44 @@ def get_openai_client(api_key: str) -> AsyncOpenAI:
     # Default max_retries: 2
 
 
-# In-memory conversation history keyed by user and space
+# ---------------------------------------------------------------------------
+# In-memory conversation cache keyed by session_id.
+# Uses an OrderedDict for simple LRU eviction.
+# ---------------------------------------------------------------------------
+CACHE_MAX_SIZE = 200
+CACHE_TTL_SECONDS = 30 * 60  # 30 minutes
+
+# Each entry: {"trajectory": [...], "display_messages": [...], "last_access": float}
+_session_cache: OrderedDict[str, Dict[str, Any]] = OrderedDict()
+
+
+def _cache_get(session_id: str) -> Optional[Dict[str, Any]]:
+    """Get a session from the cache, updating access time."""
+    entry = _session_cache.get(session_id)
+    if entry is None:
+        return None
+    if time.time() - entry["last_access"] > CACHE_TTL_SECONDS:
+        _session_cache.pop(session_id, None)
+        return None
+    entry["last_access"] = time.time()
+    _session_cache.move_to_end(session_id)
+    return entry
+
+
+def _cache_put(session_id: str, trajectory: List, display_messages: List) -> None:
+    """Store a session in the cache, evicting oldest if needed."""
+    _session_cache[session_id] = {
+        "trajectory": trajectory,
+        "display_messages": display_messages,
+        "last_access": time.time(),
+    }
+    _session_cache.move_to_end(session_id)
+    # Evict oldest entries if cache exceeds max size
+    while len(_session_cache) > CACHE_MAX_SIZE:
+        _session_cache.popitem(last=False)
+
+
+# Legacy in-memory conversation history (kept for backward compat with old /history endpoint)
 conversation_state: Dict[str, List[Dict[str, Any]]] = {}
 MAX_HISTORY = 10
 
@@ -217,8 +263,81 @@ def format_sse_message(event: str, data: dict) -> str:
     return f"event: {event}\ndata: {json.dumps(data)}\n\n"
 
 
+def _format_tool_display(tool_name: str, args: dict, result: dict) -> str:
+    """Build the display string for a tool call (mirrors frontend formatResult)."""
+
+    def fmt_args(a: dict) -> str:
+        if not a:
+            return ""
+        readable = ", ".join(f"{k}: {v}" for k, v in a.items())
+        return f"({readable})"
+
+    def fmt_result(d: dict) -> str:
+        if d.get("ok") is False:
+            return f"❌ {d.get('error', 'Error')}"
+        if "tasks" in d:
+            return f"✅ Found {len(d['tasks'])} tasks"
+        if "weather" in d:
+            w = d["weather"]
+            return f"🌤️ {w.get('location', '')}: {w.get('temperature_display', '')}"
+        if "books" in d:
+            return f"📚 Found {len(d['books'])} book recommendations"
+        if "quotes" in d:
+            return f'💭 "{d["quotes"][0]}"'
+        if "results" in d:
+            return f"🔍 Found {len(d['results'])} results"
+        if "entries" in d:
+            return f"📖 Found {len(d['entries'])} journal entries"
+        if "entry" in d:
+            entry = d["entry"]
+            return f"📖 Journal entry from {entry['date']}" if entry else "📖 No journal entry found"
+        return "✅ Success"
+
+    return f"🔧 {tool_name}{fmt_args(args)}: {fmt_result(result)}"
+
+
+async def _persist_turn(
+    session_id: str,
+    user_id: str,
+    space_id: Optional[str],
+    user_message: str,
+    content_parts: List[str],
+    input_messages: List[Dict[str, Any]],
+    display_messages: List[Dict[str, Any]],
+) -> None:
+    """Save trajectory, display messages, and legacy chat entries after a turn."""
+    assistant_text = "".join(content_parts)
+    if assistant_text:
+        display_messages.append({"role": "assistant", "content": assistant_text})
+
+    # Save to new session storage
+    await save_trajectory(session_id, user_id, input_messages, display_messages)
+    _cache_put(session_id, input_messages, display_messages)
+
+    # Also save to legacy chats collection for backward compatibility
+    user_entry = ChatMessage(user_id=user_id, space_id=space_id, role="user", content=user_message)
+    assistant_entry = ChatMessage(user_id=user_id, space_id=space_id, role="assistant", content=assistant_text)
+    await save_chat_message(user_entry)
+    await save_chat_message(assistant_entry)
+
+    # Update legacy in-memory state
+    key = f"{user_id}:{space_id}" if space_id else user_id
+    history = conversation_state.get(key, [])
+    history.extend(
+        [
+            {"role": "user", "content": user_message},
+            {"role": "assistant", "content": assistant_text},
+        ]
+    )
+    conversation_state[key] = history[-10:]
+
+
 async def stream_agent_response(
-    user_message: str, user_id: str, space_id: Optional[str] = None, user_name: Optional[str] = None
+    user_message: str,
+    user_id: str,
+    space_id: Optional[str] = None,
+    user_name: Optional[str] = None,
+    session_id: Optional[str] = None,
 ) -> AsyncGenerator[str, None]:
     """Stream agent responses with sequential tool execution and summarization."""
 
@@ -253,20 +372,39 @@ async def stream_agent_response(
     # Combine native tools with MCP tools (both already in Responses API format)
     tools = list(OPENAI_TOOL_SCHEMAS.values()) + list(mcp_tools.values())
 
+    # -----------------------------------------------------------------------
+    # Session handling: create or resume
+    # -----------------------------------------------------------------------
+    is_new_session = session_id is None
+
+    if is_new_session:
+        session_id = await create_session(user_id, space_id, user_message)
+        logger.info(f"Created new session {session_id}")
+        input_messages: list[dict[str, Any]] = []
+        display_messages: list[dict[str, Any]] = []
+    else:
+        # Try in-memory cache first, then DB
+        cached = _cache_get(session_id)
+        if cached:
+            input_messages = list(cached["trajectory"])
+            display_messages = list(cached["display_messages"])
+            logger.info(f"Loaded session {session_id} from cache ({len(input_messages)} trajectory items)")
+        else:
+            traj_doc = await get_session_trajectory(session_id, user_id)
+            if not traj_doc:
+                yield format_sse_message("error", {"message": "Session not found"})
+                return
+            input_messages = list(traj_doc.get("trajectory", []))
+            display_messages = list(traj_doc.get("display_messages", []))
+            logger.info(f"Loaded session {session_id} from DB ({len(input_messages)} trajectory items)")
+
     tool_names = list(OPENAI_TOOL_SCHEMAS.keys()) + list(mcp_tools.keys())
-    ready_data = {"ok": True, "tools": tool_names, "space_id": space_id}
+    ready_data = {"ok": True, "tools": tool_names, "space_id": space_id, "session_id": session_id}
     yield format_sse_message("ready", ready_data)
 
-    # Load conversation history for this user/space
-    key = f"{user_id}:{space_id}" if space_id else user_id
-    history = conversation_state.get(key)
-    if history is None:
-        db_history = await get_chat_history(user_id, space_id, limit=MAX_HISTORY)
-        history = [{"role": m.role, "content": m.content} for m in db_history]
-        conversation_state[key] = history
-
-    # Convert chat format messages to responses format
-    # First message is system (developer instructions), rest are history + new user message
+    # -----------------------------------------------------------------------
+    # Build developer instructions (regenerated each turn, never stored)
+    # -----------------------------------------------------------------------
     from datetime import datetime
 
     from bson import ObjectId
@@ -301,16 +439,12 @@ Today's date: {current_date}
 {user_context}Current context: You are helping the user in their "{space_name}" space.
 This space has the following categories: {categories_str}.
 When adding new tasks, choose a category from this list, or use "General" if none fit well."""
-    input_messages: list[dict[str, Any]] = []
 
-    for msg in history:
-        role = msg["role"]
-        # Map system -> developer, keep user/assistant as-is
-        if role == "system":
-            role = "developer"
-        input_messages.append({"role": role, "content": msg["content"]})
-
+    # -----------------------------------------------------------------------
+    # Append user message to trajectory + display_messages
+    # -----------------------------------------------------------------------
     input_messages.append({"role": "user", "content": user_message})
+    display_messages.append({"role": "user", "content": user_message})
 
     try:
         api_call_count = 0
@@ -404,8 +538,8 @@ When adding new tasks, choose a category from this list, or use "General" if non
                                 partial_tool_calls[call_id]["call_id"] = event.item.call_id
 
             if partial_tool_calls:
-                tool_names = [p["name"] for p in partial_tool_calls.values() if p.get("name")]
-                logger.info(f"Executing {len(partial_tool_calls)} tools: {', '.join(tool_names)}")
+                tool_names_executing = [p["name"] for p in partial_tool_calls.values() if p.get("name")]
+                logger.info(f"Executing {len(partial_tool_calls)} tools: {', '.join(tool_names_executing)}")
 
                 # Append assistant's message with function calls to input (like response.output)
                 assistant_output_items = []
@@ -472,6 +606,15 @@ When adding new tasks, choose a category from this list, or use "General" if non
                         result = {"ok": False, "error": str(e)}
 
                     yield format_sse_message("tool_result", {"tool": tool_name, "args": args, "data": result})
+
+                    # Build display message for this tool call
+                    tool_display = _format_tool_display(tool_name, args, result)
+                    display_messages.append({
+                        "role": "system",
+                        "content": tool_display,
+                        "toolData": {"tool": tool_name, "args": args, "data": result},
+                    })
+
                     # Use call_id from the event, not the item id
                     actual_call_id = partial.get("call_id", call_id)
                     logger.info(f"Adding function_call_output with call_id: {actual_call_id}")
@@ -503,6 +646,13 @@ When adding new tasks, choose a category from this list, or use "General" if non
                 f"Total input tokens: {total_input_tokens}, "
                 f"Total output tokens: {total_output_tokens}, "
                 f"Total tokens: {total_input_tokens + total_output_tokens}"
+            )
+
+            # Persist BEFORE yielding done — the client closes the connection
+            # on "done", which can cancel the generator before post-yield code runs.
+            await _persist_turn(
+                session_id, user_id, space_id, user_message,
+                content_parts, input_messages, display_messages,
             )
 
             yield format_sse_message("done", {"ok": True})
@@ -556,23 +706,13 @@ When adding new tasks, choose a category from this list, or use "General" if non
                     except Exception as e:
                         logger.error(f"Error accessing usage data in final response: {e}", exc_info=True)
 
+            # Persist before yielding done
+            await _persist_turn(
+                session_id, user_id, space_id, user_message,
+                content_parts, input_messages, display_messages,
+            )
+
             yield format_sse_message("done", {"ok": True, "info": f"Reached maximum of {MAX_AGENT_STEPS} agent steps"})
-
-        # Update conversation history
-        user_entry = ChatMessage(user_id=user_id, space_id=space_id, role="user", content=user_message)
-        assistant_entry = ChatMessage(
-            user_id=user_id, space_id=space_id, role="assistant", content="".join(content_parts)
-        )
-        await save_chat_message(user_entry)
-        await save_chat_message(assistant_entry)
-
-        history.extend(
-            [
-                {"role": "user", "content": user_message},
-                {"role": "assistant", "content": "".join(content_parts)},
-            ]
-        )
-        conversation_state[key] = history[-10:]
 
     except Exception as e:
         error_msg = str(e)
@@ -585,10 +725,58 @@ When adding new tasks, choose a category from this list, or use "General" if non
         yield format_sse_message("error", {"message": error_msg})
 
 
+@router.get("/sessions")
+async def list_chat_sessions(
+    space_id: Optional[str] = Query(None, description="Space ID"),
+    current_user: dict = Depends(get_current_user),
+):
+    """List chat sessions for dropdown (lightweight metadata only)."""
+    user_id = current_user.get("user_id")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="User not authenticated")
+    return await list_sessions(user_id, space_id)
+
+
+@router.get("/sessions/{session_id}")
+async def get_chat_session(
+    session_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    """Load a specific past session for rendering and resuming."""
+    user_id = current_user.get("user_id")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="User not authenticated")
+
+    result = await get_session_trajectory(session_id, user_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="Session not found")
+    return result
+
+
+@router.delete("/sessions/{session_id}")
+async def delete_chat_session(
+    session_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    """Delete a single chat session."""
+    user_id = current_user.get("user_id")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="User not authenticated")
+
+    deleted = await delete_session(session_id, user_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    # Also remove from cache
+    _session_cache.pop(session_id, None)
+    return {"ok": True}
+
+
 @router.get("/stream")
 async def agent_stream(
     q: str = Query(..., description="User query"),
     space_id: Optional[str] = Query(None, description="Space ID"),
+    session_id: Optional[str] = Query(None, description="Session ID to resume; omit for new session"),
     user_data: dict = Depends(get_current_user),
 ):
     """Stream agent responses with tool calls via Server-Sent Events."""
@@ -601,7 +789,7 @@ async def agent_stream(
 
     # Create async generator
     async def generate():
-        async for chunk in stream_agent_response(q, user_id, space_id, user_name):
+        async for chunk in stream_agent_response(q, user_id, space_id, user_name, session_id):
             yield chunk
 
     # Return streaming response
@@ -614,7 +802,7 @@ async def clear_history(
     space_id: Optional[str] = Query(None, description="Space ID"),
     current_user: dict = Depends(get_current_user),
 ):
-    """Clear chat history for the current user and optional space."""
+    """Clear chat history for the current user and optional space (legacy endpoint)."""
     user_id = current_user.get("user_id")
     if not user_id:
         raise HTTPException(status_code=401, detail="User not authenticated")
