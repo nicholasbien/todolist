@@ -89,7 +89,7 @@ describe('Offline Journal Functionality', () => {
     await sw.syncQueue();
 
     // Verify correct API call was made (should use backend URL due to sync routing)
-    expect(fetch).toHaveBeenCalledWith('http://localhost:8000/journals', expect.objectContaining({
+    expect(fetch).toHaveBeenCalledWith('http://localhost/api/journals', expect.objectContaining({
       method: 'POST',
       headers: expect.objectContaining({
         'Authorization': 'Bearer token123',
@@ -224,7 +224,7 @@ describe('Offline Journal Functionality', () => {
     await sw.syncQueue();
 
     // Verify correct DELETE API call was made (should use backend URL due to sync routing)
-    expect(fetch).toHaveBeenCalledWith('http://localhost:8000/journals/server_journal_456', expect.objectContaining({
+    expect(fetch).toHaveBeenCalledWith('http://localhost/api/journals/server_journal_456', expect.objectContaining({
       method: 'DELETE',
       headers: expect.objectContaining({
         'Authorization': 'Bearer token123'

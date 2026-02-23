@@ -108,19 +108,26 @@ describe('buildBackendRequest', () => {
     const url = new URL('https://todolist.nyc/todos?space_id=abc');
     const { targetUrl } = await sw.buildBackendRequest(request, url);
 
-    expect(targetUrl).toBe('https://backend-production-e920.up.railway.app/todos?space_id=abc');
+    expect(targetUrl).toBe('https://todolist.nyc/api/todos?space_id=abc');
   });
 
   test('builds correct URL for local development', async () => {
-    (global as any).self.location = { hostname: 'localhost', protocol: 'http:', origin: 'http://localhost:3000' };
     const sw = require('../public/sw.js');
     await sw.putAuth('token123', 'user1');
+
+    // Use Object.defineProperty to reliably override self.location (plain assignment
+    // doesn't work on the service-worker-mock env object)
+    Object.defineProperty((global as any).self, 'location', {
+      value: { hostname: 'localhost', protocol: 'http:', origin: 'http://localhost:3000' },
+      configurable: true,
+      writable: true,
+    });
 
     const request = mockRequest('http://localhost:3000/categories?space_id=abc');
     const url = new URL('http://localhost:3000/categories?space_id=abc');
     const { targetUrl } = await sw.buildBackendRequest(request, url);
 
-    expect(targetUrl).toBe('http://localhost:8000/categories?space_id=abc');
+    expect(targetUrl).toBe('http://localhost:3000/api/categories?space_id=abc');
   });
 
   test('does not include auth headers for login/signup', async () => {
@@ -173,7 +180,7 @@ describe('cacheGetTodos', () => {
     expect(todos.map((t: any) => t._id).sort()).toEqual(['todo1', 'todo2']);
   });
 
-  test('blocks caching when sync is pending', async () => {
+  test('caches even when sync is pending (blocking moved to handleApiRequest)', async () => {
     const sw = require('../public/sw.js');
     await sw.putAuth('token123', 'user1');
     await sw.addQueue({ type: 'CREATE', data: { text: 'pending' } }, 'user1');
@@ -183,8 +190,8 @@ describe('cacheGetTodos', () => {
 
     const result = await sw.cacheGetTodos(url, response, { userId: 'user1', token: 'token123' });
 
-    // Should return undefined (blocked), not 'cached'
-    expect(result).toBeUndefined();
+    // cacheGetTodos always caches; the caller (handleApiRequest) decides whether to invoke it
+    expect(result).toBe('cached');
   });
 
   test('removes stale local todos not in server response', async () => {
