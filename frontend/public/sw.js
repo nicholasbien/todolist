@@ -881,12 +881,12 @@ async function handleApiRequest(request) {
       // Trigger sync for writes, and for reads if queue has pending ops
       if (response.ok) {
         if (request.method !== 'GET') {
-          syncQueue().catch(() => {});
+          syncQueue().catch(err => console.error('Sync error after write:', err));
         } else {
           getAuth().then(auth => {
             if (!auth?.userId) return;
             readQueue(auth.userId).then(q => {
-              if (q.length > 0) syncQueue().catch(() => {});
+              if (q.length > 0) syncQueue().catch(err => console.error('Sync error after read:', err));
             });
           }).catch(() => {});
         }
@@ -1386,7 +1386,6 @@ function normalizePriority(p) {
 function getBackendUrl() {
   // Route traffic through same-origin Next.js proxy.
   // Proxy target is controlled by BACKEND_URL in server env.
-  if (!self.location) return null;
   return `${self.location.origin}${CONFIG.API_PROXY_PATH}`;
 }
 
@@ -1411,7 +1410,6 @@ async function syncQueue() {
     const queue = await readQueue(authData.userId);
     const headers = await getAuthHeaders();
     const backendUrl = getBackendUrl();
-    if (!backendUrl) return; // self.location not yet available
 
     // Load persistent ID mapping
     let idMap = await getIdMap(authData.userId);
@@ -1777,7 +1775,7 @@ async function syncQueue() {
     // If a sync was requested while we were busy, run one follow-up (Bug 7 fix)
     if (syncPending) {
       syncPending = false;
-      syncQueue().catch(() => {});
+      syncQueue().catch(err => console.error('Sync error on follow-up:', err));
     }
   }
 }

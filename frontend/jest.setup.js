@@ -96,3 +96,13 @@ global.self = global.self || {
   location: { origin: 'http://localhost:3000' },
   navigator: { onLine: false }, // Default to offline for testing
 };
+
+// Drain background async chains between test files.
+// Service worker code triggers fire-and-forget syncQueue() calls via handleApiRequest.
+// In serial mode (--maxWorkers=1) those chains can still be running when the next
+// file's beforeEach replaces global.self. Waiting here (after all tests in a file
+// complete but before the next file starts) lets fake-indexeddb's setImmediate-based
+// IDB operations finish while global.self.location is still valid.
+afterAll(async () => {
+  await new Promise(r => setTimeout(r, 50));
+});
