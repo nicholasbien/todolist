@@ -29,6 +29,7 @@ export default function TodoItem({
   const [isCompleting, setIsCompleting] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [shouldAnimate, setShouldAnimate] = useState(false);
+  const [hoveredButton, setHoveredButton] = useState<string | null>(null);
   const containerRef = React.useRef<HTMLDivElement>(null);
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const longPressTriggeredRef = useRef(false);
@@ -147,11 +148,15 @@ export default function TodoItem({
           {!todo.completed ? (
             <button
               onClick={(e) => { e.stopPropagation(); handleCompleteClick(e); }}
+              onMouseEnter={() => setHoveredButton('complete')}
+              onMouseLeave={() => setHoveredButton(null)}
               disabled={isCompleting}
-              className={`text-lg w-11 h-11 flex items-center justify-center rounded-lg transition-all duration-200 ${
+              className={`text-lg w-11 h-11 flex items-center justify-center rounded-lg transition-all duration-200 focus:outline-none ${
                 isCompleting
                   ? "text-green-200 bg-green-900/40 scale-110"
-                  : "text-green-400 hover:text-green-300 hover:bg-green-900/20"
+                  : hoveredButton === 'complete'
+                  ? "text-green-300 bg-green-900/20"
+                  : "text-green-400"
               }`}
               aria-label="Mark task as complete"
             >
@@ -160,7 +165,13 @@ export default function TodoItem({
           ) : (
             <button
               onClick={(e) => { e.stopPropagation(); handleCompleteClick(e); }}
-              className="text-yellow-400 hover:text-yellow-300 hover:bg-yellow-900/20 text-lg w-11 h-11 flex items-center justify-center rounded-lg transition-colors"
+              onMouseEnter={() => setHoveredButton('uncomplete')}
+              onMouseLeave={() => setHoveredButton(null)}
+              className={`text-lg w-11 h-11 flex items-center justify-center rounded-lg transition-colors focus:outline-none ${
+                hoveredButton === 'uncomplete'
+                  ? "text-yellow-300 bg-yellow-900/20"
+                  : "text-yellow-400"
+              }`}
               aria-label="Mark task as incomplete"
             >
               <RotateCcw className="w-5 h-5" />
@@ -168,11 +179,15 @@ export default function TodoItem({
           )}
           <button
             onClick={(e) => { e.stopPropagation(); handleDeleteClick(e); }}
+            onMouseEnter={() => setHoveredButton('delete')}
+            onMouseLeave={() => setHoveredButton(null)}
             disabled={isDeleting}
-            className={`text-lg w-11 h-11 flex items-center justify-center rounded-lg transition-all duration-200 ${
+            className={`text-lg w-11 h-11 flex items-center justify-center rounded-lg transition-all duration-200 focus:outline-none ${
               isDeleting
                 ? "text-red-200 bg-red-900/40 scale-110"
-                : "text-red-400 hover:text-red-300 hover:bg-red-900/20"
+                : hoveredButton === 'delete'
+                ? "text-red-300 bg-red-900/20"
+                : "text-red-400"
             }`}
             aria-label="Delete task"
           >
