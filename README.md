@@ -360,8 +360,7 @@ WEBSITE_URL=https://your-site-url.com
 
 ### Frontend (.env.local)
 ```bash
-# Local development - OpenAI key for client-side features
-OPENAI_API_KEY=your_openai_api_key
+# No OpenAI key is needed in frontend env (AI calls are backend-only)
 
 # API URL Configuration (Environment-Aware)
 # ⚠️ LEAVE UNSET FOR DEVELOPMENT: This enables offline functionality
