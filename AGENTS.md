@@ -615,7 +615,6 @@ OPENAI_API_KEY=your_openai_api_key
 
 ### AI Agent
 - `GET /agent/stream?q={query}&space_id={id}` - Streaming AI agent with tool calling
-- `DELETE /agent/history?space_id={id}` - Clear chat history for space
 
 ### Authentication
 - `POST /auth/signup` - Send verification code (no auth required)
