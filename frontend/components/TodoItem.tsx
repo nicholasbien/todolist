@@ -148,7 +148,7 @@ export default function TodoItem({
             <button
               onClick={(e) => { e.stopPropagation(); handleCompleteClick(e); }}
               disabled={isCompleting}
-              className={`text-lg w-11 h-11 flex items-center justify-center rounded-lg transition-all duration-200 ${
+              className={`text-lg w-11 h-11 flex items-center justify-center rounded-lg transition-all duration-200 focus:outline-none ${
                 isCompleting
                   ? "text-green-200 bg-green-900/40 scale-110"
                   : "text-green-400 hover:text-green-300 hover:bg-green-900/20"
@@ -160,7 +160,7 @@ export default function TodoItem({
           ) : (
             <button
               onClick={(e) => { e.stopPropagation(); handleCompleteClick(e); }}
-              className="text-yellow-400 hover:text-yellow-300 hover:bg-yellow-900/20 text-lg w-11 h-11 flex items-center justify-center rounded-lg transition-colors"
+              className="text-yellow-400 hover:text-yellow-300 hover:bg-yellow-900/20 text-lg w-11 h-11 flex items-center justify-center rounded-lg transition-colors focus:outline-none"
               aria-label="Mark task as incomplete"
             >
               <RotateCcw className="w-5 h-5" />
@@ -169,7 +169,7 @@ export default function TodoItem({
           <button
             onClick={(e) => { e.stopPropagation(); handleDeleteClick(e); }}
             disabled={isDeleting}
-            className={`text-lg w-11 h-11 flex items-center justify-center rounded-lg transition-all duration-200 ${
+            className={`text-lg w-11 h-11 flex items-center justify-center rounded-lg transition-all duration-200 focus:outline-none ${
               isDeleting
                 ? "text-red-200 bg-red-900/40 scale-110"
                 : "text-red-400 hover:text-red-300 hover:bg-red-900/20"
