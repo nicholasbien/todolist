@@ -308,6 +308,16 @@ node scripts/test-offline-sync.js
 | 6 | Data created online still accessible after going offline (IndexedDB cache) |
 | 7 | Multiple offline ops (update + delete + create) all sync in one batch |
 
+### When to run these tests
+
+**Run `node scripts/test-offline-sync.js` whenever you change offline sync behavior**, including:
+- Any modification to `frontend/public/sw.js`
+- Changes to `context/OfflineContext.tsx`
+- New API endpoints that need to work offline (must be added to `API_ROUTES` in the SW)
+- Changes to how queued operations are serialized, ordered, or replayed
+
+**When adding new offline behavior, add a new test** to `scripts/test-offline-sync.js` that covers it. See `docs/OFFLINE_SYNC_TESTING.md` for patterns, helper reference, gotchas, and step-by-step guidance on writing new tests.
+
 ### How sync works (reference)
 
 1. Browser goes offline → `navigator.onLine = false` → SW routes all API requests to IndexedDB
