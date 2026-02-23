@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { MessageRenderer, PlainTextRenderer } from './MessageRenderer';
@@ -433,31 +434,32 @@ export default function AgentChatbot({ activeSpace, token, isActive = true }: Ch
         )}
       </div>
 
-      {sessionToDelete && (
-        <div className="fixed inset-0 bg-black/50 z-40 flex items-center justify-center p-4">
-          <div className="w-full max-w-sm bg-gray-900 border border-gray-700 rounded-lg p-4 shadow-xl">
-            <h3 className="text-base font-semibold text-gray-100 mb-2">Delete chat?</h3>
-            <p className="text-sm text-gray-300 mb-4">
+      {sessionToDelete && createPortal(
+        <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50">
+          <div className="bg-black border border-gray-800 p-6 rounded-xl w-80 space-y-4 shadow-2xl">
+            <h3 className="text-gray-100 text-lg font-bold mb-2">Delete chat?</h3>
+            <p className="text-sm text-gray-300">
               Delete <span className="font-medium">&quot;{sessionToDelete.title}&quot;</span>? This can&apos;t be undone.
             </p>
-            <div className="flex justify-end gap-2">
-              <button
-                onClick={() => setSessionToDelete(null)}
-                disabled={deleteSessionLoading}
-                className="px-3 py-1.5 text-sm rounded border border-gray-600 text-gray-300 hover:bg-gray-800 disabled:opacity-50"
-              >
-                Cancel
-              </button>
+            <div className="flex justify-center space-x-3">
               <button
                 onClick={deleteSession}
                 disabled={deleteSessionLoading}
-                className="px-3 py-1.5 text-sm rounded bg-red-600 text-white hover:bg-red-500 disabled:opacity-50"
+                className="border border-red-500 text-red-400 hover:bg-red-900/20 px-6 py-2 rounded-lg transition-colors disabled:opacity-50"
               >
                 {deleteSessionLoading ? 'Deleting...' : 'Delete'}
               </button>
+              <button
+                onClick={() => setSessionToDelete(null)}
+                disabled={deleteSessionLoading}
+                className="border border-gray-600 text-gray-300 hover:bg-gray-800 px-6 py-2 rounded-lg transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Messages container */}
