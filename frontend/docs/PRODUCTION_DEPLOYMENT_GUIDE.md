@@ -25,9 +25,6 @@ This guide covers deploying the AI-powered todo application with MCP (Model Cont
 
 **Required `.env.local` (Development) / `.env.production` (Production):**
 ```bash
-# OpenAI Configuration
-OPENAI_API_KEY=sk-your-openai-api-key-here
-
 # Build Configuration
 NEXT_PUBLIC_APP_URL=https://your-domain.com
 CAPACITOR_BUILD=false
@@ -341,7 +338,6 @@ services:
       - "3000:3000"
     environment:
       - NODE_ENV=production
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
     depends_on:
       - backend
     restart: unless-stopped
@@ -403,9 +399,7 @@ docker-compose up -d --build
   "buildCommand": "npm run build",
   "devCommand": "npm run dev",
   "installCommand": "npm install",
-  "env": {
-    "OPENAI_API_KEY": "@openai_api_key"
-  },
+  "env": {},
   "functions": {
     "pages/api/agent/stream.ts": {
       "maxDuration": 300

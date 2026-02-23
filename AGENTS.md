@@ -563,7 +563,7 @@ See `docs/ENVIRONMENT_SETUP.md` for complete environment variable documentation.
 
 Quick setup:
 - Backend: Copy `backend/.env.example` to `backend/.env` and fill in your API keys
-- Frontend: Create `frontend/.env.local` with `OPENAI_API_KEY`
+- Frontend: Create `frontend/.env.local` with `BACKEND_URL` (only required env var; no OpenAI key needed in frontend)
 
 ### Backend (.env)
 ```
@@ -581,7 +581,7 @@ ADMIN_EMAIL=your_email@gmail.com
 
 ### Frontend (.env.local)
 ```
-OPENAI_API_KEY=your_openai_api_key
+BACKEND_URL=http://localhost:8000   # Used by Next.js API proxy; defaults to localhost:8000 in dev
 ```
 
 ---
