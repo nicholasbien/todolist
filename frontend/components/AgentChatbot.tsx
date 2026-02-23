@@ -31,6 +31,8 @@ export default function AgentChatbot({ activeSpace, token, isActive = true }: Ch
   const [sessions, setSessions] = useState<SessionMeta[]>([]);
   const [sessionsLoading, setSessionsLoading] = useState(false);
   const [showSessionDropdown, setShowSessionDropdown] = useState(false);
+  const [sessionToDelete, setSessionToDelete] = useState<SessionMeta | null>(null);
+  const [deleteSessionLoading, setDeleteSessionLoading] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
@@ -167,21 +169,31 @@ export default function AgentChatbot({ activeSpace, token, isActive = true }: Ch
   // -----------------------------------------------------------------------
   // Delete a session
   // -----------------------------------------------------------------------
-  const deleteSession = async (sessionId: string, e: React.MouseEvent) => {
+  const requestDeleteSession = (session: SessionMeta, e: React.MouseEvent) => {
     e.stopPropagation();
+    setSessionToDelete(session);
+  };
+
+  const deleteSession = async () => {
+    if (!token || !sessionToDelete) return;
+
+    setDeleteSessionLoading(true);
     if (!token) return;
     try {
-      await fetch(`/agent/sessions/${sessionId}`, {
+      await fetch(`/agent/sessions/${sessionToDelete._id}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` },
       });
-      setSessions((prev) => prev.filter((s) => s._id !== sessionId));
-      if (currentSessionId === sessionId) {
+      setSessions((prev) => prev.filter((s) => s._id !== sessionToDelete._id));
+      if (currentSessionId === sessionToDelete._id) {
         setCurrentSessionId(null);
         setMessages([]);
       }
     } catch {
       // Ignore delete errors
+    } finally {
+      setDeleteSessionLoading(false);
+      setSessionToDelete(null);
     }
   };
 
@@ -192,30 +204,6 @@ export default function AgentChatbot({ activeSpace, token, isActive = true }: Ch
     setCurrentSessionId(null);
     setMessages([]);
     setShowSessionDropdown(false);
-  };
-
-  // -----------------------------------------------------------------------
-  // Clear chat (legacy)
-  // -----------------------------------------------------------------------
-  const handleClear = async () => {
-    setMessages([]);
-    setCurrentSessionId(null);
-
-    try {
-      const params = new URLSearchParams();
-      if (activeSpace?._id) {
-        params.append('space_id', activeSpace._id);
-      }
-      const clearUrl = `/agent/history?${params.toString()}`;
-
-      const headers: Record<string, string> = {};
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
-      await fetch(clearUrl, { method: 'DELETE', headers });
-    } catch {
-      // Ignore network errors
-    }
   };
 
   // -----------------------------------------------------------------------
@@ -379,7 +367,7 @@ export default function AgentChatbot({ activeSpace, token, isActive = true }: Ch
 
   return (
     <div className="flex flex-col h-full">
-      {/* Top bar: session dropdown + new chat + clear */}
+      {/* Top bar: session dropdown + new chat */}
       <div className="mb-2 flex items-center gap-2 flex-shrink-0">
         {/* Past Chats dropdown */}
         <div className="relative" ref={dropdownRef}>
@@ -421,7 +409,7 @@ export default function AgentChatbot({ activeSpace, token, isActive = true }: Ch
                     <p className="text-gray-500 text-xs">{formatSessionDate(session.updated_at)}</p>
                   </div>
                   <button
-                    onClick={(e) => deleteSession(session._id, e)}
+                    onClick={(e) => requestDeleteSession(session, e)}
                     className="text-gray-500 hover:text-red-400 flex-shrink-0 text-xs px-1 transition-colors"
                     aria-label="Delete session"
                   >
@@ -443,18 +431,34 @@ export default function AgentChatbot({ activeSpace, token, isActive = true }: Ch
             New Chat
           </button>
         )}
-
-        {/* Clear Chat (push to right) */}
-        {messages.length > 0 && (
-          <button
-            onClick={handleClear}
-            disabled={loading}
-            className="ml-auto bg-gray-700 text-gray-200 px-3 py-1 rounded text-sm hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
-            Clear Chat
-          </button>
-        )}
       </div>
+
+      {sessionToDelete && (
+        <div className="fixed inset-0 bg-black/50 z-40 flex items-center justify-center p-4">
+          <div className="w-full max-w-sm bg-gray-900 border border-gray-700 rounded-lg p-4 shadow-xl">
+            <h3 className="text-base font-semibold text-gray-100 mb-2">Delete chat?</h3>
+            <p className="text-sm text-gray-300 mb-4">
+              Delete <span className="font-medium">&quot;{sessionToDelete.title}&quot;</span>? This can&apos;t be undone.
+            </p>
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setSessionToDelete(null)}
+                disabled={deleteSessionLoading}
+                className="px-3 py-1.5 text-sm rounded border border-gray-600 text-gray-300 hover:bg-gray-800 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={deleteSession}
+                disabled={deleteSessionLoading}
+                className="px-3 py-1.5 text-sm rounded bg-red-600 text-white hover:bg-red-500 disabled:opacity-50"
+              >
+                {deleteSessionLoading ? 'Deleting...' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Messages container */}
       <div

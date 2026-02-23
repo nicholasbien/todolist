@@ -26,7 +26,7 @@ from chat_sessions import (  # noqa: E402
     list_sessions,
     save_trajectory,
 )
-from chats import ChatMessage, delete_chat_history, get_chat_history, save_chat_message  # noqa: E402
+from chats import ChatMessage, save_chat_message  # noqa: E402
 from fastapi import APIRouter, Depends, Header, HTTPException, Query  # noqa: E402
 from fastapi.responses import StreamingResponse  # noqa: E402
 from openai import AsyncOpenAI  # noqa: E402
@@ -609,11 +609,13 @@ When adding new tasks, choose a category from this list, or use "General" if non
 
                     # Build display message for this tool call
                     tool_display = _format_tool_display(tool_name, args, result)
-                    display_messages.append({
-                        "role": "system",
-                        "content": tool_display,
-                        "toolData": {"tool": tool_name, "args": args, "data": result},
-                    })
+                    display_messages.append(
+                        {
+                            "role": "system",
+                            "content": tool_display,
+                            "toolData": {"tool": tool_name, "args": args, "data": result},
+                        }
+                    )
 
                     # Use call_id from the event, not the item id
                     actual_call_id = partial.get("call_id", call_id)
@@ -651,8 +653,13 @@ When adding new tasks, choose a category from this list, or use "General" if non
             # Persist BEFORE yielding done — the client closes the connection
             # on "done", which can cancel the generator before post-yield code runs.
             await _persist_turn(
-                session_id, user_id, space_id, user_message,
-                content_parts, input_messages, display_messages,
+                session_id,
+                user_id,
+                space_id,
+                user_message,
+                content_parts,
+                input_messages,
+                display_messages,
             )
 
             yield format_sse_message("done", {"ok": True})
@@ -708,8 +715,13 @@ When adding new tasks, choose a category from this list, or use "General" if non
 
             # Persist before yielding done
             await _persist_turn(
-                session_id, user_id, space_id, user_message,
-                content_parts, input_messages, display_messages,
+                session_id,
+                user_id,
+                space_id,
+                user_message,
+                content_parts,
+                input_messages,
+                display_messages,
             )
 
             yield format_sse_message("done", {"ok": True, "info": f"Reached maximum of {MAX_AGENT_STEPS} agent steps"})
@@ -795,19 +807,3 @@ async def agent_stream(
     # Return streaming response
     headers = {"Cache-Control": "no-cache", "Connection": "keep-alive", "X-Accel-Buffering": "no"}  # For nginx
     return StreamingResponse(generate(), media_type="text/event-stream", headers=headers)
-
-
-@router.delete("/history")
-async def clear_history(
-    space_id: Optional[str] = Query(None, description="Space ID"),
-    current_user: dict = Depends(get_current_user),
-):
-    """Clear chat history for the current user and optional space (legacy endpoint)."""
-    user_id = current_user.get("user_id")
-    if not user_id:
-        raise HTTPException(status_code=401, detail="User not authenticated")
-
-    key = f"{user_id}:{space_id}" if space_id else user_id
-    conversation_state.pop(key, None)
-    await delete_chat_history(user_id, space_id)
-    return {"ok": True}
