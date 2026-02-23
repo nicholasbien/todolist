@@ -235,7 +235,10 @@ export default function AgentChatbot({ activeSpace, token, isActive = true }: Ch
         params.append('token', token);
       }
 
-      const agentUrl = `/agent/stream?${params.toString()}`;
+      // Use the App Router route which pipes the backend SSE stream natively
+      // without buffering.  The /api/agent prefix is in the SW passthrough
+      // list so it bypasses service-worker interception entirely.
+      const agentUrl = `/api/agent/stream?${params.toString()}`;
       const es = new EventSource(agentUrl);
 
       es.addEventListener('ready', (e) => {

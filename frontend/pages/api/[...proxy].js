@@ -65,8 +65,44 @@ export default async function handler(req, res) {
       body,
     });
 
-    const data = await response.text();
     console.log('🔀 Response status:', response.status);
+
+    const contentType = response.headers.get('content-type') || '';
+
+    // Stream SSE responses instead of buffering — buffering breaks real-time
+    // token delivery.  This fallback path is used when the App Router route
+    // at /api/agent/stream is unavailable (e.g. during SSR or service-worker
+    // bypass failure).
+    if (contentType.includes('text/event-stream')) {
+      res.status(response.status);
+      response.headers.forEach((value, key) => {
+        // Skip headers that conflict with Node.js chunked streaming
+        if (!['transfer-encoding', 'content-length', 'connection'].includes(key.toLowerCase())) {
+          res.setHeader(key, value);
+        }
+      });
+      // Prevent Next.js gzip middleware from buffering before delivery
+      res.setHeader('Content-Encoding', 'identity');
+      // Disable Nagle's algorithm so each chunk is sent immediately
+      res.socket?.setNoDelay(true);
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          res.write(decoder.decode(value, { stream: true }));
+        }
+      } catch (streamErr) {
+        console.error('🔀 SSE stream error:', streamErr);
+      } finally {
+        res.end();
+      }
+      return;
+    }
+
+    const data = await response.text();
     console.log('🔀 Response data length:', data.length);
     console.log('🔀 Response preview:', data.substring(0, 200));
 

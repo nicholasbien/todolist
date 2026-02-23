@@ -26,7 +26,7 @@ from chat_sessions import (  # noqa: E402
     list_sessions,
     save_trajectory,
 )
-from chats import ChatMessage, delete_chat_history, get_chat_history, save_chat_message  # noqa: E402
+from chats import ChatMessage, delete_chat_history, save_chat_message  # noqa: E402
 from fastapi import APIRouter, Depends, Header, HTTPException, Query  # noqa: E402
 from fastapi.responses import StreamingResponse  # noqa: E402
 from openai import AsyncOpenAI  # noqa: E402
@@ -259,8 +259,20 @@ def estimate_token_count(messages: List[Dict[str, Any]], tools: Optional[List[Di
 
 
 def format_sse_message(event: str, data: dict) -> str:
-    """Format message for Server-Sent Events."""
-    return f"event: {event}\ndata: {json.dumps(data)}\n\n"
+    """Format message for Server-Sent Events.
+
+    Token events are padded to ≥1 KB so each fills a TCP segment and the
+    browser flushes it immediately.  Without padding, the browser batches
+    dozens of tiny (~35 B) chunks into one read, making streaming appear to
+    deliver all tokens at once.  SSE comment lines (': …') are ignored by
+    all EventSource clients.
+    """
+    payload = f"event: {event}\ndata: {json.dumps(data)}\n\n"
+    if event == "token":
+        padding_needed = max(0, 1024 - len(payload))
+        if padding_needed > 0:
+            payload = f": {'x' * padding_needed}\n{payload}"
+    return payload
 
 
 def _format_tool_display(tool_name: str, args: dict, result: dict) -> str:
@@ -383,6 +395,7 @@ async def stream_agent_response(
         input_messages: list[dict[str, Any]] = []
         display_messages: list[dict[str, Any]] = []
     else:
+        assert session_id is not None  # narrowed: not None in else branch
         # Try in-memory cache first, then DB
         cached = _cache_get(session_id)
         if cached:
@@ -398,6 +411,7 @@ async def stream_agent_response(
             display_messages = list(traj_doc.get("display_messages", []))
             logger.info(f"Loaded session {session_id} from DB ({len(input_messages)} trajectory items)")
 
+    assert session_id is not None  # always set: either created above or passed in
     tool_names = list(OPENAI_TOOL_SCHEMAS.keys()) + list(mcp_tools.keys())
     ready_data = {"ok": True, "tools": tool_names, "space_id": space_id, "session_id": session_id}
     yield format_sse_message("ready", ready_data)
@@ -609,11 +623,13 @@ When adding new tasks, choose a category from this list, or use "General" if non
 
                     # Build display message for this tool call
                     tool_display = _format_tool_display(tool_name, args, result)
-                    display_messages.append({
-                        "role": "system",
-                        "content": tool_display,
-                        "toolData": {"tool": tool_name, "args": args, "data": result},
-                    })
+                    display_messages.append(
+                        {
+                            "role": "system",
+                            "content": tool_display,
+                            "toolData": {"tool": tool_name, "args": args, "data": result},
+                        }
+                    )
 
                     # Use call_id from the event, not the item id
                     actual_call_id = partial.get("call_id", call_id)
@@ -651,8 +667,13 @@ When adding new tasks, choose a category from this list, or use "General" if non
             # Persist BEFORE yielding done — the client closes the connection
             # on "done", which can cancel the generator before post-yield code runs.
             await _persist_turn(
-                session_id, user_id, space_id, user_message,
-                content_parts, input_messages, display_messages,
+                session_id,
+                user_id,
+                space_id,
+                user_message,
+                content_parts,
+                input_messages,
+                display_messages,
             )
 
             yield format_sse_message("done", {"ok": True})
@@ -708,8 +729,13 @@ When adding new tasks, choose a category from this list, or use "General" if non
 
             # Persist before yielding done
             await _persist_turn(
-                session_id, user_id, space_id, user_message,
-                content_parts, input_messages, display_messages,
+                session_id,
+                user_id,
+                space_id,
+                user_message,
+                content_parts,
+                input_messages,
+                display_messages,
             )
 
             yield format_sse_message("done", {"ok": True, "info": f"Reached maximum of {MAX_AGENT_STEPS} agent steps"})
