@@ -427,7 +427,7 @@ export default function AgentChatbot({ activeSpace, token, isActive = true }: Ch
           <button
             onClick={handleNewChat}
             disabled={loading}
-            className="border border-gray-600 text-gray-300 px-3 py-1 rounded text-sm hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="ml-auto border border-gray-600 text-gray-300 px-3 py-1 rounded text-sm hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             New Chat
           </button>
