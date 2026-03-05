@@ -26,6 +26,7 @@ export default function AgentChatbot({ activeSpace, token, isActive = true }: Ch
   const [thinkingDots, setThinkingDots] = useState(0);
   const [isOnline, setIsOnline] = useState(true);
   const [showOfflineMessage, setShowOfflineMessage] = useState(false);
+  const [isQuestionFocused, setIsQuestionFocused] = useState(false);
 
   // Session state
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
@@ -605,6 +606,8 @@ export default function AgentChatbot({ activeSpace, token, isActive = true }: Ch
             onMouseEnter={() => !isOnline && setShowOfflineMessage(true)}
             onMouseLeave={() => setShowOfflineMessage(false)}
             onClick={handleOfflineClick}
+            onFocus={() => setIsQuestionFocused(true)}
+            onBlur={() => setIsQuestionFocused(false)}
             aria-label="Ask assistant a question"
           />
           {showOfflineMessage && !isOnline && (
@@ -618,7 +621,11 @@ export default function AgentChatbot({ activeSpace, token, isActive = true }: Ch
         <button
           onClick={handleAsk}
           disabled={loading || !question.trim() || !isOnline}
-          className="border border-accent text-accent px-6 py-3 rounded-lg hover:bg-accent/10 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          className={`border px-6 py-3 rounded-lg hover:bg-accent/10 disabled:opacity-50 disabled:cursor-not-allowed transition-colors ${
+            isQuestionFocused
+              ? 'border-accent text-accent'
+              : 'border-gray-700 text-gray-300 hover:text-gray-100'
+          }`}
           onMouseEnter={() => !isOnline && setShowOfflineMessage(true)}
           onMouseLeave={() => setShowOfflineMessage(false)}
         >
