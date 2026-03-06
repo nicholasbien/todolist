@@ -383,14 +383,6 @@ export default function AgentChatbot({ activeSpace, token, isActive = true }: Ch
 
           {showSessionDropdown && (
             <div className="absolute left-0 top-full mt-1 w-72 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-20 max-h-80 overflow-y-auto custom-scrollbar">
-              {/* New Chat option at top */}
-              <button
-                onClick={handleNewChat}
-                className="w-full text-left px-3 py-2 text-sm text-accent hover:bg-gray-700 border-b border-gray-700 transition-colors"
-              >
-                + New Chat
-              </button>
-
               {sessions.length === 0 && !sessionsLoading && (
                 <div className="px-3 py-3 text-sm text-gray-500 text-center">
                   No past chats
