@@ -101,6 +101,7 @@ export default function AIToDoListApp({
   const { logout, clearAuthExpired, authenticatedFetch } = useAuth();
   const [todos, setTodos] = useState([]);
   const [newTodo, setNewTodo] = useState("");
+  const [isNewTodoFocused, setIsNewTodoFocused] = useState(false);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(false);
   const [loadingTodos, setLoadingTodos] = useState(false);
@@ -1581,6 +1582,8 @@ export default function AIToDoListApp({
           <textarea
             value={newTodo}
             onChange={(e) => setNewTodo(e.target.value)}
+            onFocus={() => setIsNewTodoFocused(true)}
+            onBlur={() => setIsNewTodoFocused(false)}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
@@ -1596,7 +1599,11 @@ export default function AIToDoListApp({
           <button
             onClick={handleAddTodo}
             disabled={loading}
-            className="bg-gray-900 text-gray-300 w-12 h-12 rounded-xl border border-gray-700 hover:bg-gray-800 hover:text-gray-100 disabled:border-gray-700 disabled:text-gray-500 flex items-center justify-center transition-colors"
+            className={`bg-gray-900 w-12 h-12 rounded-xl border hover:bg-gray-800 disabled:border-gray-700 disabled:text-gray-500 flex items-center justify-center transition-colors ${
+              isNewTodoFocused
+                ? 'border-accent text-accent'
+                : 'border-gray-700 text-gray-300 hover:text-gray-100'
+            }`}
           >
             {loading ? '...' : '+'}
           </button>
