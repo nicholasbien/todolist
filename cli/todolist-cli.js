@@ -143,6 +143,18 @@ const commands = {
     console.log(`Released session ${sessionId}`);
   },
 
+  async 'get-session-by-todo'(args) {
+    const { positional } = parseFlags(args);
+    const todoId = positional[0];
+    if (!todoId) { console.error('Usage: get-session-by-todo <todo_id>'); process.exit(1); }
+    const { data } = await request('GET', `/agent/sessions/by-todo/${todoId}`);
+    if (data.session_id) {
+      console.log(data.session_id);
+    } else {
+      console.log('No session linked to this todo.');
+    }
+  },
+
   async 'list-todos'(args) {
     const { flags } = parseFlags(args);
     const completed = flags.completed || false;
@@ -224,6 +236,7 @@ Commands:
   post-message -s <id> -c <text>   Post a message to a session
   claim-session <session_id>       Claim a session for this agent
   release-session <session_id>     Release a session claim
+  get-session-by-todo <todo_id>    Get the session linked to a todo
   list-todos [--completed]         List todos
   add-todo <text> [--category C] [--priority P] [--notes N]
   complete-todo <todo_id>          Mark a todo complete
