@@ -21,12 +21,14 @@ sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 from auth import verify_session  # noqa: E402
 from chat_sessions import (  # noqa: E402
     append_message,
+    claim_session,
     create_session,
     delete_session,
     find_session_by_todo,
     get_pending_sessions,
     get_session_trajectory,
     list_sessions,
+    release_session,
     save_trajectory,
 )
 from chats import ChatMessage, save_chat_message  # noqa: E402
@@ -844,6 +846,39 @@ async def create_chat_session(
         await append_message(session_id, user_id, role, req.message)
 
     return {"session_id": session_id, "title": req.title}
+
+
+class ClaimSessionRequest(BaseModel):
+    agent_id: str
+
+
+@router.post("/sessions/{session_id}/claim")
+async def claim_chat_session(
+    session_id: str,
+    req: ClaimSessionRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    """Atomically claim a session for an agent. Returns ok=true if claimed."""
+    user_id = current_user.get("user_id")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="User not authenticated")
+
+    claimed = await claim_session(session_id, user_id, req.agent_id)
+    return {"ok": claimed, "session_id": session_id, "agent_id": req.agent_id}
+
+
+@router.post("/sessions/{session_id}/release")
+async def release_chat_session(
+    session_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    """Release an agent's claim on a session."""
+    user_id = current_user.get("user_id")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="User not authenticated")
+
+    await release_session(session_id, user_id)
+    return {"ok": True}
 
 
 @router.post("/sessions/{session_id}/messages")
