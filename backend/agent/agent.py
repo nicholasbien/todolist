@@ -20,6 +20,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
 from auth import verify_session  # noqa: E402
 from chat_sessions import (  # noqa: E402
+    append_message,
     create_session,
     delete_session,
     get_session_trajectory,
@@ -30,6 +31,7 @@ from chats import ChatMessage, save_chat_message  # noqa: E402
 from fastapi import APIRouter, Depends, Header, HTTPException, Query  # noqa: E402
 from fastapi.responses import StreamingResponse  # noqa: E402
 from openai import AsyncOpenAI  # noqa: E402
+from pydantic import BaseModel  # noqa: E402
 
 from .schemas import OPENAI_TOOL_SCHEMAS  # noqa: E402
 from .tools import AVAILABLE_TOOLS  # noqa: E402
@@ -375,9 +377,7 @@ async def stream_agent_response(
     # -----------------------------------------------------------------------
     # Session handling: create or resume
     # -----------------------------------------------------------------------
-    is_new_session = session_id is None
-
-    if is_new_session:
+    if session_id is None:
         session_id = await create_session(user_id, space_id, user_message)
         logger.info(f"Created new session {session_id}")
         input_messages: list[dict[str, Any]] = []
@@ -781,6 +781,56 @@ async def delete_chat_session(
 
     # Also remove from cache
     _session_cache.pop(session_id, None)
+    return {"ok": True}
+
+
+class CreateSessionRequest(BaseModel):
+    title: str
+    space_id: Optional[str] = None
+    message: Optional[str] = None
+
+
+class PostMessageRequest(BaseModel):
+    role: str  # "user" or "assistant"
+    content: str
+
+
+@router.post("/sessions")
+async def create_chat_session(
+    req: CreateSessionRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    """Create a new chat session. Optionally include an initial message."""
+    user_id = current_user.get("user_id")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="User not authenticated")
+
+    session_id = await create_session(user_id, req.space_id, req.title)
+
+    if req.message:
+        await append_message(session_id, user_id, "assistant", req.message)
+
+    return {"session_id": session_id, "title": req.title}
+
+
+@router.post("/sessions/{session_id}/messages")
+async def post_session_message(
+    session_id: str,
+    req: PostMessageRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    """Append a message to a session. Used by external agents to post updates."""
+    user_id = current_user.get("user_id")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="User not authenticated")
+
+    if req.role not in ("user", "assistant"):
+        raise HTTPException(status_code=400, detail="Role must be 'user' or 'assistant'")
+
+    success = await append_message(session_id, user_id, req.role, req.content)
+    if not success:
+        raise HTTPException(status_code=404, detail="Session not found")
+
     return {"ok": True}
 
 
