@@ -9,7 +9,7 @@ const API_URL = process.env.TODOLIST_API_URL || 'http://localhost:8000';
 const AUTH_TOKEN = process.env.TODOLIST_AUTH_TOKEN;
 const DEFAULT_SPACE_ID = process.env.DEFAULT_SPACE_ID || '';
 
-if (!AUTH_TOKEN) {
+if (!AUTH_TOKEN && process.argv[2] !== 'help') {
   console.error('Error: TODOLIST_AUTH_TOKEN environment variable is required');
   process.exit(1);
 }
@@ -23,7 +23,7 @@ function request(method, path, body) {
     const opts = {
       method,
       hostname: url.hostname,
-      port: url.port,
+      port: url.port || (url.protocol === 'https:' ? 443 : 80),
       path: url.pathname + url.search,
       headers: {
         'Authorization': `Bearer ${AUTH_TOKEN}`,
@@ -34,11 +34,18 @@ function request(method, path, body) {
       let data = '';
       res.on('data', (chunk) => (data += chunk));
       res.on('end', () => {
+        let parsed;
         try {
-          resolve({ status: res.statusCode, data: JSON.parse(data) });
+          parsed = JSON.parse(data);
         } catch {
-          resolve({ status: res.statusCode, data });
+          parsed = data;
         }
+        if (res.statusCode >= 400) {
+          const msg = parsed.detail || parsed.message || JSON.stringify(parsed);
+          reject(new Error(`HTTP ${res.statusCode}: ${msg}`));
+          return;
+        }
+        resolve({ status: res.statusCode, data: parsed });
       });
     });
     req.on('error', reject);
@@ -47,44 +54,70 @@ function request(method, path, body) {
   });
 }
 
+// --- Arg parsing helpers ---
+
+function parseFlags(args) {
+  const flags = {};
+  const positional = [];
+  let i = 0;
+  while (i < args.length) {
+    if (args[i].startsWith('--') && i + 1 < args.length && !args[i + 1].startsWith('--')) {
+      flags[args[i].slice(2)] = args[i + 1];
+      i += 2;
+    } else if (args[i].startsWith('-') && args[i].length === 2 && i + 1 < args.length && !args[i + 1].startsWith('-')) {
+      flags[args[i].slice(1)] = args[i + 1];
+      i += 2;
+    } else if (args[i] === '--completed') {
+      flags.completed = true;
+      i++;
+    } else {
+      positional.push(args[i]);
+      i++;
+    }
+  }
+  return { flags, positional };
+}
+
 // --- Commands ---
 
 const commands = {
   async 'list-pending'() {
     const params = DEFAULT_SPACE_ID ? `?space_id=${DEFAULT_SPACE_ID}` : '';
     const { data } = await request('GET', `/agent/sessions/pending${params}`);
-    if (!data.length) {
+    if (!Array.isArray(data) || !data.length) {
       console.log('No pending messages.');
       return;
     }
     for (const s of data) {
       const todo = s.todo_id ? ` [Todo: ${s.todo_id}]` : '';
       const agent = s.agent_id ? ` [Claimed: ${s.agent_id}]` : '';
-      console.log(`${s._id} | ${s.title}${todo}${agent}`);
-      console.log(`  Message: ${s.last_message}`);
+      console.log(`${s._id} | ${s.title || '(untitled)'}${todo}${agent}`);
+      console.log(`  Message: ${s.last_message || '(empty)'}`);
       console.log();
     }
   },
 
   async 'get-session'(args) {
-    const sessionId = args[0];
+    const { positional } = parseFlags(args);
+    const sessionId = positional[0];
     if (!sessionId) { console.error('Usage: get-session <session_id>'); process.exit(1); }
     const { data } = await request('GET', `/agent/sessions/${sessionId}`);
-    console.log(`Session: ${data.title}`);
+    console.log(`Session: ${data.title || '(untitled)'}`);
     console.log('---');
     for (const m of data.display_messages || []) {
       const prefix = m.role === 'user' ? 'USER' : 'AGENT';
       const ts = m.timestamp ? ` (${new Date(m.timestamp).toLocaleString()})` : '';
       console.log(`[${prefix}${ts}]`);
-      console.log(m.content);
+      console.log(m.content || '');
       console.log();
     }
   },
 
   async 'post-message'(args) {
-    const sessionId = parseFlag(args, '--session-id') || parseFlag(args, '-s');
-    const content = parseFlag(args, '--content') || parseFlag(args, '-c') || args.join(' ');
-    const role = parseFlag(args, '--role') || 'assistant';
+    const { flags, positional } = parseFlags(args);
+    const sessionId = flags['session-id'] || flags.s;
+    const content = flags.content || flags.c || positional.join(' ');
+    const role = flags.role || 'assistant';
     if (!sessionId || !content) {
       console.error('Usage: post-message --session-id <id> --content <text> [--role assistant|user]');
       process.exit(1);
@@ -94,82 +127,80 @@ const commands = {
   },
 
   async 'claim-session'(args) {
-    const sessionId = parseFlag(args, '--session-id') || parseFlag(args, '-s') || args[0];
-    const agentId = parseFlag(args, '--agent-id') || parseFlag(args, '-a') || 'openclaw';
+    const { flags, positional } = parseFlags(args);
+    const sessionId = flags['session-id'] || flags.s || positional[0];
+    const agentId = flags['agent-id'] || flags.a || 'openclaw';
     if (!sessionId) { console.error('Usage: claim-session <session_id> [--agent-id <id>]'); process.exit(1); }
     const { data } = await request('POST', `/agent/sessions/${sessionId}/claim`, { agent_id: agentId });
     console.log(data.ok ? `Claimed session ${sessionId}` : `Failed to claim — already taken`);
   },
 
   async 'release-session'(args) {
-    const sessionId = args[0];
+    const { positional } = parseFlags(args);
+    const sessionId = positional[0];
     if (!sessionId) { console.error('Usage: release-session <session_id>'); process.exit(1); }
     await request('POST', `/agent/sessions/${sessionId}/release`);
     console.log(`Released session ${sessionId}`);
   },
 
   async 'list-todos'(args) {
-    const completed = args.includes('--completed');
-    const params = new URLSearchParams();
-    if (DEFAULT_SPACE_ID) params.set('active_space_id', DEFAULT_SPACE_ID);
-    const { data } = await request('GET', `/todos?${params}`);
-    const todos = (data || []).filter((t) => (completed ? t.completed : !t.completed));
+    const { flags } = parseFlags(args);
+    const completed = flags.completed || false;
+    const params = DEFAULT_SPACE_ID ? `?space_id=${DEFAULT_SPACE_ID}` : '';
+    const { data } = await request('GET', `/todos${params}`);
+    const todos = (Array.isArray(data) ? data : []).filter((t) => (completed ? t.completed : !t.completed));
     if (!todos.length) { console.log('No todos found.'); return; }
     for (const t of todos) {
       const check = t.completed ? '[x]' : '[ ]';
       const cat = t.category ? ` [${t.category}]` : '';
       const pri = t.priority ? ` (${t.priority})` : '';
-      console.log(`${check} ${t.text}${cat}${pri} (ID: ${t._id})`);
+      const notes = t.notes ? `\n     Notes: ${t.notes}` : '';
+      console.log(`${check} ${t.text || '(no text)'}${cat}${pri} (ID: ${t._id})${notes}`);
     }
   },
 
   async 'add-todo'(args) {
-    const text = parseFlag(args, '--text') || parseFlag(args, '-t') || args.join(' ');
+    const { flags, positional } = parseFlags(args);
+    const text = flags.text || flags.t || positional.join(' ');
     if (!text) { console.error('Usage: add-todo <text> [--category <cat>] [--priority High|Medium|Low]'); process.exit(1); }
     const body = { text, dateAdded: new Date().toISOString(), created_by_agent: true };
     if (DEFAULT_SPACE_ID) body.space_id = DEFAULT_SPACE_ID;
-    const cat = parseFlag(args, '--category');
-    const pri = parseFlag(args, '--priority');
-    const notes = parseFlag(args, '--notes');
-    if (cat) body.category = cat;
-    if (pri) body.priority = pri;
-    if (notes) body.notes = notes;
+    if (flags.category) body.category = flags.category;
+    if (flags.priority) body.priority = flags.priority;
+    if (flags.notes) body.notes = flags.notes;
     const { data } = await request('POST', '/todos', body);
-    console.log(`Added: "${data.text}" [${data.category}] (${data.priority}) ID: ${data._id}`);
+    console.log(`Added: "${data.text || text}" [${data.category || 'auto'}] (${data.priority || 'auto'}) ID: ${data._id}`);
   },
 
   async 'complete-todo'(args) {
-    const id = args[0];
+    const { positional } = parseFlags(args);
+    const id = positional[0];
     if (!id) { console.error('Usage: complete-todo <todo_id>'); process.exit(1); }
     await request('PUT', `/todos/${id}`, { completed: true });
     console.log(`Completed todo ${id}`);
   },
 
   async 'update-todo'(args) {
-    const id = args[0];
+    const { flags, positional } = parseFlags(args);
+    const id = positional[0];
     if (!id) { console.error('Usage: update-todo <todo_id> [--text <text>] [--priority <p>] [--category <c>]'); process.exit(1); }
     const body = {};
-    const text = parseFlag(args, '--text');
-    const pri = parseFlag(args, '--priority');
-    const cat = parseFlag(args, '--category');
-    const notes = parseFlag(args, '--notes');
-    if (text) body.text = text;
-    if (pri) body.priority = pri;
-    if (cat) body.category = cat;
-    if (notes) body.notes = notes;
-    if (!Object.keys(body).length) { console.error('Nothing to update'); process.exit(1); }
+    if (flags.text) body.text = flags.text;
+    if (flags.priority) body.priority = flags.priority;
+    if (flags.category) body.category = flags.category;
+    if (flags.notes) body.notes = flags.notes;
+    if (!Object.keys(body).length) { console.error('Nothing to update. Use --text, --priority, --category, or --notes'); process.exit(1); }
     await request('PUT', `/todos/${id}`, body);
     console.log(`Updated todo ${id}`);
   },
 
   async 'create-session'(args) {
-    const title = parseFlag(args, '--title') || args.join(' ');
+    const { flags, positional } = parseFlags(args);
+    const title = flags.title || positional.join(' ');
     if (!title) { console.error('Usage: create-session --title <title> [--todo-id <id>]'); process.exit(1); }
-    const body = { title };
+    const body = { title, message_role: 'assistant' };
     if (DEFAULT_SPACE_ID) body.space_id = DEFAULT_SPACE_ID;
-    const todoId = parseFlag(args, '--todo-id');
-    if (todoId) body.todo_id = todoId;
-    body.message_role = 'assistant';
+    if (flags['todo-id']) body.todo_id = flags['todo-id'];
     const { data } = await request('POST', '/agent/sessions', body);
     console.log(`Created session ${data.session_id}`);
   },
@@ -177,9 +208,10 @@ const commands = {
   async 'list-sessions'() {
     const params = DEFAULT_SPACE_ID ? `?space_id=${DEFAULT_SPACE_ID}` : '';
     const { data } = await request('GET', `/agent/sessions${params}`);
-    for (const s of data || []) {
+    if (!Array.isArray(data) || !data.length) { console.log('No sessions found.'); return; }
+    for (const s of data) {
       const todo = s.todo_id ? ` [Todo: ${s.todo_id}]` : '';
-      console.log(`${s._id} | ${s.title}${todo}`);
+      console.log(`${s._id} | ${s.title || '(untitled)'}${todo}`);
     }
   },
 
@@ -206,14 +238,6 @@ Environment variables:
   DEFAULT_SPACE_ID      Default space ID`);
   },
 };
-
-// --- Arg parsing helpers ---
-
-function parseFlag(args, flag) {
-  const idx = args.indexOf(flag);
-  if (idx === -1 || idx + 1 >= args.length) return null;
-  return args[idx + 1];
-}
 
 // --- Main ---
 
