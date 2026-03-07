@@ -217,6 +217,7 @@ export default function AIToDoListApp({
   const membersFetchIdRef = useRef(0);
 
   // Tab state
+  const [pendingSessionId, setPendingSessionId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'tasks' | 'agent' | 'journal'>('tasks');
   const [tabIndex, setTabIndex] = useState(0); // 0=tasks, 1=agent, 2=journal
   const tasksTabRef = useRef<HTMLDivElement>(null);
@@ -381,6 +382,45 @@ export default function AIToDoListApp({
     setTabIndex(index);
     setActiveTab(tabs[index]);
   }, []);
+
+  const handleChatAboutTodo = useCallback(async (todo: any) => {
+    if (!token) return;
+    try {
+      // Check if a session already exists for this todo
+      const res = await fetch(`/agent/sessions/by-todo/${todo._id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.session_id) {
+          setPendingSessionId(data.session_id);
+          handleTabChange(1);
+          return;
+        }
+      }
+
+      // Create a new session linked to this todo
+      const createRes = await fetch('/agent/sessions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          title: todo.text.slice(0, 60),
+          space_id: activeSpace?._id,
+          todo_id: todo._id,
+          message: `Task: ${todo.text}\nCategory: ${todo.category}\nPriority: ${todo.priority}${todo.dueDate ? `\nDue: ${todo.dueDate}` : ''}${todo.notes ? `\nNotes: ${todo.notes}` : ''}`,
+        }),
+      });
+      if (!createRes.ok) throw new Error('Failed to create session');
+      const createData = await createRes.json();
+      setPendingSessionId(createData.session_id);
+      handleTabChange(1);
+    } catch (err) {
+      console.error('Failed to open chat for todo:', err);
+    }
+  }, [token, activeSpace?._id, handleTabChange]);
 
   // Scroll to top when clicking header
   const handleScrollToTop = useCallback(() => {
@@ -1791,6 +1831,7 @@ export default function AIToDoListApp({
                   handleDeleteTodo={handleDeleteTodo}
                   isCollaborative={(activeSpace?.member_ids?.length ?? 0) > 1}
                   onEdit={handleEditTodo}
+                  onChat={handleChatAboutTodo}
                 />
               </SortableItem>
             ))}
@@ -1825,6 +1866,7 @@ export default function AIToDoListApp({
               handleDeleteTodo={handleDeleteTodo}
               isCollaborative={(activeSpace?.member_ids?.length ?? 0) > 1}
               onEdit={handleEditTodo}
+              onChat={handleChatAboutTodo}
             />
           ))}
         </div>
@@ -1932,7 +1974,13 @@ export default function AIToDoListApp({
             <h2 className="text-xl font-semibold text-gray-100">Assistant</h2>
           </div> */}
           <div style={{ flex: 1, minHeight: 0 }}>
-            <AgentChatbot activeSpace={activeSpace} token={token} isActive={activeTab === 'agent'} />
+            <AgentChatbot
+              activeSpace={activeSpace}
+              token={token}
+              isActive={activeTab === 'agent'}
+              pendingSessionId={pendingSessionId}
+              onSessionLoaded={() => setPendingSessionId(null)}
+            />
           </div>
         </div>
 

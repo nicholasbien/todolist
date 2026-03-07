@@ -23,6 +23,8 @@ from chat_sessions import (  # noqa: E402
     append_message,
     create_session,
     delete_session,
+    find_session_by_todo,
+    get_pending_sessions,
     get_session_trajectory,
     list_sessions,
     save_trajectory,
@@ -749,6 +751,34 @@ async def list_chat_sessions(
     return await list_sessions(user_id, space_id)
 
 
+@router.get("/sessions/by-todo/{todo_id}")
+async def get_session_by_todo(
+    todo_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    """Find the chat session linked to a specific todo, if any."""
+    user_id = current_user.get("user_id")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="User not authenticated")
+
+    session_id = await find_session_by_todo(user_id, todo_id)
+    if not session_id:
+        return {"session_id": None}
+    return {"session_id": session_id}
+
+
+@router.get("/sessions/pending")
+async def get_pending_chat_sessions(
+    space_id: Optional[str] = Query(None),
+    current_user: dict = Depends(get_current_user),
+):
+    """Return sessions with pending user messages awaiting agent response."""
+    user_id = current_user.get("user_id")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="User not authenticated")
+    return await get_pending_sessions(user_id, space_id)
+
+
 @router.get("/sessions/{session_id}")
 async def get_chat_session(
     session_id: str,
@@ -788,6 +818,8 @@ class CreateSessionRequest(BaseModel):
     title: str
     space_id: Optional[str] = None
     message: Optional[str] = None
+    message_role: str = "user"
+    todo_id: Optional[str] = None
 
 
 class PostMessageRequest(BaseModel):
@@ -805,10 +837,11 @@ async def create_chat_session(
     if not user_id:
         raise HTTPException(status_code=401, detail="User not authenticated")
 
-    session_id = await create_session(user_id, req.space_id, req.title)
+    session_id = await create_session(user_id, req.space_id, req.title, req.todo_id)
 
     if req.message:
-        await append_message(session_id, user_id, "assistant", req.message)
+        role = req.message_role if req.message_role in ("user", "assistant") else "user"
+        await append_message(session_id, user_id, role, req.message)
 
     return {"session_id": session_id, "title": req.title}
 

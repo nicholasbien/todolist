@@ -311,6 +311,7 @@ class TodolistMCPServer {
                                 title: { type: 'string', description: 'Session title (e.g. task or project name)' },
                                 space_id: { type: 'string', description: 'Space ID' },
                                 message: { type: 'string', description: 'Optional initial message to post' },
+                                todo_id: { type: 'string', description: 'Optional todo ID to link this session to a specific task' },
                             },
                             required: ['title'],
                         },
@@ -337,6 +338,16 @@ class TodolistMCPServer {
                                 role: { type: 'string', enum: ['user', 'assistant'], description: 'Message role (default: assistant)' },
                             },
                             required: ['session_id', 'content'],
+                        },
+                    },
+                    {
+                        name: 'get_pending_sessions',
+                        description: 'Get sessions with pending user messages awaiting agent response. Use this to poll for new messages from the user.',
+                        inputSchema: {
+                            type: 'object',
+                            properties: {
+                                space_id: { type: 'string', description: 'Space ID (omit for all spaces)' },
+                            },
                         },
                     },
                     {
@@ -411,6 +422,7 @@ class TodolistMCPServer {
                     case 'create_session': return await this.createSession2(args);
                     case 'get_session': return await this.getSession(args);
                     case 'post_to_session': return await this.postToSession(args);
+                    case 'get_pending_sessions': return await this.getPendingSessions(args);
                     case 'delete_session': return await this.deleteSession2(args);
                     // Insights & Export
                     case 'get_insights': return await this.getInsights(args);
@@ -640,10 +652,29 @@ class TodolistMCPServer {
         const sid = this.spaceId(args);
         if (sid)
             body.space_id = sid;
-        if (args.message)
+        if (args.message) {
             body.message = args.message;
+            body.message_role = 'assistant';
+        }
+        if (args.todo_id)
+            body.todo_id = args.todo_id;
         const response = await api.post('/agent/sessions', body);
         return this.text(`Created session "${args.title}" (ID: ${response.data.session_id})`);
+    }
+    async getPendingSessions(args) {
+        const params = {};
+        const sid = this.spaceId(args);
+        if (sid)
+            params.space_id = sid;
+        const response = await api.get('/agent/sessions/pending', { params });
+        const pending = response.data;
+        if (pending.length === 0)
+            return this.text('No pending messages.');
+        const lines = pending.map((s, i) => {
+            const todoInfo = s.todo_id ? ` [Todo: ${s.todo_id}]` : '';
+            return `${i + 1}. ${s.title}${todoInfo} (ID: ${s._id})\n   Message: ${s.last_message}`;
+        });
+        return this.text(lines.join('\n\n'));
     }
     async getSession(args) {
         const response = await api.get(`/agent/sessions/${args.session_id}`);
