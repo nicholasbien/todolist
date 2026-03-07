@@ -54,6 +54,17 @@ function request(method, path, body) {
   });
 }
 
+// --- String helpers ---
+
+function decodeEscapes(str) {
+  return str.replace(/\\(.)?/g, (match, char) => {
+    if (char === 'n') return '\n';
+    if (char === 't') return '\t';
+    if (char === '\\') return '\\';
+    return match; // keep unrecognized escapes as-is
+  });
+}
+
 // --- Arg parsing helpers ---
 
 function parseFlags(args) {
@@ -116,7 +127,8 @@ const commands = {
   async 'post-message'(args) {
     const { flags, positional } = parseFlags(args);
     const sessionId = flags['session-id'] || flags.s;
-    const content = flags.content || flags.c || positional.join(' ');
+    const rawContent = flags.content || flags.c || positional.join(' ');
+    const content = decodeEscapes(rawContent);
     const role = flags.role || 'assistant';
     if (!sessionId || !content) {
       console.error('Usage: post-message --session-id <id> --content <text> [--role assistant|user]');
