@@ -614,6 +614,11 @@ BACKEND_URL=http://localhost:8000   # Used by Next.js API proxy; defaults to loc
 
 ### AI Agent
 - `GET /agent/stream?q={query}&space_id={id}` - Streaming AI agent with tool calling
+- `GET /agent/sessions?space_id={id}` - List chat sessions
+- `GET /agent/sessions/{id}` - Get session with messages
+- `POST /agent/sessions` - Create session (body: `{title, space_id?, message?}`)
+- `POST /agent/sessions/{id}/messages` - Post message to session (body: `{role, content}`)
+- `DELETE /agent/sessions/{id}` - Delete session
 
 ### Authentication
 - `POST /auth/signup` - Send verification code (no auth required)
@@ -762,6 +767,133 @@ Automated testing: `__tests__/ServiceWorkerRouteValidation.test.ts` catches miss
 - `scripts/take-screenshots.js` - Captures all modal screenshots for UI PRs (see Screenshot Requirement section)
 - `scripts/test-offline-sync.js` - Playwright E2E tests for offline/online sync flows (see Offline Testing section below)
 - `scripts/populate_sample_data.py` - Populates sample data for testing
+
+---
+
+## MCP Server
+
+The MCP server (`mcp-server/`) lets external AI agents (Claude Code, OpenClaw, etc.) interact with the todolist app via the Model Context Protocol. It exposes 26 tools covering all app operations.
+
+### Setup
+
+```bash
+cd mcp-server
+npm install
+npm run build
+```
+
+### Configuration
+
+The server needs three environment variables:
+
+| Variable | Description | How to get it |
+|---|---|---|
+| `TODOLIST_API_URL` | Backend URL | `http://localhost:8000` or `https://backend-production-e920.up.railway.app` |
+| `TODOLIST_AUTH_TOKEN` | JWT auth token | Login via API (see test account below) |
+| `DEFAULT_SPACE_ID` | Default space for operations | `GET /spaces` with your token |
+
+**Getting a token (test account):**
+```bash
+curl -s -X POST -H "Content-Type: application/json" \
+  -d '{"email":"test@example.com","code":"000000"}' \
+  http://localhost:8000/auth/login
+# Copy the "token" from response
+
+curl -s -H "Authorization: Bearer YOUR_TOKEN" http://localhost:8000/spaces
+# Copy the "_id" of your default space
+```
+
+**Set via `.env` file** (for `npm run dev`):
+```bash
+cp .env.example .env
+# Edit .env with your values
+```
+
+### Adding to Claude Code
+
+Create or edit `~/.claude/projects/<project-path>/settings.json`:
+```json
+{
+  "mcpServers": {
+    "todolist": {
+      "command": "node",
+      "args": ["/absolute/path/to/todolist/mcp-server/dist/index.js"],
+      "env": {
+        "TODOLIST_API_URL": "http://localhost:8000",
+        "TODOLIST_AUTH_TOKEN": "your_token",
+        "DEFAULT_SPACE_ID": "your_space_id"
+      }
+    }
+  }
+}
+```
+
+Restart Claude Code after adding the config. The tools will appear as `mcp__todolist__*`.
+
+### Adding to Claude Desktop
+
+Edit `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS):
+```json
+{
+  "mcpServers": {
+    "todolist": {
+      "command": "node",
+      "args": ["/absolute/path/to/todolist/mcp-server/dist/index.js"],
+      "env": {
+        "TODOLIST_API_URL": "http://localhost:8000",
+        "TODOLIST_AUTH_TOKEN": "your_token",
+        "DEFAULT_SPACE_ID": "your_space_id"
+      }
+    }
+  }
+}
+```
+
+### Available Tools
+
+**Todos:** `list_todos`, `add_todo`, `update_todo`, `complete_todo`, `delete_todo`, `reorder_todos`
+
+**Spaces:** `list_spaces`, `create_space`, `update_space`, `delete_space`, `list_space_members`, `invite_to_space`, `leave_space`
+
+**Categories:** `list_categories`, `add_category`, `rename_category`, `delete_category`
+
+**Journals:** `get_journal`, `write_journal`, `delete_journal`
+
+**Chat Sessions:** `list_sessions`, `create_session`, `get_session`, `post_to_session`, `delete_session`
+
+**Other:** `get_insights`, `export_data`
+
+### Chat Sessions as Task Tracking
+
+Chat sessions let any agent track work and communicate asynchronously with the user through the web app's Assistant tab.
+
+**Workflow:**
+```
+Agent                                  User (Web App)
+─────                                  ──────────────
+create_session("Refactor auth")
+post_to_session(id, "Plan: ...")
+                                       [Sees update in Assistant tab]
+                                       "Skip the migration step"
+get_session(id) → reads feedback
+post_to_session(id, "Done! ...")
+                                       [Reviews in Assistant tab]
+```
+
+- `create_session` — Start a new thread with a title and optional first message
+- `post_to_session` — Post status updates (role: `assistant`) or questions
+- `get_session` — Read the full conversation to see user responses
+- Messages posted via MCP appear in the web app's Assistant tab alongside regular AI chat sessions
+
+### Token Expiration
+
+Auth tokens expire after 30 days of inactivity. If you get 401 errors, re-login:
+```bash
+curl -s -X POST -H "Content-Type: application/json" \
+  -d '{"email":"test@example.com","code":"000000"}' \
+  http://localhost:8000/auth/login
+```
+Update the token in your MCP config and restart the agent.
 
 ---
 
