@@ -78,27 +78,46 @@ async def get_pending_sessions(user_id: str, space_id: Optional[str] = None) -> 
     Falls back to checking the last message role for legacy docs that
     don't have the flag yet.
     """
-    query: Dict[str, Any] = {"user_id": user_id, "needs_agent_response": True}
+    base_query: Dict[str, Any] = {"user_id": user_id}
     if space_id:
-        query["space_id"] = space_id
+        base_query["space_id"] = space_id
 
-    cursor = trajectories_collection.find(query)
+    # Query 1: docs with the flag set (fast, indexed)
+    flagged_query = {**base_query, "needs_agent_response": True}
+    # Query 2: legacy docs missing the flag — fall back to last-message check
+    legacy_query = {**base_query, "needs_agent_response": {"$exists": False}}
+
+    seen_ids: set = set()
     pending = []
-    async for traj in cursor:
-        session_doc = await sessions_collection.find_one({"_id": ObjectId(traj["session_id"])})
-        if session_doc:
-            msgs = traj.get("display_messages", [])
-            last_msg = msgs[-1].get("content", "") if msgs else ""
-            pending.append(
-                {
-                    "_id": str(session_doc["_id"]),
-                    "title": session_doc.get("title", ""),
-                    "todo_id": session_doc.get("todo_id"),
-                    "agent_id": traj.get("agent_id"),
-                    "last_message": last_msg,
-                    "updated_at": session_doc.get("updated_at"),
-                }
-            )
+
+    async def _collect(cursor) -> None:  # type: ignore[no-untyped-def]
+        async for traj in cursor:
+            sid = traj["session_id"]
+            if sid in seen_ids:
+                continue
+            # For legacy docs, verify last message is from user
+            if "needs_agent_response" not in traj:
+                msgs = traj.get("display_messages", [])
+                if not msgs or msgs[-1].get("role") != "user":
+                    continue
+            session_doc = await sessions_collection.find_one({"_id": ObjectId(sid)})
+            if session_doc:
+                seen_ids.add(sid)
+                msgs = traj.get("display_messages", [])
+                last_msg = msgs[-1].get("content", "") if msgs else ""
+                pending.append(
+                    {
+                        "_id": str(session_doc["_id"]),
+                        "title": session_doc.get("title", ""),
+                        "todo_id": session_doc.get("todo_id"),
+                        "agent_id": traj.get("agent_id"),
+                        "last_message": last_msg,
+                        "updated_at": session_doc.get("updated_at"),
+                    }
+                )
+
+    await _collect(trajectories_collection.find(flagged_query))
+    await _collect(trajectories_collection.find(legacy_query))
     return pending
 
 
@@ -202,6 +221,7 @@ async def append_message(session_id: str, user_id: str, role: str, content: str)
 
     if role == "user":
         update["$set"]["needs_agent_response"] = True
+        update["$set"]["agent_id"] = None  # Clear stale claim so a new agent can pick it up
     elif role == "assistant":
         update["$set"]["needs_agent_response"] = False
         update["$set"]["agent_id"] = None
