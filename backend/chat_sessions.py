@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Optional
 
 from bson import ObjectId
 from db import db
+from pymongo.errors import DuplicateKeyError
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -15,7 +16,17 @@ trajectories_collection = db.chat_trajectories
 
 
 async def create_session(user_id: str, space_id: Optional[str], title: str, todo_id: Optional[str] = None) -> str:
-    """Create a new chat session and return its string ID."""
+    """Create a new chat session and return its string ID.
+
+    If todo_id is provided and a session already exists for that todo,
+    returns the existing session ID (enforced by unique partial index).
+    """
+    # If linking to a todo, check for existing session first
+    if todo_id:
+        existing = await find_session_by_todo(user_id, todo_id)
+        if existing:
+            return existing
+
     now = datetime.utcnow()
     doc = {
         "user_id": user_id,
@@ -25,7 +36,16 @@ async def create_session(user_id: str, space_id: Optional[str], title: str, todo
         "created_at": now,
         "updated_at": now,
     }
-    result = await sessions_collection.insert_one(doc)
+    try:
+        result = await sessions_collection.insert_one(doc)
+    except DuplicateKeyError:
+        # Race condition: another request created the session between our
+        # find_session_by_todo check and insert_one. Return the existing one.
+        if todo_id:
+            existing = await find_session_by_todo(user_id, todo_id)
+            if existing:
+                return existing
+        raise
     session_id = str(result.inserted_id)
 
     # Create the corresponding trajectory document
@@ -176,7 +196,14 @@ async def init_chat_session_indexes() -> None:
 
         await trajectories_collection.create_index("session_id", unique=True)
         await trajectories_collection.create_index("user_id")
-        await sessions_collection.create_index([("user_id", 1), ("todo_id", 1)])
+        # Unique partial index: enforce at most one session per (user_id, todo_id)
+        # where todo_id is not null. This prevents duplicate todo-linked sessions
+        # even under concurrent requests.
+        await sessions_collection.create_index(
+            [("user_id", 1), ("todo_id", 1)],
+            unique=True,
+            partialFilterExpression={"todo_id": {"$type": "string"}},
+        )
         logger.info("Chat session indexes created successfully")
     except Exception as e:
         logger.error(f"Error creating chat session indexes: {e}")

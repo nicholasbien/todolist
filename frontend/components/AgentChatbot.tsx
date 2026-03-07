@@ -37,6 +37,12 @@ export default function AgentChatbot({ activeSpace, token, isActive = true, pend
   const shouldAutoScrollRef = useRef(true);
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastKnownCountRef = useRef(0);
+  const currentSessionIdRef = useRef<string | null>(null);
+
+  // Keep ref in sync for use in async poll callbacks
+  useEffect(() => {
+    currentSessionIdRef.current = currentSessionId;
+  }, [currentSessionId]);
 
   // -----------------------------------------------------------------------
   // Fetch sessions list
@@ -85,12 +91,19 @@ export default function AgentChatbot({ activeSpace, token, isActive = true, pend
     // Set initial known count
     lastKnownCountRef.current = messages.length;
 
+    // Capture the session ID this effect was created for
+    const polledSessionId = currentSessionId;
+
     const poll = async () => {
       try {
-        const res = await fetch(`/agent/sessions/${currentSessionId}`, {
+        const res = await fetch(`/agent/sessions/${polledSessionId}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (!res.ok) return;
+
+        // Guard: ignore results if the active session changed while we were fetching
+        if (polledSessionId !== currentSessionIdRef.current) return;
+
         const data = await res.json();
         const serverMessages = data.display_messages || [];
 
@@ -196,11 +209,17 @@ export default function AgentChatbot({ activeSpace, token, isActive = true, pend
       });
       if (!res.ok) throw new Error('Failed to load session');
       const data = await res.json();
-      setMessages(data.display_messages || []);
+      const loadedMessages = data.display_messages || [];
+      setMessages(loadedMessages);
+      // Keep loading=true if the last message is from the user (waiting for agent reply).
+      // The polling effect will clear loading when the agent responds.
+      const lastRole = loadedMessages[loadedMessages.length - 1]?.role;
+      if (lastRole !== 'user') {
+        setLoading(false);
+      }
       setCurrentSessionId(sessionId);
     } catch (err: any) {
       setError(err.message || 'Failed to load chat');
-    } finally {
       setLoading(false);
     }
   };
