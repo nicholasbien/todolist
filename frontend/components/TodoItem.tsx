@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Check, RotateCcw, X } from "lucide-react";
+import { Check, MessageCircle, RotateCcw, X } from "lucide-react";
 
 interface TodoItemProps {
   todo: any;
@@ -12,6 +12,7 @@ interface TodoItemProps {
   handleDeleteTodo: (id: string) => void;
   isCollaborative: boolean;
   onEdit: (todo: any) => void;
+  onChat: (todo: any) => void;
 }
 
 export default function TodoItem({
@@ -25,6 +26,7 @@ export default function TodoItem({
   handleDeleteTodo,
   isCollaborative,
   onEdit,
+  onChat,
 }: TodoItemProps) {
   const [isCompleting, setIsCompleting] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -145,6 +147,19 @@ export default function TodoItem({
         </div>
 
         <div className="flex items-center space-x-2 ml-3" onTouchStart={(e) => e.stopPropagation()}>
+          <button
+            onClick={(e) => { e.stopPropagation(); onChat(todo); }}
+            onMouseEnter={() => setHoveredButton('chat')}
+            onMouseLeave={() => setHoveredButton(null)}
+            className={`text-lg w-11 h-11 flex items-center justify-center rounded-lg transition-all duration-200 focus:outline-none ${
+              hoveredButton === 'chat'
+                ? "text-accent bg-accent/10"
+                : "text-gray-400"
+            }`}
+            aria-label="Chat about this task"
+          >
+            <MessageCircle className="w-5 h-5" />
+          </button>
           {!todo.completed ? (
             <button
               onClick={(e) => { e.stopPropagation(); handleCompleteClick(e); }}

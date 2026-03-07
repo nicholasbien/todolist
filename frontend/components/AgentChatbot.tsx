@@ -1,6 +1,4 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { createPortal } from 'react-dom';
-import { ChevronDown, ChevronRight } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { MessageRenderer, PlainTextRenderer } from './MessageRenderer';
 
@@ -8,6 +6,8 @@ interface ChatbotProps {
   activeSpace: any;
   token?: string;
   isActive?: boolean;
+  pendingSessionId?: string | null;
+  onSessionLoaded?: () => void;
 }
 
 interface SessionMeta {
@@ -17,10 +17,9 @@ interface SessionMeta {
   updated_at: string;
 }
 
-export default function AgentChatbot({ activeSpace, token, isActive = true }: ChatbotProps) {
+export default function AgentChatbot({ activeSpace, token, isActive = true, pendingSessionId, onSessionLoaded }: ChatbotProps) {
   const [question, setQuestion] = useState('');
-  const [expandedTools, setExpandedTools] = useState<Set<number>>(new Set());
-  const [messages, setMessages] = useState<{ role: string; content: string; toolData?: any }[]>([]);
+  const [messages, setMessages] = useState<{ role: string; content: string }[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [thinkingDots, setThinkingDots] = useState(0);
@@ -32,14 +31,12 @@ export default function AgentChatbot({ activeSpace, token, isActive = true }: Ch
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [sessions, setSessions] = useState<SessionMeta[]>([]);
   const [sessionsLoading, setSessionsLoading] = useState(false);
-  const [showSessionDropdown, setShowSessionDropdown] = useState(false);
-  const [sessionToDelete, setSessionToDelete] = useState<SessionMeta | null>(null);
-  const [deleteSessionLoading, setDeleteSessionLoading] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const shouldAutoScrollRef = useRef(true);
-  const dropdownRef = useRef<HTMLDivElement>(null);
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const lastKnownCountRef = useRef(0);
 
   // -----------------------------------------------------------------------
   // Fetch sessions list
@@ -74,19 +71,57 @@ export default function AgentChatbot({ activeSpace, token, isActive = true }: Ch
   }, [fetchSessions]);
 
   // -----------------------------------------------------------------------
-  // Close dropdown when clicking outside
+  // Polling logic for agent responses
   // -----------------------------------------------------------------------
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-        setShowSessionDropdown(false);
-      }
-    };
-    if (showSessionDropdown) {
-      document.addEventListener('mousedown', handleClickOutside);
+  const stopPolling = useCallback(() => {
+    if (pollingRef.current) {
+      clearInterval(pollingRef.current);
+      pollingRef.current = null;
     }
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [showSessionDropdown]);
+  }, []);
+
+  const startPolling = useCallback((sessionId: string) => {
+    stopPolling();
+
+    pollingRef.current = setInterval(async () => {
+      if (!token) return;
+      try {
+        const res = await fetch(`/agent/sessions/${sessionId}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        const serverMessages = data.display_messages || [];
+
+        // Check if there are new messages from the agent
+        if (serverMessages.length > lastKnownCountRef.current) {
+          setMessages(serverMessages);
+          // If last message is from assistant, stop polling
+          const lastMsg = serverMessages[serverMessages.length - 1];
+          if (lastMsg?.role === 'assistant') {
+            setLoading(false);
+            stopPolling();
+            fetchSessions();
+          }
+        }
+      } catch {
+        // Ignore polling errors
+      }
+    }, 10000);
+  }, [token, stopPolling, fetchSessions]);
+
+  // Cleanup polling on unmount
+  useEffect(() => {
+    return () => stopPolling();
+  }, [stopPolling]);
+
+  // Load session from parent (e.g., clicking chat icon on a task)
+  useEffect(() => {
+    if (pendingSessionId && pendingSessionId !== currentSessionId) {
+      loadSession(pendingSessionId);
+      onSessionLoaded?.();
+    }
+  }, [pendingSessionId]);
 
   // -----------------------------------------------------------------------
   // Scroll helpers
@@ -150,7 +185,6 @@ export default function AgentChatbot({ activeSpace, token, isActive = true }: Ch
   // -----------------------------------------------------------------------
   const loadSession = async (sessionId: string) => {
     if (!token) return;
-    setShowSessionDropdown(false);
     setLoading(true);
     setError('');
     try {
@@ -169,152 +203,67 @@ export default function AgentChatbot({ activeSpace, token, isActive = true }: Ch
   };
 
   // -----------------------------------------------------------------------
-  // Delete a session
-  // -----------------------------------------------------------------------
-  const requestDeleteSession = (session: SessionMeta, e: React.MouseEvent) => {
-    e.stopPropagation();
-    setSessionToDelete(session);
-  };
-
-  const deleteSession = async () => {
-    if (!token || !sessionToDelete) return;
-
-    setDeleteSessionLoading(true);
-    if (!token) return;
-    try {
-      await fetch(`/agent/sessions/${sessionToDelete._id}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      setSessions((prev) => prev.filter((s) => s._id !== sessionToDelete._id));
-      if (currentSessionId === sessionToDelete._id) {
-        setCurrentSessionId(null);
-        setMessages([]);
-      }
-    } catch {
-      // Ignore delete errors
-    } finally {
-      setDeleteSessionLoading(false);
-      setSessionToDelete(null);
-    }
-  };
-
-  // -----------------------------------------------------------------------
   // Start a new chat
   // -----------------------------------------------------------------------
   const handleNewChat = () => {
     setCurrentSessionId(null);
     setMessages([]);
-    setShowSessionDropdown(false);
+    stopPolling();
   };
 
   // -----------------------------------------------------------------------
   // Send a message
   // -----------------------------------------------------------------------
   const handleAsk = async () => {
-    if (!question.trim()) return;
+    if (!question.trim() || !token) return;
 
     const userQuestion = question;
     setMessages((prev) => [...prev, { role: 'user', content: userQuestion }]);
     setQuestion('');
     setLoading(true);
     setError('');
-
     shouldAutoScrollRef.current = true;
 
-    let assistantResponse = { role: 'assistant', content: '' };
-    let assistantMessageAdded = false;
-
     try {
-      const params = new URLSearchParams();
-      params.append('q', userQuestion);
-      if (activeSpace?._id) {
-        params.append('space_id', activeSpace._id);
+      let sessionId = currentSessionId;
+
+      // Create session if needed
+      if (!sessionId) {
+        const createRes = await fetch('/agent/sessions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            title: userQuestion.slice(0, 60),
+            space_id: activeSpace?._id,
+          }),
+        });
+        if (!createRes.ok) throw new Error('Failed to create session');
+        const createData = await createRes.json();
+        sessionId = createData.session_id;
+        setCurrentSessionId(sessionId);
       }
-      if (currentSessionId) {
-        params.append('session_id', currentSessionId);
-      }
-      if (token) {
-        params.append('token', token);
-      }
 
-      const agentUrl = `/agent/stream?${params.toString()}`;
-      const es = new EventSource(agentUrl);
-
-      es.addEventListener('ready', (e) => {
-        const data = JSON.parse((e as MessageEvent).data);
-        if (data.session_id && !currentSessionId) {
-          setCurrentSessionId(data.session_id);
-        }
+      // Post user message
+      const postRes = await fetch(`/agent/sessions/${sessionId}/messages`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ role: 'user', content: userQuestion }),
       });
+      if (!postRes.ok) throw new Error('Failed to send message');
 
-      es.addEventListener('token', (e) => {
-        const { token: responseToken } = JSON.parse((e as MessageEvent).data);
-        assistantResponse.content += responseToken;
-
-        if (!assistantMessageAdded) {
-          setMessages((prev) => [...prev, { ...assistantResponse }]);
-          setLoading(false);
-          assistantMessageAdded = true;
-        } else {
-          setMessages((prev) => [...prev.slice(0, -1), { ...assistantResponse }]);
-        }
-      });
-
-      es.addEventListener('tool_result', (e) => {
-        const { tool, args, data } = JSON.parse((e as MessageEvent).data);
-
-        const formatArgs = (args: any) => {
-          if (!args || Object.keys(args).length === 0) return '';
-          const readable = Object.entries(args)
-            .map(([key, value]) => `${key}: ${value}`)
-            .join(', ');
-          return `(${readable})`;
-        };
-
-        const formatResult = (data: any) => {
-          if (data.ok === false) return `❌ ${data.error}`;
-          if (data.tasks) return `✅ Found ${data.tasks.length} tasks`;
-          if (data.weather) return `🌤️ ${data.weather.location}: ${data.weather.temperature_display}`;
-          if (data.books) return `📚 Found ${data.books.length} book recommendations`;
-          if (data.quotes) return `💭 "${data.quotes[0]}"`;
-          if (data.results) return `🔍 Found ${data.results.length} results`;
-          if (data.entries) return `📖 Found ${data.entries.length} journal entries`;
-          if (data.entry) return data.entry ? `📖 Journal entry from ${data.entry.date}` : `📖 No journal entry found`;
-          return '✅ Success';
-        };
-
-        const toolMessage = `🔧 ${tool}${formatArgs(args)}: ${formatResult(data)}`;
-        setMessages((prev) => [...prev, { role: 'system', content: toolMessage, toolData: { tool, args, data } }]);
-      });
-
-      es.addEventListener('done', () => {
-        es.close();
-        // Refresh sessions list after conversation completes
-        fetchSessions();
-      });
-
-      es.addEventListener('error', () => {
-        setError('Error receiving response');
-        setLoading(false);
-        es.close();
-      });
+      // Start polling for agent response
+      lastKnownCountRef.current = messages.length + 1; // current messages + the one we just added
+      startPolling(sessionId!);
     } catch (err: any) {
-      setError(err.message || 'Error');
+      setError(err.message || 'Error sending message');
       setLoading(false);
     }
-  };
-
-  const toggleToolExpansion = (index: number) => {
-    setExpandedTools((prev) => {
-      const newSet = new Set(prev);
-      if (newSet.has(index)) {
-        newSet.delete(index);
-      } else {
-        newSet.add(index);
-      }
-      return newSet;
-    });
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -333,89 +282,15 @@ export default function AgentChatbot({ activeSpace, token, isActive = true }: Ch
     }
   };
 
-  // Remove sensitive database IDs and user info from tool data before displaying
-  const sanitizeToolData = (data: any): any => {
-    if (data === null || data === undefined) return data;
-    if (typeof data !== 'object') return data;
-
-    if (Array.isArray(data)) {
-      return data.map(item => sanitizeToolData(item));
-    }
-
-    const sanitized: any = {};
-    for (const [key, value] of Object.entries(data)) {
-      const sensitiveFields = ['_id', 'id', 'user_id', 'space_id', 'owner_id', 'member_ids', 'pending_emails'];
-      if (sensitiveFields.includes(key)) {
-        continue;
-      }
-      sanitized[key] = sanitizeToolData(value);
-    }
-    return sanitized;
-  };
-
-  // Format date for session list
-  const formatSessionDate = (dateStr: string) => {
-    const date = new Date(dateStr);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-
-    if (diffDays === 0) return 'Today';
-    if (diffDays === 1) return 'Yesterday';
-    if (diffDays < 7) return `${diffDays}d ago`;
-
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-  };
-
   return (
     <div className="flex flex-col h-full">
-      {/* Top bar: session dropdown + new chat */}
+      {/* Top bar: session title + new chat */}
       <div className="mb-2 flex items-center gap-2 flex-shrink-0">
-        {/* Past Chats dropdown */}
-        <div className="relative" ref={dropdownRef}>
-          <button
-            onClick={() => setShowSessionDropdown(!showSessionDropdown)}
-            disabled={sessionsLoading}
-            className="bg-gray-700 text-gray-200 px-3 py-1 rounded text-sm hover:bg-gray-600 disabled:opacity-50 transition-colors flex items-center gap-1"
-          >
-            Past Chats
-            <ChevronDown className={`w-3 h-3 transition-transform ${showSessionDropdown ? 'rotate-180' : ''}`} />
-          </button>
-
-          {showSessionDropdown && (
-            <div className="absolute left-0 top-full mt-1 w-72 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-20 max-h-80 overflow-y-auto custom-scrollbar">
-              {sessions.length === 0 && !sessionsLoading && (
-                <div className="px-3 py-3 text-sm text-gray-500 text-center">
-                  No past chats
-                </div>
-              )}
-
-              {sessions.map((session) => (
-                <div
-                  key={session._id}
-                  onClick={() => loadSession(session._id)}
-                  className={`flex items-center justify-between px-3 py-2 text-sm cursor-pointer hover:bg-gray-700 transition-colors ${
-                    currentSessionId === session._id ? 'bg-gray-700/50 border-l-2 border-accent' : ''
-                  }`}
-                >
-                  <div className="flex-1 min-w-0 mr-2">
-                    <p className="text-gray-200 truncate">{session.title}</p>
-                    <p className="text-gray-500 text-xs">{formatSessionDate(session.updated_at)}</p>
-                  </div>
-                  <button
-                    onClick={(e) => requestDeleteSession(session, e)}
-                    className="text-gray-500 hover:text-red-400 flex-shrink-0 text-xs px-1 transition-colors"
-                    aria-label="Delete session"
-                  >
-                    ×
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* New Chat button */}
+        {currentSessionId && (
+          <span className="text-sm text-gray-400 truncate flex-1">
+            {sessions.find(s => s._id === currentSessionId)?.title || 'Chat'}
+          </span>
+        )}
         {(messages.length > 0 || currentSessionId) && (
           <button
             onClick={handleNewChat}
@@ -426,34 +301,6 @@ export default function AgentChatbot({ activeSpace, token, isActive = true }: Ch
           </button>
         )}
       </div>
-
-      {sessionToDelete && createPortal(
-        <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50">
-          <div className="bg-black border border-gray-800 p-6 rounded-xl w-80 space-y-4 shadow-2xl">
-            <h3 className="text-gray-100 text-lg font-bold mb-2">Delete chat?</h3>
-            <p className="text-sm text-gray-300">
-              Delete <span className="font-medium">&quot;{sessionToDelete.title}&quot;</span>? This can&apos;t be undone.
-            </p>
-            <div className="flex justify-center space-x-3">
-              <button
-                onClick={deleteSession}
-                disabled={deleteSessionLoading}
-                className="border border-red-500 text-red-400 hover:bg-red-900/20 px-6 py-2 rounded-lg transition-colors disabled:opacity-50"
-              >
-                {deleteSessionLoading ? 'Deleting...' : 'Delete'}
-              </button>
-              <button
-                onClick={() => setSessionToDelete(null)}
-                disabled={deleteSessionLoading}
-                className="border border-gray-600 text-gray-300 hover:bg-gray-800 px-6 py-2 rounded-lg transition-colors disabled:opacity-50"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
 
       {/* Messages container */}
       <div
@@ -466,45 +313,14 @@ export default function AgentChatbot({ activeSpace, token, isActive = true }: Ch
           <div className="flex items-center justify-center min-h-full py-8">
             <div className="max-w-md text-center space-y-4 px-6">
               <p className="text-gray-300 text-base leading-relaxed">
-                Hi, I&apos;m your personal assistant
+                Send a message to your agent
               </p>
               <p className="text-gray-400 text-sm leading-relaxed">
-                Ask me anything! I can help you manage your tasks, check the weather, find information, and more.
+                Messages are picked up by your connected agent (Claude Code, etc.) which can do real work and respond.
               </p>
-
-              <div className="text-left space-y-4 mt-4">
-                <div>
-                  <h4 className="text-sm font-semibold text-gray-200 mb-2">Task Management</h4>
-                  <ul className="text-sm text-gray-400 space-y-1 ml-4">
-                    <li>• Add, update, and search your tasks</li>
-                    <li>• Get task recommendations and suggestions</li>
-                  </ul>
-                </div>
-
-                <div>
-                  <h4 className="text-sm font-semibold text-gray-200 mb-2">Journal Access</h4>
-                  <ul className="text-sm text-gray-400 space-y-1 ml-4">
-                    <li>• Add journal entries</li>
-                    <li>• Search through your past reflections</li>
-                  </ul>
-                </div>
-
-                <div>
-                  <h4 className="text-sm font-semibold text-gray-200 mb-2">Information & Resources</h4>
-                  <ul className="text-sm text-gray-400 space-y-1 ml-4">
-                    <li>• Search the web for current information</li>
-                    <li>• Check current weather and forecasts</li>
-                    <li>• Get book recommendations</li>
-                    <li>• Find inspirational quotes</li>
-                  </ul>
-                </div>
-              </div>
-
-              <div className="mt-4 pt-4 border-t border-gray-800">
-                <p className="text-sm text-gray-500 italic">
-                  Try: &quot;What should I get done today?&quot;, &quot;Summarize my latest journals&quot;, or &quot;What&apos;s the weather in NYC?&quot;
-                </p>
-              </div>
+              <p className="text-gray-500 text-xs mt-4">
+                Tip: Click the chat icon on any task to start a conversation about it.
+              </p>
             </div>
           </div>
         )}
@@ -518,43 +334,11 @@ export default function AgentChatbot({ activeSpace, token, isActive = true }: Ch
                 ? 'bg-blue-900/30 text-blue-200 border border-blue-700/50 rounded-lg'
                 : 'text-gray-100'
             }`}>
-              <div className="text-sm mb-1 opacity-75 flex justify-between items-center">
-                <span>{msg.role === 'system' ? 'Tool' : ''}</span>
-                {/* Temporarily disabled - tool step dropdown
-                {msg.role === 'system' && msg.toolData && (
-                  <button
-                    onClick={() => toggleToolExpansion(idx)}
-                    className="text-sm text-blue-300 hover:text-blue-100 transition-colors"
-                    aria-label={expandedTools.has(idx) ? 'Collapse tool details' : 'Expand tool details'}
-                  >
-                    {expandedTools.has(idx) ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-                  </button>
-                )}
-                */}
-              </div>
               {msg.role === 'assistant' ? (
                 <MessageRenderer content={msg.content} className="text-base" />
               ) : (
                 <PlainTextRenderer content={msg.content} className="text-sm" />
               )}
-              {/* Temporarily disabled - tool step input/output details
-              {msg.role === 'system' && msg.toolData && expandedTools.has(idx) && (
-                <div className="mt-2 pt-2 border-t border-blue-700/30 text-sm">
-                  <div className="mb-1">
-                    <span className="text-blue-300 font-medium">Input:</span>
-                    <pre className="mt-1 bg-blue-950/50 p-2 rounded text-blue-100 overflow-x-auto">
-                      {JSON.stringify(sanitizeToolData(msg.toolData.args), null, 2)}
-                    </pre>
-                  </div>
-                  <div>
-                    <span className="text-blue-300 font-medium">Output:</span>
-                    <pre className="mt-1 bg-blue-950/50 p-2 rounded text-blue-100 overflow-x-auto">
-                      {JSON.stringify(sanitizeToolData(msg.toolData.data), null, 2)}
-                    </pre>
-                  </div>
-                </div>
-              )}
-              */}
             </div>
           </div>
         ))}
@@ -562,7 +346,7 @@ export default function AgentChatbot({ activeSpace, token, isActive = true }: Ch
           <div className="flex justify-start">
             <div className="text-gray-100 w-full px-0 py-2">
               <div className="text-xs mb-1 opacity-75"></div>
-              <div className="text-sm">{`Thinking${'.'.repeat(thinkingDots)}`}</div>
+              <div className="text-sm">{`Waiting for agent${'.'.repeat(thinkingDots)}`}</div>
             </div>
           </div>
         )}

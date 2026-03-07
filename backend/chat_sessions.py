@@ -14,13 +14,14 @@ sessions_collection = db.chat_sessions
 trajectories_collection = db.chat_trajectories
 
 
-async def create_session(user_id: str, space_id: Optional[str], title: str) -> str:
+async def create_session(user_id: str, space_id: Optional[str], title: str, todo_id: Optional[str] = None) -> str:
     """Create a new chat session and return its string ID."""
     now = datetime.utcnow()
     doc = {
         "user_id": user_id,
         "space_id": space_id,
         "title": title[:120],
+        "todo_id": todo_id,
         "created_at": now,
         "updated_at": now,
     }
@@ -40,6 +41,41 @@ async def create_session(user_id: str, space_id: Optional[str], title: str) -> s
         }
     )
     return session_id
+
+
+async def find_session_by_todo(user_id: str, todo_id: str) -> Optional[str]:
+    """Find a session linked to a specific todo. Returns session_id if found."""
+    doc = await sessions_collection.find_one({"user_id": user_id, "todo_id": todo_id})
+    if doc:
+        return str(doc["_id"])
+    return None
+
+
+async def get_pending_sessions(user_id: str, space_id: Optional[str] = None) -> List[Dict[str, Any]]:
+    """Return sessions that have a pending user message (last message role=user)."""
+    query: Dict[str, Any] = {"user_id": user_id}
+    if space_id:
+        query["space_id"] = space_id
+
+    # Get all trajectories for this user
+    cursor = trajectories_collection.find(query)
+    pending = []
+    async for traj in cursor:
+        msgs = traj.get("display_messages", [])
+        if msgs and msgs[-1].get("role") == "user":
+            # Get the session metadata
+            session_doc = await sessions_collection.find_one({"_id": ObjectId(traj["session_id"])})
+            if session_doc:
+                pending.append(
+                    {
+                        "_id": str(session_doc["_id"]),
+                        "title": session_doc.get("title", ""),
+                        "todo_id": session_doc.get("todo_id"),
+                        "last_message": msgs[-1].get("content", ""),
+                        "updated_at": session_doc.get("updated_at"),
+                    }
+                )
+    return pending
 
 
 async def list_sessions(user_id: str, space_id: Optional[str] = None, limit: int = 50) -> List[Dict[str, Any]]:
@@ -140,6 +176,7 @@ async def init_chat_session_indexes() -> None:
 
         await trajectories_collection.create_index("session_id", unique=True)
         await trajectories_collection.create_index("user_id")
+        await sessions_collection.create_index([("user_id", 1), ("todo_id", 1)])
         logger.info("Chat session indexes created successfully")
     except Exception as e:
         logger.error(f"Error creating chat session indexes: {e}")
