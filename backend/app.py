@@ -362,7 +362,7 @@ async def api_create_todo(request: Request, current_user: dict = Depends(get_cur
         try:
             from chat_sessions import append_message, create_session
 
-            todo_id = str(result.get("_id", ""))
+            todo_id = str(result.id) if result.id else ""
             if todo_id and not body.get("created_offline", False):
                 session_id = await create_session(
                     user_id=body["user_id"],
