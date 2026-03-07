@@ -4,7 +4,7 @@
 
 **Environment setup (once per session):**
 ```bash
-export TODOLIST_API_URL=https://backend-production-e920.up.railway.app
+export TODOLIST_API_URL=https://todolist-backend-production-a83b.up.railway.app
 export TODOLIST_AUTH_TOKEN=7WOHCYUYiv7Ta8KEVFYUM3ozk7hC-7j2CqWiHsuBFuM
 export DEFAULT_SPACE_ID=69abce0e50a04398b2ab1709
 ```

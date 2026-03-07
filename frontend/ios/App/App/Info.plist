@@ -28,7 +28,7 @@
 		<true/>
 		<key>NSExceptionDomains</key>
 		<dict>
-			<key>backend-production-e920.up.railway.app</key>
+			<key>todolist-backend-production-a83b.up.railway.app</key>
 			<dict>
 				<key>NSExceptionAllowsInsecureHTTPLoads</key>
 				<false/>
@@ -66,7 +66,7 @@
 	<array>
 		<string>todolist.nyc</string>
 		<string>app.todolist.nyc</string>
-		<string>backend-production-e920.up.railway.app</string>
+		<string>todolist-backend-production-a83b.up.railway.app</string>
 		<string>localhost</string>
 	</array>
 </dict>

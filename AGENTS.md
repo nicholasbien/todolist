@@ -505,7 +505,7 @@ The app uses an **offline-first service worker proxy** for all API communication
 2. **Service Worker Proxy** (`public/sw.js`):
    - Intercepts all same-origin API requests matching `API_ROUTES`
    - Routes to appropriate backend based on environment:
-     - **Production**: `https://backend-production-e920.up.railway.app`
+     - **Production**: `https://todolist-backend-production-a83b.up.railway.app`
      - **Local Development**: `http://localhost:8000`
      - **Capacitor**: Direct to production backend (bypasses service worker)
 
@@ -788,7 +788,7 @@ The server needs three environment variables:
 
 | Variable | Description | How to get it |
 |---|---|---|
-| `TODOLIST_API_URL` | Backend URL | `http://localhost:8000` or `https://backend-production-e920.up.railway.app` |
+| `TODOLIST_API_URL` | Backend URL | `http://localhost:8000` or `https://todolist-backend-production-a83b.up.railway.app` |
 | `TODOLIST_AUTH_TOKEN` | JWT auth token | Login via API (see test account below) |
 | `DEFAULT_SPACE_ID` | Default space for operations | `GET /spaces` with your token |
 

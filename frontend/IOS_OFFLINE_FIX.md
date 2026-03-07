@@ -15,7 +15,7 @@ API requests were bypassing the service worker by going directly to the backend:
 ```
 App loads from: https://app.todolist.nyc
 Service worker at: https://app.todolist.nyc (same origin)
-API calls go to: https://backend-production-e920.up.railway.app (DIFFERENT origin!)
+API calls go to: https://todolist-backend-production-a83b.up.railway.app (DIFFERENT origin!)
                  ↑ Service worker CANNOT intercept cross-origin requests
 ```
 
@@ -60,11 +60,11 @@ function getApiBaseUrl() {
 **Before:**
 ```typescript
 const clearUrl = Capacitor.isNativePlatform()
-  ? `https://backend-production-e920.up.railway.app/agent/history?...`
+  ? `https://todolist-backend-production-a83b.up.railway.app/agent/history?...`
   : `/agent/history?...`;
 
 const agentUrl = Capacitor.isNativePlatform()
-  ? `https://backend-production-e920.up.railway.app/agent/stream?...`
+  ? `https://todolist-backend-production-a83b.up.railway.app/agent/stream?...`
   : `/agent/stream?...`;
 ```
 
@@ -79,7 +79,7 @@ const agentUrl = `/agent/stream?${params.toString()}`;
 
 1. **App makes request**: `fetch('/todos')` (relative URL)
 2. **Service worker intercepts**: Catches same-origin request
-3. **Online**: Service worker routes to `https://backend-production-e920.up.railway.app/todos`
+3. **Online**: Service worker routes to `https://todolist-backend-production-a83b.up.railway.app/todos`
 4. **Offline**: Service worker serves from IndexedDB, queues writes for later sync
 
 ## Testing Checklist
@@ -100,7 +100,7 @@ const agentUrl = `/agent/stream?${params.toString()}`;
 📱 Registering service worker...
 🔗 API Request: todos -> /todos (Capacitor: true, via SW: true)
 📡 Request will be intercepted by service worker: /todos
-🔗 Service worker routing: https://app.todolist.nyc/todos -> https://backend-production-e920.up.railway.app/todos
+🔗 Service worker routing: https://app.todolist.nyc/todos -> https://todolist-backend-production-a83b.up.railway.app/todos
 ```
 
 ### Expected Console Logs (Web)

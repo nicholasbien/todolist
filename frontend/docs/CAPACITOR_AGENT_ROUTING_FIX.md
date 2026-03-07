@@ -23,7 +23,7 @@ Service Worker → Python Backend Agent → Direct Tools → Backend APIs
 
 #### Capacitor Mobile Apps
 ```
-User → AgentChatbot → "https://backend-production-e920.up.railway.app/agent/stream" (absolute)
+User → AgentChatbot → "https://todolist-backend-production-a83b.up.railway.app/agent/stream" (absolute)
                   ↓ (direct to backend)
 Python Backend Agent → Direct Tools → Backend APIs
 ```
@@ -40,7 +40,7 @@ const es = new EventSource(`/agent/stream?${params.toString()}`);
 
 // AFTER (works in both web and Capacitor)
 const agentUrl = Capacitor.isNativePlatform()
-  ? `https://backend-production-e920.up.railway.app/agent/stream?${params.toString()}`
+  ? `https://todolist-backend-production-a83b.up.railway.app/agent/stream?${params.toString()}`
   : `/agent/stream?${params.toString()}`;
 
 const es = new EventSource(agentUrl);
@@ -48,7 +48,7 @@ const es = new EventSource(agentUrl);
 
 ### Key Insight
 
-Capacitor apps **can** make requests to the backend server directly - they just need absolute URLs instead of relative ones. The backend server (`backend-production-e920.up.railway.app`) provides the Python agent functionality via FastAPI.
+Capacitor apps **can** make requests to the backend server directly - they just need absolute URLs instead of relative ones. The backend server (`todolist-backend-production-a83b.up.railway.app`) provides the Python agent functionality via FastAPI.
 
 ## Implementation Details
 
@@ -80,7 +80,7 @@ app.todolist.nyc (Frontend - Next.js + MCP)
     ├── memory-server.ts ← Task/journal tools
     └── weather-server.ts ← Weather tools
 
-backend-production-e920.up.railway.app (Backend - FastAPI)
+todolist-backend-production-a83b.up.railway.app (Backend - FastAPI)
 ├── /todos ← Regular API endpoints
 ├── /auth
 └── ... (other backend routes)

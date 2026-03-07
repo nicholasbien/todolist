@@ -88,14 +88,14 @@ describe('API Proxy Fallback Tests', () => {
     // Test production
     process.env.NODE_ENV = 'production';
     const prodUrl = process.env.NODE_ENV === 'production'
-      ? 'https://backend-production-e920.up.railway.app'
+      ? 'https://todolist-backend-production-a83b.up.railway.app'
       : 'http://localhost:8000';
-    expect(prodUrl).toBe('https://backend-production-e920.up.railway.app');
+    expect(prodUrl).toBe('https://todolist-backend-production-a83b.up.railway.app');
 
     // Test development
     process.env.NODE_ENV = 'development';
     const devUrl = process.env.NODE_ENV === 'production'
-      ? 'https://backend-production-e920.up.railway.app'
+      ? 'https://todolist-backend-production-a83b.up.railway.app'
       : 'http://localhost:8000';
     expect(devUrl).toBe('http://localhost:8000');
 

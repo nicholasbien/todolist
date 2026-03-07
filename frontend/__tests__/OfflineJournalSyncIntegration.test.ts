@@ -37,7 +37,7 @@ const mockServiceWorkerGlobal = {
     hostname: 'localhost'
   },
   CONFIG: {
-    PRODUCTION_BACKEND: 'https://backend-production-e920.up.railway.app',
+    PRODUCTION_BACKEND: 'https://todolist-backend-production-a83b.up.railway.app',
     LOCAL_BACKEND: 'http://localhost:8000',
     PRODUCTION_DOMAIN: 'todolist.nyc'
   },
@@ -200,14 +200,14 @@ describe('CRITICAL: Offline Journal Sync Regression Protection', () => {
         name: 'Production Web',
         protocol: 'https:',
         hostname: 'app.todolist.nyc',
-        expectedUrl: 'https://backend-production-e920.up.railway.app/journals',
+        expectedUrl: 'https://todolist-backend-production-a83b.up.railway.app/journals',
         description: 'Must route to production backend'
       },
       {
         name: 'Capacitor Mobile',
         protocol: 'file:',
         hostname: '',
-        expectedUrl: 'https://backend-production-e920.up.railway.app/journals',
+        expectedUrl: 'https://todolist-backend-production-a83b.up.railway.app/journals',
         description: 'Must route directly to production backend'
       }
     ];
@@ -233,7 +233,7 @@ describe('CRITICAL: Offline Journal Sync Regression Protection', () => {
       if (syncUrl.includes('localhost')) {
         expect(syncUrl).toBe('http://localhost:8000/journals');
       } else {
-        expect(syncUrl).toBe('https://backend-production-e920.up.railway.app/journals');
+        expect(syncUrl).toBe('https://todolist-backend-production-a83b.up.railway.app/journals');
       }
     });
 
@@ -429,7 +429,7 @@ describe('CRITICAL: Offline Journal Sync Regression Protection', () => {
       expect(syncUrl).toBe('http://localhost:8000/journals');
     } else {
       // Otherwise should route to production (which is what we got)
-      expect(syncUrl).toBe('https://backend-production-e920.up.railway.app/journals');
+      expect(syncUrl).toBe('https://todolist-backend-production-a83b.up.railway.app/journals');
     }
     expect(syncUrl).not.toBe('/journals'); // Not the buggy frontend URL
 

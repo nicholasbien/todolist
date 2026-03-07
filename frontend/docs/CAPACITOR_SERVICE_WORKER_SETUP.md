@@ -17,7 +17,7 @@ Added App-Bound Domains to enable service worker APIs in WKWebView:
 <array>
     <string>todolist.nyc</string>
     <string>app.todolist.nyc</string>
-    <string>backend-production-e920.up.railway.app</string>
+    <string>todolist-backend-production-a83b.up.railway.app</string>
     <string>localhost</string>
 </array>
 ```
@@ -80,7 +80,7 @@ if ('serviceWorker' in navigator) {
 1. **App Launch**: Capacitor loads `https://todolist.nyc` in WKWebView
 2. **SW Registration**: Service worker registers from HTTPS context
 3. **API Requests**: Your existing SW intercepts requests like `/todos`, `/auth`, etc.
-4. **Backend Routing**: SW routes to `backend-production-e920.up.railway.app`
+4. **Backend Routing**: SW routes to `todolist-backend-production-a83b.up.railway.app`
 5. **Offline Support**: IndexedDB caching works normally
 6. **Sync**: Background sync when coming back online
 
