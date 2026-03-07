@@ -767,6 +767,9 @@ Automated testing: `__tests__/ServiceWorkerRouteValidation.test.ts` catches miss
 - `scripts/take-screenshots.js` - Captures all modal screenshots for UI PRs (see Screenshot Requirement section)
 - `scripts/test-offline-sync.js` - Playwright E2E tests for offline/online sync flows (see Offline Testing section below)
 - `scripts/populate_sample_data.py` - Populates sample data for testing
+- `scripts/auto-claim-sessions.js` - Sequential polling worker that claims pending sessions, classifies requests, spawns handlers, posts responses, and releases claims
+- `scripts/session-classifier.js` - Deterministic classifier that routes sessions to `coding` vs `simple` handlers using keyword and code-signal heuristics
+- `scripts/subagent-spawner.js` - Handler runner that spawns `codex` for coding sessions (with timeout/retries) or generates direct simple responses
 
 ---
 
@@ -859,7 +862,7 @@ Edit `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS):
 
 **Journals:** `get_journal`, `write_journal`, `delete_journal`
 
-**Chat Sessions:** `list_sessions`, `create_session`, `get_session`, `post_to_session`, `get_pending_sessions`, `delete_session`
+**Chat Sessions:** `list_sessions`, `create_session`, `get_session`, `post_to_session`, `get_pending_sessions`, `claim_session`, `release_session`, `delete_session`
 
 **Other:** `get_insights`, `export_data`
 
@@ -871,11 +874,15 @@ The app uses chat sessions as an asynchronous messaging channel between the user
 1. User creates a task → backend auto-creates a linked session with task details as a `user` message
 2. User can also send messages via the Assistant tab in the web app
 3. Agent polls `get_pending_sessions` → finds sessions where the last message is `role: user`
-4. Agent reads the session, does the work, posts a response via `post_to_session`
-5. User sees the response in the web app (frontend polls every 5s)
+4. Agent atomically claims session ownership via `claim_session(session_id, agent_id)`
+5. Agent reads the session, does the work, posts a response via `post_to_session`
+6. Agent releases ownership via `release_session(session_id)` (or rely on assistant-post auto-clear)
+7. User sees the response in the web app (frontend polls every 5s)
 
 **Key tools:**
 - `get_pending_sessions` — Returns sessions awaiting agent response (last message is from user)
+- `claim_session(session_id, agent_id)` — Atomically claim a session before starting work
+- `release_session(session_id)` — Release claim after work is finished or failed
 - `get_session(session_id)` — Read full conversation history
 - `post_to_session(session_id, content)` — Post agent response (role: `assistant`)
 - `create_session(title, todo_id?)` — Create a session, optionally linked to a task
@@ -908,12 +915,10 @@ pending = get_pending_sessions()
 
 for session in pending:
     session_id = session["_id"]
+    claim = claim_session(session_id=session_id, agent_id="orchestrator-1")
+    if not claim["ok"]:
+        continue  # another worker already owns it
 
-    # Skip if a worker is already handling this session
-    if session_id in active_workers:
-        continue
-
-    # Spawn a worker agent for this session
     worker = spawn_agent(
         session_id=session_id,
         task_title=session["title"],
@@ -932,9 +937,10 @@ Each worker agent handles a single session/task:
 2. Understand context:    Parse task details, conversation history
 3. Do the work:           Edit code, run tests, research, etc.
 4. Post response:         post_to_session(session_id, result)
-5. Check for follow-ups:  get_session(session_id) — did user reply?
-6. If follow-up exists:   Go to step 2
-7. If done:               Worker exits, orchestrator removes from active_workers
+5. Release claim:         release_session(session_id)
+6. Check for follow-ups:  get_session(session_id) — did user reply?
+7. If follow-up exists:   Go to step 2 (and reclaim)
+8. If done:               Worker exits, orchestrator removes from active_workers
 ```
 
 #### Webhook Integration (Recommended)
