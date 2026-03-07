@@ -71,7 +71,7 @@ export default function AgentChatbot({ activeSpace, token, isActive = true, pend
   }, [fetchSessions]);
 
   // -----------------------------------------------------------------------
-  // Polling logic for agent responses
+  // Polling logic — always poll the active session for new messages
   // -----------------------------------------------------------------------
   const stopPolling = useCallback(() => {
     if (pollingRef.current) {
@@ -93,14 +93,13 @@ export default function AgentChatbot({ activeSpace, token, isActive = true, pend
         const data = await res.json();
         const serverMessages = data.display_messages || [];
 
-        // Check if there are new messages from the agent
         if (serverMessages.length > lastKnownCountRef.current) {
           setMessages(serverMessages);
-          // If last message is from assistant, stop polling
+          lastKnownCountRef.current = serverMessages.length;
+          // If we were waiting for a response and got one, clear loading
           const lastMsg = serverMessages[serverMessages.length - 1];
           if (lastMsg?.role === 'assistant') {
             setLoading(false);
-            stopPolling();
             fetchSessions();
           }
         }
@@ -110,10 +109,16 @@ export default function AgentChatbot({ activeSpace, token, isActive = true, pend
     }, 10000);
   }, [token, stopPolling, fetchSessions]);
 
-  // Cleanup polling on unmount
+  // Start/stop polling based on active session and tab visibility
   useEffect(() => {
+    if (currentSessionId && isActive) {
+      lastKnownCountRef.current = messages.length;
+      startPolling(currentSessionId);
+    } else {
+      stopPolling();
+    }
     return () => stopPolling();
-  }, [stopPolling]);
+  }, [currentSessionId, isActive]);
 
   // Load session from parent (e.g., clicking chat icon on a task)
   useEffect(() => {
@@ -256,10 +261,6 @@ export default function AgentChatbot({ activeSpace, token, isActive = true, pend
         body: JSON.stringify({ role: 'user', content: userQuestion }),
       });
       if (!postRes.ok) throw new Error('Failed to send message');
-
-      // Start polling for agent response
-      lastKnownCountRef.current = messages.length + 1; // current messages + the one we just added
-      startPolling(sessionId!);
     } catch (err: any) {
       setError(err.message || 'Error sending message');
       setLoading(false);
