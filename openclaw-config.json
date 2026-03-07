@@ -1,0 +1,21 @@
+{
+  "mcpServers": {
+    "todolist": {
+      "command": "node",
+      "args": ["/data/workspace/todolist/mcp-server/dist/index.js"],
+      "env": {
+        "TODOLIST_API_URL": "https://backend-production-e920.up.railway.app",
+        "TODOLIST_AUTH_TOKEN": "6rcSzOEAr0XnoBPk5-SO2oSHTG_Al7fZI0TldqqVKGM",
+        "DEFAULT_SPACE_ID": "6938fa7241cae0360ece9a89"
+      }
+    }
+  },
+  "agents": {
+    "defaults": {
+      "heartbeat": {
+        "every": "1m",
+        "target": "none"
+      }
+    }
+  }
+}
