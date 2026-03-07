@@ -357,6 +357,32 @@ async def api_create_todo(request: Request, current_user: dict = Depends(get_cur
         # Create the todo in the database
         result = await create_todo(todo)
         logger.info(f"Todo created successfully: {result}")
+
+        # Create a linked chat session so agents can see the new task
+        try:
+            from chat_sessions import append_message, create_session
+
+            todo_id = str(result.get("_id", ""))
+            if todo_id and not body.get("created_offline", False):
+                session_id = await create_session(
+                    user_id=body["user_id"],
+                    space_id=body.get("space_id"),
+                    title=body.get("text", "New task")[:60],
+                    todo_id=todo_id,
+                )
+                task_details = f"New task: {body.get('text', '')}"
+                if body.get("category"):
+                    task_details += f"\nCategory: {body['category']}"
+                if body.get("priority"):
+                    task_details += f"\nPriority: {body['priority']}"
+                if body.get("dueDate"):
+                    task_details += f"\nDue: {body['dueDate']}"
+                if body.get("notes"):
+                    task_details += f"\nNotes: {body['notes']}"
+                await append_message(session_id, body["user_id"], "user", task_details)
+        except Exception as e:
+            logger.error(f"Failed to create session for todo: {e}")
+
         return result
     except Exception as e:
         logger.error(f"Error creating todo: {str(e)}")
