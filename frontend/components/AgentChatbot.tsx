@@ -73,20 +73,21 @@ export default function AgentChatbot({ activeSpace, token, isActive = true, pend
   // -----------------------------------------------------------------------
   // Polling logic — always poll the active session for new messages
   // -----------------------------------------------------------------------
-  const stopPolling = useCallback(() => {
-    if (pollingRef.current) {
-      clearInterval(pollingRef.current);
-      pollingRef.current = null;
+  useEffect(() => {
+    if (!currentSessionId || !isActive || !token) {
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+        pollingRef.current = null;
+      }
+      return;
     }
-  }, []);
 
-  const startPolling = useCallback((sessionId: string) => {
-    stopPolling();
+    // Set initial known count
+    lastKnownCountRef.current = messages.length;
 
-    pollingRef.current = setInterval(async () => {
-      if (!token) return;
+    const poll = async () => {
       try {
-        const res = await fetch(`/agent/sessions/${sessionId}`, {
+        const res = await fetch(`/agent/sessions/${currentSessionId}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (!res.ok) return;
@@ -96,29 +97,26 @@ export default function AgentChatbot({ activeSpace, token, isActive = true, pend
         if (serverMessages.length > lastKnownCountRef.current) {
           setMessages(serverMessages);
           lastKnownCountRef.current = serverMessages.length;
-          // If we were waiting for a response and got one, clear loading
-          const lastMsg = serverMessages[serverMessages.length - 1];
-          if (lastMsg?.role === 'assistant') {
+          if (serverMessages[serverMessages.length - 1]?.role === 'assistant') {
             setLoading(false);
-            fetchSessions();
           }
         }
       } catch {
         // Ignore polling errors
       }
-    }, 10000);
-  }, [token, stopPolling, fetchSessions]);
+    };
 
-  // Start/stop polling based on active session and tab visibility
-  useEffect(() => {
-    if (currentSessionId && isActive) {
-      lastKnownCountRef.current = messages.length;
-      startPolling(currentSessionId);
-    } else {
-      stopPolling();
-    }
-    return () => stopPolling();
-  }, [currentSessionId, isActive]);
+    // Poll immediately once, then every 5 seconds
+    poll();
+    pollingRef.current = setInterval(poll, 5000);
+
+    return () => {
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+        pollingRef.current = null;
+      }
+    };
+  }, [currentSessionId, isActive, token]);
 
   // Load session from parent (e.g., clicking chat icon on a task)
   useEffect(() => {
@@ -213,7 +211,6 @@ export default function AgentChatbot({ activeSpace, token, isActive = true, pend
   const handleNewChat = () => {
     setCurrentSessionId(null);
     setMessages([]);
-    stopPolling();
   };
 
   // -----------------------------------------------------------------------
