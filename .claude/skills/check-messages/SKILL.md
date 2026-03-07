@@ -12,8 +12,8 @@ Check for pending user messages posted via the todolist web app's Assistant tab 
 
 1. Call `mcp__todolist__get_pending_sessions` to check for sessions with unread user messages.
 2. If there are no pending messages, respond only with "No pending messages." and stop.
-3. **Skip already-claimed sessions** — if a session shows `[Claimed by: ...]` in the output, another agent is already working on it. Do not dispatch again.
-4. For each unclaimed pending session, **claim it first** by calling `mcp__todolist__claim_session` with the session_id and a unique agent_id (use a descriptive name like `"cc-{session_id_short}"`). If the claim fails, skip that session.
+3. **Handle claimed sessions** — if a session shows `[Claimed by: {agent_id}]`, try to **resume** the existing agent with that ID (using the Agent tool's `resume` parameter) so it keeps its context. If the agent can't be resumed (e.g., it already finished), reclaim with a new agent_id.
+4. For unclaimed pending sessions, **claim it first** by calling `mcp__todolist__claim_session` with the session_id and a unique agent_id (use a descriptive name like `"cc-{session_id_short}"`). If the claim fails, skip that session.
 5. Launch a **background Agent** to handle the claimed session:
    - Use the Agent tool with `run_in_background: true`
    - Pass the session ID, agent_id, and last message to the agent

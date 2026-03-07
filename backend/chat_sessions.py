@@ -221,7 +221,9 @@ async def append_message(session_id: str, user_id: str, role: str, content: str)
 
     if role == "user":
         update["$set"]["needs_agent_response"] = True
-        update["$set"]["agent_id"] = None  # Clear stale claim so a new agent can pick it up
+        # Keep agent_id so the same agent can pick up the follow-up message
+        # with its existing context. claim_session allows reclaiming with
+        # the same agent_id.
     elif role == "assistant":
         update["$set"]["needs_agent_response"] = False
         update["$set"]["agent_id"] = None
