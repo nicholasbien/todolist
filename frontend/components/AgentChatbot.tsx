@@ -20,7 +20,8 @@ interface SessionMeta {
 export default function AgentChatbot({ activeSpace, token, isActive = true, pendingSessionId, onSessionLoaded }: ChatbotProps) {
   const [question, setQuestion] = useState('');
   const [messages, setMessages] = useState<{ role: string; content: string }[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [waitingForAgent, setWaitingForAgent] = useState(false);
   const [error, setError] = useState('');
   const [thinkingDots, setThinkingDots] = useState(0);
   const [isOnline, setIsOnline] = useState(true);
@@ -110,9 +111,8 @@ export default function AgentChatbot({ activeSpace, token, isActive = true, pend
         if (serverMessages.length > lastKnownCountRef.current) {
           setMessages(serverMessages);
           lastKnownCountRef.current = serverMessages.length;
-          if (serverMessages[serverMessages.length - 1]?.role === 'assistant') {
-            setLoading(false);
-          }
+          const lastRole = serverMessages[serverMessages.length - 1]?.role;
+          setWaitingForAgent(lastRole === 'user');
         }
       } catch {
         // Ignore polling errors
@@ -170,7 +170,7 @@ export default function AgentChatbot({ activeSpace, token, isActive = true, pend
   // Thinking dots animation
   useEffect(() => {
     let interval: ReturnType<typeof setInterval>;
-    if (loading) {
+    if (waitingForAgent) {
       interval = setInterval(() => {
         setThinkingDots((d) => (d + 1) % 4);
       }, 500);
@@ -180,7 +180,7 @@ export default function AgentChatbot({ activeSpace, token, isActive = true, pend
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [loading]);
+  }, [waitingForAgent]);
 
   // Track online/offline status
   useEffect(() => {
@@ -201,7 +201,6 @@ export default function AgentChatbot({ activeSpace, token, isActive = true, pend
   // -----------------------------------------------------------------------
   const loadSession = async (sessionId: string) => {
     if (!token) return;
-    setLoading(true);
     setError('');
     try {
       const res = await fetch(`/agent/sessions/${sessionId}`, {
@@ -211,16 +210,11 @@ export default function AgentChatbot({ activeSpace, token, isActive = true, pend
       const data = await res.json();
       const loadedMessages = data.display_messages || [];
       setMessages(loadedMessages);
-      // Keep loading=true if the last message is from the user (waiting for agent reply).
-      // The polling effect will clear loading when the agent responds.
       const lastRole = loadedMessages[loadedMessages.length - 1]?.role;
-      if (lastRole !== 'user') {
-        setLoading(false);
-      }
+      setWaitingForAgent(lastRole === 'user');
       setCurrentSessionId(sessionId);
     } catch (err: any) {
       setError(err.message || 'Failed to load chat');
-      setLoading(false);
     }
   };
 
@@ -241,7 +235,8 @@ export default function AgentChatbot({ activeSpace, token, isActive = true, pend
     const userQuestion = question;
     setMessages((prev) => [...prev, { role: 'user', content: userQuestion }]);
     setQuestion('');
-    setLoading(true);
+    setSending(true);
+    setWaitingForAgent(true);
     setError('');
     shouldAutoScrollRef.current = true;
 
@@ -279,7 +274,9 @@ export default function AgentChatbot({ activeSpace, token, isActive = true, pend
       if (!postRes.ok) throw new Error('Failed to send message');
     } catch (err: any) {
       setError(err.message || 'Error sending message');
-      setLoading(false);
+      setWaitingForAgent(false);
+    } finally {
+      setSending(false);
     }
   };
 
@@ -311,7 +308,7 @@ export default function AgentChatbot({ activeSpace, token, isActive = true, pend
         {(messages.length > 0 || currentSessionId) && (
           <button
             onClick={handleNewChat}
-            disabled={loading}
+            disabled={sending}
             className="ml-auto border border-gray-600 text-gray-300 px-3 py-1 rounded text-sm hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             New Chat
@@ -326,7 +323,7 @@ export default function AgentChatbot({ activeSpace, token, isActive = true, pend
         className="flex-1 mb-4 space-y-4 overflow-y-auto custom-scrollbar"
       >
         {/* Blank state when no messages */}
-        {messages.length === 0 && !loading && (
+        {messages.length === 0 && !waitingForAgent && (
           <div className="flex items-center justify-center min-h-full py-8">
             <div className="max-w-md text-center space-y-4 px-6">
               <p className="text-gray-300 text-base leading-relaxed">
@@ -359,7 +356,7 @@ export default function AgentChatbot({ activeSpace, token, isActive = true, pend
             </div>
           </div>
         ))}
-        {loading && (
+        {waitingForAgent && (
           <div className="flex justify-start">
             <div className="text-gray-100 w-full px-0 py-2">
               <div className="text-xs mb-1 opacity-75"></div>
@@ -395,7 +392,7 @@ export default function AgentChatbot({ activeSpace, token, isActive = true, pend
             onChange={(e) => setQuestion(e.target.value)}
             onKeyPress={handleKeyPress}
             placeholder={isOnline ? "Ask a question..." : "Assistant requires internet connection"}
-            disabled={loading || !isOnline}
+            disabled={sending || !isOnline}
             onMouseEnter={() => !isOnline && setShowOfflineMessage(true)}
             onMouseLeave={() => setShowOfflineMessage(false)}
             onClick={handleOfflineClick}
@@ -413,7 +410,7 @@ export default function AgentChatbot({ activeSpace, token, isActive = true, pend
         </div>
         <button
           onClick={handleAsk}
-          disabled={loading || !question.trim() || !isOnline}
+          disabled={sending || !question.trim() || !isOnline}
           className={`border px-6 py-3 rounded-lg hover:bg-accent/10 disabled:opacity-50 disabled:cursor-not-allowed transition-colors ${
             isQuestionFocused
               ? 'border-accent text-accent'
