@@ -72,30 +72,79 @@ async def find_session_by_todo(user_id: str, todo_id: str) -> Optional[str]:
 
 
 async def get_pending_sessions(user_id: str, space_id: Optional[str] = None) -> List[Dict[str, Any]]:
-    """Return sessions that have a pending user message (last message role=user)."""
-    query: Dict[str, Any] = {"user_id": user_id}
-    if space_id:
-        query["space_id"] = space_id
+    """Return sessions that need an agent response.
 
-    # Get all trajectories for this user
-    cursor = trajectories_collection.find(query)
+    Uses the ``needs_agent_response`` flag for fast indexed queries.
+    Falls back to checking the last message role for legacy docs that
+    don't have the flag yet.
+    """
+    base_query: Dict[str, Any] = {"user_id": user_id}
+    if space_id:
+        base_query["space_id"] = space_id
+
+    # Query 1: docs with the flag set (fast, indexed)
+    flagged_query = {**base_query, "needs_agent_response": True}
+    # Query 2: legacy docs missing the flag — fall back to last-message check
+    legacy_query = {**base_query, "needs_agent_response": {"$exists": False}}
+
+    seen_ids: set = set()
     pending = []
-    async for traj in cursor:
-        msgs = traj.get("display_messages", [])
-        if msgs and msgs[-1].get("role") == "user":
-            # Get the session metadata
-            session_doc = await sessions_collection.find_one({"_id": ObjectId(traj["session_id"])})
+
+    async def _collect(cursor) -> None:  # type: ignore[no-untyped-def]
+        async for traj in cursor:
+            sid = traj["session_id"]
+            if sid in seen_ids:
+                continue
+            # For legacy docs, verify last message is from user
+            if "needs_agent_response" not in traj:
+                msgs = traj.get("display_messages", [])
+                if not msgs or msgs[-1].get("role") != "user":
+                    continue
+            session_doc = await sessions_collection.find_one({"_id": ObjectId(sid)})
             if session_doc:
+                seen_ids.add(sid)
+                msgs = traj.get("display_messages", [])
+                last_msg = msgs[-1].get("content", "") if msgs else ""
                 pending.append(
                     {
                         "_id": str(session_doc["_id"]),
                         "title": session_doc.get("title", ""),
                         "todo_id": session_doc.get("todo_id"),
-                        "last_message": msgs[-1].get("content", ""),
+                        "agent_id": traj.get("agent_id"),
+                        "last_message": last_msg,
                         "updated_at": session_doc.get("updated_at"),
                     }
                 )
+
+    await _collect(trajectories_collection.find(flagged_query))
+    await _collect(trajectories_collection.find(legacy_query))
     return pending
+
+
+async def claim_session(session_id: str, user_id: str, agent_id: str) -> bool:
+    """Atomically claim a session for an agent. Returns True if claimed.
+
+    Uses an atomic update that only succeeds if agent_id is not already set
+    (or is the same agent reclaiming). This prevents duplicate dispatch.
+    """
+    result = await trajectories_collection.update_one(
+        {
+            "session_id": session_id,
+            "user_id": user_id,
+            "needs_agent_response": True,
+            "$or": [{"agent_id": {"$exists": False}}, {"agent_id": None}, {"agent_id": agent_id}],
+        },
+        {"$set": {"agent_id": agent_id, "updated_at": datetime.utcnow()}},
+    )
+    return result.modified_count > 0 or result.matched_count > 0
+
+
+async def release_session(session_id: str, user_id: str) -> None:
+    """Clear the agent_id claim on a session (called when agent finishes)."""
+    await trajectories_collection.update_one(
+        {"session_id": session_id, "user_id": user_id},
+        {"$set": {"agent_id": None}},
+    )
 
 
 async def list_sessions(user_id: str, space_id: Optional[str] = None, limit: int = 50) -> List[Dict[str, Any]]:
@@ -158,18 +207,30 @@ async def save_trajectory(
 async def append_message(session_id: str, user_id: str, role: str, content: str) -> bool:
     """Append a message to a session's display_messages. Returns True if found.
 
-    This allows external agents to post updates to a session without going
-    through the OpenAI streaming flow.
+    Automatically manages ``needs_agent_response``:
+    - user message  → needs_agent_response = True
+    - assistant msg → needs_agent_response = False, agent_id = None
     """
     now = datetime.utcnow()
     message = {"role": role, "content": content, "timestamp": now.isoformat()}
 
+    update: Dict[str, Any] = {
+        "$push": {"display_messages": message},
+        "$set": {"updated_at": now},
+    }
+
+    if role == "user":
+        update["$set"]["needs_agent_response"] = True
+        # Keep agent_id so the same agent can pick up the follow-up message
+        # with its existing context. claim_session allows reclaiming with
+        # the same agent_id.
+    elif role == "assistant":
+        update["$set"]["needs_agent_response"] = False
+        update["$set"]["agent_id"] = None
+
     result = await trajectories_collection.update_one(
         {"session_id": session_id, "user_id": user_id},
-        {
-            "$push": {"display_messages": message},
-            "$set": {"updated_at": now},
-        },
+        update,
     )
     if result.matched_count == 0:
         return False
@@ -196,6 +257,9 @@ async def init_chat_session_indexes() -> None:
 
         await trajectories_collection.create_index("session_id", unique=True)
         await trajectories_collection.create_index("user_id")
+        await trajectories_collection.create_index(
+            [("user_id", 1), ("needs_agent_response", 1)],
+        )
         # Unique partial index: enforce at most one session per (user_id, todo_id)
         # where todo_id is not null. This prevents duplicate todo-linked sessions
         # even under concurrent requests.
