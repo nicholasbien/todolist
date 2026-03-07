@@ -1,0 +1,107 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - main [ref=e3]:
+    - generic [ref=e4]:
+      - generic [ref=e6]:
+        - heading "todolist.nyc" [level=1] [ref=e7]:
+          - link "todolist.nyc" [ref=e8] [cursor=pointer]:
+            - /url: /home/
+        - generic [ref=e9]:
+          - button "Personal" [ref=e11] [cursor=pointer]:
+            - img [ref=e13]
+            - generic [ref=e16]: Personal
+            - img [ref=e17]
+          - button "Settings" [ref=e20] [cursor=pointer]:
+            - img [ref=e21]
+      - generic [ref=e24]:
+        - button "Tasks" [ref=e25] [cursor=pointer]
+        - button "Assistant" [ref=e26] [cursor=pointer]
+        - button "Journal" [ref=e27] [cursor=pointer]
+      - generic [ref=e30]:
+        - generic [ref=e33]:
+          - generic [ref=e35]:
+            - button "All" [ref=e36] [cursor=pointer]
+            - button "General" [ref=e37] [cursor=pointer]
+            - button "+" [ref=e38] [cursor=pointer]
+          - generic [ref=e39]:
+            - generic [ref=e41]:
+              - textbox "Add new task" [ref=e42]:
+                - /placeholder: Add a new task...
+              - button "+" [ref=e43] [cursor=pointer]
+            - generic [ref=e44]:
+              - generic [ref=e45]:
+                - generic [ref=e46]:
+                  - paragraph [ref=e48]: Offline todo - smoke
+                  - generic [ref=e49]:
+                    - button "Mark task as complete" [ref=e50] [cursor=pointer]:
+                      - img [ref=e51]
+                    - button "Delete task" [ref=e53] [cursor=pointer]:
+                      - img [ref=e54]
+                - generic [ref=e57]:
+                  - combobox [ref=e58] [cursor=pointer]:
+                    - option "General" [selected]
+                  - combobox [ref=e59] [cursor=pointer]:
+                    - option "High"
+                    - option "Medium" [selected]
+                    - option "Low"
+              - generic [ref=e60]:
+                - generic [ref=e61]:
+                  - paragraph [ref=e63]: Offline todo - smoke
+                  - generic [ref=e64]:
+                    - button "Mark task as complete" [ref=e65] [cursor=pointer]:
+                      - img [ref=e66]
+                    - button "Delete task" [ref=e68] [cursor=pointer]:
+                      - img [ref=e69]
+                - generic [ref=e72]:
+                  - combobox [ref=e73] [cursor=pointer]:
+                    - option "General" [selected]
+                  - combobox [ref=e74] [cursor=pointer]:
+                    - option "High"
+                    - option "Medium" [selected]
+                    - option "Low"
+        - generic [ref=e78]:
+          - generic [ref=e81]:
+            - paragraph [ref=e82]: Hi, I'm your personal assistant
+            - paragraph [ref=e83]: Ask me anything! I can help you manage your tasks, check the weather, find information, and more.
+            - generic [ref=e84]:
+              - generic [ref=e85]:
+                - heading [level=4] [ref=e86]: Task Management
+                - list [ref=e87]:
+                  - listitem [ref=e88]: • Add, update, and search your tasks
+                  - listitem [ref=e89]: • Get task recommendations and suggestions
+              - generic [ref=e90]:
+                - heading [level=4] [ref=e91]: Journal Access
+                - list [ref=e92]:
+                  - listitem [ref=e93]: • Add journal entries
+                  - listitem [ref=e94]: • Search through your past reflections
+              - generic [ref=e95]:
+                - heading [level=4] [ref=e96]: Information & Resources
+                - list [ref=e97]:
+                  - listitem [ref=e98]: • Search the web for current information
+                  - listitem [ref=e99]: • Check current weather and forecasts
+                  - listitem [ref=e100]: • Get book recommendations
+                  - listitem [ref=e101]: • Find inspirational quotes
+            - paragraph [ref=e103]: "Try: \"What should I get done today?\", \"Summarize my latest journals\", or \"What's the weather in NYC?\""
+          - generic [ref=e104]:
+            - textbox [ref=e106]:
+              - /placeholder: Ask a question...
+            - button [disabled] [ref=e107]: Send
+        - generic [ref=e111]:
+          - generic [ref=e112]:
+            - generic [ref=e113]:
+              - button [ref=e114] [cursor=pointer]: <
+              - textbox [ref=e115]: 2026-02-17
+              - button [ref=e116] [cursor=pointer]: ">"
+            - generic [ref=e117]: Synced online
+          - textbox [ref=e119]:
+            - /placeholder: Write about your day on Tuesday, February 17, 2026...
+            - text: Offline journal-1771314265499
+          - generic [ref=e121]:
+            - generic [ref=e122]:
+              - generic [ref=e123]: "Created: 2/17/2026, 6:15:40 AM"
+              - generic [ref=e124]: "Updated: 2/17/2026, 7:44:25 AM"
+            - button [disabled] [ref=e125]: Save
+  - alert [ref=e126]
+```

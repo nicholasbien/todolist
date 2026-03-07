@@ -1,0 +1,77 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - main [ref=e3]:
+    - generic [ref=e4]:
+      - generic [ref=e6]:
+        - heading "todolist.nyc" [level=1] [ref=e7]:
+          - link "todolist.nyc" [ref=e8] [cursor=pointer]:
+            - /url: /home/
+        - generic [ref=e9]:
+          - button "📴" [ref=e11] [cursor=pointer]
+          - button "No Space" [ref=e13] [cursor=pointer]:
+            - img [ref=e15]
+            - generic [ref=e17]: No Space
+            - img [ref=e18]
+          - button "Settings" [ref=e21] [cursor=pointer]:
+            - img [ref=e22]
+      - generic [ref=e25]:
+        - generic [ref=e26]: "Error loading todos: Failed to fetch todos"
+        - button "Close error message" [ref=e27] [cursor=pointer]: ×
+      - generic [ref=e28]:
+        - button "Tasks" [ref=e29] [cursor=pointer]
+        - button "Assistant" [ref=e30] [cursor=pointer]
+        - button "Journal" [ref=e31] [cursor=pointer]
+      - generic [ref=e34]:
+        - generic [ref=e37]:
+          - generic [ref=e39]:
+            - button [ref=e40] [cursor=pointer]: All
+            - button [ref=e41] [cursor=pointer]: +
+          - generic [ref=e44]:
+            - textbox [ref=e45]:
+              - /placeholder: Add a new task...
+            - button [ref=e46] [cursor=pointer]: +
+        - generic [ref=e50]:
+          - generic [ref=e53]:
+            - paragraph [ref=e54]: Hi, I'm your personal assistant
+            - paragraph [ref=e55]: Ask me anything! I can help you manage your tasks, check the weather, find information, and more.
+            - generic [ref=e56]:
+              - generic [ref=e57]:
+                - heading [level=4] [ref=e58]: Task Management
+                - list [ref=e59]:
+                  - listitem [ref=e60]: • Add, update, and search your tasks
+                  - listitem [ref=e61]: • Get task recommendations and suggestions
+              - generic [ref=e62]:
+                - heading [level=4] [ref=e63]: Journal Access
+                - list [ref=e64]:
+                  - listitem [ref=e65]: • Add journal entries
+                  - listitem [ref=e66]: • Search through your past reflections
+              - generic [ref=e67]:
+                - heading [level=4] [ref=e68]: Information & Resources
+                - list [ref=e69]:
+                  - listitem [ref=e70]: • Search the web for current information
+                  - listitem [ref=e71]: • Check current weather and forecasts
+                  - listitem [ref=e72]: • Get book recommendations
+                  - listitem [ref=e73]: • Find inspirational quotes
+            - paragraph [ref=e75]: "Try: \"What should I get done today?\", \"Summarize my latest journals\", or \"What's the weather in NYC?\""
+          - generic [ref=e76]:
+            - textbox [disabled] [ref=e78]:
+              - /placeholder: Assistant requires internet connection
+            - button [disabled] [ref=e79]: Send
+        - generic [ref=e83]:
+          - generic [ref=e84]:
+            - generic [ref=e85]: Failed to fetch
+            - button "Close error message" [ref=e86] [cursor=pointer]: ×
+          - generic [ref=e87]:
+            - generic [ref=e88]:
+              - button "Previous day" [ref=e89] [cursor=pointer]: <
+              - textbox "Select journal date" [ref=e90]: 2026-02-17
+              - button "Next day" [ref=e91] [cursor=pointer]: ">"
+            - generic [ref=e92]: Unsaved changes
+          - textbox "Journal entry" [ref=e94]:
+            - /placeholder: Write about your day on Tuesday, February 17, 2026...
+            - text: Offline journal-1771316038888
+          - button "Save" [ref=e97] [cursor=pointer]
+  - alert [ref=e98]
+```

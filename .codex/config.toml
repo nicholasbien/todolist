@@ -1,0 +1,5 @@
+# ~/.codex/config.toml
+
+approval_policy = "never"         # Never ask for approvals
+sandbox_mode    = "danger-full-access"   # Full access sandbox
+

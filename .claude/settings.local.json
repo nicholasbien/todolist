@@ -1,0 +1,19 @@
+{
+  "dangerouslySkipPermissions": [
+    "curl",
+    "ss -tlnp",
+    "netstat -tlnp",
+    "node",
+    "npx",
+    "pnpm",
+    "python3",
+    "sed",
+    "perl",
+    "awk",
+    "git",
+    "Edit",
+    "Write",
+    "/data/workspace/todolist/frontend/node_modules/.bin/playwright",
+    "env APP_URL=http://localhost:3000 API_URL=http://localhost:8000"
+  ]
+}

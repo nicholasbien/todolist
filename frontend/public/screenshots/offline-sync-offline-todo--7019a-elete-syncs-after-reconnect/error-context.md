@@ -1,0 +1,213 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - main [ref=e3]:
+    - generic [ref=e4]:
+      - generic [ref=e6]:
+        - heading "todolist.nyc" [level=1] [ref=e7]:
+          - link "todolist.nyc" [ref=e8] [cursor=pointer]:
+            - /url: /home/
+        - generic [ref=e9]:
+          - button "Personal" [ref=e11] [cursor=pointer]:
+            - img [ref=e13]
+            - generic [ref=e16]: Personal
+            - img [ref=e17]
+          - button "Settings" [ref=e20] [cursor=pointer]:
+            - img [ref=e21]
+      - generic [ref=e24]:
+        - button "Tasks" [ref=e25] [cursor=pointer]
+        - button "Assistant" [ref=e26] [cursor=pointer]
+        - button "Journal" [ref=e27] [cursor=pointer]
+      - generic [ref=e30]:
+        - generic [ref=e33]:
+          - generic [ref=e35]:
+            - button "All" [ref=e36] [cursor=pointer]
+            - button "General" [ref=e37] [cursor=pointer]
+            - button "+" [ref=e38] [cursor=pointer]
+          - generic [ref=e39]:
+            - generic [ref=e41]:
+              - textbox "Add new task" [ref=e42]:
+                - /placeholder: Add a new task...
+              - button "+" [ref=e43] [cursor=pointer]
+            - generic [ref=e44]:
+              - generic [ref=e45]:
+                - generic [ref=e46]:
+                  - paragraph [ref=e48]: Offline todo - smoke
+                  - generic [ref=e49]:
+                    - button "Mark task as complete" [ref=e50] [cursor=pointer]:
+                      - img [ref=e51]
+                    - button "Delete task" [ref=e53] [cursor=pointer]:
+                      - img [ref=e54]
+                - generic [ref=e57]:
+                  - combobox [ref=e58] [cursor=pointer]:
+                    - option "General" [selected]
+                  - combobox [ref=e59] [cursor=pointer]:
+                    - option "High"
+                    - option "Medium" [selected]
+                    - option "Low"
+              - generic [ref=e60]:
+                - generic [ref=e61]:
+                  - paragraph [ref=e63]: Offline todo - smoke
+                  - generic [ref=e64]:
+                    - button "Mark task as complete" [ref=e65] [cursor=pointer]:
+                      - img [ref=e66]
+                    - button "Delete task" [ref=e68] [cursor=pointer]:
+                      - img [ref=e69]
+                - generic [ref=e72]:
+                  - combobox [ref=e73] [cursor=pointer]:
+                    - option "General" [selected]
+                  - combobox [ref=e74] [cursor=pointer]:
+                    - option "High"
+                    - option "Medium" [selected]
+                    - option "Low"
+              - generic [ref=e75]:
+                - generic [ref=e76]:
+                  - paragraph [ref=e78]: Offline todo - smoke
+                  - generic [ref=e79]:
+                    - button "Mark task as complete" [ref=e80] [cursor=pointer]:
+                      - img [ref=e81]
+                    - button "Delete task" [ref=e83] [cursor=pointer]:
+                      - img [ref=e84]
+                - generic [ref=e87]:
+                  - combobox [ref=e88] [cursor=pointer]:
+                    - option "General" [selected]
+                  - combobox [ref=e89] [cursor=pointer]:
+                    - option "High"
+                    - option "Medium" [selected]
+                    - option "Low"
+              - generic [ref=e90]:
+                - generic [ref=e91]:
+                  - paragraph [ref=e93]: Offline todo - smoke
+                  - generic [ref=e94]:
+                    - button "Mark task as complete" [ref=e95] [cursor=pointer]:
+                      - img [ref=e96]
+                    - button "Delete task" [ref=e98] [cursor=pointer]:
+                      - img [ref=e99]
+                - generic [ref=e102]:
+                  - combobox [ref=e103] [cursor=pointer]:
+                    - option "General" [selected]
+                  - combobox [ref=e104] [cursor=pointer]:
+                    - option "High"
+                    - option "Medium" [selected]
+                    - option "Low"
+              - generic [ref=e105]:
+                - generic [ref=e106]:
+                  - paragraph [ref=e108]: Offline todo - smoke
+                  - generic [ref=e109]:
+                    - button "Mark task as complete" [ref=e110] [cursor=pointer]:
+                      - img [ref=e111]
+                    - button "Delete task" [ref=e113] [cursor=pointer]:
+                      - img [ref=e114]
+                - generic [ref=e117]:
+                  - combobox [ref=e118] [cursor=pointer]:
+                    - option "General" [selected]
+                  - combobox [ref=e119] [cursor=pointer]:
+                    - option "High"
+                    - option "Medium" [selected]
+                    - option "Low"
+              - generic [ref=e120]:
+                - generic [ref=e121]:
+                  - paragraph [ref=e123]: Offline todo - smoke
+                  - generic [ref=e124]:
+                    - button "Mark task as complete" [ref=e125] [cursor=pointer]:
+                      - img [ref=e126]
+                    - button "Delete task" [ref=e128] [cursor=pointer]:
+                      - img [ref=e129]
+                - generic [ref=e132]:
+                  - combobox [ref=e133] [cursor=pointer]:
+                    - option "General" [selected]
+                  - combobox [ref=e134] [cursor=pointer]:
+                    - option "High"
+                    - option "Medium" [selected]
+                    - option "Low"
+              - generic [ref=e135]:
+                - generic [ref=e136]:
+                  - paragraph [ref=e138]: Offline todo - smoke
+                  - generic [ref=e139]:
+                    - button "Mark task as complete" [ref=e140] [cursor=pointer]:
+                      - img [ref=e141]
+                    - button "Delete task" [ref=e143] [cursor=pointer]:
+                      - img [ref=e144]
+                - generic [ref=e147]:
+                  - combobox [ref=e148] [cursor=pointer]:
+                    - option "General" [selected]
+                  - combobox [ref=e149] [cursor=pointer]:
+                    - option "High"
+                    - option "Medium" [selected]
+                    - option "Low"
+              - generic [ref=e150]:
+                - generic [ref=e151]:
+                  - paragraph [ref=e153]: Offline todo - smoke
+                  - generic [ref=e154]:
+                    - button "Mark task as complete" [ref=e155] [cursor=pointer]:
+                      - img [ref=e156]
+                    - button "Delete task" [ref=e158] [cursor=pointer]:
+                      - img [ref=e159]
+                - generic [ref=e162]:
+                  - combobox [ref=e163] [cursor=pointer]:
+                    - option "General" [selected]
+                  - combobox [ref=e164] [cursor=pointer]:
+                    - option "High"
+                    - option "Medium" [selected]
+                    - option "Low"
+              - generic [ref=e165]:
+                - generic [ref=e166]:
+                  - paragraph [ref=e168]: Offline todo - smoke
+                  - generic [ref=e169]:
+                    - button "Mark task as complete" [ref=e170] [cursor=pointer]:
+                      - img [ref=e171]
+                    - button "Delete task" [ref=e173] [cursor=pointer]:
+                      - img [ref=e174]
+                - generic [ref=e177]:
+                  - combobox [ref=e178] [cursor=pointer]:
+                    - option "General" [selected]
+                  - combobox [ref=e179] [cursor=pointer]:
+                    - option "High"
+                    - option "Medium" [selected]
+                    - option "Low"
+            - button "Show Completed (5)" [ref=e181] [cursor=pointer]
+        - generic [ref=e185]:
+          - generic [ref=e188]:
+            - paragraph [ref=e189]: Hi, I'm your personal assistant
+            - paragraph [ref=e190]: Ask me anything! I can help you manage your tasks, check the weather, find information, and more.
+            - generic [ref=e191]:
+              - generic [ref=e192]:
+                - heading [level=4] [ref=e193]: Task Management
+                - list [ref=e194]:
+                  - listitem [ref=e195]: • Add, update, and search your tasks
+                  - listitem [ref=e196]: • Get task recommendations and suggestions
+              - generic [ref=e197]:
+                - heading [level=4] [ref=e198]: Journal Access
+                - list [ref=e199]:
+                  - listitem [ref=e200]: • Add journal entries
+                  - listitem [ref=e201]: • Search through your past reflections
+              - generic [ref=e202]:
+                - heading [level=4] [ref=e203]: Information & Resources
+                - list [ref=e204]:
+                  - listitem [ref=e205]: • Search the web for current information
+                  - listitem [ref=e206]: • Check current weather and forecasts
+                  - listitem [ref=e207]: • Get book recommendations
+                  - listitem [ref=e208]: • Find inspirational quotes
+            - paragraph [ref=e210]: "Try: \"What should I get done today?\", \"Summarize my latest journals\", or \"What's the weather in NYC?\""
+          - generic [ref=e211]:
+            - textbox [ref=e213]:
+              - /placeholder: Ask a question...
+            - button [disabled] [ref=e214]: Send
+        - generic [ref=e218]:
+          - generic [ref=e219]:
+            - generic [ref=e220]:
+              - button [ref=e221] [cursor=pointer]: <
+              - textbox [ref=e222]: 2026-02-17
+              - button [ref=e223] [cursor=pointer]: ">"
+            - generic [ref=e224]: Synced online
+          - textbox [ref=e226]:
+            - /placeholder: Write about your day on Tuesday, February 17, 2026...
+            - text: Offline journal-1771314265499
+          - generic [ref=e228]:
+            - generic [ref=e229]:
+              - generic [ref=e230]: "Created: 2/17/2026, 6:15:40 AM"
+              - generic [ref=e231]: "Updated: 2/17/2026, 7:44:25 AM"
+            - button [disabled] [ref=e232]: Save
+  - alert [ref=e233]
+```

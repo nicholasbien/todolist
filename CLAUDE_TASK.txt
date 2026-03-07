@@ -1,0 +1,27 @@
+Complete PR #231: Apply the precise space-aware caching fix to sw.js and update tests.
+
+The current sw.js uses a CONSERVATIVE approach that blocks ALL cached todos/journals when ANY space is being deleted. Change it to a PRECISE approach that only blocks the specific space's cache.
+
+Required changes:
+
+1. Version bump: Change v126 → v127 (line ~1)
+
+2. Space-precise todos check (around line 260-280):
+   - Current: `const hasCachedTodos = await caches.has(ALL_TODOS_CACHE)` blocks ALL todos
+   - Change to: Check if cache has entries for THIS space only
+   - Pattern: Query cache for entries matching current space, return true only if found
+
+3. Space-precise journal check (around line 300-320):
+   - Same pattern as todos - check only for current space entries
+
+Test file updates needed:
+- Update sw.test.js to test space-precise behavior
+- Tests should verify: deleting space A doesn't block todos for space B
+
+After changes:
+1. Run `npx jest sw.test.js` to verify tests pass
+2. Run `git status` and `git diff` to review changes
+3. Commit with message: "fix: precise space-aware caching - only block affected space"
+4. Push to PR #231 branch
+
+Use Python for file modifications to avoid permission issues. The changes should be minimal and focused on making the cache checks space-specific.

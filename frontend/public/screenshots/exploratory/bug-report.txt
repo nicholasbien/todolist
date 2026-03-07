@@ -1,0 +1,2 @@
+BUG-AGENT-01: No response from assistant after sending message
+  Steps: Type message and press Enter in assistant tab

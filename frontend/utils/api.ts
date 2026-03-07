@@ -1,8 +1,10 @@
 import { Capacitor } from '@capacitor/core';
 
 // Configuration - keep in sync with service worker
+// NOTE: Backend URL is configured via Railway environment variables (BACKEND_URL)
+// and read by the proxy at build time. These are fallback values for reference only.
 const CONFIG = {
-  PRODUCTION_BACKEND: 'https://backend-production-e920.up.railway.app',
+  PRODUCTION_BACKEND: process.env.BACKEND_URL || 'http://localhost:8000',
   PRODUCTION_DOMAIN: 'todolist.nyc'
 };
 

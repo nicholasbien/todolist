@@ -1,0 +1,402 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - main [ref=e3]:
+    - generic [ref=e4]:
+      - generic [ref=e6]:
+        - heading "todolist.nyc" [level=1] [ref=e7]:
+          - link "todolist.nyc" [ref=e8] [cursor=pointer]:
+            - /url: /home/
+        - generic [ref=e9]:
+          - button "Personal" [ref=e11] [cursor=pointer]:
+            - img [ref=e13]
+            - generic [ref=e16]: Personal
+            - img [ref=e17]
+          - button "Settings" [ref=e20] [cursor=pointer]:
+            - img [ref=e21]
+      - generic [ref=e24]:
+        - button "Tasks" [ref=e25] [cursor=pointer]
+        - button "Assistant" [ref=e26] [cursor=pointer]
+        - button "Journal" [ref=e27] [cursor=pointer]
+      - generic [ref=e30]:
+        - generic [ref=e33]:
+          - generic [ref=e35]:
+            - button "All" [ref=e36] [cursor=pointer]
+            - button "General" [ref=e37] [cursor=pointer]
+            - button "TestCat17" [ref=e38] [cursor=pointer]
+            - button "TestCat528" [ref=e39] [cursor=pointer]
+            - button "+" [ref=e40] [cursor=pointer]
+          - generic [ref=e42]:
+            - button "Search tasks" [ref=e44] [cursor=pointer]:
+              - img [ref=e45]
+            - button "Sort options" [ref=e48] [cursor=pointer]:
+              - img [ref=e49]
+          - generic [ref=e52]:
+            - generic [ref=e54]:
+              - textbox "Add new task" [ref=e55]:
+                - /placeholder: Add task(s)… (Shift+Enter for newline)
+              - button "+" [ref=e56] [cursor=pointer]
+            - generic [ref=e57]:
+              - generic [ref=e60]:
+                - generic [ref=e61]:
+                  - paragraph [ref=e63]: Exploratory test task 1
+                  - generic [ref=e64]:
+                    - button "Mark task as complete" [ref=e65] [cursor=pointer]:
+                      - img [ref=e66]
+                    - button "Delete task" [ref=e68] [cursor=pointer]:
+                      - img [ref=e69]
+                - generic [ref=e72]:
+                  - combobox [ref=e73] [cursor=pointer]:
+                    - option "General"
+                    - option "TestCat17" [selected]
+                    - option "TestCat528"
+                  - combobox [ref=e74] [cursor=pointer]:
+                    - option "High"
+                    - option "Medium" [selected]
+                    - option "Low"
+              - generic [ref=e77]:
+                - generic [ref=e78]:
+                  - paragraph [ref=e80]: Edit me 1771350762989
+                  - generic [ref=e81]:
+                    - button "Mark task as complete" [ref=e82] [cursor=pointer]:
+                      - img [ref=e83]
+                    - button "Delete task" [ref=e85] [cursor=pointer]:
+                      - img [ref=e86]
+                - generic [ref=e89]:
+                  - combobox [ref=e90] [cursor=pointer]:
+                    - option "General" [selected]
+                    - option "TestCat17"
+                    - option "TestCat528"
+                  - combobox [ref=e91] [cursor=pointer]:
+                    - option "High"
+                    - option "Medium" [selected]
+                    - option "Low"
+              - generic [ref=e94]:
+                - generic [ref=e95]:
+                  - paragraph [ref=e97]: Test task 1771350733601
+                  - generic [ref=e98]:
+                    - button "Mark task as complete" [ref=e99] [cursor=pointer]:
+                      - img [ref=e100]
+                    - button "Delete task" [ref=e102] [cursor=pointer]:
+                      - img [ref=e103]
+                - generic [ref=e106]:
+                  - combobox [ref=e107] [cursor=pointer]:
+                    - option "General"
+                    - option "TestCat17" [selected]
+                    - option "TestCat528"
+                  - combobox [ref=e108] [cursor=pointer]:
+                    - option "High"
+                    - option "Medium" [selected]
+                    - option "Low"
+              - generic [ref=e111]:
+                - generic [ref=e112]:
+                  - paragraph [ref=e114]: Edit me 1771350689741
+                  - generic [ref=e115]:
+                    - button "Mark task as complete" [ref=e116] [cursor=pointer]:
+                      - img [ref=e117]
+                    - button "Delete task" [ref=e119] [cursor=pointer]:
+                      - img [ref=e120]
+                - generic [ref=e123]:
+                  - combobox [ref=e124] [cursor=pointer]:
+                    - option "General" [selected]
+                    - option "TestCat17"
+                    - option "TestCat528"
+                  - combobox [ref=e125] [cursor=pointer]:
+                    - option "High"
+                    - option "Medium" [selected]
+                    - option "Low"
+              - generic [ref=e128]:
+                - generic [ref=e129]:
+                  - paragraph [ref=e131]: Edit me 1771350664867
+                  - generic [ref=e132]:
+                    - button "Mark task as complete" [ref=e133] [cursor=pointer]:
+                      - img [ref=e134]
+                    - button "Delete task" [ref=e136] [cursor=pointer]:
+                      - img [ref=e137]
+                - generic [ref=e140]:
+                  - combobox [ref=e141] [cursor=pointer]:
+                    - option "General" [selected]
+                    - option "TestCat17"
+                    - option "TestCat528"
+                  - combobox [ref=e142] [cursor=pointer]:
+                    - option "High"
+                    - option "Medium" [selected]
+                    - option "Low"
+              - generic [ref=e145]:
+                - generic [ref=e146]:
+                  - paragraph [ref=e148]: Edit me 1771350456791
+                  - generic [ref=e149]:
+                    - button "Mark task as complete" [ref=e150] [cursor=pointer]:
+                      - img [ref=e151]
+                    - button "Delete task" [ref=e153] [cursor=pointer]:
+                      - img [ref=e154]
+                - generic [ref=e157]:
+                  - combobox [ref=e158] [cursor=pointer]:
+                    - option "General" [selected]
+                    - option "TestCat17"
+                    - option "TestCat528"
+                  - combobox [ref=e159] [cursor=pointer]:
+                    - option "High"
+                    - option "Medium" [selected]
+                    - option "Low"
+              - generic [ref=e162]:
+                - generic [ref=e163]:
+                  - paragraph [ref=e165]: Complete me 1771350268928
+                  - generic [ref=e166]:
+                    - button "Mark task as complete" [ref=e167] [cursor=pointer]:
+                      - img [ref=e168]
+                    - button "Delete task" [ref=e170] [cursor=pointer]:
+                      - img [ref=e171]
+                - generic [ref=e174]:
+                  - combobox [ref=e175] [cursor=pointer]:
+                    - option "General" [selected]
+                    - option "TestCat17"
+                    - option "TestCat528"
+                  - combobox [ref=e176] [cursor=pointer]:
+                    - option "High"
+                    - option "Medium" [selected]
+                    - option "Low"
+              - generic [ref=e179]:
+                - generic [ref=e180]:
+                  - paragraph [ref=e182]: Test task 1771350261076
+                  - generic [ref=e183]:
+                    - button "Mark task as complete" [ref=e184] [cursor=pointer]:
+                      - img [ref=e185]
+                    - button "Delete task" [ref=e187] [cursor=pointer]:
+                      - img [ref=e188]
+                - generic [ref=e191]:
+                  - combobox [ref=e192] [cursor=pointer]:
+                    - option "General" [selected]
+                    - option "TestCat17"
+                    - option "TestCat528"
+                  - combobox [ref=e193] [cursor=pointer]:
+                    - option "High"
+                    - option "Medium" [selected]
+                    - option "Low"
+              - generic [ref=e196]:
+                - generic [ref=e197]:
+                  - paragraph [ref=e199]: Offline todo - smoke
+                  - generic [ref=e200]:
+                    - button "Mark task as complete" [ref=e201] [cursor=pointer]:
+                      - img [ref=e202]
+                    - button "Delete task" [ref=e204] [cursor=pointer]:
+                      - img [ref=e205]
+                - generic [ref=e208]:
+                  - combobox [ref=e209] [cursor=pointer]:
+                    - option "General" [selected]
+                    - option "TestCat17"
+                    - option "TestCat528"
+                  - combobox [ref=e210] [cursor=pointer]:
+                    - option "High"
+                    - option "Medium" [selected]
+                    - option "Low"
+              - generic [ref=e213]:
+                - generic [ref=e214]:
+                  - paragraph [ref=e216]: Offline todo - smoke
+                  - generic [ref=e217]:
+                    - button "Mark task as complete" [ref=e218] [cursor=pointer]:
+                      - img [ref=e219]
+                    - button "Delete task" [ref=e221] [cursor=pointer]:
+                      - img [ref=e222]
+                - generic [ref=e225]:
+                  - combobox [ref=e226] [cursor=pointer]:
+                    - option "General" [selected]
+                    - option "TestCat17"
+                    - option "TestCat528"
+                  - combobox [ref=e227] [cursor=pointer]:
+                    - option "High"
+                    - option "Medium" [selected]
+                    - option "Low"
+              - generic [ref=e230]:
+                - generic [ref=e231]:
+                  - paragraph [ref=e233]: Offline todo - smoke
+                  - generic [ref=e234]:
+                    - button "Mark task as complete" [ref=e235] [cursor=pointer]:
+                      - img [ref=e236]
+                    - button "Delete task" [ref=e238] [cursor=pointer]:
+                      - img [ref=e239]
+                - generic [ref=e242]:
+                  - combobox [ref=e243] [cursor=pointer]:
+                    - option "General" [selected]
+                    - option "TestCat17"
+                    - option "TestCat528"
+                  - combobox [ref=e244] [cursor=pointer]:
+                    - option "High"
+                    - option "Medium" [selected]
+                    - option "Low"
+              - generic [ref=e247]:
+                - generic [ref=e248]:
+                  - paragraph [ref=e250]: Offline todo - smoke
+                  - generic [ref=e251]:
+                    - button "Mark task as complete" [ref=e252] [cursor=pointer]:
+                      - img [ref=e253]
+                    - button "Delete task" [ref=e255] [cursor=pointer]:
+                      - img [ref=e256]
+                - generic [ref=e259]:
+                  - combobox [ref=e260] [cursor=pointer]:
+                    - option "General" [selected]
+                    - option "TestCat17"
+                    - option "TestCat528"
+                  - combobox [ref=e261] [cursor=pointer]:
+                    - option "High"
+                    - option "Medium" [selected]
+                    - option "Low"
+              - generic [ref=e264]:
+                - generic [ref=e265]:
+                  - paragraph [ref=e267]: Offline todo - smoke
+                  - generic [ref=e268]:
+                    - button "Mark task as complete" [ref=e269] [cursor=pointer]:
+                      - img [ref=e270]
+                    - button "Delete task" [ref=e272] [cursor=pointer]:
+                      - img [ref=e273]
+                - generic [ref=e276]:
+                  - combobox [ref=e277] [cursor=pointer]:
+                    - option "General" [selected]
+                    - option "TestCat17"
+                    - option "TestCat528"
+                  - combobox [ref=e278] [cursor=pointer]:
+                    - option "High"
+                    - option "Medium" [selected]
+                    - option "Low"
+              - generic [ref=e281]:
+                - generic [ref=e282]:
+                  - paragraph [ref=e284]: Offline todo - smoke
+                  - generic [ref=e285]:
+                    - button "Mark task as complete" [ref=e286] [cursor=pointer]:
+                      - img [ref=e287]
+                    - button "Delete task" [ref=e289] [cursor=pointer]:
+                      - img [ref=e290]
+                - generic [ref=e293]:
+                  - combobox [ref=e294] [cursor=pointer]:
+                    - option "General" [selected]
+                    - option "TestCat17"
+                    - option "TestCat528"
+                  - combobox [ref=e295] [cursor=pointer]:
+                    - option "High"
+                    - option "Medium" [selected]
+                    - option "Low"
+              - generic [ref=e298]:
+                - generic [ref=e299]:
+                  - paragraph [ref=e301]: Offline todo - smoke
+                  - generic [ref=e302]:
+                    - button "Mark task as complete" [ref=e303] [cursor=pointer]:
+                      - img [ref=e304]
+                    - button "Delete task" [ref=e306] [cursor=pointer]:
+                      - img [ref=e307]
+                - generic [ref=e310]:
+                  - combobox [ref=e311] [cursor=pointer]:
+                    - option "General" [selected]
+                    - option "TestCat17"
+                    - option "TestCat528"
+                  - combobox [ref=e312] [cursor=pointer]:
+                    - option "High"
+                    - option "Medium" [selected]
+                    - option "Low"
+              - generic [ref=e315]:
+                - generic [ref=e316]:
+                  - paragraph [ref=e318]: Offline todo - smoke
+                  - generic [ref=e319]:
+                    - button "Mark task as complete" [ref=e320] [cursor=pointer]:
+                      - img [ref=e321]
+                    - button "Delete task" [ref=e323] [cursor=pointer]:
+                      - img [ref=e324]
+                - generic [ref=e327]:
+                  - combobox [ref=e328] [cursor=pointer]:
+                    - option "General" [selected]
+                    - option "TestCat17"
+                    - option "TestCat528"
+                  - combobox [ref=e329] [cursor=pointer]:
+                    - option "High"
+                    - option "Medium" [selected]
+                    - option "Low"
+              - generic [ref=e332]:
+                - generic [ref=e333]:
+                  - paragraph [ref=e335]: Offline todo - smoke
+                  - generic [ref=e336]:
+                    - button "Mark task as complete" [ref=e337] [cursor=pointer]:
+                      - img [ref=e338]
+                    - button "Delete task" [ref=e340] [cursor=pointer]:
+                      - img [ref=e341]
+                - generic [ref=e344]:
+                  - combobox [ref=e345] [cursor=pointer]:
+                    - option "General" [selected]
+                    - option "TestCat17"
+                    - option "TestCat528"
+                  - combobox [ref=e346] [cursor=pointer]:
+                    - option "High"
+                    - option "Medium" [selected]
+                    - option "Low"
+              - generic [ref=e349]:
+                - generic [ref=e350]:
+                  - paragraph [ref=e352]: <script>alert("xss")</script> & "quotes" 'single'
+                  - generic [ref=e353]:
+                    - button "Mark task as complete" [ref=e354] [cursor=pointer]:
+                      - img [ref=e355]
+                    - button "Delete task" [ref=e357] [cursor=pointer]:
+                      - img [ref=e358]
+                - generic [ref=e361]:
+                  - combobox [ref=e362] [cursor=pointer]:
+                    - option "General" [selected]
+                    - option "TestCat17"
+                    - option "TestCat528"
+                  - combobox [ref=e363] [cursor=pointer]:
+                    - option "High"
+                    - option "Medium"
+                    - option "Low" [selected]
+              - generic [ref=e366]:
+                - generic [ref=e367]:
+                  - paragraph [ref=e369]: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+                  - generic [ref=e370]:
+                    - button "Mark task as complete" [ref=e371] [cursor=pointer]:
+                      - img [ref=e372]
+                    - button "Delete task" [ref=e374] [cursor=pointer]:
+                      - img [ref=e375]
+                - generic [ref=e378]:
+                  - combobox [ref=e379] [cursor=pointer]:
+                    - option "General" [selected]
+                    - option "TestCat17"
+                    - option "TestCat528"
+                  - combobox [ref=e380] [cursor=pointer]:
+                    - option "High"
+                    - option "Medium"
+                    - option "Low" [selected]
+            - status [ref=e381]
+            - button "Show Completed (7)" [ref=e383] [cursor=pointer]
+        - generic [ref=e387]:
+          - generic [ref=e390]:
+            - paragraph [ref=e391]: Hi, I'm your personal assistant
+            - paragraph [ref=e392]: Ask me anything! I can help you manage your tasks, check the weather, find information, and more.
+            - generic [ref=e393]:
+              - generic [ref=e394]:
+                - heading [level=4] [ref=e395]: Task Management
+                - list [ref=e396]:
+                  - listitem [ref=e397]: • Add, update, and search your tasks
+                  - listitem [ref=e398]: • Get task recommendations and suggestions
+              - generic [ref=e399]:
+                - heading [level=4] [ref=e400]: Journal Access
+                - list [ref=e401]:
+                  - listitem [ref=e402]: • Add journal entries
+                  - listitem [ref=e403]: • Search through your past reflections
+              - generic [ref=e404]:
+                - heading [level=4] [ref=e405]: Information & Resources
+                - list [ref=e406]:
+                  - listitem [ref=e407]: • Search the web for current information
+                  - listitem [ref=e408]: • Check current weather and forecasts
+                  - listitem [ref=e409]: • Get book recommendations
+                  - listitem [ref=e410]: • Find inspirational quotes
+            - paragraph [ref=e412]: "Try: \"What should I get done today?\", \"Summarize my latest journals\", or \"What's the weather in NYC?\""
+          - generic [ref=e413]:
+            - textbox [ref=e415]:
+              - /placeholder: Ask a question...
+            - button [disabled] [ref=e416]: Send
+        - generic [ref=e420]:
+          - generic [ref=e422]:
+            - button [ref=e423] [cursor=pointer]: <
+            - textbox [ref=e424]: 2026-02-21
+            - button [ref=e425] [cursor=pointer]: ">"
+          - textbox [ref=e427]:
+            - /placeholder: Write about your day on Saturday, February 21, 2026...
+          - button [disabled] [ref=e430]: Save
+  - alert [ref=e431]
+```
