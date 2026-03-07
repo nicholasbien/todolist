@@ -209,7 +209,9 @@ async def append_message(session_id: str, user_id: str, role: str, content: str)
 
     Automatically manages ``needs_agent_response``:
     - user message  → needs_agent_response = True
-    - assistant msg → needs_agent_response = False, agent_id = None
+    - assistant msg → appends message, then checks if a user message
+      arrived in the meantime.  Only clears the flag when the last
+      message in the array is still from the assistant.
     """
     now = datetime.utcnow()
     message = {"role": role, "content": content, "timestamp": now.isoformat()}
@@ -224,9 +226,6 @@ async def append_message(session_id: str, user_id: str, role: str, content: str)
         # Keep agent_id so the same agent can pick up the follow-up message
         # with its existing context. claim_session allows reclaiming with
         # the same agent_id.
-    elif role == "assistant":
-        update["$set"]["needs_agent_response"] = False
-        update["$set"]["agent_id"] = None
 
     result = await trajectories_collection.update_one(
         {"session_id": session_id, "user_id": user_id},
@@ -234,6 +233,18 @@ async def append_message(session_id: str, user_id: str, role: str, content: str)
     )
     if result.matched_count == 0:
         return False
+
+    # For assistant messages, atomically clear the flag only if no user
+    # message snuck in after ours (last element's role == "assistant").
+    if role == "assistant":
+        await trajectories_collection.update_one(
+            {
+                "session_id": session_id,
+                "user_id": user_id,
+                "display_messages.-1.role": "assistant",
+            },
+            {"$set": {"needs_agent_response": False, "agent_id": None}},
+        )
 
     await sessions_collection.update_one(
         {"_id": ObjectId(session_id)},
