@@ -1,0 +1,7 @@
+[deploy]
+startCommand = "python3 app.py"
+restartPolicyType = "ON_FAILURE"
+
+[build]
+builder = "NIXPACKS"
+buildCommand = "pip3 install -r requirements.txt"
