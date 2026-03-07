@@ -1,7 +1,0 @@
-[deploy]
-startCommand = "./start.sh"
-restartPolicyType = "ON_FAILURE"
-
-[build]
-builder = "NIXPACKS"
-buildCommand = "pip install -r backend/requirements.txt"
