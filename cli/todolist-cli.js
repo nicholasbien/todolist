@@ -56,13 +56,44 @@ function request(method, path, body) {
 
 // --- String helpers ---
 
+/**
+ * Decode escape sequences in a string (\n, \t, \r, \\, etc.)
+ * Supports: \n, \t, \r, \b, \f, \\, \", \', \xHH (hex), \uHHHH (unicode)
+ * @param {string|null|undefined} str - Input string to decode
+ * @returns {string} - Decoded string, or empty string for null/undefined input
+ */
 function decodeEscapes(str) {
-  return str.replace(/\\(.)?/g, (match, char) => {
-    if (char === 'n') return '\n';
-    if (char === 't') return '\t';
-    if (char === '\\') return '\\';
-    return match; // keep unrecognized escapes as-is
-  });
+  if (str == null) return '';
+
+  // Escape sequence map for common single-char escapes
+  const escapes = {
+    n: '\n',   // newline
+    t: '\t',   // tab
+    r: '\r',   // carriage return
+    b: '\b',   // backspace
+    f: '\f',   // form feed
+    v: '\v',   // vertical tab
+    '\\': '\\', // backslash
+    '"': '"',  // double quote
+    "'": "'",  // single quote
+  };
+
+  return str.replace(
+    /\\(?:([nrtbfv\\"'])|x([0-9a-fA-F]{2})|u([0-9a-fA-F]{4})|(.?))/g,
+    (_match, simple, hex, unicode, other) => {
+      if (simple) {
+        return escapes[simple];
+      }
+      if (hex) {
+        return String.fromCharCode(parseInt(hex, 16));
+      }
+      if (unicode) {
+        return String.fromCharCode(parseInt(unicode, 16));
+      }
+      // Keep unrecognized escapes as-is (including trailing backslash)
+      return other === undefined ? '\\' : '\\' + other;
+    }
+  );
 }
 
 // --- Arg parsing helpers ---
