@@ -818,6 +818,7 @@ class CreateSessionRequest(BaseModel):
     title: str
     space_id: Optional[str] = None
     message: Optional[str] = None
+    message_role: str = "user"
     todo_id: Optional[str] = None
 
 
@@ -839,7 +840,8 @@ async def create_chat_session(
     session_id = await create_session(user_id, req.space_id, req.title, req.todo_id)
 
     if req.message:
-        await append_message(session_id, user_id, "assistant", req.message)
+        role = req.message_role if req.message_role in ("user", "assistant") else "user"
+        await append_message(session_id, user_id, role, req.message)
 
     return {"session_id": session_id, "title": req.title}
 

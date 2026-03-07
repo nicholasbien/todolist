@@ -702,7 +702,10 @@ class TodolistMCPServer {
     const body: any = { title: args.title };
     const sid = this.spaceId(args);
     if (sid) body.space_id = sid;
-    if (args.message) body.message = args.message;
+    if (args.message) {
+      body.message = args.message;
+      body.message_role = 'assistant';
+    }
     if (args.todo_id) body.todo_id = args.todo_id;
 
     const response = await api.post('/agent/sessions', body);
