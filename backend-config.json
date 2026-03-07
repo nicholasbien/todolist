@@ -1,0 +1,26 @@
+{
+  "_comment": "SINGLE SOURCE OF TRUTH for backend URLs. Edit ONLY THIS FILE when changing backend deployment.",
+  "environments": {
+    "production": {
+      "backendUrl": "https://todolist-backend-production-a83b.up.railway.app",
+      "frontendUrl": "https://todolist-frontend-production-5d57.up.railway.app",
+      "description": "Railway production deployment"
+    },
+    "local": {
+      "backendUrl": "http://localhost:8000",
+      "frontendUrl": "http://localhost:3000",
+      "description": "Local development"
+    }
+  },
+  "envVars": {
+    "TODOLIST_API_URL": "Set this to the backend URL for your environment",
+    "BACKEND_URL": "Used by Next.js proxy - set via Railway dashboard for production"
+  },
+  "manualUpdatesRequired": [
+    "Railway dashboard environment variables (BACKEND_URL)",
+    "iOS Info.plist WKAppBoundDomains (if changing domain)",
+    "Auth0/Cognito allowed origins (if using)",
+    "CORS settings in Railway backend"
+  ],
+  "_lastUpdated": "2026-03-07"
+}
