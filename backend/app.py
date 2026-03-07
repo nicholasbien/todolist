@@ -379,7 +379,8 @@ async def api_create_todo(request: Request, current_user: dict = Depends(get_cur
                     task_details += f"\nDue: {body['dueDate']}"
                 if body.get("notes"):
                     task_details += f"\nNotes: {body['notes']}"
-                await append_message(session_id, body["user_id"], "assistant", task_details)
+                msg_role = "assistant" if body.get("created_by_agent") else "user"
+                await append_message(session_id, body["user_id"], msg_role, task_details)
         except Exception as e:
             logger.error(f"Failed to create session for todo: {e}")
 

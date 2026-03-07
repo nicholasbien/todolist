@@ -537,6 +537,7 @@ class TodolistMCPServer {
     if (args.dueDate) body.dueDate = args.dueDate;
     if (args.notes) body.notes = args.notes;
     body.dateAdded = new Date().toISOString();
+    body.created_by_agent = true;
 
     const response = await api.post('/todos', body);
     const todo = response.data;
