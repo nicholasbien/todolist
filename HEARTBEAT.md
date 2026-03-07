@@ -1,5 +1,7 @@
 # Todolist Heartbeat Checklist
 
+> **Backend URL:** Configured in `backend-config.json` (single source of truth). See `docs/BACKEND_URL_CHANGE_GUIDE.md`.
+
 ## Agent Integration Tasks (Using CLI)
 
 **Environment setup (once per session):**

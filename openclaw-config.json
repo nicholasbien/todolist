@@ -1,9 +1,11 @@
 {
+  "_comment": "Backend URL is maintained in backend-config.json - this file should reference that when possible",
   "mcpServers": {
     "todolist": {
       "command": "node",
       "args": ["/data/workspace/todolist/mcp-server/dist/index.js"],
       "env": {
+        "_comment": "See backend-config.json for canonical URL - update both when changing",
         "TODOLIST_API_URL": "https://todolist-backend-production-a83b.up.railway.app",
         "TODOLIST_AUTH_TOKEN": "6rcSzOEAr0XnoBPk5-SO2oSHTG_Al7fZI0TldqqVKGM",
         "DEFAULT_SPACE_ID": "6938fa7241cae0360ece9a89"
