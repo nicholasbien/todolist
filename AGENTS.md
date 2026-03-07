@@ -859,31 +859,149 @@ Edit `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS):
 
 **Journals:** `get_journal`, `write_journal`, `delete_journal`
 
-**Chat Sessions:** `list_sessions`, `create_session`, `get_session`, `post_to_session`, `delete_session`
+**Chat Sessions:** `list_sessions`, `create_session`, `get_session`, `post_to_session`, `get_pending_sessions`, `delete_session`
 
 **Other:** `get_insights`, `export_data`
 
-### Chat Sessions as Task Tracking
+### Agent Messaging System
 
-Chat sessions let any agent track work and communicate asynchronously with the user through the web app's Assistant tab.
+The app uses chat sessions as an asynchronous messaging channel between the user (web app) and external agents (Claude Code, OpenClaw, etc.). Every task automatically gets a linked chat session when created.
 
-**Workflow:**
+**How it works:**
+1. User creates a task → backend auto-creates a linked session with task details as a `user` message
+2. User can also send messages via the Assistant tab in the web app
+3. Agent polls `get_pending_sessions` → finds sessions where the last message is `role: user`
+4. Agent reads the session, does the work, posts a response via `post_to_session`
+5. User sees the response in the web app (frontend polls every 5s)
+
+**Key tools:**
+- `get_pending_sessions` — Returns sessions awaiting agent response (last message is from user)
+- `get_session(session_id)` — Read full conversation history
+- `post_to_session(session_id, content)` — Post agent response (role: `assistant`)
+- `create_session(title, todo_id?)` — Create a session, optionally linked to a task
+
+### Orchestrator Integration Guide
+
+This section describes how an orchestrator (OpenClaw, Claude Agent SDK, custom service) should integrate with the agent messaging system.
+
+#### Architecture
+
 ```
-Agent                                  User (Web App)
-─────                                  ──────────────
-create_session("Refactor auth")
-post_to_session(id, "Plan: ...")
-                                       [Sees update in Assistant tab]
-                                       "Skip the migration step"
-get_session(id) → reads feedback
-post_to_session(id, "Done! ...")
-                                       [Reviews in Assistant tab]
+┌─────────────┐     ┌─────────────┐     ┌──────────────────┐
+│  Web App     │────→│  Backend    │────→│  Orchestrator     │
+│  (user)      │     │  (API)      │     │  (OpenClaw, etc.) │
+│              │←────│             │←────│                   │
+└─────────────┘     └─────────────┘     └──────────────────┘
+                                          │
+                                          ├── Agent Worker 1 (task A)
+                                          ├── Agent Worker 2 (task B)
+                                          └── Agent Worker 3 (task C)
 ```
 
-- `create_session` — Start a new thread with a title and optional first message
-- `post_to_session` — Post status updates (role: `assistant`) or questions
-- `get_session` — Read the full conversation to see user responses
-- Messages posted via MCP appear in the web app's Assistant tab alongside regular AI chat sessions
+#### Polling Loop (Dispatcher)
+
+The orchestrator runs a central dispatcher that polls for new messages:
+
+```python
+# Poll every 10-30 seconds
+pending = get_pending_sessions()
+
+for session in pending:
+    session_id = session["_id"]
+
+    # Skip if a worker is already handling this session
+    if session_id in active_workers:
+        continue
+
+    # Spawn a worker agent for this session
+    worker = spawn_agent(
+        session_id=session_id,
+        task_title=session["title"],
+        todo_id=session.get("todo_id"),
+        last_message=session["last_message"],
+    )
+    active_workers[session_id] = worker
+```
+
+#### Worker Agent Lifecycle
+
+Each worker agent handles a single session/task:
+
+```
+1. Read full session:     get_session(session_id)
+2. Understand context:    Parse task details, conversation history
+3. Do the work:           Edit code, run tests, research, etc.
+4. Post response:         post_to_session(session_id, result)
+5. Check for follow-ups:  get_session(session_id) — did user reply?
+6. If follow-up exists:   Go to step 2
+7. If done:               Worker exits, orchestrator removes from active_workers
+```
+
+#### Webhook Integration (Recommended)
+
+Instead of polling, the orchestrator can register a webhook:
+
+```
+POST /agent/webhooks
+{
+  "url": "https://your-orchestrator.com/webhook",
+  "events": ["session.message_created"]
+}
+```
+
+When a user posts a message, the backend POSTs to the webhook URL with the session_id and message content. The orchestrator can then immediately dispatch a worker. *(Webhook endpoint is not yet implemented — currently polling only.)*
+
+#### Session-Task Linking
+
+Every task has a linked session via `todo_id`:
+- `get_pending_sessions` returns `todo_id` for each pending session
+- Workers can use `update_todo`, `complete_todo`, etc. to modify the linked task
+- This enables workflows like: user creates task → agent picks it up → agent works on it → agent marks it complete
+
+#### Deduplication
+
+The orchestrator must track which sessions have active workers to avoid duplicate work. Use the `session_id` as the key:
+
+```python
+active_workers: Dict[str, AgentWorker] = {}
+
+# Before dispatching
+if session_id in active_workers:
+    if active_workers[session_id].is_alive():
+        continue  # Already being handled
+    else:
+        del active_workers[session_id]  # Worker finished, clean up
+```
+
+#### MCP Configuration
+
+The orchestrator connects to the todolist MCP server:
+
+```json
+{
+  "mcpServers": {
+    "todolist": {
+      "command": "node",
+      "args": ["/path/to/todolist/mcp-server/dist/index.js"],
+      "env": {
+        "TODOLIST_API_URL": "https://your-backend-url",
+        "TODOLIST_AUTH_TOKEN": "your_jwt_token",
+        "DEFAULT_SPACE_ID": "your_space_id"
+      }
+    }
+  }
+}
+```
+
+#### Claude Code Setup (Simple)
+
+For Claude Code (no orchestrator), use the polling skill:
+
+```
+/loop 1m /check-messages
+```
+
+This runs the `check-messages` skill every minute, which calls `get_pending_sessions` and handles messages inline. Background agents can be dispatched for longer tasks but lack persistent state management.
 
 ### Token Expiration
 
