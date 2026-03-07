@@ -14,6 +14,14 @@ logger = logging.getLogger(__name__)
 sessions_collection = db.chat_sessions
 trajectories_collection = db.chat_trajectories
 
+# Session management configuration
+MAX_ACTIVE_SESSIONS = 10  # Maximum sessions to show in list-pending
+SESSION_STALE_DAYS = 7     # Sessions older than this are archived (not in list-pending)
+
+# Session status types
+SESSION_STATUS_ACTIVE = "active"
+SESSION_STATUS_ARCHIVED = "archived"
+
 
 async def create_session(user_id: str, space_id: Optional[str], title: str, todo_id: Optional[str] = None) -> str:
     """Create a new chat session and return its string ID.
@@ -77,13 +85,24 @@ async def get_pending_sessions(user_id: str, space_id: Optional[str] = None) -> 
     Uses the ``needs_agent_response`` flag for fast indexed queries.
     Falls back to checking the last message role for legacy docs that
     don't have the flag yet.
+    
+    Implements session capping: MAX_ACTIVE_SESSIONS limit and stale session filtering.
     """
+    from datetime import timedelta
+    
     base_query: Dict[str, Any] = {"user_id": user_id}
     if space_id:
         base_query["space_id"] = space_id
-
-    # Query 1: docs with the flag set (fast, indexed)
-    flagged_query = {**base_query, "needs_agent_response": True}
+    
+    # Archive filter: only sessions updated in last SESSION_STALE_DAYS
+    stale_threshold = datetime.utcnow() - timedelta(days=SESSION_STALE_DAYS)
+    
+    # Query 1: docs with the flag set (fast, indexed) + not stale
+    flagged_query = {
+        **base_query, 
+        "needs_agent_response": True,
+        "updated_at": {"$gte": stale_threshold}
+    }
     # Query 2: legacy docs missing the flag — fall back to last-message check
     legacy_query = {**base_query, "needs_agent_response": {"$exists": False}}
 
@@ -118,6 +137,15 @@ async def get_pending_sessions(user_id: str, space_id: Optional[str] = None) -> 
 
     await _collect(trajectories_collection.find(flagged_query))
     await _collect(trajectories_collection.find(legacy_query))
+    
+    # Sort by updated_at (newest first) and apply session cap
+    pending.sort(key=lambda x: x.get("updated_at", datetime.min), reverse=True)
+    
+    # Apply MAX_ACTIVE_SESSIONS cap
+    if len(pending) > MAX_ACTIVE_SESSIONS:
+        logger.info(f"Session cap applied: {len(pending)} sessions, returning {MAX_ACTIVE_SESSIONS}")
+        return pending[:MAX_ACTIVE_SESSIONS]
+    
     return pending
 
 
@@ -212,6 +240,12 @@ async def append_message(session_id: str, user_id: str, role: str, content: str)
     - assistant msg → appends message, then checks if a user message
       arrived in the meantime.  Only clears the flag when the last
       message in the array is still from the assistant.
+    
+    Session Archival & Resurrection:
+    - Sessions older than SESSION_STALE_DAYS are excluded from list-pending
+    - When a new message is added, updated_at is refreshed to now
+    - This "resurrects" archived sessions, making them active again
+    - See get_pending_sessions() for stale session filtering logic
     """
     now = datetime.utcnow()
     message = {"role": role, "content": content, "timestamp": now.isoformat()}
