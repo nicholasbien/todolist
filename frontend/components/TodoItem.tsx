@@ -13,6 +13,7 @@ interface TodoItemProps {
   isCollaborative: boolean;
   onEdit: (todo: any) => void;
   onChat: (todo: any) => void;
+  hasUnreadReply?: boolean;
 }
 
 export default function TodoItem({
@@ -27,6 +28,7 @@ export default function TodoItem({
   isCollaborative,
   onEdit,
   onChat,
+  hasUnreadReply,
 }: TodoItemProps) {
   const [isCompleting, setIsCompleting] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -151,14 +153,19 @@ export default function TodoItem({
             onClick={(e) => { e.stopPropagation(); onChat(todo); }}
             onMouseEnter={() => setHoveredButton('chat')}
             onMouseLeave={() => setHoveredButton(null)}
-            className={`text-lg w-11 h-11 flex items-center justify-center rounded-lg transition-all duration-200 focus:outline-none ${
-              hoveredButton === 'chat'
+            className={`relative text-lg w-11 h-11 flex items-center justify-center rounded-lg transition-all duration-200 focus:outline-none ${
+              hasUnreadReply
+                ? "text-accent"
+                : hoveredButton === 'chat'
                 ? "text-accent bg-accent/10"
                 : "text-gray-400"
             }`}
             aria-label="Chat about this task"
           >
             <MessageCircle className="w-5 h-5" />
+            {hasUnreadReply && (
+              <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-accent rounded-full animate-pulse" />
+            )}
           </button>
           {!todo.completed ? (
             <button

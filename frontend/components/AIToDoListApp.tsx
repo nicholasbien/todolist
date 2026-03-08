@@ -224,6 +224,27 @@ export default function AIToDoListApp({
   const agentTabRef = useRef<HTMLDivElement>(null);
   const journalTabRef = useRef<HTMLDivElement>(null);
 
+  // Unread agent replies
+  const [unreadTodoIds, setUnreadTodoIds] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (!token || !activeSpace?._id) return;
+    let cancelled = false;
+    const poll = async () => {
+      try {
+        const res = await fetch(`/agent/sessions/unread-todos?space_id=${activeSpace._id}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok && !cancelled) {
+          const data = await res.json();
+          setUnreadTodoIds(new Set(data.todo_ids || []));
+        }
+      } catch {}
+    };
+    poll();
+    const interval = setInterval(poll, 10000);
+    return () => { cancelled = true; clearInterval(interval); };
+  }, [token, activeSpace?._id]);
 
   const handleOpenEmailSettings = async () => {
     try {
@@ -393,6 +414,16 @@ export default function AIToDoListApp({
       if (res.ok) {
         const data = await res.json();
         if (data.session_id) {
+          // Mark as read and clear from unread set
+          fetch(`/agent/sessions/${data.session_id}/mark-read`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}` },
+          }).catch(() => {});
+          setUnreadTodoIds(prev => {
+            const next = new Set(prev);
+            next.delete(todo._id);
+            return next;
+          });
           setPendingSessionId(data.session_id);
           handleTabChange(1);
           return;
@@ -1832,6 +1863,7 @@ export default function AIToDoListApp({
                   isCollaborative={(activeSpace?.member_ids?.length ?? 0) > 1}
                   onEdit={handleEditTodo}
                   onChat={handleChatAboutTodo}
+                  hasUnreadReply={unreadTodoIds.has(todo._id)}
                 />
               </SortableItem>
             ))}
@@ -1867,6 +1899,7 @@ export default function AIToDoListApp({
               isCollaborative={(activeSpace?.member_ids?.length ?? 0) > 1}
               onEdit={handleEditTodo}
               onChat={handleChatAboutTodo}
+              hasUnreadReply={unreadTodoIds.has(todo._id)}
             />
           ))}
         </div>

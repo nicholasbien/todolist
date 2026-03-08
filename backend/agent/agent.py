@@ -27,7 +27,9 @@ from chat_sessions import (  # noqa: E402
     find_session_by_todo,
     get_pending_sessions,
     get_session_trajectory,
+    get_unread_todo_ids,
     list_sessions,
+    mark_session_read,
     release_session,
     save_trajectory,
     trajectories_collection,
@@ -780,6 +782,32 @@ async def get_pending_chat_sessions(
     if not user_id:
         raise HTTPException(status_code=401, detail="User not authenticated")
     return await get_pending_sessions(user_id, space_id)
+
+
+@router.get("/sessions/unread-todos")
+async def get_unread_todos(
+    space_id: Optional[str] = Query(None),
+    current_user: dict = Depends(get_current_user),
+):
+    """Return todo_ids that have unread agent replies."""
+    user_id = current_user.get("user_id")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="User not authenticated")
+    todo_ids = await get_unread_todo_ids(user_id, space_id)
+    return {"todo_ids": todo_ids}
+
+
+@router.post("/sessions/{session_id}/mark-read")
+async def mark_session_as_read(
+    session_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    """Mark a session's agent replies as read."""
+    user_id = current_user.get("user_id")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="User not authenticated")
+    await mark_session_read(session_id, user_id)
+    return {"ok": True}
 
 
 @router.get("/sessions/{session_id}")

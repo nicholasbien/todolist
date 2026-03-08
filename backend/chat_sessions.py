@@ -353,7 +353,7 @@ async def append_message(
             if msgs and msgs[-1].get("role") == "assistant":
                 await trajectories_collection.update_one(
                     {"session_id": session_id, "user_id": user_id},
-                    {"$set": {"needs_agent_response": False}},
+                    {"$set": {"needs_agent_response": False, "has_unread_reply": True}},
                 )
 
             # Auto-release after MAX_SESSION_TURNS exchanges
@@ -386,6 +386,29 @@ async def delete_session(session_id: str, user_id: str) -> bool:
     return result.deleted_count > 0
 
 
+async def get_unread_todo_ids(user_id: str, space_id: Optional[str] = None) -> List[str]:
+    """Return todo_ids that have unread agent replies."""
+    query: Dict[str, Any] = {"user_id": user_id, "has_unread_reply": True}
+    if space_id:
+        query["space_id"] = space_id
+
+    todo_ids = []
+    async for traj in trajectories_collection.find(query, {"session_id": 1}):
+        session_doc = await sessions_collection.find_one({"_id": ObjectId(traj["session_id"])}, {"todo_id": 1})
+        if session_doc and session_doc.get("todo_id"):
+            todo_ids.append(session_doc["todo_id"])
+    return todo_ids
+
+
+async def mark_session_read(session_id: str, user_id: str) -> bool:
+    """Clear the unread reply flag for a session. Returns True if found."""
+    result = await trajectories_collection.update_one(
+        {"session_id": session_id, "user_id": user_id},
+        {"$set": {"has_unread_reply": False}},
+    )
+    return result.matched_count > 0
+
+
 async def init_chat_session_indexes() -> None:
     """Create indexes for chat sessions and trajectories."""
     try:
@@ -398,6 +421,9 @@ async def init_chat_session_indexes() -> None:
         await trajectories_collection.create_index("user_id")
         await trajectories_collection.create_index(
             [("user_id", 1), ("needs_agent_response", 1)],
+        )
+        await trajectories_collection.create_index(
+            [("user_id", 1), ("has_unread_reply", 1)],
         )
         # Unique partial index: enforce at most one session per (user_id, todo_id)
         # where todo_id is not null. This prevents duplicate todo-linked sessions
