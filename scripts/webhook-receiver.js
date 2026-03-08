@@ -320,8 +320,8 @@ class WebhookReceiver {
   async claimSessionCli(sessionId) {
     const { execSync } = require('child_process');
     
-    // Use relative path from Railway working directory (/app)
-    const cliPath = 'todolist/cli/todolist-cli.js';
+    // Use CLI from same directory (copied during build)
+    const cliPath = './todolist-cli.js';
     
     // Debug: Log env var status
     this._log('debug', 'Claim session env check', {
