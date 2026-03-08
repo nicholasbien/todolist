@@ -223,6 +223,10 @@ export default function AIToDoListApp({
   const agentTabRef = useRef<HTMLDivElement>(null);
   const journalTabRef = useRef<HTMLDivElement>(null);
 
+  // Session state for task-linked chats
+  const [pendingSessionId, setPendingSessionId] = useState<string | null>(null);
+  const [todoSessionStatuses, setTodoSessionStatuses] = useState<Record<string, string>>({});
+
 
   const handleOpenEmailSettings = async () => {
     try {
@@ -374,6 +378,69 @@ export default function AIToDoListApp({
     fetchTodos();
     fetchMembers();
   }, [fetchCategories, fetchTodos, fetchMembers]);
+
+  // Poll todo session statuses every 10 seconds
+  useEffect(() => {
+    if (!token || !activeSpace) return;
+    const fetchStatuses = async () => {
+      try {
+        const params = new URLSearchParams();
+        if (activeSpace?._id) params.append('space_id', activeSpace._id);
+        const res = await authenticatedFetch(`/agent/sessions/todo-statuses?${params.toString()}`);
+        if (res.ok) {
+          const data = await res.json();
+          setTodoSessionStatuses(data);
+        }
+      } catch {
+        // Silently ignore
+      }
+    };
+    fetchStatuses();
+    const interval = setInterval(fetchStatuses, 10000);
+    return () => clearInterval(interval);
+  }, [token, activeSpace, authenticatedFetch]);
+
+  // Handle opening a task-linked chat session
+  const handleChatAboutTodo = useCallback(async (todo: any) => {
+    try {
+      // Check for existing session
+      const res = await authenticatedFetch(`/agent/sessions/by-todo/${todo._id}`);
+      if (res.ok) {
+        const session = await res.json();
+        // Mark as read if needed
+        if (session.has_unread_reply) {
+          await authenticatedFetch(`/agent/sessions/${session._id}/mark-read`, { method: 'POST' });
+          setTodoSessionStatuses(prev => {
+            const next = { ...prev };
+            delete next[todo._id];
+            return next;
+          });
+        }
+        setPendingSessionId(session._id);
+      } else if (res.status === 404) {
+        // Create new session linked to this todo
+        const createRes = await authenticatedFetch('/agent/sessions', {
+          method: 'POST',
+          body: JSON.stringify({
+            space_id: activeSpace?._id || null,
+            title: todo.text,
+            todo_id: todo._id,
+            initial_message: `Task: ${todo.text}`,
+            initial_role: 'user',
+          }),
+        });
+        if (createRes.ok) {
+          const session = await createRes.json();
+          setPendingSessionId(session._id);
+        }
+      }
+      // Switch to agent tab
+      setTabIndex(1);
+      setActiveTab('agent');
+    } catch (err) {
+      console.error('Error opening task chat:', err);
+    }
+  }, [authenticatedFetch, activeSpace]);
 
   // Handle tab change (from button click only - swiping is disabled)
   const handleTabChange = useCallback((index: number) => {
@@ -1791,6 +1858,8 @@ export default function AIToDoListApp({
                   handleDeleteTodo={handleDeleteTodo}
                   isCollaborative={(activeSpace?.member_ids?.length ?? 0) > 1}
                   onEdit={handleEditTodo}
+                  onChat={handleChatAboutTodo}
+                  sessionStatus={todoSessionStatuses[todo._id] as any}
                 />
               </SortableItem>
             ))}
@@ -1932,7 +2001,13 @@ export default function AIToDoListApp({
             <h2 className="text-xl font-semibold text-gray-100">Assistant</h2>
           </div> */}
           <div style={{ flex: 1, minHeight: 0 }}>
-            <AgentChatbot activeSpace={activeSpace} token={token} isActive={activeTab === 'agent'} />
+            <AgentChatbot
+              activeSpace={activeSpace}
+              token={token}
+              isActive={activeTab === 'agent'}
+              pendingSessionId={pendingSessionId}
+              onSessionLoaded={() => setPendingSessionId(null)}
+            />
           </div>
         </div>
 

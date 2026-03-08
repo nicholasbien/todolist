@@ -457,6 +457,7 @@ async def add_task(request: TaskAddRequest, user_id: str, space_id: Optional[str
             space_id=space_id,
             dateAdded=datetime.utcnow().isoformat(),
             notes=notes,
+            creator_type="agent",
         )
 
         created_todo = await db_create_todo(todo)

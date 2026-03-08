@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Check, RotateCcw, X } from "lucide-react";
+import { Check, RotateCcw, X, MessageCircle, Clock, Loader2, User, Bot } from "lucide-react";
 
 interface TodoItemProps {
   todo: any;
@@ -12,6 +12,8 @@ interface TodoItemProps {
   handleDeleteTodo: (id: string) => void;
   isCollaborative: boolean;
   onEdit: (todo: any) => void;
+  onChat?: (todo: any) => void;
+  sessionStatus?: 'waiting' | 'processing' | 'unread_reply';
 }
 
 export default function TodoItem({
@@ -25,6 +27,8 @@ export default function TodoItem({
   handleDeleteTodo,
   isCollaborative,
   onEdit,
+  onChat,
+  sessionStatus,
 }: TodoItemProps) {
   const [isCompleting, setIsCompleting] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -144,7 +148,34 @@ export default function TodoItem({
           </p>
         </div>
 
-        <div className="flex items-center space-x-2 ml-3" onTouchStart={(e) => e.stopPropagation()}>
+        <div className="flex items-center space-x-1 ml-3" onTouchStart={(e) => e.stopPropagation()}>
+          {/* Chat button */}
+          {onChat && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onChat(todo); }}
+              className={`relative text-lg w-11 h-11 flex items-center justify-center rounded-lg transition-all duration-200 focus:outline-none ${
+                sessionStatus === 'unread_reply'
+                  ? 'text-accent'
+                  : sessionStatus === 'processing'
+                  ? 'text-yellow-400'
+                  : sessionStatus === 'waiting'
+                  ? 'text-gray-400'
+                  : 'text-gray-500 hover:text-gray-300'
+              }`}
+              aria-label="Chat about this task"
+            >
+              {sessionStatus === 'waiting' ? (
+                <Clock className="w-5 h-5" />
+              ) : sessionStatus === 'processing' ? (
+                <Loader2 className="w-5 h-5 animate-spin" />
+              ) : (
+                <MessageCircle className="w-5 h-5" />
+              )}
+              {sessionStatus === 'unread_reply' && (
+                <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-accent rounded-full animate-pulse" />
+              )}
+            </button>
+          )}
           {!todo.completed ? (
             <button
               onClick={(e) => { e.stopPropagation(); handleCompleteClick(e); }}
@@ -294,6 +325,14 @@ export default function TodoItem({
                 return dueDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
               }
             })()}
+          </span>
+        )}
+        {todo.creator_type === 'agent' && (
+          <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full ${
+            todo.completed ? 'bg-purple-900/20 text-gray-500' : 'bg-purple-900/30 text-purple-300'
+          }`}>
+            <Bot className="w-3 h-3" />
+            AI
           </span>
         )}
         {isCollaborative && todo.first_name && (

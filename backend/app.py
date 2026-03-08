@@ -34,6 +34,9 @@ from categories import (
     migrate_legacy_categories,
     rename_category,
 )
+from chat_sessions import append_message, claim_session
+from chat_sessions import create_session as create_chat_session
+from chat_sessions import find_session_by_todo, mark_session_read, release_session
 
 # Import the classification function and todo management
 from classify import classify_task
@@ -350,6 +353,9 @@ async def api_create_todo(request: Request, current_user: dict = Depends(get_cur
         # Ensure dateAdded exists (frontend should provide this)
         body.setdefault("dateAdded", datetime.now().isoformat())
 
+        # Pass through creator_type if provided
+        body.setdefault("creator_type", "user")
+
         # Create Todo object from request data
         todo = Todo(**body)
         logger.info(f"Created Todo object: {todo}")
@@ -357,6 +363,36 @@ async def api_create_todo(request: Request, current_user: dict = Depends(get_cur
         # Create the todo in the database
         result = await create_todo(todo)
         logger.info(f"Todo created successfully: {result}")
+
+        # Auto-create a linked session for the task (unless created offline)
+        if not body.get("created_offline", False):
+            try:
+                todo_dict = result.dict(by_alias=True)
+                todo_id = str(todo_dict["_id"])
+                # Build initial message with task details
+                parts = [f"Task: {todo_dict['text']}"]
+                if todo_dict.get("category") and todo_dict["category"] != "General":
+                    parts.append(f"Category: {todo_dict['category']}")
+                if todo_dict.get("priority"):
+                    parts.append(f"Priority: {todo_dict['priority']}")
+                if todo_dict.get("dueDate"):
+                    parts.append(f"Due: {todo_dict['dueDate']}")
+                if todo_dict.get("notes"):
+                    parts.append(f"Notes: {todo_dict['notes']}")
+                initial_msg = "\n".join(parts)
+
+                # Post as assistant if agent-created, user if user-created
+                role = "assistant" if body.get("creator_type") == "agent" else "user"
+                session_id = await create_chat_session(
+                    current_user["user_id"],
+                    body.get("space_id"),
+                    todo_dict["text"],
+                    todo_id=todo_id,
+                )
+                await append_message(session_id, current_user["user_id"], role, initial_msg)
+            except Exception as e:
+                logger.error(f"Failed to auto-create session for todo: {e}")
+
         return result
     except Exception as e:
         logger.error(f"Error creating todo: {str(e)}")
@@ -852,6 +888,133 @@ async def export_data(
         )
 
     raise HTTPException(status_code=400, detail="Invalid format")
+
+
+# ---------------------------------------------------------------------------
+# Agent session messaging endpoints
+# ---------------------------------------------------------------------------
+
+
+class CreateSessionRequest(BaseModel):
+    space_id: Optional[str] = None
+    title: Optional[str] = None
+    todo_id: Optional[str] = None
+    initial_message: Optional[str] = None
+    initial_role: str = "user"
+
+
+class PostMessageRequest(BaseModel):
+    role: str = "user"
+    content: str
+
+
+class ClaimSessionRequest(BaseModel):
+    agent_id: str
+
+
+@app.post("/agent/sessions")
+async def api_create_agent_session(req: CreateSessionRequest, current_user: dict = Depends(get_current_user)):
+    """Create a new messaging session, optionally linked to a todo."""
+    user_id = current_user["user_id"]
+
+    # If todo_id provided, check for existing session
+    if req.todo_id:
+        existing = await find_session_by_todo(user_id, req.todo_id)
+        if existing:
+            return existing
+
+    title = req.title or req.initial_message or "New session"
+    session_id = await create_chat_session(user_id, req.space_id, title, todo_id=req.todo_id)
+
+    # Post initial message if provided
+    if req.initial_message:
+        await append_message(session_id, user_id, req.initial_role, req.initial_message)
+
+    session = await find_session_by_todo(user_id, req.todo_id) if req.todo_id else None
+    if not session:
+        from bson import ObjectId as _ObjId
+        from chat_sessions import sessions_collection
+
+        doc = await sessions_collection.find_one({"_id": _ObjId(session_id)})
+        if doc:
+            doc["_id"] = str(doc["_id"])
+            session = doc
+
+    return session
+
+
+@app.post("/agent/sessions/{session_id}/messages")
+async def api_post_session_message(
+    session_id: str,
+    req: PostMessageRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    """Post a message to a session."""
+    user_id = current_user["user_id"]
+    message = await append_message(session_id, user_id, req.role, req.content)
+    return {"ok": True, "message": message}
+
+
+@app.post("/agent/sessions/{session_id}/claim")
+async def api_claim_session(
+    session_id: str,
+    req: ClaimSessionRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    """Atomically claim a session for an agent."""
+    ok = await claim_session(session_id, current_user["user_id"], req.agent_id)
+    return {"ok": ok}
+
+
+@app.post("/agent/sessions/{session_id}/release")
+async def api_release_session(
+    session_id: str,
+    req: ClaimSessionRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    """Release agent claim on a session."""
+    ok = await release_session(session_id, current_user["user_id"], req.agent_id)
+    return {"ok": ok}
+
+
+@app.post("/agent/sessions/{session_id}/mark-read")
+async def api_mark_session_read(
+    session_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    """Mark a session's agent replies as read."""
+    ok = await mark_session_read(session_id, current_user["user_id"])
+    return {"ok": ok}
+
+
+@app.get("/todos/{todo_id}")
+async def api_get_single_todo(
+    todo_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    """Get a single todo by ID."""
+    from bson import ObjectId as _ObjId
+
+    try:
+        doc = await todos_collection.find_one({"_id": _ObjId(todo_id)})
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid todo ID")
+    if not doc:
+        raise HTTPException(status_code=404, detail="Todo not found")
+    # Check space access
+    if doc.get("space_id") and not await user_in_space(current_user["user_id"], doc["space_id"]):
+        raise HTTPException(status_code=403, detail="Not in space")
+    doc["_id"] = str(doc["_id"])
+    # Add first_name
+    try:
+        import auth
+
+        user = await auth.users_collection.find_one({"_id": _ObjId(doc["user_id"])})
+        if user:
+            doc["first_name"] = user.get("first_name", "")
+    except Exception:
+        doc["first_name"] = ""
+    return doc
 
 
 if __name__ == "__main__":
