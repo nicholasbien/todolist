@@ -224,20 +224,21 @@ export default function AIToDoListApp({
   const agentTabRef = useRef<HTMLDivElement>(null);
   const journalTabRef = useRef<HTMLDivElement>(null);
 
-  // Unread agent replies
-  const [unreadTodoIds, setUnreadTodoIds] = useState<Set<string>>(new Set());
+  // Todo session statuses: todo_id → 'waiting' | 'processing' | 'unread_reply'
+  type SessionStatus = 'waiting' | 'processing' | 'unread_reply';
+  const [todoSessionStatuses, setTodoSessionStatuses] = useState<Record<string, SessionStatus>>({});
 
   useEffect(() => {
     if (!token || !activeSpace?._id) return;
     let cancelled = false;
     const poll = async () => {
       try {
-        const res = await fetch(`/agent/sessions/unread-todos?space_id=${activeSpace._id}`, {
+        const res = await fetch(`/agent/sessions/todo-statuses?space_id=${activeSpace._id}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (res.ok && !cancelled) {
           const data = await res.json();
-          setUnreadTodoIds(new Set(data.todo_ids || []));
+          setTodoSessionStatuses(data.statuses || {});
         }
       } catch {}
     };
@@ -414,14 +415,14 @@ export default function AIToDoListApp({
       if (res.ok) {
         const data = await res.json();
         if (data.session_id) {
-          // Mark as read and clear from unread set
+          // Mark as read and clear status
           fetch(`/agent/sessions/${data.session_id}/mark-read`, {
             method: 'POST',
             headers: { Authorization: `Bearer ${token}` },
           }).catch(() => {});
-          setUnreadTodoIds(prev => {
-            const next = new Set(prev);
-            next.delete(todo._id);
+          setTodoSessionStatuses(prev => {
+            const next = { ...prev };
+            delete next[todo._id];
             return next;
           });
           setPendingSessionId(data.session_id);
@@ -1863,7 +1864,7 @@ export default function AIToDoListApp({
                   isCollaborative={(activeSpace?.member_ids?.length ?? 0) > 1}
                   onEdit={handleEditTodo}
                   onChat={handleChatAboutTodo}
-                  hasUnreadReply={unreadTodoIds.has(todo._id)}
+                  sessionStatus={todoSessionStatuses[todo._id]}
                 />
               </SortableItem>
             ))}
@@ -1899,7 +1900,7 @@ export default function AIToDoListApp({
               isCollaborative={(activeSpace?.member_ids?.length ?? 0) > 1}
               onEdit={handleEditTodo}
               onChat={handleChatAboutTodo}
-              hasUnreadReply={unreadTodoIds.has(todo._id)}
+              sessionStatus={todoSessionStatuses[todo._id]}
             />
           ))}
         </div>

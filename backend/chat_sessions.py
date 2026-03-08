@@ -26,9 +26,7 @@ SESSION_STATUS_ACTIVE = "active"
 SESSION_STATUS_ARCHIVED = "archived"
 
 
-async def create_session(
-    user_id: str, space_id: Optional[str], title: str, todo_id: Optional[str] = None
-) -> str:
+async def create_session(user_id: str, space_id: Optional[str], title: str, todo_id: Optional[str] = None) -> str:
     """Create a new chat session and return its string ID.
 
     If todo_id is provided and a session already exists for that todo,
@@ -85,9 +83,7 @@ async def find_session_by_todo(user_id: str, todo_id: str) -> Optional[str]:
     return None
 
 
-async def get_pending_sessions(
-    user_id: str, space_id: Optional[str] = None
-) -> List[Dict[str, Any]]:
+async def get_pending_sessions(user_id: str, space_id: Optional[str] = None) -> List[Dict[str, Any]]:
     """Return sessions that need an agent response.
 
     Uses the ``needs_agent_response`` flag for fast indexed queries.
@@ -151,9 +147,7 @@ async def get_pending_sessions(
 
     # Apply MAX_ACTIVE_SESSIONS cap
     if len(pending) > MAX_ACTIVE_SESSIONS:
-        logger.info(
-            f"Session cap applied: {len(pending)} sessions, returning {MAX_ACTIVE_SESSIONS}"
-        )
+        logger.info(f"Session cap applied: {len(pending)} sessions, returning {MAX_ACTIVE_SESSIONS}")
         return pending[:MAX_ACTIVE_SESSIONS]
 
     return pending
@@ -192,9 +186,7 @@ async def claim_session(session_id: str, user_id: str, agent_id: str) -> bool:
                     {"_id": ObjectId(session_doc["todo_id"]), "user_id": user_id},
                     {"$set": {"agent_id": agent_id}},
                 )
-                logger.info(
-                    f"Synced agent_id to todo {session_doc['todo_id']} for session {session_id}"
-                )
+                logger.info(f"Synced agent_id to todo {session_doc['todo_id']} for session {session_id}")
         except Exception as e:
             logger.warning(f"Failed to sync agent_id to linked todo: {e}")
 
@@ -219,39 +211,27 @@ async def release_session(session_id: str, user_id: str, agent_id: str = "") -> 
                 {"_id": ObjectId(session_doc["todo_id"]), "user_id": user_id},
                 {"$set": {"agent_id": None}},
             )
-            logger.info(
-                f"Cleared agent_id from todo {session_doc['todo_id']} for session {session_id}"
-            )
+            logger.info(f"Cleared agent_id from todo {session_doc['todo_id']} for session {session_id}")
     except Exception as e:
         logger.warning(f"Failed to clear agent_id from linked todo: {e}")
 
 
-async def list_sessions(
-    user_id: str, space_id: Optional[str] = None, limit: int = 50
-) -> List[Dict[str, Any]]:
+async def list_sessions(user_id: str, space_id: Optional[str] = None, limit: int = 50) -> List[Dict[str, Any]]:
     """List sessions for dropdown. Returns lightweight metadata only."""
     query: Dict[str, Any] = {"user_id": user_id}
     if space_id is not None:
         query["space_id"] = space_id
 
-    cursor = (
-        sessions_collection.find(query, {"user_id": 0})
-        .sort("updated_at", -1)
-        .limit(limit)
-    )
+    cursor = sessions_collection.find(query, {"user_id": 0}).sort("updated_at", -1).limit(limit)
     items = await cursor.to_list(length=limit)
     for item in items:
         item["_id"] = str(item["_id"])
     return items
 
 
-async def get_session_trajectory(
-    session_id: str, user_id: str
-) -> Optional[Dict[str, Any]]:
+async def get_session_trajectory(session_id: str, user_id: str) -> Optional[Dict[str, Any]]:
     """Load a session's trajectory and display messages. Validates ownership."""
-    doc = await trajectories_collection.find_one(
-        {"session_id": session_id, "user_id": user_id}
-    )
+    doc = await trajectories_collection.find_one({"session_id": session_id, "user_id": user_id})
     if not doc:
         return None
 
@@ -299,9 +279,7 @@ async def save_trajectory(
 MAX_SESSION_TURNS = 10
 
 
-async def append_message(
-    session_id: str, user_id: str, role: str, content: str
-) -> bool:
+async def append_message(session_id: str, user_id: str, role: str, content: str) -> bool:
     """Append a message to a session's display_messages. Returns True if found.
 
     Automatically manages ``needs_agent_response``:
@@ -359,9 +337,7 @@ async def append_message(
             # Auto-release after MAX_SESSION_TURNS exchanges
             turn_count = sum(1 for m in msgs if m.get("role") == "assistant")
             if turn_count >= MAX_SESSION_TURNS:
-                logger.info(
-                    f"Session {session_id} hit {MAX_SESSION_TURNS} turns — auto-releasing agent"
-                )
+                logger.info(f"Session {session_id} hit {MAX_SESSION_TURNS} turns — auto-releasing agent")
                 await trajectories_collection.update_one(
                     {"session_id": session_id, "user_id": user_id},
                     {"$set": {"agent_id": None}},
@@ -377,12 +353,8 @@ async def append_message(
 
 async def delete_session(session_id: str, user_id: str) -> bool:
     """Delete a session and its trajectory. Returns True if found."""
-    result = await sessions_collection.delete_one(
-        {"_id": ObjectId(session_id), "user_id": user_id}
-    )
-    await trajectories_collection.delete_one(
-        {"session_id": session_id, "user_id": user_id}
-    )
+    result = await sessions_collection.delete_one({"_id": ObjectId(session_id), "user_id": user_id})
+    await trajectories_collection.delete_one({"session_id": session_id, "user_id": user_id})
     return result.deleted_count > 0
 
 
@@ -400,6 +372,40 @@ async def get_unread_todo_ids(user_id: str, space_id: Optional[str] = None) -> L
     return todo_ids
 
 
+async def get_todo_session_statuses(user_id: str, space_id: Optional[str] = None) -> Dict[str, str]:
+    """Return a map of todo_id → status for all todos with active sessions.
+
+    Statuses:
+      - ``waiting``       – needs agent response, no agent claimed yet
+      - ``processing``    – needs agent response, agent has claimed it
+      - ``unread_reply``  – agent replied but user hasn't viewed it
+    """
+    base_query: Dict[str, Any] = {"user_id": user_id}
+    if space_id:
+        base_query["space_id"] = space_id
+
+    statuses: Dict[str, str] = {}
+
+    async for traj in trajectories_collection.find(
+        base_query,
+        {"session_id": 1, "needs_agent_response": 1, "has_unread_reply": 1, "agent_id": 1},
+    ):
+        session_doc = await sessions_collection.find_one({"_id": ObjectId(traj["session_id"])}, {"todo_id": 1})
+        if not session_doc or not session_doc.get("todo_id"):
+            continue
+
+        todo_id = session_doc["todo_id"]
+
+        if traj.get("has_unread_reply"):
+            statuses[todo_id] = "unread_reply"
+        elif traj.get("needs_agent_response"):
+            if traj.get("agent_id"):
+                statuses[todo_id] = "processing"
+            else:
+                statuses[todo_id] = "waiting"
+    return statuses
+
+
 async def mark_session_read(session_id: str, user_id: str) -> bool:
     """Clear the unread reply flag for a session. Returns True if found."""
     result = await trajectories_collection.update_one(
@@ -412,9 +418,7 @@ async def mark_session_read(session_id: str, user_id: str) -> bool:
 async def init_chat_session_indexes() -> None:
     """Create indexes for chat sessions and trajectories."""
     try:
-        await sessions_collection.create_index(
-            [("user_id", 1), ("space_id", 1), ("updated_at", -1)]
-        )
+        await sessions_collection.create_index([("user_id", 1), ("space_id", 1), ("updated_at", -1)])
         await sessions_collection.create_index("user_id")
 
         await trajectories_collection.create_index("session_id", unique=True)

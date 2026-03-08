@@ -27,6 +27,7 @@ from chat_sessions import (  # noqa: E402
     find_session_by_todo,
     get_pending_sessions,
     get_session_trajectory,
+    get_todo_session_statuses,
     get_unread_todo_ids,
     list_sessions,
     mark_session_read,
@@ -795,6 +796,19 @@ async def get_unread_todos(
         raise HTTPException(status_code=401, detail="User not authenticated")
     todo_ids = await get_unread_todo_ids(user_id, space_id)
     return {"todo_ids": todo_ids}
+
+
+@router.get("/sessions/todo-statuses")
+async def get_todo_statuses(
+    space_id: Optional[str] = Query(None),
+    current_user: dict = Depends(get_current_user),
+):
+    """Return session status for each todo: waiting, processing, or unread_reply."""
+    user_id = current_user.get("user_id")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="User not authenticated")
+    statuses = await get_todo_session_statuses(user_id, space_id)
+    return {"statuses": statuses}
 
 
 @router.post("/sessions/{session_id}/mark-read")

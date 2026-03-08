@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Check, MessageCircle, RotateCcw, X } from "lucide-react";
+import { Check, Clock, Loader2, MessageCircle, RotateCcw, X } from "lucide-react";
 
 interface TodoItemProps {
   todo: any;
@@ -13,7 +13,7 @@ interface TodoItemProps {
   isCollaborative: boolean;
   onEdit: (todo: any) => void;
   onChat: (todo: any) => void;
-  hasUnreadReply?: boolean;
+  sessionStatus?: 'waiting' | 'processing' | 'unread_reply';
 }
 
 export default function TodoItem({
@@ -28,7 +28,7 @@ export default function TodoItem({
   isCollaborative,
   onEdit,
   onChat,
-  hasUnreadReply,
+  sessionStatus,
 }: TodoItemProps) {
   const [isCompleting, setIsCompleting] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -154,16 +154,26 @@ export default function TodoItem({
             onMouseEnter={() => setHoveredButton('chat')}
             onMouseLeave={() => setHoveredButton(null)}
             className={`relative text-lg w-11 h-11 flex items-center justify-center rounded-lg transition-all duration-200 focus:outline-none ${
-              hasUnreadReply
+              sessionStatus === 'unread_reply'
                 ? "text-accent"
+                : sessionStatus === 'processing'
+                ? "text-yellow-400"
+                : sessionStatus === 'waiting'
+                ? "text-gray-500"
                 : hoveredButton === 'chat'
                 ? "text-accent bg-accent/10"
                 : "text-gray-400"
             }`}
             aria-label="Chat about this task"
           >
-            <MessageCircle className="w-5 h-5" />
-            {hasUnreadReply && (
+            {sessionStatus === 'waiting' ? (
+              <Clock className="w-5 h-5" />
+            ) : sessionStatus === 'processing' ? (
+              <Loader2 className="w-5 h-5 animate-spin" />
+            ) : (
+              <MessageCircle className="w-5 h-5" />
+            )}
+            {sessionStatus === 'unread_reply' && (
               <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-accent rounded-full animate-pulse" />
             )}
           </button>
