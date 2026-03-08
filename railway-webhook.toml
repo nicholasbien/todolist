@@ -1,0 +1,26 @@
+[build]
+builder = "NIXPACKS"
+watchPatterns = ["scripts/**"]
+
+[deploy]
+startCommand = "node scripts/webhook-server.js"
+healthcheckPath = "/health"
+healthcheckTimeout = 30
+
+[env.WEBHOOK_PORT]
+value = "8080"
+
+[env.WEBHOOK_HOST]
+value = "0.0.0.0"
+
+[env.NODE_ENV]
+value = "production"
+
+[env.AUTO_CLAIM_ENABLED]
+value = "true"
+
+[env.AGENT_ID]
+value = "openclaw-webhook"
+
+[nixpacks]
+nodeVersion = "22"
