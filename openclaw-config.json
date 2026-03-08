@@ -4,7 +4,7 @@
       "command": "node",
       "args": ["/data/workspace/todolist/mcp-server/dist/index.js"],
       "env": {
-        "TODOLIST_API_URL": "https://backend-openclaw.up.railway.app",
+        "TODOLIST_API_URL": "https://backend-openclaw.railway.app",
         "TODOLIST_AUTH_TOKEN": "${TODOLIST_AUTH_TOKEN}",
         "DEFAULT_SPACE_ID": "${DEFAULT_SPACE_ID}"
       }
