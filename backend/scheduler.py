@@ -107,7 +107,6 @@ def update_schedule_time(
 
 def remove_user_schedule(user_id: str) -> None:
     """Remove a user's scheduled email job."""
-    global scheduler
     if scheduler is None:
         return
 
