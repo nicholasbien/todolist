@@ -24,6 +24,7 @@ async def client():
     # Reset database connections to avoid event loop issues between tests
     import auth
     import categories
+    import chat_sessions
     import chats
     import db
     import journals
@@ -45,6 +46,14 @@ async def client():
     spaces.spaces_collection = db.db.spaces
     chats.chats_collection = db.db.chats
     journals.journals_collection = db.db.journals
+    chat_sessions.sessions_collection = db.db.chat_sessions
+    chat_sessions.trajectories_collection = db.db.chat_trajectories
+
+    # Clear global MCP session state to prevent stale connections across tests
+    from agent.agent import mcp_contexts, mcp_sessions
+
+    mcp_sessions.clear()
+    mcp_contexts.clear()
 
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://testserver") as async_client:
         yield async_client
