@@ -34,9 +34,9 @@ from categories import (
     migrate_legacy_categories,
     rename_category,
 )
-from chat_sessions import append_message, claim_session
+from chat_sessions import append_message
 from chat_sessions import create_session as create_chat_session
-from chat_sessions import find_session_by_todo, mark_session_read, release_session
+from chat_sessions import find_session_by_todo, mark_session_read
 
 # Import the classification function and todo management
 from classify import classify_task
@@ -908,10 +908,6 @@ class PostMessageRequest(BaseModel):
     content: str
 
 
-class ClaimSessionRequest(BaseModel):
-    agent_id: str
-
-
 @app.post("/agent/sessions")
 async def api_create_agent_session(req: CreateSessionRequest, current_user: dict = Depends(get_current_user)):
     """Create a new messaging session, optionally linked to a todo."""
@@ -953,28 +949,6 @@ async def api_post_session_message(
     user_id = current_user["user_id"]
     message = await append_message(session_id, user_id, req.role, req.content)
     return {"ok": True, "message": message}
-
-
-@app.post("/agent/sessions/{session_id}/claim")
-async def api_claim_session(
-    session_id: str,
-    req: ClaimSessionRequest,
-    current_user: dict = Depends(get_current_user),
-):
-    """Atomically claim a session for an agent."""
-    ok = await claim_session(session_id, current_user["user_id"], req.agent_id)
-    return {"ok": ok}
-
-
-@app.post("/agent/sessions/{session_id}/release")
-async def api_release_session(
-    session_id: str,
-    req: ClaimSessionRequest,
-    current_user: dict = Depends(get_current_user),
-):
-    """Release agent claim on a session."""
-    ok = await release_session(session_id, current_user["user_id"], req.agent_id)
-    return {"ok": ok}
 
 
 @app.post("/agent/sessions/{session_id}/mark-read")

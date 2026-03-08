@@ -221,30 +221,6 @@ class TodolistMCPServer {
                         },
                     },
                     {
-                        name: 'claim_session',
-                        description: 'Atomically claim a session for processing',
-                        inputSchema: {
-                            type: 'object',
-                            properties: {
-                                session_id: { type: 'string', description: 'Session ID' },
-                                agent_id: { type: 'string', description: 'Agent identifier' },
-                            },
-                            required: ['session_id', 'agent_id'],
-                        },
-                    },
-                    {
-                        name: 'release_session',
-                        description: 'Release claim on a session',
-                        inputSchema: {
-                            type: 'object',
-                            properties: {
-                                session_id: { type: 'string', description: 'Session ID' },
-                                agent_id: { type: 'string', description: 'Agent identifier' },
-                            },
-                            required: ['session_id', 'agent_id'],
-                        },
-                    },
-                    {
                         name: 'delete_session',
                         description: 'Delete a chat session',
                         inputSchema: {
@@ -326,8 +302,6 @@ class TodolistMCPServer {
                     case 'get_session': return await this.getSession(args);
                     case 'get_pending_sessions': return await this.getPendingSessions(args);
                     case 'post_to_session': return await this.postToSession(args);
-                    case 'claim_session': return await this.claimSession(args);
-                    case 'release_session': return await this.releaseSession(args);
                     case 'delete_session': return await this.deleteSession(args);
                     case 'get_journal': return await this.getJournal(args);
                     case 'write_journal': return await this.writeJournal(args);
@@ -481,18 +455,6 @@ class TodolistMCPServer {
             content: args.content,
         });
         return this.textResult(`Posted ${args.role || 'assistant'} message to session ${args.session_id}`);
-    }
-    async claimSession(args) {
-        const response = await api.post(`/agent/sessions/${args.session_id}/claim`, {
-            agent_id: args.agent_id,
-        });
-        return this.textResult(response.data.ok ? `Claimed session ${args.session_id}` : `Failed to claim session (already claimed?)`);
-    }
-    async releaseSession(args) {
-        const response = await api.post(`/agent/sessions/${args.session_id}/release`, {
-            agent_id: args.agent_id,
-        });
-        return this.textResult(response.data.ok ? `Released session ${args.session_id}` : `Failed to release session`);
     }
     async deleteSession(args) {
         await api.delete(`/agent/sessions/${args.session_id}`);

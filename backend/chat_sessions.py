@@ -88,6 +88,7 @@ async def get_session_trajectory(session_id: str, user_id: str) -> Optional[Dict
     return {
         "session_id": session_id,
         "title": title,
+        "todo_id": session_doc.get("todo_id") if session_doc else None,
         "display_messages": doc.get("display_messages", []),
         "trajectory": doc.get("trajectory", []),
         "created_at": doc.get("created_at"),
@@ -207,7 +208,7 @@ async def get_unread_todo_ids(user_id: str, space_id: Optional[str] = None) -> L
 async def get_todo_session_statuses(user_id: str, space_id: Optional[str] = None) -> Dict[str, str]:
     """Return a map of todo_id -> status for todos with linked sessions.
 
-    Status values: 'waiting', 'processing', 'unread_reply'
+    Status values: 'waiting', 'unread_reply'
     """
     query: Dict[str, Any] = {
         "user_id": user_id,
@@ -218,7 +219,7 @@ async def get_todo_session_statuses(user_id: str, space_id: Optional[str] = None
 
     cursor = sessions_collection.find(
         query,
-        {"todo_id": 1, "needs_agent_response": 1, "has_unread_reply": 1, "agent_id": 1},
+        {"todo_id": 1, "needs_agent_response": 1, "has_unread_reply": 1},
     )
     items = await cursor.to_list(length=200)
 
@@ -230,10 +231,7 @@ async def get_todo_session_statuses(user_id: str, space_id: Optional[str] = None
         if item.get("has_unread_reply"):
             statuses[todo_id] = "unread_reply"
         elif item.get("needs_agent_response"):
-            if item.get("agent_id"):
-                statuses[todo_id] = "processing"
-            else:
-                statuses[todo_id] = "waiting"
+            statuses[todo_id] = "waiting"
     return statuses
 
 
@@ -242,32 +240,6 @@ async def mark_session_read(session_id: str, user_id: str) -> bool:
     result = await sessions_collection.update_one(
         {"_id": ObjectId(session_id), "user_id": user_id},
         {"$set": {"has_unread_reply": False}},
-    )
-    return result.modified_count > 0
-
-
-async def claim_session(session_id: str, user_id: str, agent_id: str) -> bool:
-    """Atomically claim a session for an agent. Returns True if successful."""
-    result = await sessions_collection.update_one(
-        {
-            "_id": ObjectId(session_id),
-            "user_id": user_id,
-            "agent_id": {"$in": [None, agent_id]},
-        },
-        {"$set": {"agent_id": agent_id}},
-    )
-    return result.modified_count > 0
-
-
-async def release_session(session_id: str, user_id: str, agent_id: str) -> bool:
-    """Release agent claim on a session."""
-    result = await sessions_collection.update_one(
-        {
-            "_id": ObjectId(session_id),
-            "user_id": user_id,
-            "agent_id": agent_id,
-        },
-        {"$set": {"agent_id": None}},
     )
     return result.modified_count > 0
 
