@@ -6,6 +6,10 @@ This guide explains how to set up OpenClaw as a persistent agent orchestrator fo
 
 OpenClaw's Gateway daemon replaces the CLI-based `/loop 1m /check-messages` pattern with a persistent background service that survives session restarts. It uses the heartbeat system to poll for pending user messages and dispatch agent responses.
 
+**CLI-first approach:** All agent interactions use `node cli/todolist-cli.js` commands (no MCP dependency). The MCP server is optional — configure it if you want richer tool integration, but the CLI covers all session operations.
+
+**Key difference from Claude Code:** OpenClaw agents stay claimed on sessions across heartbeats, enabling persistent multi-turn conversations with users.
+
 ## Quick Start
 
 ### 1. Install the MCP server dependencies
@@ -18,49 +22,27 @@ npm run build
 
 ### 2. Get your auth token
 
-Log in to the todolist web app, then grab your session token:
-- Open browser DevTools → Application → Local Storage
-- Copy the `token` value
-
-Alternatively, use the API directly:
 ```bash
-# Request OTP
-curl -X POST https://your-app-url.com/auth/send-code \
-  -H "Content-Type: application/json" \
-  -d '{"email": "your@email.com"}'
-
-# Verify OTP and get token
-curl -X POST https://your-app-url.com/auth/verify-code \
-  -H "Content-Type: application/json" \
-  -d '{"email": "your@email.com", "code": "123456"}'
+# For test account (instant, no email):
+curl -s -X POST -H "Content-Type: application/json" \
+  -d '{"email": "test@example.com", "code": "000000"}' \
+  https://backend-openclaw.up.railway.app/auth/login
 # Response: {"token": "your-session-token", ...}
 ```
+
+Or log in to the web app → DevTools → Application → Local Storage → copy `auth_token`.
 
 ### 3. Get your space ID
 
 ```bash
-curl https://your-app-url.com/spaces \
+curl -s https://backend-openclaw.up.railway.app/spaces \
   -H "Authorization: Bearer your-session-token"
-# Response: [{"_id": "your-space-id", "name": "My Space", ...}]
+# Response: [{"_id": "your-space-id", "name": "Personal", ...}]
 ```
 
-### 4. Configure OpenClaw MCP server
+### 4. Configure OpenClaw
 
-Run this to add the todolist MCP server to OpenClaw:
-
-```bash
-openclaw config set mcpServers.todolist '{
-  "command": "node",
-  "args": ["/absolute/path/to/todolist/mcp-server/dist/index.js"],
-  "env": {
-    "TODOLIST_API_URL": "https://your-app-url.com",
-    "TODOLIST_AUTH_TOKEN": "your-session-token",
-    "DEFAULT_SPACE_ID": "your-space-id"
-  }
-}'
-```
-
-Or add it directly to your `openclaw.json`:
+Add the todolist MCP server to your OpenClaw config:
 
 ```json
 {
@@ -69,7 +51,7 @@ Or add it directly to your `openclaw.json`:
       "command": "node",
       "args": ["/absolute/path/to/todolist/mcp-server/dist/index.js"],
       "env": {
-        "TODOLIST_API_URL": "https://your-app-url.com",
+        "TODOLIST_API_URL": "https://backend-openclaw.up.railway.app",
         "TODOLIST_AUTH_TOKEN": "your-session-token",
         "DEFAULT_SPACE_ID": "your-space-id"
       }
@@ -78,24 +60,15 @@ Or add it directly to your `openclaw.json`:
 }
 ```
 
-> **Note:** The MCP server runs locally as a child process of OpenClaw. It makes HTTP requests to your backend API — no server deployment needed.
+### 5. HEARTBEAT.md
 
-### 5. Create HEARTBEAT.md
+`HEARTBEAT.md` is already included in the repo root. It contains CLI-based instructions that OpenClaw follows on each heartbeat interval. No MCP required — all commands use `node cli/todolist-cli.js`.
 
-Create `HEARTBEAT.md` in the todolist workspace directory:
-
-```markdown
-# Heartbeat checklist
-
-- Call mcp__todolist__get_pending_sessions to check for unread user messages
-- For each pending session without a [Claimed by: ...] tag:
-  1. Claim it with mcp__todolist__claim_session (use a unique agent_id)
-  2. Read the full conversation with mcp__todolist__get_session
-  3. Do the requested work (answer questions, manage todos, edit code, etc.)
-  4. Post your response with mcp__todolist__post_to_session
-- Skip sessions that are already claimed by another agent
-- If no pending messages, reply HEARTBEAT_OK
-```
+Review and customize it if needed. The default instructions:
+- Poll for pending messages via `list-pending`
+- Claim unclaimed sessions, read conversations, do work, post responses
+- Stay claimed for follow-ups (persistent multi-turn conversations)
+- Auto-release after 10 agent responses
 
 ### 6. Configure heartbeat interval
 
@@ -104,46 +77,83 @@ openclaw config set agents.defaults.heartbeat.every "1m"
 openclaw config set agents.defaults.heartbeat.target "none"
 ```
 
-Or in `openclaw.json`:
-
-```json5
-agents: {
-  defaults: {
-    heartbeat: {
-      every: "1m",        // Poll every minute (adjust as needed)
-      target: "none"      // Runs internally, no external notification
-    }
-  }
-}
-```
-
 ### 7. Verify it works
 
 ```bash
 # Check that OpenClaw can see the todolist tools
 openclaw tools list | grep todolist
 
-# Or just send a test message from the web app and wait for a response
+# Send a test message from the web app's Assistant tab and wait ~1 minute
 ```
 
 ## Architecture
 
 ```
 ┌─────────────────────────────────────┐        ┌──────────────────┐
-│  Your machine                       │        │  Production      │
+│  Your machine                       │        │  Railway          │
 │                                     │        │                  │
 │  OpenClaw Gateway                   │        │  Backend API     │
 │    ├── Heartbeat (every 1m)         │        │  (FastAPI)       │
 │    └── MCP Server (child process) ──────HTTP──→               │
-│         (node dist/index.js)        │        │                  │
+│         (node dist/index.js)        │        │  MongoDB         │
 └─────────────────────────────────────┘        └──────────────────┘
 ```
 
-The MCP server is a thin translation layer: it receives tool calls from OpenClaw via stdin/stdout and turns them into HTTP requests to the backend API. It runs locally — no deployment needed.
+## Persistent Session Lifecycle
 
-## Available MCP Tools
+Sessions support multi-turn conversations between users and agents:
 
-Once configured, OpenClaw has access to 28+ todolist tools:
+```
+1. User sends message        → needs_agent_response = true
+2. Agent claims session      → agent_id = "oc-abc123"
+3. Agent posts response      → needs_agent_response = false, agent_id KEPT
+4. User sends follow-up      → needs_agent_response = true, same agent_id
+5. Heartbeat detects pending → resumes SAME agent (preserves context)
+6. Repeat steps 3-5...
+7. After 10 agent responses  → agent_id auto-released (MAX_SESSION_TURNS)
+8. Or agent explicitly calls → release_session() when done
+```
+
+**Why this matters for OpenClaw:** The gateway should track which agent handles which session and resume the same agent on follow-ups. This keeps conversation context intact across heartbeats.
+
+## CLI Commands (Primary)
+
+All agent interactions use the CLI. Set env vars first:
+
+```bash
+export TODOLIST_API_URL="https://backend-openclaw.up.railway.app"
+export TODOLIST_AUTH_TOKEN="your-token"
+export DEFAULT_SPACE_ID="your-space-id"
+```
+
+**Session commands:**
+```bash
+node cli/todolist-cli.js list-pending                        # Check for pending messages
+node cli/todolist-cli.js get-session <id>                    # Read full conversation
+node cli/todolist-cli.js claim-session <id> --agent-id oc-1  # Claim a session
+node cli/todolist-cli.js post-message -s <id> -c "response"  # Post a message
+node cli/todolist-cli.js watch-session <id> --since <ISO>    # Poll for new messages
+node cli/todolist-cli.js release-session <id>                # Release when done
+```
+
+**Task commands:**
+```bash
+node cli/todolist-cli.js list-todos                          # List active tasks
+node cli/todolist-cli.js add-todo "task text" --priority High # Create a task
+node cli/todolist-cli.js complete-todo <id>                  # Mark complete
+node cli/todolist-cli.js update-todo <id> --notes "details"  # Update task
+```
+
+**Other commands:**
+```bash
+node cli/todolist-cli.js list-sessions                       # List all sessions
+node cli/todolist-cli.js create-session --title "New chat"   # Create a session
+node cli/todolist-cli.js help                                # Full command list
+```
+
+## MCP Tools (Optional)
+
+If you prefer MCP over CLI, configure the MCP server (see step 4 above). Available tools:
 
 | Category | Tools |
 |----------|-------|
@@ -155,32 +165,38 @@ Once configured, OpenClaw has access to 28+ todolist tools:
 | Journal | `write_journal`, `get_journal`, `delete_journal` |
 | Other | `get_insights`, `export_data` |
 
-## Session Claiming
+## API Endpoints
 
-The `claim_session` / `release_session` system prevents duplicate work:
+For direct HTTP integration (no MCP):
 
-- `claim_session(session_id, agent_id)` — atomically claims a session; fails if already claimed by a different agent
-- When an agent posts a response (`post_to_session`), the claim is automatically released
-- If a user sends a follow-up message, the `agent_id` is preserved so the same agent can resume with context
-- `get_pending_sessions` shows `[Claimed by: agent_id]` for claimed sessions
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/agent/sessions/pending` | GET | Sessions with `needs_agent_response=true` |
+| `/agent/sessions/{id}` | GET | Full session with messages |
+| `/agent/sessions/{id}/claim` | POST | Atomically claim (body: `{agent_id}`) |
+| `/agent/sessions/{id}/release` | POST | Release claim |
+| `/agent/sessions/{id}/messages` | POST | Post message (body: `{role, content}`) |
+| `/agent/sessions/{id}/watch?since=<ISO>` | GET | New messages since timestamp |
+| `/agent/sessions` | POST | Create session (body: `{title, space_id?, todo_id?}`) |
+| `/agent/sessions` | GET | List all sessions |
 
-## Comparison: CLI Loop vs OpenClaw Gateway
+All endpoints require `Authorization: Bearer <token>` header.
 
-| Feature | CLI `/loop` | OpenClaw Gateway |
-|---------|------------|-----------------|
+## Comparison: Claude Code vs OpenClaw
+
+| Feature | Claude Code `/loop` | OpenClaw Gateway |
+|---------|---------------------|------------------|
 | Persistence | Dies with CLI session | Runs as system daemon |
 | Polling | `/loop 1m /check-messages` | Heartbeat every Nm |
 | Agent context | Lost between sessions | Managed by Gateway |
 | Multi-agent | Manual worktree isolation | Native session management |
-| Setup | Zero config | Requires openclaw.json |
+| Setup | Zero config | Requires openclaw config |
+| Session resume | Via Agent `resume` param | Native agent persistence |
 
 ## Troubleshooting
 
 - **MCP server not found**: Make sure the path in `args` is absolute and `npm run build` has been run
-- **Auth errors**: Token may have expired — grab a fresh one from the web app
-- **No pending messages**: Check that `TODOLIST_API_URL` points to the right backend and `DEFAULT_SPACE_ID` is correct
-- **Heartbeat not firing**: Verify with `openclaw config get agents.defaults.heartbeat` — interval should not be `0m`
-
-## Webhook Integration (Future)
-
-For even faster response times, a webhook endpoint can be added to the backend that POSTs to OpenClaw's Gateway when a user sends a message. This eliminates polling latency entirely. See the orchestrator integration guide in `AGENTS.md` for the planned webhook API.
+- **Auth errors (401)**: Token expired — re-login to get a fresh one (tokens last 30 days)
+- **No pending messages**: Check `TODOLIST_API_URL` and `DEFAULT_SPACE_ID` are correct
+- **Heartbeat not firing**: Verify with `openclaw config get agents.defaults.heartbeat`
+- **Session stuck as pending**: The MongoDB `-1` index bug was fixed — make sure backend is up to date
