@@ -49,9 +49,19 @@ async def client():
     chat_sessions.sessions_collection = db.db.chat_sessions
     chat_sessions.trajectories_collection = db.db.chat_trajectories
 
-    # Clear global MCP session state to prevent stale connections across tests
+    # Rebind agent module's imported reference so it reads from the same test DB
+    import agent.agent as agent_module
+
+    agent_module.trajectories_collection = db.db.chat_trajectories
+
+    # Async-cleanup MCP contexts before clearing to avoid leaked subprocesses
     from agent.agent import mcp_contexts, mcp_sessions
 
+    for ctx in list(mcp_contexts.values()):
+        try:
+            await ctx.__aexit__(None, None, None)
+        except Exception:
+            pass
     mcp_sessions.clear()
     mcp_contexts.clear()
 
