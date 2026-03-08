@@ -319,16 +319,48 @@ class WebhookReceiver {
    */
   async claimSessionCli(sessionId) {
     const { execSync } = require('child_process');
+    const path = require('path');
+    
+    // Use relative path from scripts/ directory (works in both local and Railway)
+    const cliPath = path.join(__dirname, '..', 'cli', 'todolist-cli.js');
+    
+    // Debug: Log env var status
+    this._log('debug', 'Claim session env check', {
+      has_auth_token: !!process.env.TODOLIST_AUTH_TOKEN,
+      auth_token_prefix: process.env.TODOLIST_AUTH_TOKEN ? process.env.TODOLIST_AUTH_TOKEN.substring(0, 10) + '...' : 'NOT SET',
+      has_api_url: !!process.env.TODOLIST_API_URL,
+      api_url: process.env.TODOLIST_API_URL,
+      cli_path: cliPath,
+      cwd: process.cwd(),
+    });
     
     try {
-      execSync(
-        `node /data/workspace/todolist/cli/todolist-cli.js claim-session ${sessionId} --agent-id ${CLAIM_AGENT_ID}`,
-        { stdio: 'pipe', timeout: 10000 }
+      const result = execSync(
+        `node "${cliPath}" claim-session ${sessionId} --agent-id ${CLAIM_AGENT_ID}`,
+        { 
+          stdio: 'pipe', 
+          timeout: 10000,
+          env: process.env, // Explicitly pass current env
+          cwd: process.cwd(),
+        }
       );
+      this._log('info', 'Session claimed successfully', { session_id: sessionId, output: result.toString() });
       return true;
     } catch (err) {
+      const stdout = err.stdout ? err.stdout.toString() : '';
+      const stderr = err.stderr ? err.stderr.toString() : '';
+      const errorMsg = err.message || 'Unknown error';
+      
+      this._log('error', 'Failed to claim session', { 
+        session_id: sessionId, 
+        error: errorMsg,
+        stdout,
+        stderr,
+        exitCode: err.status,
+      });
+      
       // Session might already be claimed - check if by us
-      if (err.stdout && err.stdout.toString().includes('already claimed')) {
+      if (stdout.includes('already claimed') || stderr.includes('already claimed') || errorMsg.includes('already claimed')) {
         return false;
       }
       return false;
