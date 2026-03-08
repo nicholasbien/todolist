@@ -8,6 +8,8 @@
  * - GET /health - Health check
  * - GET /stats - Session router stats
  * - POST /webhook/test - Test endpoint
+ * 
+ * Now with MongoDB persistence for session reliability.
  */
 
 const express = require('express');
@@ -52,15 +54,38 @@ const messageRouter = new MessageRouter({ sessionRouter, logger });
 const webhookReceiver = new WebhookReceiver({ sessionRouter, messageRouter, logger });
 
 /**
+ * Initialize database connection and load sessions
+ */
+async function initializeServer() {
+  try {
+    // Initialize MongoDB connection
+    const dbConnected = await sessionRouter.initDatabase();
+    
+    if (dbConnected) {
+      // Load active sessions from DB into memory
+      const loadedCount = await sessionRouter.loadActiveSessions();
+      logger('info', `Server initialized with ${loadedCount} active sessions from DB`);
+    } else {
+      logger('warn', 'Running without MongoDB persistence - sessions will be lost on restart');
+    }
+  } catch (err) {
+    logger('error', 'Failed to initialize database', { error: err.message });
+    // Continue without DB - fallback to in-memory only
+  }
+}
+
+/**
  * Health check endpoint
  */
 app.get('/health', (req, res) => {
   const stats = sessionRouter.stats();
+  const dbStatus = sessionRouter._dbEnabled ? 'connected' : 'disabled';
   res.json({
     status: 'healthy',
     uptime: process.uptime(),
     timestamp: new Date().toISOString(),
     sessions: stats,
+    database: dbStatus,
     environment: NODE_ENV,
   });
 });
@@ -82,6 +107,7 @@ app.get('/stats', (req, res) => {
   res.json({
     stats,
     active_sessions: activeSessions,
+    database: sessionRouter._dbEnabled ? 'connected' : 'disabled',
   });
 });
 
@@ -120,9 +146,9 @@ app.get('/sessions/:sessionId/status', async (req, res) => {
 /**
  * Force mark session complete (for testing/admin)
  */
-app.post('/sessions/:sessionId/complete', (req, res) => {
+app.post('/sessions/:sessionId/complete', async (req, res) => {
   const { sessionId } = req.params;
-  sessionRouter.complete(sessionId);
+  await sessionRouter.complete(sessionId);
   res.json({ completed: true, session_id: sessionId });
 });
 
@@ -133,6 +159,7 @@ app.get('/sessions', (req, res) => {
   const active = sessionRouter.getActiveSessions();
   res.json({
     count: active.length,
+    database: sessionRouter._dbEnabled ? 'connected' : 'disabled',
     sessions: active.map(s => ({
       session_id: s.todolistSessionId,
       subagent_session_key: s.subagentSessionKey,
@@ -156,47 +183,55 @@ app.use((req, res) => {
   res.status(404).json({ error: 'Not found', path: req.path });
 });
 
-// Start server
-const server = app.listen(PORT, HOST, () => {
-  logger('info', `Webhook server started`, {
-    host: HOST,
-    port: PORT,
-    environment: NODE_ENV,
-    endpoints: {
-      health: `http://${HOST}:${PORT}/health`,
-      webhook: `http://${HOST}:${PORT}/webhook/agent-message`,
-      test: `http://${HOST}:${PORT}/webhook/test`,
-      stats: `http://${HOST}:${PORT}/stats`,
-    },
-  });
-});
-
-// Graceful shutdown
-function gracefulShutdown(signal) {
-  logger('info', `Received ${signal}, shutting down gracefully...`);
+// Start server after initializing DB
+async function startServer() {
+  await initializeServer();
   
-  sessionRouter.shutdown();
-  messageRouter.shutdown();
-  
-  server.close(() => {
-    logger('info', 'Server closed');
-    process.exit(0);
+  const server = app.listen(PORT, HOST, () => {
+    logger('info', `Webhook server started`, {
+      host: HOST,
+      port: PORT,
+      environment: NODE_ENV,
+      database: sessionRouter._dbEnabled ? 'connected' : 'disabled',
+      endpoints: {
+        health: `http://${HOST}:${PORT}/health`,
+        webhook: `http://${HOST}:${PORT}/webhook/agent-message`,
+        test: `http://${HOST}:${PORT}/webhook/test`,
+        stats: `http://${HOST}:${PORT}/stats`,
+      },
+    });
   });
 
-  // Force shutdown after 10 seconds
-  setTimeout(() => {
-    logger('error', 'Forced shutdown after timeout');
-    process.exit(1);
-  }, 10000);
+  // Graceful shutdown
+  async function gracefulShutdown(signal) {
+    logger('info', `Received ${signal}, shutting down gracefully...`);
+    
+    await sessionRouter.shutdown();
+    await messageRouter.shutdown();
+    
+    server.close(() => {
+      logger('info', 'Server closed');
+      process.exit(0);
+    });
+
+    // Force shutdown after 10 seconds
+    setTimeout(() => {
+      logger('error', 'Forced shutdown after timeout');
+      process.exit(1);
+    }, 10000);
+  }
+
+  process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+  process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 }
 
-process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
-process.on('SIGINT', () => gracefulShutdown('SIGINT'));
-
 // Export for testing
-module.exports = { app, server, sessionRouter, messageRouter, webhookReceiver };
+module.exports = { app, sessionRouter, messageRouter, webhookReceiver, startServer };
 
-// If run directly, keep server running
+// If run directly, start server
 if (require.main === module) {
-  logger('info', 'Webhook server running as main process');
+  startServer().catch(err => {
+    logger('error', 'Failed to start server', { error: err.message });
+    process.exit(1);
+  });
 }

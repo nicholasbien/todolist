@@ -134,8 +134,8 @@ class WebhookReceiver {
       return { status: 200, body: { action: 'ignored', reason: 'auto_claim_disabled' } };
     }
 
-    // Check if session already has a subagent
-    const existingMapping = this.router.lookup(session_id);
+    // Check if session already has a subagent (memory + DB fallback)
+    const existingMapping = await this.router.lookupWithFallback(session_id);
     if (existingMapping) {
       this._log('info', 'Session already has active subagent', { session_id, subagentSessionKey: existingMapping.subagentSessionKey });
       return { status: 200, body: { action: 'already_exists', session_id, subagent_session_key: existingMapping.subagentSessionKey } };
@@ -163,8 +163,8 @@ class WebhookReceiver {
         initialMessage: payload.message,
       });
 
-      // Register the subagent session
-      this.router.register(session_id, subagent.sessionKey, {
+      // Register the subagent session (async - persists to DB)
+      await this.router.register(session_id, subagent.sessionKey, {
         subagentType: classification.type,
         agentId: subagent.agentId || CLAIM_AGENT_ID,
         metadata: {
