@@ -193,18 +193,22 @@ class TestAgentToolsUnit:
             "space_id": "test_space",
             "user_id": "test_user",
             "notes": None,
+            "creator_type": "agent",
         }
         mock_create_todo.return_value = mock_todo
 
         request = TaskAddRequest(text="Test task", category="Work", priority="high")
         result = await add_task(request, "test_user", "test_space")
 
+        called_todo = mock_create_todo.await_args[0][0]
         assert result["ok"] is True
         assert result["id"] == "test_id_123"
         assert result["task"]["text"] == "Test task"
         assert result["task"]["category"] == "Work"
         assert result["task"]["priority"] == "high"
         assert result["task"]["notes"] is None
+        assert result["task"]["creator_type"] == "agent"
+        assert called_todo.creator_type == "agent"
 
     @pytest.mark.asyncio
     @patch("agent.tools.db_create_todo", new_callable=AsyncMock)
@@ -229,6 +233,7 @@ class TestAgentToolsUnit:
             "space_id": "test_space",
             "user_id": "test_user",
             "notes": expected_notes,
+            "creator_type": "agent",
         }
         mock_create_todo.return_value = mock_todo
 
@@ -238,11 +243,13 @@ class TestAgentToolsUnit:
         called_todo = mock_create_todo.await_args[0][0]
         assert called_todo.text == expected_title
         assert called_todo.notes == expected_notes
+        assert called_todo.creator_type == "agent"
         assert len(expected_title) <= MAX_TASK_TITLE_LENGTH + 1  # Allow for ellipsis
 
         assert result["ok"] is True
         assert result["task"]["text"] == expected_title
         assert result["task"]["notes"] == expected_notes
+        assert result["task"]["creator_type"] == "agent"
 
     @pytest.mark.asyncio
     @patch("agent.tools.get_todos")

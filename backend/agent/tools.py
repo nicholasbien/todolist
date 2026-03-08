@@ -457,6 +457,7 @@ async def add_task(request: TaskAddRequest, user_id: str, space_id: Optional[str
             space_id=space_id,
             dateAdded=datetime.utcnow().isoformat(),
             notes=notes,
+            creator_type="agent",
         )
 
         created_todo = await db_create_todo(todo)
@@ -477,6 +478,7 @@ async def add_task(request: TaskAddRequest, user_id: str, space_id: Optional[str
                 "space_id": created_task_dict.get("space_id"),
                 "user_id": created_task_dict.get("user_id"),
                 "notes": created_task_dict.get("notes"),
+                "creator_type": created_task_dict.get("creator_type", "agent"),
             },
         }
     except Exception as e:

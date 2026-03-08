@@ -319,6 +319,7 @@ async def api_create_todo(request: Request, current_user: dict = Depends(get_cur
         body["user_id"] = current_user["user_id"]
         if "space_id" not in body:
             body["space_id"] = None
+        body["creator_type"] = "user"
 
         # Determine the text to classify
         text = body.get("text", "").strip()

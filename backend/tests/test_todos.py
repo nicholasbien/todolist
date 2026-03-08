@@ -29,6 +29,7 @@ async def test_todo_crud_flow(client, test_email):
     # Classification runs via OpenAI — verify a category and priority were assigned
     assert todo["category"]  # Should be a non-empty string
     assert todo["priority"] in ("Low", "Medium", "High")
+    assert todo["creator_type"] == "user"
     todo_id = todo["_id"]
 
     # Retrieve todos from default space
@@ -127,3 +128,4 @@ async def test_add_todo_with_selected_category(client, test_email):
     # Category should be preserved as-is (not overridden by classification)
     assert todo["category"] == "Work"
     assert todo["priority"] == "Medium"
+    assert todo["creator_type"] == "user"

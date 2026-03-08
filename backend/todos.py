@@ -1,6 +1,6 @@
 import logging
 from datetime import datetime
-from typing import Dict, Optional
+from typing import Dict, Literal, Optional
 
 import auth
 from bson import ObjectId
@@ -73,6 +73,7 @@ class Todo(BaseModel):
     space_id: Optional[str] = None
     created_offline: bool = False
     agent_id: Optional[str] = None  # Track which agent is handling this task
+    creator_type: Literal["user", "agent"] = "user"
 
     class Config:
         arbitrary_types_allowed = True
@@ -293,9 +294,20 @@ async def update_todo_fields(todo_id: str, updates: dict, user_id: str):
 async def migrate_legacy_todos() -> None:
     try:
         # Update all todos that don't have space_id field to have space_id: None
-        result = await todos_collection.update_many({"space_id": {"$exists": False}}, {"$set": {"space_id": None}})
-        if result.modified_count > 0:
-            logger.info("Migrated %d legacy todos to have space_id: None", result.modified_count)
+        space_result = await todos_collection.update_many(
+            {"space_id": {"$exists": False}},
+            {"$set": {"space_id": None}},
+        )
+        if space_result.modified_count > 0:
+            logger.info("Migrated %d legacy todos to have space_id: None", space_result.modified_count)
+
+        # Backfill creator_type for older todos created before this field existed
+        creator_result = await todos_collection.update_many(
+            {"creator_type": {"$exists": False}},
+            {"$set": {"creator_type": "user"}},
+        )
+        if creator_result.modified_count > 0:
+            logger.info("Migrated %d legacy todos to have creator_type: user", creator_result.modified_count)
     except Exception as e:
         logger.error(f"Error migrating legacy todos: {str(e)}")
 

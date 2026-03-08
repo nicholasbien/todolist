@@ -1,8 +1,22 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Check, Clock, Loader2, MessageCircle, RotateCcw, X } from "lucide-react";
+import { Bot, Check, Clock, Loader2, MessageCircle, RotateCcw, User, X } from "lucide-react";
+
+type CreatorType = "user" | "agent";
+
+interface TodoItemData {
+  _id: string;
+  text: string;
+  link?: string | null;
+  category: string;
+  priority: string;
+  dueDate?: string | null;
+  completed: boolean;
+  first_name?: string | null;
+  creator_type?: CreatorType;
+}
 
 interface TodoItemProps {
-  todo: any;
+  todo: TodoItemData;
   categories: string[];
   editingCategory: string | null;
   setEditingCategory: (id: string | null) => void;
@@ -11,8 +25,8 @@ interface TodoItemProps {
   handleCompleteTodo: (id: string) => void;
   handleDeleteTodo: (id: string) => void;
   isCollaborative: boolean;
-  onEdit: (todo: any) => void;
-  onChat: (todo: any) => void;
+  onEdit: (todo: TodoItemData) => void;
+  onChat: (todo: TodoItemData) => void;
   sessionStatus?: 'waiting' | 'processing' | 'unread_reply';
 }
 
@@ -37,6 +51,15 @@ export default function TodoItem({
   const containerRef = React.useRef<HTMLDivElement>(null);
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const longPressTriggeredRef = useRef(false);
+  const creatorType: CreatorType = todo.creator_type === "agent" ? "agent" : "user";
+  const isAgentTask = creatorType === "agent";
+  const CreatorIcon = isAgentTask ? Bot : User;
+  const creatorLabel = isAgentTask ? "Created by assistant" : "Created by you";
+  const creatorBadgeStyles = todo.completed
+    ? "text-gray-500 border-gray-800 bg-black"
+    : isAgentTask
+    ? "text-purple-300 border-purple-700/60 bg-purple-500/10"
+    : "text-sky-300 border-sky-700/60 bg-sky-500/10";
 
   useEffect(() => {
     setShouldAnimate(true);
@@ -284,6 +307,14 @@ export default function TodoItem({
           <option value="Medium">Medium</option>
           <option value="Low">Low</option>
         </select>
+        <span
+          className={`inline-flex items-center gap-1 px-2 py-1 rounded-md border text-xs font-medium ${creatorBadgeStyles}`}
+          aria-label={creatorLabel}
+          title={creatorLabel}
+        >
+          <CreatorIcon className="w-3.5 h-3.5" />
+          <span>{isAgentTask ? "AI" : "You"}</span>
+        </span>
         {todo.dueDate && (
           <span className={`text-sm ${todo.completed ? "text-gray-500" : "text-gray-300"}`}>
             Due: {(() => {
