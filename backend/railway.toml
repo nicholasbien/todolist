@@ -1,18 +1,7 @@
 [deploy]
-startCommand = "bash start_combined.sh"
+startCommand = "python3 app.py"
 restartPolicyType = "ON_FAILURE"
-healthcheckPath = "/health"
 
 [build]
 builder = "NIXPACKS"
-buildCommand = "pip3 install -r requirements.txt && mkdir -p scripts && cp -r ../scripts/* scripts/ 2>/dev/null || true"
-
-[nixpacks]
-nodeVersion = "22"
-
-[variables]
-NODE_ENV = "production"
-WEBHOOK_PORT = "8081"
-WEBHOOK_HOST = "0.0.0.0"
-AUTO_CLAIM_ENABLED = "true"
-AGENT_ID = "openclaw-webhook"
+buildCommand = "pip3 install -r requirements.txt"
