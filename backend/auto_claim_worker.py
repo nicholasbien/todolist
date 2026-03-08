@@ -11,7 +11,7 @@ import logging
 import os
 
 from auth import users_collection
-from chat_sessions import append_message, get_pending_sessions, get_session_trajectory
+from chat_sessions import append_message, get_pending_sessions, get_session_trajectory, trajectories_collection
 
 logger = logging.getLogger(__name__)
 
@@ -55,6 +55,13 @@ async def acknowledge_session(session: dict, user_id: str) -> None:
         return
 
     await append_message(session_id, user_id, "assistant", ACK_MESSAGE)
+
+    # Re-set needs_agent_response so a real agent still picks this up.
+    # The ack is just a courtesy message — the session still needs work.
+    await trajectories_collection.update_one(
+        {"session_id": session_id, "user_id": user_id},
+        {"$set": {"needs_agent_response": True}},
+    )
     logger.info(f"ACK session {session_id}: {message[:80]!r}")
 
 
