@@ -231,7 +231,7 @@ async function postMessageToTodolist(sessionId, message) {
   try {
     execSync(
       `node "${cliPath}" post-message -s ${sessionId} -c "${message.replace(/"/g, '\\"')}"`,
-      { stdio: 'pipe', timeout: 15000 }
+      { stdio: 'pipe', timeout: 15000, env: { ...process.env } }
     );
     return true;
   } catch (err) {
