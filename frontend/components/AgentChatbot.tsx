@@ -30,6 +30,7 @@ export default function AgentChatbot({ activeSpace, token, isActive = true, pend
 
   // Session state
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+  const [isTaskSession, setIsTaskSession] = useState(false);
   const [sessions, setSessions] = useState<SessionMeta[]>([]);
   const [sessionsLoading, setSessionsLoading] = useState(false);
 
@@ -73,7 +74,9 @@ export default function AgentChatbot({ activeSpace, token, isActive = true, pend
   // Fetch sessions on mount and when space changes
   useEffect(() => {
     setCurrentSessionId(null);
+    setIsTaskSession(false);
     setMessages([]);
+    setWaitingForAgent(false);
     fetchSessions();
   }, [fetchSessions]);
 
@@ -212,6 +215,7 @@ export default function AgentChatbot({ activeSpace, token, isActive = true, pend
       setMessages(loadedMessages);
       const lastRole = loadedMessages[loadedMessages.length - 1]?.role;
       setWaitingForAgent(lastRole === 'user');
+      setIsTaskSession(!!data.todo_id);
       setCurrentSessionId(sessionId);
     } catch (err: any) {
       setError(err.message || 'Failed to load chat');
@@ -223,7 +227,9 @@ export default function AgentChatbot({ activeSpace, token, isActive = true, pend
   // -----------------------------------------------------------------------
   const handleNewChat = () => {
     setCurrentSessionId(null);
+    setIsTaskSession(false);
     setMessages([]);
+    setWaitingForAgent(false);
   };
 
   // -----------------------------------------------------------------------
@@ -236,47 +242,98 @@ export default function AgentChatbot({ activeSpace, token, isActive = true, pend
     setMessages((prev) => [...prev, { role: 'user', content: userQuestion }]);
     setQuestion('');
     setSending(true);
-    setWaitingForAgent(true);
     setError('');
     shouldAutoScrollRef.current = true;
 
-    try {
-      let sessionId = currentSessionId;
-
-      // Create session if needed
-      if (!sessionId) {
-        const createRes = await fetch('/agent/sessions', {
+    if (isTaskSession && currentSessionId) {
+      // Task-linked session: post message and wait for external agent
+      setWaitingForAgent(true);
+      try {
+        const postRes = await fetch(`/agent/sessions/${currentSessionId}/messages`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${token}`,
           },
-          body: JSON.stringify({
-            title: userQuestion.slice(0, 60),
-            space_id: activeSpace?._id,
-          }),
+          body: JSON.stringify({ role: 'user', content: userQuestion }),
         });
-        if (!createRes.ok) throw new Error('Failed to create session');
-        const createData = await createRes.json();
-        sessionId = createData.session_id;
-        setCurrentSessionId(sessionId);
+        if (!postRes.ok) throw new Error('Failed to send message');
+      } catch (err: any) {
+        setError(err.message || 'Error sending message');
+        setWaitingForAgent(false);
+      } finally {
+        setSending(false);
       }
+    } else {
+      // Regular assistant chat: stream response via SSE
+      try {
+        const params = new URLSearchParams({ q: userQuestion });
+        if (activeSpace?._id) params.append('space_id', activeSpace._id);
+        if (currentSessionId) params.append('session_id', currentSessionId);
 
-      // Post user message
-      const postRes = await fetch(`/agent/sessions/${sessionId}/messages`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ role: 'user', content: userQuestion }),
-      });
-      if (!postRes.ok) throw new Error('Failed to send message');
-    } catch (err: any) {
-      setError(err.message || 'Error sending message');
-      setWaitingForAgent(false);
-    } finally {
-      setSending(false);
+        const apiBase = Capacitor.isNativePlatform()
+          ? (process.env.NEXT_PUBLIC_API_URL || 'https://todolist-backend-production-a83b.up.railway.app')
+          : '';
+
+        const eventSource = new EventSource(
+          `${apiBase}/agent/stream?${params.toString()}&token=${token}`
+        );
+
+        let assistantContent = '';
+
+        eventSource.addEventListener('ready', (e: any) => {
+          const data = JSON.parse(e.data);
+          if (data.session_id && !currentSessionId) {
+            setCurrentSessionId(data.session_id);
+          }
+        });
+
+        eventSource.addEventListener('token', (e: any) => {
+          const data = JSON.parse(e.data);
+          assistantContent += data.token;
+          setMessages((prev) => {
+            const updated = [...prev];
+            const lastMsg = updated[updated.length - 1];
+            if (lastMsg?.role === 'assistant') {
+              updated[updated.length - 1] = { role: 'assistant', content: assistantContent };
+            } else {
+              updated.push({ role: 'assistant', content: assistantContent });
+            }
+            return updated;
+          });
+        });
+
+        eventSource.addEventListener('tool_result', (e: any) => {
+          const data = JSON.parse(e.data);
+          const toolMsg = `🔧 Used tool: ${data.tool}`;
+          setMessages((prev) => [...prev, { role: 'system', content: toolMsg }]);
+        });
+
+        eventSource.addEventListener('done', () => {
+          eventSource.close();
+          setSending(false);
+          fetchSessions();
+        });
+
+        eventSource.addEventListener('error', (e: any) => {
+          try {
+            const data = JSON.parse(e.data);
+            setError(data.message || 'Error from agent');
+          } catch {
+            // EventSource connection error
+          }
+          eventSource.close();
+          setSending(false);
+        });
+
+        eventSource.onerror = () => {
+          eventSource.close();
+          setSending(false);
+        };
+      } catch (err: any) {
+        setError(err.message || 'Error connecting to agent');
+        setSending(false);
+      }
     }
   };
 
@@ -360,7 +417,7 @@ export default function AgentChatbot({ activeSpace, token, isActive = true, pend
           <div className="flex justify-start">
             <div className="text-gray-100 w-full px-0 py-2">
               <div className="text-xs mb-1 opacity-75"></div>
-              <div className="text-sm">{`Waiting for agent${'.'.repeat(thinkingDots)}`}</div>
+              <div className="text-sm">{isTaskSession ? `Waiting for agent${'.'.repeat(thinkingDots)}` : `Thinking${'.'.repeat(thinkingDots)}`}</div>
             </div>
           </div>
         )}

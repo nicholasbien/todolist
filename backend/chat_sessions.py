@@ -175,6 +175,7 @@ async def get_session_trajectory(session_id: str, user_id: str) -> Optional[Dict
     return {
         "session_id": session_id,
         "title": title,
+        "todo_id": session_doc.get("todo_id") if session_doc else None,
         "display_messages": doc.get("display_messages", []),
         "trajectory": doc.get("trajectory", []),
         "created_at": doc.get("created_at"),
