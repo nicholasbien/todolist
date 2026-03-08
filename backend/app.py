@@ -1,3 +1,4 @@
+import asyncio
 import csv
 import json
 import logging
@@ -145,6 +146,16 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.error(f"✗ Scheduler failed to start: {e}")
             failed_steps.append("scheduler")
+
+        # Start auto-claim background worker
+        try:
+            from auto_claim_worker import run_worker
+
+            asyncio.create_task(run_worker())
+            logger.info("✓ Auto-claim worker started")
+        except Exception as e:
+            logger.error(f"✗ Auto-claim worker failed to start: {e}")
+            failed_steps.append("auto_claim_worker")
 
         if failed_steps:
             logger.warning(f"⚠️  Startup completed with {len(failed_steps)} failed steps: {', '.join(failed_steps)}")
