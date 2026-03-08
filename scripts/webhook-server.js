@@ -17,7 +17,8 @@ const { SessionRouter } = require('./session-router');
 const { MessageRouter, setOpenClawTools } = require('./message-router');
 
 // Configuration
-const PORT = process.env.WEBHOOK_PORT || 3456;
+// Railway provides PORT env var, fallback to WEBHOOK_PORT or 3456
+const PORT = process.env.PORT || process.env.WEBHOOK_PORT || 3456;
 const HOST = process.env.WEBHOOK_HOST || '0.0.0.0';
 const NODE_ENV = process.env.NODE_ENV || 'development';
 
