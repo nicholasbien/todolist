@@ -1,0 +1,63 @@
+name: Deploy to Railway
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  deploy-backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./backend
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install Railway CLI
+      run: npm install -g @railway/cli
+    
+    - name: Deploy Backend
+      env:
+        RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+      run: |
+        railway login --token "$RAILWAY_TOKEN"
+        railway up --service todolist-backend
+
+  deploy-frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./frontend
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install Railway CLI
+      run: npm install -g @railway/cli
+    
+    - name: Deploy Frontend
+      env:
+        RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+      run: |
+        railway login --token "$RAILWAY_TOKEN"
+        railway up --service todolist-frontend
+
+  deploy-webhook:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./scripts
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install Railway CLI
+      run: npm install -g @railway/cli
+    
+    - name: Deploy Webhook Server
+      env:
+        RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+      run: |
+        railway login --token "$RAILWAY_TOKEN"
+        railway up --service todolist-webhook
