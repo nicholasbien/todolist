@@ -5,11 +5,19 @@ import { CallToolRequestSchema, ErrorCode, ListToolsRequestSchema, McpError, } f
 import axios from 'axios';
 import { config } from 'dotenv';
 config();
-const API_URL = process.env.TODOLIST_API_URL || 'http://localhost:8000';
+const API_URL = process.env.TODOLIST_API_URL;
 const AUTH_TOKEN = process.env.TODOLIST_AUTH_TOKEN;
-const DEFAULT_SPACE_ID = process.env.DEFAULT_SPACE_ID || '';
+const DEFAULT_SPACE_ID = process.env.DEFAULT_SPACE_ID;
+if (!API_URL) {
+    console.error('TODOLIST_API_URL environment variable is required');
+    process.exit(1);
+}
 if (!AUTH_TOKEN) {
     console.error('TODOLIST_AUTH_TOKEN environment variable is required');
+    process.exit(1);
+}
+if (!DEFAULT_SPACE_ID) {
+    console.error('DEFAULT_SPACE_ID environment variable is required');
     process.exit(1);
 }
 const api = axios.create({

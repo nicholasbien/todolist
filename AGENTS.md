@@ -557,6 +557,17 @@ const API_ROUTES = [
 
 ---
 
+## Configuration Rules
+
+**No fallback URLs. Ever.** If a URL is wrong, the app must fail loudly — not silently connect to the wrong backend.
+
+- **`openclaw-config.json`** is the MCP server config for Claude/OpenClaw agents. It contains the production backend URL, auth token, and default space ID. All values must be explicit — no `${VAR}` placeholders or hardcoded fallbacks.
+- **`backend-config.json`** is the single source of truth for deployment URLs. `cli/production-env.sh` reads from it via `jq`.
+- **`cli/production-env.sh`** must NOT have a hardcoded fallback URL. If `jq` or the config file is missing, the script must fail, not silently use a stale URL.
+- When changing the backend URL, update `backend-config.json` first, then `openclaw-config.json`, then verify `cli/production-env.sh` has no stale fallbacks.
+- Railway URLs use the format `<service>-<project>.up.railway.app` (note: `.up.railway.app` with dots, NOT `up-railway.app` with a hyphen).
+- Auth tokens for the test account (`test@example.com` / `000000`) expire after 30 days of inactivity. If you get 401s, re-login and update `openclaw-config.json`.
+
 ## Environment Setup
 
 See `docs/ENVIRONMENT_SETUP.md` for complete environment variable documentation.
@@ -791,7 +802,7 @@ The server needs three environment variables:
 
 | Variable | Description | How to get it |
 |---|---|---|
-| `TODOLIST_API_URL` | Backend URL | `http://localhost:8000` or `https://todolist-backend-production-a83b.up.railway.app` |
+| `TODOLIST_API_URL` | Backend URL | `http://localhost:8000` (local) or `https://backend-openclaw.up.railway.app` (production) |
 | `TODOLIST_AUTH_TOKEN` | JWT auth token | Login via API (see test account below) |
 | `DEFAULT_SPACE_ID` | Default space for operations | `GET /spaces` with your token |
 

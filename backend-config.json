@@ -2,9 +2,9 @@
   "_comment": "SINGLE SOURCE OF TRUTH for backend URLs. Edit ONLY THIS FILE when changing backend deployment.",
   "environments": {
     "production": {
-      "backendUrl": "https://todolist-backend-production-a83b.up.railway.app",
-      "frontendUrl": "https://todolist-frontend-production-5d57.up.railway.app",
-      "description": "Railway production deployment"
+      "backendUrl": "https://backend-openclaw.up.railway.app",
+      "frontendUrl": "https://todolist-openclaw.up.railway.app",
+      "description": "Railway openclaw deployment"
     },
     "local": {
       "backendUrl": "http://localhost:8000",
