@@ -188,7 +188,7 @@ class WebhookReceiver {
       };
     } catch (err) {
       this._log('error', 'Failed to spawn subagent', { session_id, error: err.message });
-      this.router.markError(session_id, err.message);
+      await this.router.markError(session_id, err.message);
       return { status: 500, body: { error: 'Failed to spawn subagent', details: err.message } };
     }
   }
@@ -237,8 +237,8 @@ class WebhookReceiver {
     
     this._log('info', 'Session claimed by agent', { session_id, agent_id });
     
-    // Touch the session to update activity
-    this.router.touch(session_id);
+    // Touch the session to update activity (async - updates DB)
+    await this.router.touch(session_id);
     
     return {
       status: 200,
@@ -254,8 +254,8 @@ class WebhookReceiver {
     
     this._log('info', 'Session released, marking complete', { session_id });
     
-    // Mark the subagent session as complete
-    this.router.complete(session_id);
+    // Mark the subagent session as complete (async - updates DB)
+    await this.router.complete(session_id);
     
     return {
       status: 200,

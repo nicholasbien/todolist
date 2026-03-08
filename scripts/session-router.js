@@ -233,6 +233,61 @@ class SessionRouter {
   }
 
   /**
+   * Look up subagent session with DB fallback.
+   * Checks memory first, then queries DB if not found.
+   * Loads active session from DB into memory if found.
+   */
+  async lookupWithFallback(todolistSessionId) {
+    // Check memory first
+    const memoryMapping = this.lookup(todolistSessionId);
+    if (memoryMapping) {
+      return memoryMapping;
+    }
+
+    // If not in memory and DB is enabled, check DB
+    if (!this._dbEnabled || !this._collection) {
+      return null;
+    }
+
+    try {
+      const doc = await this._collection.findOne({ 
+        todolist_session_id: todolistSessionId,
+        status: { $in: ['active', 'claimed'] }
+      });
+
+      if (!doc) {
+        return null;
+      }
+
+      // Load from DB into memory
+      const mapping = {
+        todolistSessionId: doc.todolist_session_id,
+        subagentSessionKey: doc.subagent_session_key,
+        subagentType: doc.agent_type || 'coding',
+        agentId: doc.agent_id || '',
+        createdAt: doc.created_at?.getTime() || Date.now(),
+        lastActivity: doc.updated_at?.getTime() || Date.now(),
+        status: 'active',
+        metadata: doc.metadata || null,
+      };
+
+      this._registry.set(todolistSessionId, mapping);
+      this._log('info', 'Loaded session from DB into memory', { 
+        todolistSessionId,
+        subagentSessionKey: mapping.subagentSessionKey 
+      });
+
+      return mapping;
+    } catch (err) {
+      this._log('error', 'DB lookup failed', { 
+        todolistSessionId, 
+        error: err.message 
+      });
+      return null;
+    }
+  }
+
+  /**
    * Touch a session to update lastActivity timestamp.
    */
   async touch(todolistSessionId) {
