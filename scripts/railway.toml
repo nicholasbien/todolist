@@ -18,6 +18,4 @@ WEBHOOK_PORT = "8080"
 WEBHOOK_HOST = "0.0.0.0"
 AUTO_CLAIM_ENABLED = "true"
 AGENT_ID = "openclaw-webhook"
-TODOLIST_AUTH_TOKEN = "nuRy4k53-gH6DlfHgm6ID_s0B0hCEugYdfRUffT63Rk"
-TODOLIST_API_URL = "https://todolist-backend-production-a83b.up.railway.app"
-DEFAULT_SPACE_ID = "69acacfc4f228ace7e2b3896"
+# TODOLIST_AUTH_TOKEN, TODOLIST_API_URL, DEFAULT_SPACE_ID — set via Railway dashboard

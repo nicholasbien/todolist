@@ -151,9 +151,9 @@ class WebhookReceiver {
     try {
       // Spawn subagent for this session
       const classification = agent_type === 'auto' ? await this.classifySession(payload) : { type: agent_type };
-      
+
       this._log('info', 'Spawning subagent for session', { session_id, agent_type: classification.type });
-      
+
       const subagent = await spawnSubagentForSession({
         sessionId: session_id,
         todoId: todo_id,
@@ -234,12 +234,12 @@ class WebhookReceiver {
    */
   async handleSessionClaimed(payload) {
     const { session_id, agent_id } = payload;
-    
+
     this._log('info', 'Session claimed by agent', { session_id, agent_id });
-    
+
     // Touch the session to update activity (async - updates DB)
     await this.router.touch(session_id);
-    
+
     return {
       status: 200,
       body: { action: 'acknowledged', event: 'session.claimed', session_id },
@@ -251,12 +251,12 @@ class WebhookReceiver {
    */
   async handleSessionReleased(payload) {
     const { session_id } = payload;
-    
+
     this._log('info', 'Session released, marking complete', { session_id });
-    
+
     // Mark the subagent session as complete (async - updates DB)
     await this.router.complete(session_id);
-    
+
     return {
       status: 200,
       body: { action: 'acknowledged', event: 'session.released', session_id },
@@ -319,28 +319,24 @@ class WebhookReceiver {
    */
   async claimSessionCli(sessionId) {
     const { execSync } = require('child_process');
-    
-    // Use CLI from same directory (copied during build)
-    const cliPath = './todolist-cli.js';
-    
+
+    // Resolve CLI path relative to this file's directory
+    const path = require('path');
+    const cliPath = path.resolve(__dirname, '..', 'cli', 'todolist-cli.js');
     // Debug: Log env var status
     this._log('debug', 'Claim session env check', {
       has_auth_token: !!process.env.TODOLIST_AUTH_TOKEN,
-      auth_token_prefix: process.env.TODOLIST_AUTH_TOKEN ? process.env.TODOLIST_AUTH_TOKEN.substring(0, 10) + '...' : 'NOT SET',
       has_api_url: !!process.env.TODOLIST_API_URL,
       api_url: process.env.TODOLIST_API_URL,
       cli_path: cliPath,
-      cwd: process.cwd(),
     });
-    
+
     try {
       const result = execSync(
         `node "${cliPath}" claim-session ${sessionId} --agent-id ${CLAIM_AGENT_ID}`,
-        { 
-          stdio: 'pipe', 
+        {
+          stdio: 'pipe',
           timeout: 10000,
-          env: process.env, // Explicitly pass current env
-          cwd: process.cwd(),
         }
       );
       this._log('info', 'Session claimed successfully', { session_id: sessionId, output: result.toString() });
@@ -349,15 +345,15 @@ class WebhookReceiver {
       const stdout = err.stdout ? err.stdout.toString() : '';
       const stderr = err.stderr ? err.stderr.toString() : '';
       const errorMsg = err.message || 'Unknown error';
-      
-      this._log('error', 'Failed to claim session', { 
-        session_id: sessionId, 
+
+      this._log('error', 'Failed to claim session', {
+        session_id: sessionId,
         error: errorMsg,
         stdout,
         stderr,
         exitCode: err.status,
       });
-      
+
       // Session might already be claimed - check if by us
       if (stdout.includes('already claimed') || stderr.includes('already claimed') || errorMsg.includes('already claimed')) {
         return false;

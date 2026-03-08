@@ -53,7 +53,7 @@ async function spawnSubagentForSession({
  */
 async function spawnCodingAgent({ sessionId, todoId, title, initialMessage, spaceId }) {
   const label = `todolist-${sessionId}`;
-  
+
   // Build the task description for the coding agent
   const taskDescription = buildCodingTaskDescription({
     sessionId,
@@ -225,10 +225,12 @@ function buildSimpleResponse({ sessionId, title, initialMessage }) {
  */
 async function postMessageToTodolist(sessionId, message) {
   const { execSync } = require('child_process');
+  const path = require('path');
+  const cliPath = path.resolve(__dirname, '..', 'cli', 'todolist-cli.js');
 
   try {
     execSync(
-      `node /data/workspace/todolist/cli/todolist-cli.js post-message -s ${sessionId} -c "${message.replace(/"/g, '\\"')}"`,
+      `node "${cliPath}" post-message -s ${sessionId} -c "${message.replace(/"/g, '\\"')}"`,
       { stdio: 'pipe', timeout: 15000 }
     );
     return true;
@@ -246,7 +248,7 @@ async function sessionsSend(sessionKey, message) {
   // In a real implementation, this would communicate with the running subagent
   // For now, we log and potentially post back to todolist
   console.log(`[sessions_send] ${sessionKey}: ${message.substring(0, 100)}...`);
-  
+
   // Extract session ID from the key (format: agent:type:sessionId:timestamp)
   const parts = sessionKey.split(':');
   if (parts.length >= 3) {
@@ -262,7 +264,7 @@ async function sessionsSend(sessionKey, message) {
  */
 async function sessionsHistory(sessionKey, options = {}) {
   const { limit = 10 } = options;
-  
+
   // In a real implementation, this would retrieve history from the running subagent
   // For now, return empty array
   return [];
@@ -319,8 +321,8 @@ async function openclawSessionsSpawn(options) {
         // Try to parse session key from output
         const lines = stdout.split('\n');
         const sessionLine = lines.find(l => l.includes('session_key') || l.includes('session:'));
-        const sessionKey = sessionLine 
-          ? sessionLine.split(':').pop().trim() 
+        const sessionKey = sessionLine
+          ? sessionLine.split(':').pop().trim()
           : `agent:${agentId}:${Date.now()}`;
 
         resolve({ sessionKey });

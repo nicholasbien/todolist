@@ -12,7 +12,7 @@ else
     # Fallback if jq not available
     export TODOLIST_API_URL=https://todolist-backend-production-a83b.up.railway.app
 fi
-export TODOLIST_AUTH_TOKEN=7WOHCYUYiv7Ta8KEVFYUM3ozk7hC-7j2CqWiHsuBFuM
+export TODOLIST_AUTH_TOKEN="${TODOLIST_AUTH_TOKEN:?Set TODOLIST_AUTH_TOKEN env var}"
 export DEFAULT_SPACE_ID=69abce0e50a04398b2ab1709
 
 echo "Production environment configured for todolist.nyc"

@@ -7,7 +7,7 @@
       "env": {
         "_comment": "See backend-config.json for canonical URL - update both when changing",
         "TODOLIST_API_URL": "https://todolist-backend-production-a83b.up.railway.app",
-        "TODOLIST_AUTH_TOKEN": "6rcSzOEAr0XnoBPk5-SO2oSHTG_Al7fZI0TldqqVKGM",
+        "TODOLIST_AUTH_TOKEN": "${TODOLIST_AUTH_TOKEN}",
         "DEFAULT_SPACE_ID": "6938fa7241cae0360ece9a89"
       }
     }
