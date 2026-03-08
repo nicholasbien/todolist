@@ -8,6 +8,13 @@ from bson import ObjectId
 from db import db
 from pymongo.errors import DuplicateKeyError
 
+from webhook_dispatcher import (
+    notify_session_created,
+    notify_message_posted,
+    notify_session_claimed,
+    notify_session_released,
+)
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -68,6 +75,19 @@ async def create_session(user_id: str, space_id: Optional[str], title: str, todo
             "updated_at": now,
         }
     )
+
+    # Dispatch webhook for new session
+    try:
+        await notify_session_created(
+            session_id=session_id,
+            user_id=user_id,
+            title=title,
+            todo_id=todo_id,
+            space_id=space_id,
+        )
+    except Exception as e:
+        logger.warning(f"Failed to dispatch session created webhook: {e}")
+
     return session_id
 
 
@@ -164,15 +184,39 @@ async def claim_session(session_id: str, user_id: str, agent_id: str) -> bool:
         },
         {"$set": {"agent_id": agent_id, "updated_at": datetime.utcnow()}},
     )
-    return result.modified_count > 0 or result.matched_count > 0
+    claimed = result.modified_count > 0 or result.matched_count > 0
+
+    # Dispatch webhook for session claim
+    if claimed:
+        try:
+            await notify_session_claimed(
+                session_id=session_id,
+                user_id=user_id,
+                agent_id=agent_id,
+            )
+        except Exception as e:
+            logger.warning(f"Failed to dispatch session claimed webhook: {e}")
+
+    return claimed
 
 
-async def release_session(session_id: str, user_id: str) -> None:
+async def release_session(session_id: str, user_id: str, agent_id: str = "") -> None:
     """Clear the agent_id claim on a session (called when agent finishes)."""
     await trajectories_collection.update_one(
         {"session_id": session_id, "user_id": user_id},
         {"$set": {"agent_id": None}},
     )
+
+    # Dispatch webhook for session release
+    if agent_id:
+        try:
+            await notify_session_released(
+                session_id=session_id,
+                user_id=user_id,
+                agent_id=agent_id,
+            )
+        except Exception as e:
+            logger.warning(f"Failed to dispatch session released webhook: {e}")
 
 
 async def list_sessions(user_id: str, space_id: Optional[str] = None, limit: int = 50) -> List[Dict[str, Any]]:
@@ -284,6 +328,19 @@ async def append_message(session_id: str, user_id: str, role: str, content: str)
         {"_id": ObjectId(session_id)},
         {"$set": {"updated_at": now}},
     )
+
+    # Dispatch webhook for user messages needing agent response
+    if role == "user":
+        try:
+            await notify_message_posted(
+                session_id=session_id,
+                user_id=user_id,
+                role=role,
+                content=content,
+            )
+        except Exception as e:
+            logger.warning(f"Failed to dispatch message posted webhook: {e}")
+
     return True
 
 
