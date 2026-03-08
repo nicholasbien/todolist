@@ -52,7 +52,6 @@ echo $RESPONSE | grep -o '"token":"[^"]*' | cut -d'"' -f4
 | `get_session` | Get session with messages |
 | `get_pending_sessions` | Get sessions awaiting agent response |
 | `post_to_session` | Post a message to a session |
-| `claim_session` / `release_session` | Lock/unlock session for agent processing |
 | `delete_session` | Delete a session |
 | `get_journal` | Get journal entry by date |
 | `write_journal` | Write/update a journal entry |
@@ -65,11 +64,9 @@ Most tools auto-detect the default space if `space_id` is omitted.
 
 For agents that process user messages:
 1. `get_pending_sessions` — find sessions needing a response
-2. `claim_session` — lock the session so no other agent picks it up
-3. `get_session` — read the conversation history
-4. Do work (add/update todos, write journals, etc.)
-5. `post_to_session` — reply with results
-6. `release_session` — unlock the session
+2. `get_session` — read the conversation history
+3. Do work (add/update todos, write journals, etc.)
+4. `post_to_session` — reply with results
 
 ### Rebuilding the MCP Server
 
@@ -231,8 +228,6 @@ All requests use paths like `/todos`, `/agent/stream` — the service worker rou
 - `GET /agent/sessions/{id}` — get session with messages
 - `POST /agent/sessions` — create session
 - `POST /agent/sessions/{id}/messages` — post message
-- `POST /agent/sessions/{id}/claim` — claim for agent
-- `POST /agent/sessions/{id}/release` — release claim
 - `POST /agent/sessions/{id}/mark-read` — mark as read
 - `DELETE /agent/sessions/{id}` — delete session
 
