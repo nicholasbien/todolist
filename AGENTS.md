@@ -1183,3 +1183,24 @@ A deployment script is available but should **NOT** be run by AI agents:
 - SMTP credentials needed for email functionality
 - Daily email scheduler runs automatically at 9 AM Eastern
 - Backend has restart policy ON_FAILURE for automatic recovery
+
+### GitHub Actions CI/CD
+The repository includes two GitHub Actions workflows in `.github/workflows/`:
+
+- `ci.yml` runs on all pull requests and on pushes to `main`:
+  - Backend: `flake8`, `black --check`, `isort --check-only`, `mypy`, `pytest`
+  - Frontend: `npm run lint`, `npx tsc --noEmit`, `npm run test -- --ci --runInBand`, `npm run build`
+  - Scripts service: `npm ci` and `node --check` on all `scripts/*.js` files
+
+- `deploy.yml` runs on pushes to `main` (and supports manual `workflow_dispatch`) and deploys all three Railway services via Railway CLI:
+  - Backend service (from `backend/`)
+  - Frontend service (from `frontend/`)
+  - Webhook/scripts service (from `scripts/`)
+
+Required GitHub repository secrets for deployment:
+- `RAILWAY_TOKEN`
+- `RAILWAY_PROJECT_ID`
+- `RAILWAY_ENVIRONMENT`
+- `RAILWAY_BACKEND_SERVICE`
+- `RAILWAY_FRONTEND_SERVICE`
+- `RAILWAY_SCRIPTS_SERVICE`

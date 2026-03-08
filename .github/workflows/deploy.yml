@@ -2,62 +2,85 @@ name: Deploy to Railway
 
 on:
   push:
-    branches: [ main ]
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-main
+  cancel-in-progress: false
+
+permissions:
+  contents: read
 
 jobs:
-  deploy-backend:
+  deploy:
+    name: Deploy backend, frontend, and scripts
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./backend
-    
-    steps:
-    - uses: actions/checkout@v4
-    
-    - name: Install Railway CLI
-      run: npm install -g @railway/cli
-    
-    - name: Deploy Backend
-      env:
-        RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-      run: |
-        railway login --token "$RAILWAY_TOKEN"
-        railway up --service todolist-backend
+    env:
+      RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+      RAILWAY_PROJECT_ID: ${{ secrets.RAILWAY_PROJECT_ID }}
+      RAILWAY_ENVIRONMENT: ${{ secrets.RAILWAY_ENVIRONMENT }}
+      RAILWAY_BACKEND_SERVICE: ${{ secrets.RAILWAY_BACKEND_SERVICE }}
+      RAILWAY_FRONTEND_SERVICE: ${{ secrets.RAILWAY_FRONTEND_SERVICE }}
+      RAILWAY_SCRIPTS_SERVICE: ${{ secrets.RAILWAY_SCRIPTS_SERVICE }}
 
-  deploy-frontend:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./frontend
-    
     steps:
-    - uses: actions/checkout@v4
-    
-    - name: Install Railway CLI
-      run: npm install -g @railway/cli
-    
-    - name: Deploy Frontend
-      env:
-        RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-      run: |
-        railway login --token "$RAILWAY_TOKEN"
-        railway up --service todolist-frontend
+      - name: Checkout
+        uses: actions/checkout@v4
 
-  deploy-webhook:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./scripts
-    
-    steps:
-    - uses: actions/checkout@v4
-    
-    - name: Install Railway CLI
-      run: npm install -g @railway/cli
-    
-    - name: Deploy Webhook Server
-      env:
-        RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-      run: |
-        railway login --token "$RAILWAY_TOKEN"
-        railway up --service todolist-webhook
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Validate Railway configuration
+        run: |
+          required_vars=(
+            RAILWAY_TOKEN
+            RAILWAY_PROJECT_ID
+            RAILWAY_ENVIRONMENT
+            RAILWAY_BACKEND_SERVICE
+            RAILWAY_FRONTEND_SERVICE
+            RAILWAY_SCRIPTS_SERVICE
+          )
+
+          for var_name in "${required_vars[@]}"; do
+            if [ -z "${!var_name}" ]; then
+              echo "::error::Missing required GitHub secret: ${var_name}"
+              exit 1
+            fi
+          done
+
+      - name: Deploy backend service
+        working-directory: backend
+        run: |
+          npx -y @railway/cli@latest up \
+            --ci \
+            --detach \
+            --project "$RAILWAY_PROJECT_ID" \
+            --environment "$RAILWAY_ENVIRONMENT" \
+            --service "$RAILWAY_BACKEND_SERVICE" \
+            --message "github:${GITHUB_SHA} backend"
+
+      - name: Deploy frontend service
+        working-directory: frontend
+        run: |
+          npx -y @railway/cli@latest up \
+            --ci \
+            --detach \
+            --project "$RAILWAY_PROJECT_ID" \
+            --environment "$RAILWAY_ENVIRONMENT" \
+            --service "$RAILWAY_FRONTEND_SERVICE" \
+            --message "github:${GITHUB_SHA} frontend"
+
+      - name: Deploy scripts service
+        working-directory: scripts
+        run: |
+          npx -y @railway/cli@latest up \
+            --ci \
+            --detach \
+            --project "$RAILWAY_PROJECT_ID" \
+            --environment "$RAILWAY_ENVIRONMENT" \
+            --service "$RAILWAY_SCRIPTS_SERVICE" \
+            --message "github:${GITHUB_SHA} scripts"
