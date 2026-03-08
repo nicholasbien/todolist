@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Check, RotateCcw, X, MessageCircle, Clock, Loader2, User, Bot } from "lucide-react";
+import { Check, RotateCcw, X, MessageCircle, Clock, User, Bot } from "lucide-react";
 
 interface TodoItemProps {
   todo: any;
@@ -13,7 +13,7 @@ interface TodoItemProps {
   isCollaborative: boolean;
   onEdit: (todo: any) => void;
   onChat?: (todo: any) => void;
-  sessionStatus?: 'waiting' | 'processing' | 'unread_reply';
+  sessionStatus?: 'waiting' | 'unread_reply';
 }
 
 export default function TodoItem({
@@ -156,8 +156,6 @@ export default function TodoItem({
               className={`relative text-lg w-11 h-11 flex items-center justify-center rounded-lg transition-all duration-200 focus:outline-none ${
                 sessionStatus === 'unread_reply'
                   ? 'text-accent'
-                  : sessionStatus === 'processing'
-                  ? 'text-yellow-400'
                   : sessionStatus === 'waiting'
                   ? 'text-gray-400'
                   : 'text-gray-500 hover:text-gray-300'
@@ -166,8 +164,6 @@ export default function TodoItem({
             >
               {sessionStatus === 'waiting' ? (
                 <Clock className="w-5 h-5" />
-              ) : sessionStatus === 'processing' ? (
-                <Loader2 className="w-5 h-5 animate-spin" />
               ) : (
                 <MessageCircle className="w-5 h-5" />
               )}
