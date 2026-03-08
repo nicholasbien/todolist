@@ -1,6 +1,6 @@
 # Heartbeat — Check for pending user messages
 
-Run this checklist every heartbeat interval.
+Run this checklist every heartbeat interval. This is the main loop for the OpenClaw agent.
 
 ## Environment
 
@@ -11,59 +11,79 @@ These env vars must be set:
 
 ## Steps
 
-1. Check for pending messages:
-   ```bash
-   node cli/todolist-cli.js list-pending
-   ```
+### 1. Poll for pending messages
 
-2. If "No pending messages" → reply `HEARTBEAT_OK` and stop.
+```bash
+node cli/todolist-cli.js list-pending
+```
 
-3. For each pending session:
+If "No pending messages" → reply `HEARTBEAT_OK` and stop.
 
-   **If already claimed by you** (`[Claimed: oc-<id>]`):
-   - You previously handled this session — the user sent a follow-up
-   - Read the session to see the new message:
-     ```bash
-     node cli/todolist-cli.js get-session <session_id>
-     ```
+### 2. For each pending session, dispatch to the right subagent
 
-   **If unclaimed**:
-   - Claim it first:
-     ```bash
-     node cli/todolist-cli.js claim-session <session_id> --agent-id oc-<session_id_short>
-     ```
-   - Read the full conversation:
-     ```bash
-     node cli/todolist-cli.js get-session <session_id>
-     ```
+Each pending session has a session_id and may show `[Claimed: <agent_id>]`.
 
-4. Do the requested work (answer questions, manage todos, edit code, research, etc.)
+**Session already claimed by a subagent** (`[Claimed: oc-<id>]`):
+- The user sent a follow-up to an ongoing conversation
+- **Resume the subagent** that previously handled this session using its agent_id
+- Forward the new user message to that subagent so it can continue with context
+- The subagent reads the session, sees the new message, and responds
 
-5. Post progress updates as you work — don't wait until you're done:
-   ```bash
-   node cli/todolist-cli.js post-message -s <session_id> -c "Looking into this..."
-   ```
+**Unclaimed session** (no `[Claimed: ...]`):
+- This is a new conversation — spawn a fresh subagent
+- Claim the session first:
+  ```bash
+  node cli/todolist-cli.js claim-session <session_id> --agent-id oc-<session_id_short>
+  ```
+- Store the mapping: `session_id → subagent_id` so future heartbeats can resume it
+- The subagent reads the session and starts working
 
-6. For long tasks, check for follow-up messages periodically:
-   ```bash
-   node cli/todolist-cli.js watch-session <session_id> --since "2026-03-07T12:00:00"
-   ```
+### 3. Subagent workflow
 
-7. Post your final response:
-   ```bash
-   node cli/todolist-cli.js post-message -s <session_id> -c "Done! Here's what I did: ..."
-   ```
+Each subagent handles one session. Give it these instructions:
 
-8. You stay claimed on the session — do NOT release unless the task is truly complete.
-   Only release when done:
-   ```bash
-   node cli/todolist-cli.js release-session <session_id>
-   ```
+```
+You are working on session <session_id>. Your agent_id is <agent_id>.
 
-## Important notes
+Read the conversation:
+  node cli/todolist-cli.js get-session <session_id>
 
-- **You stay claimed** after posting a response. Your agent_id is preserved so you handle follow-ups.
-- **Sessions auto-release** after 10 agent responses (MAX_SESSION_TURNS).
-- **Resume context**: When a user sends a follow-up to a session you previously handled, you'll see it as `[Claimed: oc-<id>]` in list-pending. Read the full session to refresh your context.
-- **Create tasks** for new work: `node cli/todolist-cli.js add-todo "task description"`
-- **If code changes are needed**, work in a git worktree to avoid conflicts with other agents.
+Post progress updates as you work:
+  node cli/todolist-cli.js post-message -s <session_id> -c "Looking into this..."
+
+Check for follow-up messages during long tasks:
+  node cli/todolist-cli.js watch-session <session_id> --since <ISO timestamp>
+
+Post your response when done:
+  node cli/todolist-cli.js post-message -s <session_id> -c "Here is what I found..."
+
+You stay claimed on this session. Do NOT release unless the user says they're done.
+Only release when complete:
+  node cli/todolist-cli.js release-session <session_id>
+```
+
+### 4. Create tasks for new work
+
+If a message involves new work, create a task to track it:
+```bash
+node cli/todolist-cli.js add-todo "task description" --priority High
+```
+
+## Session-to-subagent mapping
+
+The backend stores `agent_id` on each session in MongoDB. This is how the mapping works:
+
+- When you claim a session, set `agent_id` to a unique ID for the subagent (e.g. `oc-<session_id_short>`)
+- When `list-pending` returns a session with `[Claimed: oc-abc123]`, you know subagent `oc-abc123` was handling it
+- Resume that subagent with its stored context — don't spawn a new one
+- The backend preserves `agent_id` across agent responses (it's NOT cleared when the agent posts)
+- After 10 agent responses, `agent_id` auto-clears (MAX_SESSION_TURNS)
+
+## Key rules
+
+- **Stay claimed** — posting a response does NOT release the session
+- **Resume, don't re-spawn** — use the agent_id to find and resume the right subagent
+- **Progress updates** — post intermediate status so the user sees activity
+- **Auto-release at 10 turns** — sessions auto-release after 10 agent responses
+- **Explicit release** — only call `release-session` when the task is truly complete
+- **Worktrees for code** — if a subagent needs to edit code, use a git worktree
