@@ -27,10 +27,10 @@ The staging environment provides a production-like environment for testing chang
 ## Deployment Flow
 
 1. **Development**: Work on feature branches
-2. **Staging**: Merge feature branches to `staging` branch
+2. **Staging**: Merge feature branches to `openclaw-staging` branch
    - Automatically deploys to Railway staging environment
    - Test and validate changes
-3. **Production**: Merge `staging` to `main` branch
+3. **Production**: Merge `openclaw-staging` to `main` branch
    - Automatically deploys to Railway production environment
 
 ## GitHub Secrets Required
@@ -133,16 +133,16 @@ Copy the staging environment ID to GitHub secret:
 You can manually trigger a staging deployment from GitHub:
 1. Go to Actions > Deploy to Staging
 2. Click "Run workflow"
-3. Select the `staging` branch
+3. Select the `openclaw-staging` branch
 4. Add a reason for the deployment
 
 ### Automatic Trigger
 
-Push to the `staging` branch:
+Push to the `openclaw-staging` branch:
 ```bash
-git checkout staging
+git checkout openclaw-staging
 git merge feature/my-new-feature
-git push origin staging
+git push origin openclaw-staging
 ```
 
 ## Database Considerations
@@ -195,5 +195,5 @@ Ensure environment variables are set specifically for the staging environment, n
 ## Workflow Files
 
 - **Production**: `.github/workflows/deploy.yml` - triggers on `main`
-- **Staging**: `.github/workflows/deploy-staging.yml` - triggers on `staging`
+- **Staging**: `.github/workflows/deploy-staging.yml` - triggers on `openclaw-staging`
 - **CI**: `.github/workflows/ci.yml` - runs on all PRs and pushes
