@@ -7,8 +7,8 @@
  * via OpenClaw's sessions_send. Also provides progress checking via sessions_history.
  */
 
-const { sessions_send, sessions_history } = require('./openclaw-sessions-wrapper');
 const { SessionRouter } = require('./session-router');
+const { sessionsSend, sessionsHistory } = require('./subagent-integration');
 
 /**
  * MessageRouter — Wraps SessionRouter with OpenClaw session tools.
@@ -52,8 +52,8 @@ class MessageRouter {
       // Touch to update activity timestamp
       this.router.touch(todolistSessionId);
 
-      // Forward message to subagent
-      await sessions_send(mapping.subagentSessionKey, userMessage);
+      // Forward message to subagent using actual OpenClaw tool
+      await sessionsSend(mapping.subagentSessionKey, userMessage);
 
       this._log('info', 'Message forwarded to subagent', {
         todolistSessionId,
