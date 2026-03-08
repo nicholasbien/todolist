@@ -300,7 +300,9 @@ async def api_get_todo(todo_id: str, current_user: dict = Depends(get_current_us
 
     # Add user's first name for collaborative spaces
     try:
-        user = await auth.users_collection.find_one({"_id": ObjectId(todo["user_id"])})
+        from auth import users_collection as auth_users
+
+        user = await auth_users.find_one({"_id": ObjectId(todo["user_id"])})
         if user:
             todo["first_name"] = user.get("first_name", "")
     except Exception:
