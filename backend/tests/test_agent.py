@@ -542,13 +542,13 @@ class TestAgentStreaming:
             assert "OpenAI API key not configured" in messages[0]
 
     @pytest.mark.asyncio
-    @patch("agent.agent.save_chat_message", new_callable=AsyncMock)
-    @patch("agent.agent.get_chat_history", new_callable=AsyncMock, return_value=[])
+    @patch("agent.agent._persist_turn", new_callable=AsyncMock)
+    @patch("agent.agent.create_session", new_callable=AsyncMock, return_value="mock_session_id")
     @patch("categories.get_categories", new_callable=AsyncMock, return_value=["General"])
     @patch("agent.agent.connect_to_mcp_server", new_callable=AsyncMock, return_value=None)
     @patch("agent.agent.AsyncOpenAI")
     async def test_stream_agent_response_success(
-        self, mock_openai_class, _mock_mcp, _mock_cats, _mock_history, _mock_save
+        self, mock_openai_class, _mock_mcp, _mock_cats, _mock_session, _mock_persist
     ):
         """Test successful streaming response with text output."""
         mock_client = AsyncMock()
@@ -582,11 +582,14 @@ class TestAgentStreaming:
         assert "done" in messages[-1]
 
     @pytest.mark.asyncio
-    @patch("agent.agent.get_chat_history", new_callable=AsyncMock, return_value=[])
+    @patch("agent.agent._persist_turn", new_callable=AsyncMock)
+    @patch("agent.agent.create_session", new_callable=AsyncMock, return_value="mock_session_id")
     @patch("categories.get_categories", new_callable=AsyncMock, return_value=["General"])
     @patch("agent.agent.connect_to_mcp_server", new_callable=AsyncMock, return_value=None)
     @patch("agent.agent.AsyncOpenAI")
-    async def test_stream_agent_response_openai_error(self, mock_openai_class, _mock_mcp, _mock_cats, _mock_history):
+    async def test_stream_agent_response_openai_error(
+        self, mock_openai_class, _mock_mcp, _mock_cats, _mock_session, _mock_persist
+    ):
         """Test streaming with OpenAI API error."""
         mock_client = AsyncMock()
         mock_client.responses.create = AsyncMock(side_effect=Exception("OpenAI API Error"))
@@ -635,30 +638,31 @@ class TestAgentIntegration:
         # Get valid token
         token = await get_token(client, test_email)
 
-        # Mock OpenAI to avoid real API calls
-        with patch("agent.agent.AsyncOpenAI") as mock_openai_class:
-            mock_client = AsyncMock()
-            mock_openai_class.return_value = mock_client
+        # Mock OpenAI and MCP to avoid real API/subprocess calls
+        with patch("agent.agent.connect_to_mcp_server", new_callable=AsyncMock, return_value=None):
+            with patch("agent.agent.AsyncOpenAI") as mock_openai_class:
+                mock_client = AsyncMock()
+                mock_openai_class.return_value = mock_client
 
-            # Mock Responses API streaming events
-            text_event = MagicMock()
-            text_event.type = "response.output_text.delta"
-            text_event.delta = "Hello, how can I help?"
+                # Mock Responses API streaming events
+                text_event = MagicMock()
+                text_event.type = "response.output_text.delta"
+                text_event.delta = "Hello, how can I help?"
 
-            completed_event = MagicMock()
-            completed_event.type = "response.completed"
-            completed_event.response.usage.input_tokens = 10
-            completed_event.response.usage.output_tokens = 5
-            completed_event.response.usage.total_tokens = 15
+                completed_event = MagicMock()
+                completed_event.type = "response.completed"
+                completed_event.response.usage.input_tokens = 10
+                completed_event.response.usage.output_tokens = 5
+                completed_event.response.usage.total_tokens = 15
 
-            mock_stream = AsyncMock()
-            mock_stream.__aiter__.return_value = [text_event, completed_event]
-            mock_client.responses.create = AsyncMock(return_value=mock_stream)
+                mock_stream = AsyncMock()
+                mock_stream.__aiter__.return_value = [text_event, completed_event]
+                mock_client.responses.create = AsyncMock(return_value=mock_stream)
 
-            with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
-                # Agent endpoint expects token in Authorization header
-                headers = {"Authorization": f"Bearer {token}"}
-                response = await client.get("/agent/stream?q=hello", headers=headers)
+                with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
+                    # Agent endpoint expects token in Authorization header
+                    headers = {"Authorization": f"Bearer {token}"}
+                    response = await client.get("/agent/stream?q=hello", headers=headers)
 
         assert response.status_code == 200
         assert response.headers["content-type"] == "text/event-stream; charset=utf-8"
@@ -669,29 +673,30 @@ class TestAgentIntegration:
         # Get valid token
         token = await get_token(client, test_email)
 
-        # Mock OpenAI to avoid real API calls
-        with patch("agent.agent.AsyncOpenAI") as mock_openai_class:
-            mock_client = AsyncMock()
-            mock_openai_class.return_value = mock_client
+        # Mock OpenAI and MCP to avoid real API/subprocess calls
+        with patch("agent.agent.connect_to_mcp_server", new_callable=AsyncMock, return_value=None):
+            with patch("agent.agent.AsyncOpenAI") as mock_openai_class:
+                mock_client = AsyncMock()
+                mock_openai_class.return_value = mock_client
 
-            # Mock Responses API streaming events
-            text_event = MagicMock()
-            text_event.type = "response.output_text.delta"
-            text_event.delta = "Hello, how can I help?"
+                # Mock Responses API streaming events
+                text_event = MagicMock()
+                text_event.type = "response.output_text.delta"
+                text_event.delta = "Hello, how can I help?"
 
-            completed_event = MagicMock()
-            completed_event.type = "response.completed"
-            completed_event.response.usage.input_tokens = 10
-            completed_event.response.usage.output_tokens = 5
-            completed_event.response.usage.total_tokens = 15
+                completed_event = MagicMock()
+                completed_event.type = "response.completed"
+                completed_event.response.usage.input_tokens = 10
+                completed_event.response.usage.output_tokens = 5
+                completed_event.response.usage.total_tokens = 15
 
-            mock_stream = AsyncMock()
-            mock_stream.__aiter__.return_value = [text_event, completed_event]
-            mock_client.responses.create = AsyncMock(return_value=mock_stream)
+                mock_stream = AsyncMock()
+                mock_stream.__aiter__.return_value = [text_event, completed_event]
+                mock_client.responses.create = AsyncMock(return_value=mock_stream)
 
-            with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
-                # EventSource can't set custom headers, so token must be in query param
-                response = await client.get(f"/agent/stream?q=hello&token={token}")
+                with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
+                    # EventSource can't set custom headers, so token must be in query param
+                    response = await client.get(f"/agent/stream?q=hello&token={token}")
 
         assert response.status_code == 200
         assert response.headers["content-type"] == "text/event-stream; charset=utf-8"
@@ -708,28 +713,29 @@ class TestAgentIntegration:
         space_data = space_response.json()
         space_id = space_data.get("_id") or space_data.get("id")
 
-        with patch("agent.agent.AsyncOpenAI") as mock_openai_class:
-            mock_client = AsyncMock()
-            mock_openai_class.return_value = mock_client
+        with patch("agent.agent.connect_to_mcp_server", new_callable=AsyncMock, return_value=None):
+            with patch("agent.agent.AsyncOpenAI") as mock_openai_class:
+                mock_client = AsyncMock()
+                mock_openai_class.return_value = mock_client
 
-            text_event = MagicMock()
-            text_event.type = "response.output_text.delta"
-            text_event.delta = "Working in your test space"
+                text_event = MagicMock()
+                text_event.type = "response.output_text.delta"
+                text_event.delta = "Working in your test space"
 
-            completed_event = MagicMock()
-            completed_event.type = "response.completed"
-            completed_event.response.usage.input_tokens = 10
-            completed_event.response.usage.output_tokens = 5
-            completed_event.response.usage.total_tokens = 15
+                completed_event = MagicMock()
+                completed_event.type = "response.completed"
+                completed_event.response.usage.input_tokens = 10
+                completed_event.response.usage.output_tokens = 5
+                completed_event.response.usage.total_tokens = 15
 
-            mock_stream = AsyncMock()
-            mock_stream.__aiter__.return_value = [text_event, completed_event]
-            mock_client.responses.create = AsyncMock(return_value=mock_stream)
+                mock_stream = AsyncMock()
+                mock_stream.__aiter__.return_value = [text_event, completed_event]
+                mock_client.responses.create = AsyncMock(return_value=mock_stream)
 
-            with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
-                # Agent endpoint expects token in Authorization header
-                headers = {"Authorization": f"Bearer {token}"}
-                response = await client.get(f"/agent/stream?q=help&space_id={space_id}", headers=headers)
+                with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
+                    # Agent endpoint expects token in Authorization header
+                    headers = {"Authorization": f"Bearer {token}"}
+                    response = await client.get(f"/agent/stream?q=help&space_id={space_id}", headers=headers)
 
         assert response.status_code == 200
 
@@ -833,9 +839,14 @@ class TestAgentSystemPrompt:
             assert callable(tool_info["func"])
 
     @pytest.mark.asyncio
+    @patch("agent.agent._persist_turn", new_callable=AsyncMock)
+    @patch("agent.agent.create_session", new_callable=AsyncMock, return_value="mock_session_id")
+    @patch("agent.agent.connect_to_mcp_server", new_callable=AsyncMock, return_value=None)
     @patch("categories.get_categories", new_callable=AsyncMock)
     @patch("db.collections")
-    async def test_agent_context_includes_date_space_categories(self, mock_collections, mock_get_categories):
+    async def test_agent_context_includes_date_space_categories(
+        self, mock_collections, mock_get_categories, _mock_mcp, _mock_session, _mock_persist
+    ):
         """Test that agent context includes current date, space name, and categories."""
         from datetime import datetime
 
