@@ -242,7 +242,7 @@ async function processSession(sessionSummary) {
     return;
   }
 
-  let shouldRelease = true;
+  let shouldRelease = false; // Stay claimed for follow-ups (persistent session model)
 
   try {
     const fullSession = await fetchFullSession(sessionId);

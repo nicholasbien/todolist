@@ -62,9 +62,11 @@ Add the todolist MCP server to your OpenClaw config:
 
 ### 5. HEARTBEAT.md
 
-`HEARTBEAT.md` is already included in the repo root. It's a short checklist (per OpenClaw best practices — keep it small since it's injected every heartbeat cycle). Detailed subagent instructions are in `AGENTS.md` under "Subagent Workflow".
+`HEARTBEAT.md` is already included in the repo root. It's a short checklist (per OpenClaw best practices — keep it small since it's injected every heartbeat cycle). Detailed subagent instructions are in `AGENTS.md` under "OpenClaw Codex Dispatch".
 
 **Important:** Do NOT put secrets (tokens, API keys) in HEARTBEAT.md — use env vars in the config instead.
+
+**Subagent dispatch:** OpenClaw uses `codex exec` to handle sessions. On each heartbeat, the main agent claims pending sessions and runs `codex exec` with a prompt that includes the session ID and CLI commands. Codex reads the session, does the work, and posts the response. See AGENTS.md for the full prompt template.
 
 ### 6. Configure heartbeat interval
 
@@ -85,14 +87,20 @@ openclaw tools list | grep todolist
 ## Architecture
 
 ```
-┌─────────────────────────────────────┐        ┌──────────────────┐
-│  Your machine                       │        │  Railway          │
-│                                     │        │                  │
-│  OpenClaw Gateway                   │        │  Backend API     │
-│    ├── Heartbeat (every 1m)         │        │  (FastAPI)       │
-│    └── MCP Server (child process) ──────HTTP──→               │
-│         (node dist/index.js)        │        │  MongoDB         │
-└─────────────────────────────────────┘        └──────────────────┘
+┌──────────────────────────────────────┐        ┌──────────────────┐
+│  Your machine                        │        │  Railway          │
+│                                      │        │                  │
+│  OpenClaw Gateway                    │        │  Backend API     │
+│    ├── Heartbeat (every 1m)          │        │  (FastAPI)       │
+│    │     └── list-pending via CLI ───────HTTP──→               │
+│    │          ├── claim-session ──────────HTTP──→               │
+│    │          └── codex exec ──┐     │        │  MongoDB         │
+│    │               (subagent)  │     │        │                  │
+│    │               ├── get-session ───────HTTP──→               │
+│    │               ├── (do work)     │        │                  │
+│    │               └── post-message ─────HTTP──→               │
+│    └── MCP Server (optional) ────────────HTTP──→               │
+└──────────────────────────────────────┘        └──────────────────┘
 ```
 
 ## Persistent Session Lifecycle
@@ -104,13 +112,13 @@ Sessions support multi-turn conversations between users and agents:
 2. Agent claims session      → agent_id = "oc-abc123"
 3. Agent posts response      → needs_agent_response = false, agent_id KEPT
 4. User sends follow-up      → needs_agent_response = true, same agent_id
-5. Heartbeat detects pending → resumes SAME agent (preserves context)
+5. Heartbeat detects pending → dispatches `codex exec` for same session
 6. Repeat steps 3-5...
 7. After 10 agent responses  → agent_id auto-released (MAX_SESSION_TURNS)
 8. Or agent explicitly calls → release_session() when done
 ```
 
-**Why this matters for OpenClaw:** The gateway should track which agent handles which session and resume the same agent on follow-ups. This keeps conversation context intact across heartbeats.
+**Why this matters for OpenClaw:** On follow-ups, the main agent dispatches `codex exec` again for the same session. Codex reads the full conversation history each time, so context is preserved even though each `codex exec` is a fresh process.
 
 ## CLI Commands (Primary)
 

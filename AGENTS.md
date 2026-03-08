@@ -1036,6 +1036,102 @@ The orchestrator connects to the todolist MCP server:
 }
 ```
 
+#### OpenClaw Codex Dispatch
+
+OpenClaw uses `codex exec` to handle sessions as subagents. On each heartbeat, the main agent checks for pending sessions and dispatches `codex exec` for each one.
+
+**How it works:**
+
+1. Heartbeat fires → main agent runs `node cli/todolist-cli.js list-pending`
+2. For each pending session, main agent claims it and spawns `codex exec`
+3. Codex reads the session, does the work, posts the response via CLI
+4. Session stays claimed — next heartbeat, if user sent a follow-up, main agent dispatches codex again
+
+**Dispatch pattern (run from repo root):**
+
+```bash
+# 1. Claim the session
+node cli/todolist-cli.js claim-session <session_id> --agent-id oc-<short_id>
+
+# 2. Dispatch codex to handle it
+codex exec --full-auto "
+You are handling a user session in the todolist app.
+Session ID: <session_id>
+
+Step 1: Read the session
+  node cli/todolist-cli.js get-session <session_id>
+
+Step 2: Understand what the user is asking, then do the work.
+
+Step 3: Post your response
+  node cli/todolist-cli.js post-message -s <session_id> -c 'Your response here'
+
+Step 4: If the task is fully complete and user won't need follow-up:
+  node cli/todolist-cli.js release-session <session_id>
+  Otherwise, stay claimed for follow-ups.
+
+Environment vars are already set: TODOLIST_API_URL, TODOLIST_AUTH_TOKEN, DEFAULT_SPACE_ID
+"
+```
+
+**For coding tasks** (codex has full repo access):
+
+```bash
+codex exec --full-auto "
+Session <session_id> asks for code changes.
+1. Read session: node cli/todolist-cli.js get-session <session_id>
+2. Post progress: node cli/todolist-cli.js post-message -s <session_id> -c 'Working on it...'
+3. Make the code changes in a git worktree to avoid conflicts
+4. Post result: node cli/todolist-cli.js post-message -s <session_id> -c 'Done. Changes on branch X.'
+"
+```
+
+**Pre-existing auto-claim scripts** (alternative to manual dispatch):
+
+The repo includes `scripts/auto-claim-sessions.js` which is a standalone polling worker that:
+- Polls for pending sessions every 15s
+- Classifies sessions as `coding` or `simple` (via `scripts/session-classifier.js`)
+- Spawns `codex exec` for coding tasks (via `scripts/subagent-spawner.js`)
+- Posts simple responses directly for non-coding tasks
+- Handles retries, timeouts, and error fallbacks
+
+Run it as a background process:
+```bash
+export TODOLIST_API_URL="https://backend-openclaw.up.railway.app"
+export TODOLIST_AUTH_TOKEN="your-token"
+export DEFAULT_SPACE_ID="your-space-id"
+node scripts/auto-claim-sessions.js
+```
+
+Or from HEARTBEAT.md, the main agent can invoke it per-session:
+```bash
+node scripts/subagent-spawner.js coding "Handle session <session_id>: read it, do the work, post response"
+```
+
+**Environment setup for OpenClaw:**
+
+These env vars must be available to both the main agent and codex subagents:
+```bash
+export TODOLIST_API_URL="https://backend-openclaw.up.railway.app"
+export TODOLIST_AUTH_TOKEN="your-token"
+export DEFAULT_SPACE_ID="your-space-id"
+```
+
+Set them in your OpenClaw config so they propagate to subprocesses:
+```json
+{
+  "mcpServers": {
+    "todolist": {
+      "env": {
+        "TODOLIST_API_URL": "https://backend-openclaw.up.railway.app",
+        "TODOLIST_AUTH_TOKEN": "your-token",
+        "DEFAULT_SPACE_ID": "your-space-id"
+      }
+    }
+  }
+}
+```
+
 #### Claude Code Setup (Simple)
 
 For Claude Code (no orchestrator), use the polling skill:
