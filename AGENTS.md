@@ -873,19 +873,35 @@ The app uses chat sessions as an asynchronous messaging channel between the user
 **How it works:**
 1. User creates a task → backend auto-creates a linked session with task details as a `user` message
 2. User can also send messages via the Assistant tab in the web app
-3. Agent polls `get_pending_sessions` → finds sessions where the last message is `role: user`
+3. Agent polls `get_pending_sessions` → finds sessions where `needs_agent_response` is true
 4. Agent atomically claims session ownership via `claim_session(session_id, agent_id)`
 5. Agent reads the session, does the work, posts a response via `post_to_session`
-6. Agent releases ownership via `release_session(session_id)` (or rely on assistant-post auto-clear)
+6. **Agent stays claimed** — `agent_id` is preserved after posting so the same agent handles follow-ups
 7. User sees the response in the web app (frontend polls every 5s)
 
-**Key tools:**
-- `get_pending_sessions` — Returns sessions awaiting agent response (last message is from user)
+**Persistent session lifecycle:**
+- Posting an assistant message clears `needs_agent_response` but **keeps `agent_id`**
+- When the user sends a follow-up, `needs_agent_response` flips back to true
+- The orchestrator should **resume the same agent** to maintain conversation context
+- Sessions auto-release after **10 assistant responses** (`MAX_SESSION_TURNS`)
+- Agents can also explicitly release via `release_session()` when the task is done
+
+**Key tools (MCP / API):**
+- `get_pending_sessions` — Returns sessions where `needs_agent_response` is true
 - `claim_session(session_id, agent_id)` — Atomically claim a session before starting work
-- `release_session(session_id)` — Release claim after work is finished or failed
+- `release_session(session_id)` — Explicitly release claim (only when task is truly done)
 - `get_session(session_id)` — Read full conversation history
-- `post_to_session(session_id, content)` — Post agent response (role: `assistant`)
+- `post_to_session(session_id, content)` — Post agent response (keeps agent claimed)
 - `create_session(title, todo_id?)` — Create a session, optionally linked to a task
+- `GET /agent/sessions/{id}/watch?since=<ISO timestamp>` — Poll for new messages since a timestamp (for subagents checking for follow-ups during long tasks)
+
+**CLI commands** (`cli/todolist-cli.js`):
+- `list-pending` — Show pending sessions
+- `get-session <id>` — Read session messages
+- `post-message -s <id> -c <text>` — Post a message
+- `claim-session <id> [--agent-id <name>]` — Claim a session
+- `release-session <id>` — Release a session
+- `watch-session <id> [--since <ISO timestamp>]` — Poll for new messages since timestamp
 
 ### Orchestrator Integration Guide
 
@@ -930,17 +946,20 @@ for session in pending:
 
 #### Worker Agent Lifecycle
 
-Each worker agent handles a single session/task:
+Each worker agent handles a single session/task with persistent claim:
 
 ```
 1. Read full session:     get_session(session_id)
 2. Understand context:    Parse task details, conversation history
 3. Do the work:           Edit code, run tests, research, etc.
-4. Post response:         post_to_session(session_id, result)
-5. Release claim:         release_session(session_id)
-6. Check for follow-ups:  get_session(session_id) — did user reply?
-7. If follow-up exists:   Go to step 2 (and reclaim)
-8. If done:               Worker exits, orchestrator removes from active_workers
+4. Post progress updates: post_to_session(session_id, "Working on X...")
+5. Check for follow-ups:  watch_session(session_id, since=<timestamp>)
+6. Post final response:   post_to_session(session_id, result)
+   → Agent stays claimed (agent_id preserved, needs_agent_response=false)
+7. When user sends follow-up → needs_agent_response flips to true
+8. Orchestrator resumes SAME agent (preserving context)
+9. Repeat from step 1
+10. When task is done:    release_session(session_id) — or auto-release at 10 turns
 ```
 
 #### Webhook Integration (Recommended)

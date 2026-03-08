@@ -7,11 +7,10 @@ from typing import Any, Dict, List, Optional
 from bson import ObjectId
 from db import db
 from pymongo.errors import DuplicateKeyError
-
 from webhook_dispatcher import (
-    notify_session_created,
     notify_message_posted,
     notify_session_claimed,
+    notify_session_created,
     notify_session_released,
 )
 
@@ -23,7 +22,7 @@ trajectories_collection = db.chat_trajectories
 
 # Session management configuration
 MAX_ACTIVE_SESSIONS = 10  # Maximum sessions to show in list-pending
-SESSION_STALE_DAYS = 7     # Sessions older than this are archived (not in list-pending)
+SESSION_STALE_DAYS = 7  # Sessions older than this are archived (not in list-pending)
 
 # Session status types
 SESSION_STATUS_ACTIVE = "active"
@@ -105,24 +104,20 @@ async def get_pending_sessions(user_id: str, space_id: Optional[str] = None) -> 
     Uses the ``needs_agent_response`` flag for fast indexed queries.
     Falls back to checking the last message role for legacy docs that
     don't have the flag yet.
-    
+
     Implements session capping: MAX_ACTIVE_SESSIONS limit and stale session filtering.
     """
     from datetime import timedelta
-    
+
     base_query: Dict[str, Any] = {"user_id": user_id}
     if space_id:
         base_query["space_id"] = space_id
-    
+
     # Archive filter: only sessions updated in last SESSION_STALE_DAYS
     stale_threshold = datetime.utcnow() - timedelta(days=SESSION_STALE_DAYS)
-    
+
     # Query 1: docs with the flag set (fast, indexed) + not stale
-    flagged_query = {
-        **base_query, 
-        "needs_agent_response": True,
-        "updated_at": {"$gte": stale_threshold}
-    }
+    flagged_query = {**base_query, "needs_agent_response": True, "updated_at": {"$gte": stale_threshold}}
     # Query 2: legacy docs missing the flag — fall back to last-message check
     legacy_query = {**base_query, "needs_agent_response": {"$exists": False}}
 
@@ -157,15 +152,15 @@ async def get_pending_sessions(user_id: str, space_id: Optional[str] = None) -> 
 
     await _collect(trajectories_collection.find(flagged_query))
     await _collect(trajectories_collection.find(legacy_query))
-    
+
     # Sort by updated_at (newest first) and apply session cap
     pending.sort(key=lambda x: x.get("updated_at", datetime.min), reverse=True)
-    
+
     # Apply MAX_ACTIVE_SESSIONS cap
     if len(pending) > MAX_ACTIVE_SESSIONS:
         logger.info(f"Session cap applied: {len(pending)} sessions, returning {MAX_ACTIVE_SESSIONS}")
         return pending[:MAX_ACTIVE_SESSIONS]
-    
+
     return pending
 
 
@@ -276,20 +271,30 @@ async def save_trajectory(
     )
 
 
+# Max back-and-forth exchanges before a session auto-releases its agent claim.
+# Each exchange = 1 user message + 1 assistant response. After this limit the
+# agent_id is cleared so the session shows up as unclaimed if the user writes again.
+MAX_SESSION_TURNS = 10
+
+
 async def append_message(session_id: str, user_id: str, role: str, content: str) -> bool:
     """Append a message to a session's display_messages. Returns True if found.
 
     Automatically manages ``needs_agent_response``:
     - user message  → needs_agent_response = True
-    - assistant msg → appends message, then checks if a user message
-      arrived in the meantime.  Only clears the flag when the last
-      message in the array is still from the assistant.
-    
+    - assistant msg → needs_agent_response = False (but agent_id is KEPT so the
+      same subagent stays claimed on the session for follow-ups)
+
+    Agent release policy:
+    - agent_id is only cleared when:
+      (a) release_session() is called explicitly (user says "done", or agent finishes)
+      (b) the session exceeds MAX_SESSION_TURNS exchanges — auto-released
+    - This lets subagents maintain a persistent conversation with the user.
+
     Session Archival & Resurrection:
     - Sessions older than SESSION_STALE_DAYS are excluded from list-pending
     - When a new message is added, updated_at is refreshed to now
     - This "resurrects" archived sessions, making them active again
-    - See get_pending_sessions() for stale session filtering logic
     """
     now = datetime.utcnow()
     message = {"role": role, "content": content, "timestamp": now.isoformat()}
@@ -301,9 +306,6 @@ async def append_message(session_id: str, user_id: str, role: str, content: str)
 
     if role == "user":
         update["$set"]["needs_agent_response"] = True
-        # Keep agent_id so the same agent can pick up the follow-up message
-        # with its existing context. claim_session allows reclaiming with
-        # the same agent_id.
 
     result = await trajectories_collection.update_one(
         {"session_id": session_id, "user_id": user_id},
@@ -312,17 +314,32 @@ async def append_message(session_id: str, user_id: str, role: str, content: str)
     if result.matched_count == 0:
         return False
 
-    # For assistant messages, atomically clear the flag only if no user
-    # message snuck in after ours (last element's role == "assistant").
+    # For assistant messages, clear needs_agent_response but KEEP agent_id.
+    # The subagent stays claimed so it can handle follow-up messages.
     if role == "assistant":
-        await trajectories_collection.update_one(
-            {
-                "session_id": session_id,
-                "user_id": user_id,
-                "display_messages.-1.role": "assistant",
-            },
-            {"$set": {"needs_agent_response": False, "agent_id": None}},
+        # Re-read to check the last message role and turn count in one query.
+        # (MongoDB doesn't support negative array indices like -1 in query filters.)
+        doc = await trajectories_collection.find_one(
+            {"session_id": session_id, "user_id": user_id},
+            {"display_messages": 1},
         )
+        if doc:
+            msgs = doc.get("display_messages", [])
+            # Only clear if last message is still from assistant (no user race)
+            if msgs and msgs[-1].get("role") == "assistant":
+                await trajectories_collection.update_one(
+                    {"session_id": session_id, "user_id": user_id},
+                    {"$set": {"needs_agent_response": False}},
+                )
+
+            # Auto-release after MAX_SESSION_TURNS exchanges
+            turn_count = sum(1 for m in msgs if m.get("role") == "assistant")
+            if turn_count >= MAX_SESSION_TURNS:
+                logger.info(f"Session {session_id} hit {MAX_SESSION_TURNS} turns — auto-releasing agent")
+                await trajectories_collection.update_one(
+                    {"session_id": session_id, "user_id": user_id},
+                    {"$set": {"agent_id": None}},
+                )
 
     await sessions_collection.update_one(
         {"_id": ObjectId(session_id)},

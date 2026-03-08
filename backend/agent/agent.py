@@ -30,6 +30,7 @@ from chat_sessions import (  # noqa: E402
     list_sessions,
     release_session,
     save_trajectory,
+    trajectories_collection,
 )
 from chats import ChatMessage, save_chat_message  # noqa: E402
 from fastapi import APIRouter, Depends, Header, HTTPException, Query  # noqa: E402
@@ -900,6 +901,57 @@ async def post_session_message(
         raise HTTPException(status_code=404, detail="Session not found")
 
     return {"ok": True}
+
+
+@router.get("/sessions/{session_id}/watch")
+async def watch_session(
+    session_id: str,
+    since: Optional[str] = Query(None, description="ISO timestamp — return only messages after this time"),
+    current_user: dict = Depends(get_current_user),
+):
+    """Poll for new messages in a session since a given timestamp.
+
+    Designed for subagents to check for follow-up user messages while working.
+    Returns only new messages and the current agent claim status.
+    """
+    user_id = current_user.get("user_id")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="User not authenticated")
+
+    result = await get_session_trajectory(session_id, user_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    messages = result.get("display_messages", [])
+
+    # Filter to messages after `since` timestamp
+    if since:
+        from datetime import datetime as dt
+
+        try:
+            dt.fromisoformat(since.replace("Z", "+00:00"))
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid 'since' timestamp")
+        new_messages = []
+        for m in messages:
+            ts = m.get("timestamp", "")
+            if ts and ts > since:
+                new_messages.append(m)
+        messages = new_messages
+
+    # Get trajectory doc for agent_id info
+    traj_doc = await trajectories_collection.find_one(
+        {"session_id": session_id, "user_id": user_id},
+        {"agent_id": 1, "needs_agent_response": 1},
+    )
+
+    return {
+        "session_id": session_id,
+        "new_messages": messages,
+        "has_new_user_message": any(m.get("role") == "user" for m in messages),
+        "agent_id": traj_doc.get("agent_id") if traj_doc else None,
+        "needs_agent_response": traj_doc.get("needs_agent_response", False) if traj_doc else False,
+    }
 
 
 @router.get("/stream")

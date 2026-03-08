@@ -249,6 +249,33 @@ const commands = {
     console.log(`Updated todo ${id}`);
   },
 
+  async 'watch-session'(args) {
+    const { flags, positional } = parseFlags(args);
+    const sessionId = flags['session-id'] || flags.s || positional[0];
+    const since = flags.since || null;
+    if (!sessionId) { console.error('Usage: watch-session <session_id> [--since <ISO timestamp>]'); process.exit(1); }
+    const params = since ? `?since=${encodeURIComponent(since)}` : '';
+    const { data } = await request('GET', `/agent/sessions/${sessionId}/watch${params}`);
+    if (!data.new_messages || !data.new_messages.length) {
+      console.log('No new messages.');
+    } else {
+      for (const m of data.new_messages) {
+        const prefix = m.role === 'user' ? 'USER' : 'AGENT';
+        const ts = m.timestamp ? ` (${m.timestamp})` : '';
+        console.log(`[${prefix}${ts}]`);
+        console.log(m.content || '');
+        console.log();
+      }
+    }
+    // Output JSON summary on last line for machine parsing
+    console.log(JSON.stringify({
+      has_new_user_message: data.has_new_user_message,
+      agent_id: data.agent_id,
+      needs_agent_response: data.needs_agent_response,
+      message_count: (data.new_messages || []).length,
+    }));
+  },
+
   async 'create-session'(args) {
     const { flags, positional } = parseFlags(args);
     const title = flags.title || positional.join(' ');
@@ -280,6 +307,7 @@ Commands:
   claim-session <session_id>       Claim a session for this agent
   release-session <session_id>     Release a session claim
   get-session-by-todo <todo_id>    Get the session linked to a todo
+  watch-session <id> [--since TS]  Poll for new messages since timestamp
   list-todos [--completed]         List todos
   add-todo <text> [--category C] [--priority P] [--notes N]
   complete-todo <todo_id>          Mark a todo complete

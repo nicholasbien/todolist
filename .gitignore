@@ -30,7 +30,6 @@ frontend/test-results/
 
 # Ephemeral agent files
 CLAUDE_TASK.txt
-HEARTBEAT.md
 
 # Test screenshots (exploratory)
 frontend/public/screenshots/exploratory/
