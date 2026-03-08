@@ -8,10 +8,11 @@
  * - GET /health - Health check
  * - GET /stats - Session router stats
  * - POST /webhook/test - Test endpoint
- * 
+ *
  * Now with MongoDB persistence for session reliability.
  */
 
+const crypto = require('crypto');
 const express = require('express');
 const cors = require('cors');
 const { WebhookReceiver } = require('./webhook-receiver');
@@ -54,14 +55,83 @@ const messageRouter = new MessageRouter({ sessionRouter, logger });
 const webhookReceiver = new WebhookReceiver({ sessionRouter, messageRouter, logger });
 
 /**
+ * Ensure we have a valid auth token by reading from MongoDB.
+ * If TODOLIST_AUTH_TOKEN is already set, validates it.
+ * Otherwise, finds or creates an active session for the agent user.
+ */
+async function ensureAgentToken(db) {
+  if (!db) return false;
+
+  const agentEmail = process.env.AGENT_USER_EMAIL;
+  if (!agentEmail) {
+    logger('warn', 'AGENT_USER_EMAIL not set — cannot auto-provision auth token');
+    return !!process.env.TODOLIST_AUTH_TOKEN;
+  }
+
+  try {
+    const usersCol = db.collection('users');
+    const sessionsCol = db.collection('sessions');
+
+    // Find the agent user
+    const user = await usersCol.findOne({ email: agentEmail });
+    if (!user) {
+      logger('error', `Agent user not found: ${agentEmail}`);
+      return false;
+    }
+    const userId = user._id.toString();
+
+    // Look for an existing active, non-expired session
+    const now = new Date();
+    let session = await sessionsCol.findOne({
+      user_id: userId,
+      is_active: true,
+      expires_at: { $gt: now },
+    }, { sort: { expires_at: -1 } });
+
+    if (session) {
+      // Extend expiration
+      const newExpiry = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+      await sessionsCol.updateOne(
+        { _id: session._id },
+        { $set: { expires_at: newExpiry } }
+      );
+      process.env.TODOLIST_AUTH_TOKEN = session.token;
+      logger('info', 'Auth token loaded from MongoDB', { user: agentEmail, expires: newExpiry.toISOString() });
+      return true;
+    }
+
+    // No active session — create one
+    const token = crypto.randomBytes(32).toString('base64url');
+    const expires = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+    await sessionsCol.insertOne({
+      user_id: userId,
+      token,
+      is_active: true,
+      created_at: now,
+      expires_at: expires,
+    });
+    process.env.TODOLIST_AUTH_TOKEN = token;
+    logger('info', 'Auth token created in MongoDB', { user: agentEmail, expires: expires.toISOString() });
+    return true;
+  } catch (err) {
+    logger('error', 'Failed to ensure agent token', { error: err.message });
+    return false;
+  }
+}
+
+/**
  * Initialize database connection and load sessions
  */
 async function initializeServer() {
   try {
     // Initialize MongoDB connection
     const dbConnected = await sessionRouter.initDatabase();
-    
+
     if (dbConnected) {
+      // Auto-provision auth token from MongoDB
+      const db = sessionRouter._mongoClient.db(process.env.MONGODB_DB_NAME || 'todo_db');
+      await ensureAgentToken(db);
+
       // Load active sessions from DB into memory
       const loadedCount = await sessionRouter.loadActiveSessions();
       logger('info', `Server initialized with ${loadedCount} active sessions from DB`);
@@ -86,6 +156,7 @@ app.get('/health', (req, res) => {
     timestamp: new Date().toISOString(),
     sessions: stats,
     database: dbStatus,
+    has_auth_token: !!process.env.TODOLIST_AUTH_TOKEN,
     environment: NODE_ENV,
   });
 });
@@ -186,7 +257,7 @@ app.use((req, res) => {
 // Start server after initializing DB
 async function startServer() {
   await initializeServer();
-  
+
   const server = app.listen(PORT, HOST, () => {
     logger('info', `Webhook server started`, {
       host: HOST,
@@ -205,10 +276,10 @@ async function startServer() {
   // Graceful shutdown
   async function gracefulShutdown(signal) {
     logger('info', `Received ${signal}, shutting down gracefully...`);
-    
+
     await sessionRouter.shutdown();
     await messageRouter.shutdown();
-    
+
     server.close(() => {
       logger('info', 'Server closed');
       process.exit(0);

@@ -25,10 +25,9 @@ value = "true"
 [env.AGENT_ID]
 value = "openclaw-webhook"
 
-# IMPORTANT: Set these via Railway dashboard (not here — secrets!)
-# TODOLIST_AUTH_TOKEN = <set in Railway dashboard>
-# TODOLIST_API_URL = <set in Railway dashboard>
-# DEFAULT_SPACE_ID = <set in Railway dashboard>
+# Auth token is auto-provisioned from MongoDB on startup.
+# Just set AGENT_USER_EMAIL and MONGODB_URL in Railway dashboard.
+# TODOLIST_API_URL and DEFAULT_SPACE_ID also needed in Railway dashboard.
 
 [nixpacks]
 nodeVersion = "22"
