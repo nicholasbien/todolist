@@ -1036,66 +1036,99 @@ The orchestrator connects to the todolist MCP server:
 }
 ```
 
-#### OpenClaw Codex Dispatch
+#### OpenClaw Subagent Dispatch
 
-OpenClaw uses `codex exec` to handle sessions as subagents. On each heartbeat, the main agent checks for pending sessions and dispatches `codex exec` for each one.
+OpenClaw acts as the **orchestrator** — it checks for pending sessions and routes work to coding subagents (Codex, Claude Code, etc.). OpenClaw does NOT do coding work itself.
 
 **How it works:**
 
 1. Heartbeat fires → main agent runs `node cli/todolist-cli.js list-pending`
-2. For each pending session, main agent claims it and spawns `codex exec`
-3. Codex reads the session, does the work, posts the response via CLI
-4. Session stays claimed — next heartbeat, if user sent a follow-up, main agent dispatches codex again
+2. For each pending session, main agent claims it and reads the conversation
+3. Main agent spawns a coding subagent via `sessions_spawn` to handle the work
+4. Main agent saves the `runId` to a tracking file so follow-ups route to the same subagent
+5. On follow-ups, main agent resumes the same subagent with the new user message
 
-**Dispatch pattern (run from repo root):**
+**Orchestrator flow:**
 
-```bash
-# 1. Claim the session
-node cli/todolist-cli.js claim-session <session_id> --agent-id oc-<short_id>
+```
+Heartbeat
+  ├── list-pending → found session abc123
+  ├── claim-session abc123
+  ├── get-session abc123 → read user request
+  ├── sessions_spawn codex "<prompt>" → returns runId: "run_xyz"
+  ├── Save mapping: abc123 → run_xyz (in .openclaw/session-agents.json)
+  └── HEARTBEAT_OK
 
-# 2. Dispatch codex to handle it
-codex exec --full-auto "
+Next heartbeat (user sent follow-up on abc123)
+  ├── list-pending → abc123 has new message
+  ├── get-session abc123 → read follow-up
+  ├── Load mapping: abc123 → run_xyz
+  ├── Route follow-up to run_xyz (resume existing subagent)
+  └── HEARTBEAT_OK
+```
+
+**Spawning a subagent:**
+
+```
+sessions_spawn codex "
 You are handling a user session in the todolist app.
 Session ID: <session_id>
 
-Step 1: Read the session
-  node cli/todolist-cli.js get-session <session_id>
+1. Read the session:
+   node cli/todolist-cli.js get-session <session_id>
 
-Step 2: Understand what the user is asking, then do the work.
+2. Do the work (code changes, research, etc.)
+   - Use a git worktree for code changes to avoid conflicts
+   - Post progress updates as you work:
+     node cli/todolist-cli.js post-message -s <session_id> -c 'Working on it...'
 
-Step 3: Post your response
-  node cli/todolist-cli.js post-message -s <session_id> -c 'Your response here'
+3. Post your final response:
+   node cli/todolist-cli.js post-message -s <session_id> -c 'Done. Here is what I did...'
 
-Step 4: If the task is fully complete and user won't need follow-up:
-  node cli/todolist-cli.js release-session <session_id>
-  Otherwise, stay claimed for follow-ups.
+4. Check for follow-up messages periodically:
+   node cli/todolist-cli.js watch-session <session_id> --since <ISO timestamp>
 
-Environment vars are already set: TODOLIST_API_URL, TODOLIST_AUTH_TOKEN, DEFAULT_SPACE_ID
+5. Only release when the task is truly complete:
+   node cli/todolist-cli.js release-session <session_id>
+
+Env vars are set: TODOLIST_API_URL, TODOLIST_AUTH_TOKEN, DEFAULT_SPACE_ID
 "
 ```
 
-**For coding tasks** (codex has full repo access):
+**Session-to-subagent tracking:**
+
+The orchestrator must persist the mapping between todolist sessions and subagent runs so follow-ups reach the same agent:
+
+```json
+// .openclaw/session-agents.json
+{
+  "69ad0918fb5006638bc514e1": {
+    "runId": "run_xyz",
+    "agentType": "codex",
+    "spawnedAt": "2026-03-08T12:00:00Z"
+  }
+}
+```
+
+On each heartbeat:
+- **New session (no mapping):** Spawn new subagent, save mapping
+- **Follow-up (has mapping):** Resume existing subagent with the new message
+- **Stale mapping (subagent finished/died):** Spawn new subagent, update mapping
+
+**Fallback: `codex exec` (if `sessions_spawn` unavailable):**
 
 ```bash
-codex exec --full-auto "
-Session <session_id> asks for code changes.
-1. Read session: node cli/todolist-cli.js get-session <session_id>
-2. Post progress: node cli/todolist-cli.js post-message -s <session_id> -c 'Working on it...'
-3. Make the code changes in a git worktree to avoid conflicts
-4. Post result: node cli/todolist-cli.js post-message -s <session_id> -c 'Done. Changes on branch X.'
-"
+# Claim and dispatch directly
+node cli/todolist-cli.js claim-session <session_id> --agent-id oc-main
+codex exec --full-auto "Read session <session_id>, do the work, post response via CLI"
 ```
 
-**Pre-existing auto-claim scripts** (alternative to manual dispatch):
+Note: `codex exec` bypasses OpenClaw's lifecycle tracking — use `sessions_spawn` when available.
 
-The repo includes `scripts/auto-claim-sessions.js` which is a standalone polling worker that:
-- Polls for pending sessions every 15s
-- Classifies sessions as `coding` or `simple` (via `scripts/session-classifier.js`)
-- Spawns `codex exec` for coding tasks (via `scripts/subagent-spawner.js`)
-- Posts simple responses directly for non-coding tasks
-- Handles retries, timeouts, and error fallbacks
+**Pre-existing auto-claim scripts** (standalone alternative):
 
-Run it as a background process:
+The repo includes `scripts/auto-claim-sessions.js` — a standalone polling worker that classifies sessions (`scripts/session-classifier.js`) and spawns `codex exec` for coding tasks (`scripts/subagent-spawner.js`). Run it independently if you don't want OpenClaw orchestration:
+
 ```bash
 export TODOLIST_API_URL="https://backend-openclaw.up.railway.app"
 export TODOLIST_AUTH_TOKEN="your-token"
@@ -1103,33 +1136,13 @@ export DEFAULT_SPACE_ID="your-space-id"
 node scripts/auto-claim-sessions.js
 ```
 
-Or from HEARTBEAT.md, the main agent can invoke it per-session:
-```bash
-node scripts/subagent-spawner.js coding "Handle session <session_id>: read it, do the work, post response"
-```
-
 **Environment setup for OpenClaw:**
 
-These env vars must be available to both the main agent and codex subagents:
+These env vars must be available to both the main agent and subagents:
 ```bash
 export TODOLIST_API_URL="https://backend-openclaw.up.railway.app"
 export TODOLIST_AUTH_TOKEN="your-token"
 export DEFAULT_SPACE_ID="your-space-id"
-```
-
-Set them in your OpenClaw config so they propagate to subprocesses:
-```json
-{
-  "mcpServers": {
-    "todolist": {
-      "env": {
-        "TODOLIST_API_URL": "https://backend-openclaw.up.railway.app",
-        "TODOLIST_AUTH_TOKEN": "your-token",
-        "DEFAULT_SPACE_ID": "your-space-id"
-      }
-    }
-  }
-}
 ```
 
 #### Claude Code Setup (Simple)
