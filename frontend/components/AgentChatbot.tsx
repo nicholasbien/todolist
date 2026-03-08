@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { ChevronDown, ChevronRight } from 'lucide-react';
+import { ChevronDown, ArrowLeft } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { MessageRenderer, PlainTextRenderer } from './MessageRenderer';
 
@@ -8,6 +8,8 @@ interface ChatbotProps {
   activeSpace: any;
   token?: string;
   isActive?: boolean;
+  pendingSessionId?: string | null;
+  onSessionLoaded?: () => void;
 }
 
 interface SessionMeta {
@@ -15,11 +17,17 @@ interface SessionMeta {
   title: string;
   created_at: string;
   updated_at: string;
+  todo_id?: string;
 }
 
-export default function AgentChatbot({ activeSpace, token, isActive = true }: ChatbotProps) {
+export default function AgentChatbot({
+  activeSpace,
+  token,
+  isActive = true,
+  pendingSessionId,
+  onSessionLoaded,
+}: ChatbotProps) {
   const [question, setQuestion] = useState('');
-  const [expandedTools, setExpandedTools] = useState<Set<number>>(new Set());
   const [messages, setMessages] = useState<{ role: string; content: string; toolData?: any }[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -35,6 +43,12 @@ export default function AgentChatbot({ activeSpace, token, isActive = true }: Ch
   const [showSessionDropdown, setShowSessionDropdown] = useState(false);
   const [sessionToDelete, setSessionToDelete] = useState<SessionMeta | null>(null);
   const [deleteSessionLoading, setDeleteSessionLoading] = useState(false);
+
+  // Task session mode: when viewing a task-linked session
+  const [isTaskSession, setIsTaskSession] = useState(false);
+  const [waitingForAgent, setWaitingForAgent] = useState(false);
+  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const lastMessageCountRef = useRef(0);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
@@ -68,10 +82,90 @@ export default function AgentChatbot({ activeSpace, token, isActive = true }: Ch
 
   // Fetch sessions on mount and when space changes
   useEffect(() => {
-    setCurrentSessionId(null);
-    setMessages([]);
+    if (!isTaskSession) {
+      setCurrentSessionId(null);
+      setMessages([]);
+    }
     fetchSessions();
   }, [fetchSessions]);
+
+  // -----------------------------------------------------------------------
+  // Handle pendingSessionId — load a task-linked session
+  // -----------------------------------------------------------------------
+  useEffect(() => {
+    if (!pendingSessionId || !token) return;
+
+    const loadTaskSession = async () => {
+      setLoading(true);
+      setError('');
+      setIsTaskSession(true);
+      try {
+        const res = await fetch(`/agent/sessions/${pendingSessionId}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) throw new Error('Failed to load session');
+        const data = await res.json();
+        const displayMessages = data.display_messages || [];
+        setMessages(displayMessages);
+        setCurrentSessionId(pendingSessionId);
+        lastMessageCountRef.current = displayMessages.length;
+
+        // Check if waiting for agent
+        const lastMsg = displayMessages[displayMessages.length - 1];
+        setWaitingForAgent(lastMsg?.role === 'user');
+      } catch (err: any) {
+        setError(err.message || 'Failed to load session');
+      } finally {
+        setLoading(false);
+        onSessionLoaded?.();
+      }
+    };
+
+    loadTaskSession();
+  }, [pendingSessionId, token, onSessionLoaded]);
+
+  // -----------------------------------------------------------------------
+  // Poll for new messages in task session mode
+  // -----------------------------------------------------------------------
+  useEffect(() => {
+    if (!isTaskSession || !currentSessionId || !token || !waitingForAgent) {
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+        pollIntervalRef.current = null;
+      }
+      return;
+    }
+
+    const pollSession = async () => {
+      try {
+        const res = await fetch(`/agent/sessions/${currentSessionId}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        const displayMessages = data.display_messages || [];
+        if (displayMessages.length > lastMessageCountRef.current) {
+          setMessages(displayMessages);
+          lastMessageCountRef.current = displayMessages.length;
+          // Check if agent has responded
+          const lastMsg = displayMessages[displayMessages.length - 1];
+          if (lastMsg?.role === 'assistant') {
+            setWaitingForAgent(false);
+          }
+        }
+      } catch {
+        // Ignore poll errors
+      }
+    };
+
+    pollIntervalRef.current = setInterval(pollSession, 5000);
+    return () => {
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+        pollIntervalRef.current = null;
+      }
+    };
+  }, [isTaskSession, currentSessionId, token, waitingForAgent]);
 
   // -----------------------------------------------------------------------
   // Close dropdown when clicking outside
@@ -119,7 +213,7 @@ export default function AgentChatbot({ activeSpace, token, isActive = true }: Ch
   // Thinking dots animation
   useEffect(() => {
     let interval: ReturnType<typeof setInterval>;
-    if (loading) {
+    if (loading || waitingForAgent) {
       interval = setInterval(() => {
         setThinkingDots((d) => (d + 1) % 4);
       }, 500);
@@ -129,7 +223,7 @@ export default function AgentChatbot({ activeSpace, token, isActive = true }: Ch
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [loading]);
+  }, [loading, waitingForAgent]);
 
   // Track online/offline status
   useEffect(() => {
@@ -153,14 +247,27 @@ export default function AgentChatbot({ activeSpace, token, isActive = true }: Ch
     setShowSessionDropdown(false);
     setLoading(true);
     setError('');
+
+    // Determine if this is a task-linked session
+    const sessionMeta = sessions.find(s => s._id === sessionId);
+    const isTodoSession = !!sessionMeta?.todo_id;
+
     try {
       const res = await fetch(`/agent/sessions/${sessionId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) throw new Error('Failed to load session');
       const data = await res.json();
-      setMessages(data.display_messages || []);
+      const displayMessages = data.display_messages || [];
+      setMessages(displayMessages);
       setCurrentSessionId(sessionId);
+      setIsTaskSession(isTodoSession);
+      lastMessageCountRef.current = displayMessages.length;
+
+      if (isTodoSession) {
+        const lastMsg = displayMessages[displayMessages.length - 1];
+        setWaitingForAgent(lastMsg?.role === 'user');
+      }
     } catch (err: any) {
       setError(err.message || 'Failed to load chat');
     } finally {
@@ -180,7 +287,6 @@ export default function AgentChatbot({ activeSpace, token, isActive = true }: Ch
     if (!token || !sessionToDelete) return;
 
     setDeleteSessionLoading(true);
-    if (!token) return;
     try {
       await fetch(`/agent/sessions/${sessionToDelete._id}`, {
         method: 'DELETE',
@@ -190,6 +296,7 @@ export default function AgentChatbot({ activeSpace, token, isActive = true }: Ch
       if (currentSessionId === sessionToDelete._id) {
         setCurrentSessionId(null);
         setMessages([]);
+        setIsTaskSession(false);
       }
     } catch {
       // Ignore delete errors
@@ -200,27 +307,57 @@ export default function AgentChatbot({ activeSpace, token, isActive = true }: Ch
   };
 
   // -----------------------------------------------------------------------
-  // Start a new chat
+  // Start a new chat / go back to main assistant
   // -----------------------------------------------------------------------
   const handleNewChat = () => {
     setCurrentSessionId(null);
     setMessages([]);
     setShowSessionDropdown(false);
+    setIsTaskSession(false);
+    setWaitingForAgent(false);
   };
 
   // -----------------------------------------------------------------------
   // Send a message
   // -----------------------------------------------------------------------
-  const handleAsk = async () => {
+  const handleSend = async () => {
     if (!question.trim()) return;
-
-    const userQuestion = question;
-    setMessages((prev) => [...prev, { role: 'user', content: userQuestion }]);
+    const userMessage = question;
     setQuestion('');
+    shouldAutoScrollRef.current = true;
+
+    if (isTaskSession && currentSessionId) {
+      // Task session mode: post message via API
+      setMessages((prev) => [...prev, { role: 'user', content: userMessage }]);
+      setWaitingForAgent(true);
+      lastMessageCountRef.current += 1;
+
+      try {
+        await fetch(`/agent/sessions/${currentSessionId}/messages`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ role: 'user', content: userMessage }),
+        });
+      } catch (err: any) {
+        setError(err.message || 'Failed to send message');
+        setWaitingForAgent(false);
+      }
+    } else {
+      // Streaming AI mode
+      handleStreamingAsk(userMessage);
+    }
+  };
+
+  // -----------------------------------------------------------------------
+  // Streaming AI chat (main assistant mode)
+  // -----------------------------------------------------------------------
+  const handleStreamingAsk = async (userQuestion: string) => {
+    setMessages((prev) => [...prev, { role: 'user', content: userQuestion }]);
     setLoading(true);
     setError('');
-
-    shouldAutoScrollRef.current = true;
 
     let assistantResponse = { role: 'assistant', content: '' };
     let assistantMessageAdded = false;
@@ -273,24 +410,23 @@ export default function AgentChatbot({ activeSpace, token, isActive = true }: Ch
         };
 
         const formatResult = (data: any) => {
-          if (data.ok === false) return `❌ ${data.error}`;
-          if (data.tasks) return `✅ Found ${data.tasks.length} tasks`;
-          if (data.weather) return `🌤️ ${data.weather.location}: ${data.weather.temperature_display}`;
-          if (data.books) return `📚 Found ${data.books.length} book recommendations`;
-          if (data.quotes) return `💭 "${data.quotes[0]}"`;
-          if (data.results) return `🔍 Found ${data.results.length} results`;
-          if (data.entries) return `📖 Found ${data.entries.length} journal entries`;
-          if (data.entry) return data.entry ? `📖 Journal entry from ${data.entry.date}` : `📖 No journal entry found`;
-          return '✅ Success';
+          if (data.ok === false) return `Error: ${data.error}`;
+          if (data.tasks) return `Found ${data.tasks.length} tasks`;
+          if (data.weather) return `${data.weather.location}: ${data.weather.temperature_display}`;
+          if (data.books) return `Found ${data.books.length} book recommendations`;
+          if (data.quotes) return `"${data.quotes[0]}"`;
+          if (data.results) return `Found ${data.results.length} results`;
+          if (data.entries) return `Found ${data.entries.length} journal entries`;
+          if (data.entry) return data.entry ? `Journal entry from ${data.entry.date}` : `No journal entry found`;
+          return 'Success';
         };
 
-        const toolMessage = `🔧 ${tool}${formatArgs(args)}: ${formatResult(data)}`;
+        const toolMessage = `Tool ${tool}${formatArgs(args)}: ${formatResult(data)}`;
         setMessages((prev) => [...prev, { role: 'system', content: toolMessage, toolData: { tool, args, data } }]);
       });
 
       es.addEventListener('done', () => {
         es.close();
-        // Refresh sessions list after conversation completes
         fetchSessions();
       });
 
@@ -305,22 +441,10 @@ export default function AgentChatbot({ activeSpace, token, isActive = true }: Ch
     }
   };
 
-  const toggleToolExpansion = (index: number) => {
-    setExpandedTools((prev) => {
-      const newSet = new Set(prev);
-      if (newSet.has(index)) {
-        newSet.delete(index);
-      } else {
-        newSet.add(index);
-      }
-      return newSet;
-    });
-  };
-
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      handleAsk();
+      handleSend();
     }
   };
 
@@ -331,26 +455,6 @@ export default function AgentChatbot({ activeSpace, token, isActive = true }: Ch
         setShowOfflineMessage(false);
       }, 3000);
     }
-  };
-
-  // Remove sensitive database IDs and user info from tool data before displaying
-  const sanitizeToolData = (data: any): any => {
-    if (data === null || data === undefined) return data;
-    if (typeof data !== 'object') return data;
-
-    if (Array.isArray(data)) {
-      return data.map(item => sanitizeToolData(item));
-    }
-
-    const sanitized: any = {};
-    for (const [key, value] of Object.entries(data)) {
-      const sensitiveFields = ['_id', 'id', 'user_id', 'space_id', 'owner_id', 'member_ids', 'pending_emails'];
-      if (sensitiveFields.includes(key)) {
-        continue;
-      }
-      sanitized[key] = sanitizeToolData(value);
-    }
-    return sanitized;
   };
 
   // Format date for session list
@@ -367,56 +471,69 @@ export default function AgentChatbot({ activeSpace, token, isActive = true }: Ch
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   };
 
+  const isWaiting = loading || waitingForAgent;
+
   return (
     <div className="flex flex-col h-full">
-      {/* Top bar: session dropdown + new chat */}
+      {/* Top bar */}
       <div className="mb-2 flex items-center gap-2 flex-shrink-0">
-        {/* Past Chats dropdown */}
-        <div className="relative" ref={dropdownRef}>
+        {isTaskSession ? (
+          // Back button when viewing a task session
           <button
-            onClick={() => setShowSessionDropdown(!showSessionDropdown)}
-            disabled={sessionsLoading}
-            className="bg-gray-700 text-gray-200 px-3 py-1 rounded text-sm hover:bg-gray-600 disabled:opacity-50 transition-colors flex items-center gap-1"
+            onClick={handleNewChat}
+            className="bg-gray-700 text-gray-200 px-3 py-1 rounded text-sm hover:bg-gray-600 transition-colors flex items-center gap-1"
           >
-            Past Chats
-            <ChevronDown className={`w-3 h-3 transition-transform ${showSessionDropdown ? 'rotate-180' : ''}`} />
+            <ArrowLeft className="w-3 h-3" />
+            Back to Assistant
           </button>
+        ) : (
+          // Past Chats dropdown (main assistant mode)
+          <div className="relative" ref={dropdownRef}>
+            <button
+              onClick={() => setShowSessionDropdown(!showSessionDropdown)}
+              disabled={sessionsLoading}
+              className="bg-gray-700 text-gray-200 px-3 py-1 rounded text-sm hover:bg-gray-600 disabled:opacity-50 transition-colors flex items-center gap-1"
+            >
+              Past Chats
+              <ChevronDown className={`w-3 h-3 transition-transform ${showSessionDropdown ? 'rotate-180' : ''}`} />
+            </button>
 
-          {showSessionDropdown && (
-            <div className="absolute left-0 top-full mt-1 w-72 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-20 max-h-80 overflow-y-auto custom-scrollbar">
-              {sessions.length === 0 && !sessionsLoading && (
-                <div className="px-3 py-3 text-sm text-gray-500 text-center">
-                  No past chats
-                </div>
-              )}
-
-              {sessions.map((session) => (
-                <div
-                  key={session._id}
-                  onClick={() => loadSession(session._id)}
-                  className={`flex items-center justify-between px-3 py-2 text-sm cursor-pointer hover:bg-gray-700 transition-colors ${
-                    currentSessionId === session._id ? 'bg-gray-700/50 border-l-2 border-accent' : ''
-                  }`}
-                >
-                  <div className="flex-1 min-w-0 mr-2">
-                    <p className="text-gray-200 truncate">{session.title}</p>
-                    <p className="text-gray-500 text-xs">{formatSessionDate(session.updated_at)}</p>
+            {showSessionDropdown && (
+              <div className="absolute left-0 top-full mt-1 w-72 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-20 max-h-80 overflow-y-auto custom-scrollbar">
+                {sessions.length === 0 && !sessionsLoading && (
+                  <div className="px-3 py-3 text-sm text-gray-500 text-center">
+                    No past chats
                   </div>
-                  <button
-                    onClick={(e) => requestDeleteSession(session, e)}
-                    className="text-gray-500 hover:text-red-400 flex-shrink-0 text-xs px-1 transition-colors"
-                    aria-label="Delete session"
+                )}
+
+                {sessions.map((session) => (
+                  <div
+                    key={session._id}
+                    onClick={() => loadSession(session._id)}
+                    className={`flex items-center justify-between px-3 py-2 text-sm cursor-pointer hover:bg-gray-700 transition-colors ${
+                      currentSessionId === session._id ? 'bg-gray-700/50 border-l-2 border-accent' : ''
+                    }`}
                   >
-                    ×
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+                    <div className="flex-1 min-w-0 mr-2">
+                      <p className="text-gray-200 truncate">{session.title}</p>
+                      <p className="text-gray-500 text-xs">{formatSessionDate(session.updated_at)}</p>
+                    </div>
+                    <button
+                      onClick={(e) => requestDeleteSession(session, e)}
+                      className="text-gray-500 hover:text-red-400 flex-shrink-0 text-xs px-1 transition-colors"
+                      aria-label="Delete session"
+                    >
+                      x
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* New Chat button */}
-        {(messages.length > 0 || currentSessionId) && (
+        {!isTaskSession && (messages.length > 0 || currentSessionId) && (
           <button
             onClick={handleNewChat}
             disabled={loading}
@@ -462,7 +579,7 @@ export default function AgentChatbot({ activeSpace, token, isActive = true }: Ch
         className="flex-1 mb-4 space-y-4 overflow-y-auto custom-scrollbar"
       >
         {/* Blank state when no messages */}
-        {messages.length === 0 && !loading && (
+        {messages.length === 0 && !loading && !isTaskSession && (
           <div className="flex items-center justify-center min-h-full py-8">
             <div className="max-w-md text-center space-y-4 px-6">
               <p className="text-gray-300 text-base leading-relaxed">
@@ -476,26 +593,26 @@ export default function AgentChatbot({ activeSpace, token, isActive = true }: Ch
                 <div>
                   <h4 className="text-sm font-semibold text-gray-200 mb-2">Task Management</h4>
                   <ul className="text-sm text-gray-400 space-y-1 ml-4">
-                    <li>• Add, update, and search your tasks</li>
-                    <li>• Get task recommendations and suggestions</li>
+                    <li>- Add, update, and search your tasks</li>
+                    <li>- Get task recommendations and suggestions</li>
                   </ul>
                 </div>
 
                 <div>
                   <h4 className="text-sm font-semibold text-gray-200 mb-2">Journal Access</h4>
                   <ul className="text-sm text-gray-400 space-y-1 ml-4">
-                    <li>• Add journal entries</li>
-                    <li>• Search through your past reflections</li>
+                    <li>- Add journal entries</li>
+                    <li>- Search through your past reflections</li>
                   </ul>
                 </div>
 
                 <div>
                   <h4 className="text-sm font-semibold text-gray-200 mb-2">Information & Resources</h4>
                   <ul className="text-sm text-gray-400 space-y-1 ml-4">
-                    <li>• Search the web for current information</li>
-                    <li>• Check current weather and forecasts</li>
-                    <li>• Get book recommendations</li>
-                    <li>• Find inspirational quotes</li>
+                    <li>- Search the web for current information</li>
+                    <li>- Check current weather and forecasts</li>
+                    <li>- Get book recommendations</li>
+                    <li>- Find inspirational quotes</li>
                   </ul>
                 </div>
               </div>
@@ -520,49 +637,22 @@ export default function AgentChatbot({ activeSpace, token, isActive = true }: Ch
             }`}>
               <div className="text-sm mb-1 opacity-75 flex justify-between items-center">
                 <span>{msg.role === 'system' ? 'Tool' : ''}</span>
-                {/* Temporarily disabled - tool step dropdown
-                {msg.role === 'system' && msg.toolData && (
-                  <button
-                    onClick={() => toggleToolExpansion(idx)}
-                    className="text-sm text-blue-300 hover:text-blue-100 transition-colors"
-                    aria-label={expandedTools.has(idx) ? 'Collapse tool details' : 'Expand tool details'}
-                  >
-                    {expandedTools.has(idx) ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-                  </button>
-                )}
-                */}
               </div>
               {msg.role === 'assistant' ? (
                 <MessageRenderer content={msg.content} className="text-base" />
               ) : (
                 <PlainTextRenderer content={msg.content} className="text-sm" />
               )}
-              {/* Temporarily disabled - tool step input/output details
-              {msg.role === 'system' && msg.toolData && expandedTools.has(idx) && (
-                <div className="mt-2 pt-2 border-t border-blue-700/30 text-sm">
-                  <div className="mb-1">
-                    <span className="text-blue-300 font-medium">Input:</span>
-                    <pre className="mt-1 bg-blue-950/50 p-2 rounded text-blue-100 overflow-x-auto">
-                      {JSON.stringify(sanitizeToolData(msg.toolData.args), null, 2)}
-                    </pre>
-                  </div>
-                  <div>
-                    <span className="text-blue-300 font-medium">Output:</span>
-                    <pre className="mt-1 bg-blue-950/50 p-2 rounded text-blue-100 overflow-x-auto">
-                      {JSON.stringify(sanitizeToolData(msg.toolData.data), null, 2)}
-                    </pre>
-                  </div>
-                </div>
-              )}
-              */}
             </div>
           </div>
         ))}
-        {loading && (
+        {isWaiting && (
           <div className="flex justify-start">
             <div className="text-gray-100 w-full px-0 py-2">
               <div className="text-xs mb-1 opacity-75"></div>
-              <div className="text-sm">{`Thinking${'.'.repeat(thinkingDots)}`}</div>
+              <div className="text-sm">
+                {waitingForAgent ? `Waiting for agent${'.'.repeat(thinkingDots)}` : `Thinking${'.'.repeat(thinkingDots)}`}
+              </div>
             </div>
           </div>
         )}
@@ -577,7 +667,7 @@ export default function AgentChatbot({ activeSpace, token, isActive = true }: Ch
             className="text-red-300 hover:text-red-100 ml-2 flex-shrink-0 text-lg leading-none"
             aria-label="Close error message"
           >
-            ×
+            x
           </button>
         </div>
       )}
@@ -593,14 +683,20 @@ export default function AgentChatbot({ activeSpace, token, isActive = true }: Ch
             value={question}
             onChange={(e) => setQuestion(e.target.value)}
             onKeyPress={handleKeyPress}
-            placeholder={isOnline ? "Ask a question..." : "Assistant requires internet connection"}
+            placeholder={
+              !isOnline
+                ? "Assistant requires internet connection"
+                : isTaskSession
+                ? "Send a message about this task..."
+                : "Ask a question..."
+            }
             disabled={loading || !isOnline}
             onMouseEnter={() => !isOnline && setShowOfflineMessage(true)}
             onMouseLeave={() => setShowOfflineMessage(false)}
             onClick={handleOfflineClick}
             onFocus={() => setIsQuestionFocused(true)}
             onBlur={() => setIsQuestionFocused(false)}
-            aria-label="Ask assistant a question"
+            aria-label={isTaskSession ? "Send message about task" : "Ask assistant a question"}
           />
           {showOfflineMessage && !isOnline && (
             <div className="absolute bottom-full left-0 mb-2 bg-gray-800 border border-gray-700 rounded-lg p-3 shadow-lg z-10 w-full">
@@ -611,7 +707,7 @@ export default function AgentChatbot({ activeSpace, token, isActive = true }: Ch
           )}
         </div>
         <button
-          onClick={handleAsk}
+          onClick={handleSend}
           disabled={loading || !question.trim() || !isOnline}
           className={`border px-6 py-3 rounded-lg hover:bg-accent/10 disabled:opacity-50 disabled:cursor-not-allowed transition-colors ${
             isQuestionFocused

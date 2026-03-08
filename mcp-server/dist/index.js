@@ -8,7 +8,6 @@ import { config } from 'dotenv';
 config();
 const API_URL = process.env.TODOLIST_API_URL || 'http://localhost:8000';
 const AUTH_TOKEN = process.env.TODOLIST_AUTH_TOKEN;
-const DEFAULT_SPACE_ID = process.env.DEFAULT_SPACE_ID;
 if (!AUTH_TOKEN) {
     console.error('TODOLIST_AUTH_TOKEN environment variable is required');
     process.exit(1);
@@ -21,12 +20,33 @@ const api = axios.create({
         'Content-Type': 'application/json',
     },
 });
+// Cache for default space ID (auto-detected on first use)
+let cachedDefaultSpaceId = null;
+async function getDefaultSpaceId() {
+    if (cachedDefaultSpaceId)
+        return cachedDefaultSpaceId;
+    try {
+        const response = await api.get('/spaces');
+        const spaces = response.data;
+        const defaultSpace = spaces.find((s) => s.is_default);
+        if (defaultSpace) {
+            cachedDefaultSpaceId = defaultSpace._id;
+        }
+        else if (spaces.length > 0) {
+            cachedDefaultSpaceId = spaces[0]._id;
+        }
+        return cachedDefaultSpaceId;
+    }
+    catch {
+        return null;
+    }
+}
 class TodolistMCPServer {
     server;
     constructor() {
         this.server = new Server({
             name: 'todolist-mcp-server',
-            version: '1.0.0',
+            version: '2.0.0',
         }, {
             capabilities: {
                 tools: {},
@@ -48,20 +68,15 @@ class TodolistMCPServer {
         this.server.setRequestHandler(ListToolsRequestSchema, async () => {
             return {
                 tools: [
+                    // --- Todo tools ---
                     {
                         name: 'add_todo',
                         description: 'Add a new todo item',
                         inputSchema: {
                             type: 'object',
                             properties: {
-                                text: {
-                                    type: 'string',
-                                    description: 'The todo item text',
-                                },
-                                space_id: {
-                                    type: 'string',
-                                    description: 'Optional space ID (uses default if not provided)',
-                                },
+                                text: { type: 'string', description: 'The todo item text' },
+                                space_id: { type: 'string', description: 'Space ID (auto-detected if not provided)' },
                             },
                             required: ['text'],
                         },
@@ -72,14 +87,8 @@ class TodolistMCPServer {
                         inputSchema: {
                             type: 'object',
                             properties: {
-                                space_id: {
-                                    type: 'string',
-                                    description: 'Optional space ID (uses default if not provided)',
-                                },
-                                completed: {
-                                    type: 'boolean',
-                                    description: 'Filter by completion status (optional)',
-                                },
+                                space_id: { type: 'string', description: 'Space ID (auto-detected if not provided)' },
+                                completed: { type: 'boolean', description: 'Filter by completion status (optional)' },
                             },
                             required: [],
                         },
@@ -90,22 +99,21 @@ class TodolistMCPServer {
                         inputSchema: {
                             type: 'object',
                             properties: {
-                                id: {
-                                    type: 'string',
-                                    description: 'Todo ID',
-                                },
-                                text: {
-                                    type: 'string',
-                                    description: 'New todo text (optional)',
-                                },
-                                completed: {
-                                    type: 'boolean',
-                                    description: 'Completion status (optional)',
-                                },
-                                category: {
-                                    type: 'string',
-                                    description: 'Todo category (optional)',
-                                },
+                                id: { type: 'string', description: 'Todo ID' },
+                                text: { type: 'string', description: 'New todo text (optional)' },
+                                completed: { type: 'boolean', description: 'Completion status (optional)' },
+                                category: { type: 'string', description: 'Todo category (optional)' },
+                            },
+                            required: ['id'],
+                        },
+                    },
+                    {
+                        name: 'complete_todo',
+                        description: 'Toggle a todo item completion status',
+                        inputSchema: {
+                            type: 'object',
+                            properties: {
+                                id: { type: 'string', description: 'Todo ID' },
                             },
                             required: ['id'],
                         },
@@ -116,22 +124,16 @@ class TodolistMCPServer {
                         inputSchema: {
                             type: 'object',
                             properties: {
-                                id: {
-                                    type: 'string',
-                                    description: 'Todo ID',
-                                },
+                                id: { type: 'string', description: 'Todo ID' },
                             },
                             required: ['id'],
                         },
                     },
+                    // --- Space tools ---
                     {
                         name: 'list_spaces',
                         description: 'List all accessible spaces',
-                        inputSchema: {
-                            type: 'object',
-                            properties: {},
-                            required: [],
-                        },
+                        inputSchema: { type: 'object', properties: {}, required: [] },
                     },
                     {
                         name: 'create_space',
@@ -139,26 +141,169 @@ class TodolistMCPServer {
                         inputSchema: {
                             type: 'object',
                             properties: {
-                                name: {
-                                    type: 'string',
-                                    description: 'Space name',
-                                },
+                                name: { type: 'string', description: 'Space name' },
                             },
                             required: ['name'],
                         },
                     },
+                    // --- Category tools ---
                     {
                         name: 'list_categories',
                         description: 'List categories for a space',
                         inputSchema: {
                             type: 'object',
                             properties: {
-                                space_id: {
-                                    type: 'string',
-                                    description: 'Optional space ID (uses default if not provided)',
-                                },
+                                space_id: { type: 'string', description: 'Space ID (auto-detected if not provided)' },
                             },
                             required: [],
+                        },
+                    },
+                    // --- Session tools ---
+                    {
+                        name: 'list_sessions',
+                        description: 'List chat sessions',
+                        inputSchema: {
+                            type: 'object',
+                            properties: {
+                                space_id: { type: 'string', description: 'Space ID (auto-detected if not provided)' },
+                            },
+                            required: [],
+                        },
+                    },
+                    {
+                        name: 'create_session',
+                        description: 'Create a new messaging session, optionally linked to a todo',
+                        inputSchema: {
+                            type: 'object',
+                            properties: {
+                                title: { type: 'string', description: 'Session title' },
+                                space_id: { type: 'string', description: 'Space ID (auto-detected if not provided)' },
+                                todo_id: { type: 'string', description: 'Link session to a todo (optional)' },
+                                initial_message: { type: 'string', description: 'Initial message to post (optional)' },
+                                initial_role: { type: 'string', enum: ['user', 'assistant'], description: 'Role of initial message (default: user)' },
+                            },
+                            required: ['title'],
+                        },
+                    },
+                    {
+                        name: 'get_session',
+                        description: 'Get a session with its messages',
+                        inputSchema: {
+                            type: 'object',
+                            properties: {
+                                session_id: { type: 'string', description: 'Session ID' },
+                            },
+                            required: ['session_id'],
+                        },
+                    },
+                    {
+                        name: 'get_pending_sessions',
+                        description: 'Get sessions that are waiting for an agent response',
+                        inputSchema: {
+                            type: 'object',
+                            properties: {
+                                space_id: { type: 'string', description: 'Space ID (auto-detected if not provided)' },
+                            },
+                            required: [],
+                        },
+                    },
+                    {
+                        name: 'post_to_session',
+                        description: 'Post a message to a session',
+                        inputSchema: {
+                            type: 'object',
+                            properties: {
+                                session_id: { type: 'string', description: 'Session ID' },
+                                content: { type: 'string', description: 'Message content' },
+                                role: { type: 'string', enum: ['user', 'assistant'], description: 'Message role (default: assistant)' },
+                            },
+                            required: ['session_id', 'content'],
+                        },
+                    },
+                    {
+                        name: 'claim_session',
+                        description: 'Atomically claim a session for processing',
+                        inputSchema: {
+                            type: 'object',
+                            properties: {
+                                session_id: { type: 'string', description: 'Session ID' },
+                                agent_id: { type: 'string', description: 'Agent identifier' },
+                            },
+                            required: ['session_id', 'agent_id'],
+                        },
+                    },
+                    {
+                        name: 'release_session',
+                        description: 'Release claim on a session',
+                        inputSchema: {
+                            type: 'object',
+                            properties: {
+                                session_id: { type: 'string', description: 'Session ID' },
+                                agent_id: { type: 'string', description: 'Agent identifier' },
+                            },
+                            required: ['session_id', 'agent_id'],
+                        },
+                    },
+                    {
+                        name: 'delete_session',
+                        description: 'Delete a chat session',
+                        inputSchema: {
+                            type: 'object',
+                            properties: {
+                                session_id: { type: 'string', description: 'Session ID' },
+                            },
+                            required: ['session_id'],
+                        },
+                    },
+                    // --- Journal tools ---
+                    {
+                        name: 'get_journal',
+                        description: 'Get journal entry for a specific date',
+                        inputSchema: {
+                            type: 'object',
+                            properties: {
+                                date: { type: 'string', description: 'Date in YYYY-MM-DD format (optional, gets recent if omitted)' },
+                                space_id: { type: 'string', description: 'Space ID (auto-detected if not provided)' },
+                            },
+                            required: [],
+                        },
+                    },
+                    {
+                        name: 'write_journal',
+                        description: 'Write or append to a journal entry',
+                        inputSchema: {
+                            type: 'object',
+                            properties: {
+                                date: { type: 'string', description: 'Date in YYYY-MM-DD format' },
+                                text: { type: 'string', description: 'Journal text content' },
+                                space_id: { type: 'string', description: 'Space ID (auto-detected if not provided)' },
+                            },
+                            required: ['date', 'text'],
+                        },
+                    },
+                    // --- Utility tools ---
+                    {
+                        name: 'get_insights',
+                        description: 'Get insights and analytics for todos',
+                        inputSchema: {
+                            type: 'object',
+                            properties: {
+                                space_id: { type: 'string', description: 'Space ID (auto-detected if not provided)' },
+                            },
+                            required: [],
+                        },
+                    },
+                    {
+                        name: 'export_data',
+                        description: 'Export todos or journals as JSON or CSV',
+                        inputSchema: {
+                            type: 'object',
+                            properties: {
+                                data: { type: 'string', enum: ['todos', 'journals'], description: 'Data type to export' },
+                                format: { type: 'string', enum: ['json', 'csv'], description: 'Export format (default: json)' },
+                                space_id: { type: 'string', description: 'Space ID (auto-detected if not provided)' },
+                            },
+                            required: ['data'],
                         },
                     },
                 ],
@@ -168,203 +313,236 @@ class TodolistMCPServer {
             try {
                 const { name, arguments: args } = request.params;
                 switch (name) {
-                    case 'add_todo':
-                        return await this.addTodo(args);
-                    case 'list_todos':
-                        return await this.listTodos(args);
-                    case 'update_todo':
-                        return await this.updateTodo(args);
-                    case 'delete_todo':
-                        return await this.deleteTodo(args);
-                    case 'list_spaces':
-                        return await this.listSpaces();
-                    case 'create_space':
-                        return await this.createSpace(args);
-                    case 'list_categories':
-                        return await this.listCategories(args);
+                    case 'add_todo': return await this.addTodo(args);
+                    case 'list_todos': return await this.listTodos(args);
+                    case 'update_todo': return await this.updateTodo(args);
+                    case 'complete_todo': return await this.completeTodo(args);
+                    case 'delete_todo': return await this.deleteTodo(args);
+                    case 'list_spaces': return await this.listSpaces();
+                    case 'create_space': return await this.createSpace(args);
+                    case 'list_categories': return await this.listCategories(args);
+                    case 'list_sessions': return await this.listSessions(args);
+                    case 'create_session': return await this.createSession(args);
+                    case 'get_session': return await this.getSession(args);
+                    case 'get_pending_sessions': return await this.getPendingSessions(args);
+                    case 'post_to_session': return await this.postToSession(args);
+                    case 'claim_session': return await this.claimSession(args);
+                    case 'release_session': return await this.releaseSession(args);
+                    case 'delete_session': return await this.deleteSession(args);
+                    case 'get_journal': return await this.getJournal(args);
+                    case 'write_journal': return await this.writeJournal(args);
+                    case 'get_insights': return await this.getInsights(args);
+                    case 'export_data': return await this.exportData(args);
                     default:
                         throw new McpError(ErrorCode.MethodNotFound, `Unknown tool: ${name}`);
                 }
             }
             catch (error) {
-                if (error instanceof McpError) {
+                if (error instanceof McpError)
                     throw error;
-                }
                 const errorMessage = error instanceof Error ? error.message : 'Unknown error';
                 throw new McpError(ErrorCode.InternalError, `Tool execution failed: ${errorMessage}`);
             }
         });
     }
+    // Helper to resolve space ID
+    async resolveSpaceId(spaceId) {
+        if (spaceId)
+            return spaceId;
+        const defaultId = await getDefaultSpaceId();
+        return defaultId || undefined;
+    }
+    textResult(text) {
+        return { content: [{ type: 'text', text }] };
+    }
+    jsonResult(data) {
+        return { content: [{ type: 'text', text: JSON.stringify(data, null, 2) }] };
+    }
+    // --- Todo tools ---
     async addTodo(args) {
-        try {
-            const spaceId = args.space_id || DEFAULT_SPACE_ID;
-            const response = await api.post('/todos', {
-                text: args.text,
-                space_id: spaceId,
-            });
-            return {
-                content: [
-                    {
-                        type: 'text',
-                        text: `Successfully added todo: "${args.text}"`,
-                    },
-                ],
-            };
-        }
-        catch (error) {
-            throw new McpError(ErrorCode.InternalError, `Failed to add todo: ${error instanceof Error ? error.message : 'Unknown error'}`);
-        }
+        const spaceId = await this.resolveSpaceId(args.space_id);
+        const response = await api.post('/todos', { text: args.text, space_id: spaceId });
+        const todo = response.data;
+        return this.textResult(`Added todo: "${todo.text}" (ID: ${todo._id}, Category: ${todo.category})`);
     }
     async listTodos(args) {
-        try {
-            const spaceId = args.space_id || DEFAULT_SPACE_ID;
-            const params = {};
-            if (spaceId)
-                params.space_id = spaceId;
-            const response = await api.get('/todos', { params });
-            let todos = response.data;
-            // Filter by completion status if specified
-            if (args.completed !== undefined) {
-                todos = todos.filter((todo) => todo.completed === args.completed);
-            }
-            const todoText = todos.length === 0
-                ? 'No todos found'
-                : todos.map((todo, index) => `${index + 1}. ${todo.completed ? '✅' : '⭕'} ${todo.text} [${todo.category || 'No category'}] (ID: ${todo._id})`).join('\n');
-            return {
-                content: [
-                    {
-                        type: 'text',
-                        text: todoText,
-                    },
-                ],
-            };
+        const spaceId = await this.resolveSpaceId(args.space_id);
+        const params = {};
+        if (spaceId)
+            params.space_id = spaceId;
+        const response = await api.get('/todos', { params });
+        let todos = response.data;
+        if (args.completed !== undefined) {
+            todos = todos.filter((t) => t.completed === args.completed);
         }
-        catch (error) {
-            throw new McpError(ErrorCode.InternalError, `Failed to list todos: ${error instanceof Error ? error.message : 'Unknown error'}`);
-        }
+        if (todos.length === 0)
+            return this.textResult('No todos found');
+        const lines = todos.map((t, i) => `${i + 1}. ${t.completed ? '[done]' : '[  ]'} ${t.text} [${t.category || 'General'}] (ID: ${t._id})`);
+        return this.textResult(lines.join('\n'));
     }
     async updateTodo(args) {
-        try {
-            const updateData = {};
-            if (args.text !== undefined)
-                updateData.text = args.text;
-            if (args.completed !== undefined)
-                updateData.completed = args.completed;
-            if (args.category !== undefined)
-                updateData.category = args.category;
-            await api.put(`/todos/${args.id}`, updateData);
-            const changes = [];
-            if (args.text)
-                changes.push(`text to "${args.text}"`);
-            if (args.completed !== undefined)
-                changes.push(`status to ${args.completed ? 'completed' : 'pending'}`);
-            if (args.category)
-                changes.push(`category to "${args.category}"`);
-            return {
-                content: [
-                    {
-                        type: 'text',
-                        text: `Successfully updated todo: ${changes.join(', ')}`,
-                    },
-                ],
-            };
-        }
-        catch (error) {
-            throw new McpError(ErrorCode.InternalError, `Failed to update todo: ${error instanceof Error ? error.message : 'Unknown error'}`);
-        }
+        const updateData = {};
+        if (args.text !== undefined)
+            updateData.text = args.text;
+        if (args.completed !== undefined)
+            updateData.completed = args.completed;
+        if (args.category !== undefined)
+            updateData.category = args.category;
+        await api.put(`/todos/${args.id}`, updateData);
+        const changes = [];
+        if (args.text)
+            changes.push(`text to "${args.text}"`);
+        if (args.completed !== undefined)
+            changes.push(`status to ${args.completed ? 'completed' : 'pending'}`);
+        if (args.category)
+            changes.push(`category to "${args.category}"`);
+        return this.textResult(`Updated todo: ${changes.join(', ')}`);
+    }
+    async completeTodo(args) {
+        const response = await api.put(`/todos/${args.id}/complete`);
+        return this.textResult(response.data.message || 'Todo completion toggled');
     }
     async deleteTodo(args) {
-        try {
-            await api.delete(`/todos/${args.id}`);
-            return {
-                content: [
-                    {
-                        type: 'text',
-                        text: `Successfully deleted todo with ID: ${args.id}`,
-                    },
-                ],
-            };
-        }
-        catch (error) {
-            throw new McpError(ErrorCode.InternalError, `Failed to delete todo: ${error instanceof Error ? error.message : 'Unknown error'}`);
-        }
+        await api.delete(`/todos/${args.id}`);
+        return this.textResult(`Deleted todo ${args.id}`);
     }
+    // --- Space tools ---
     async listSpaces() {
-        try {
-            const response = await api.get('/spaces');
-            const spaces = response.data;
-            if (spaces.length === 0) {
-                return {
-                    content: [
-                        {
-                            type: 'text',
-                            text: 'No spaces found',
-                        },
-                    ],
-                };
-            }
-            const spaceText = spaces.map((space, index) => `${index + 1}. ${space.name} ${space.is_default ? '(Default)' : ''} (ID: ${space._id})`).join('\n');
-            return {
-                content: [
-                    {
-                        type: 'text',
-                        text: `Available spaces:\n${spaceText}`,
-                    },
-                ],
-            };
-        }
-        catch (error) {
-            throw new McpError(ErrorCode.InternalError, `Failed to list spaces: ${error instanceof Error ? error.message : 'Unknown error'}`);
-        }
+        const response = await api.get('/spaces');
+        const spaces = response.data;
+        if (spaces.length === 0)
+            return this.textResult('No spaces found');
+        const lines = spaces.map((s, i) => `${i + 1}. ${s.name} ${s.is_default ? '(Default)' : ''} (ID: ${s._id})`);
+        return this.textResult(`Available spaces:\n${lines.join('\n')}`);
     }
     async createSpace(args) {
-        try {
-            const response = await api.post('/spaces', { name: args.name });
-            const space = response.data;
-            return {
-                content: [
-                    {
-                        type: 'text',
-                        text: `Successfully created space: "${args.name}" (ID: ${space._id})`,
-                    },
-                ],
-            };
-        }
-        catch (error) {
-            throw new McpError(ErrorCode.InternalError, `Failed to create space: ${error instanceof Error ? error.message : 'Unknown error'}`);
-        }
+        const response = await api.post('/spaces', { name: args.name });
+        return this.textResult(`Created space: "${args.name}" (ID: ${response.data._id})`);
     }
+    // --- Category tools ---
     async listCategories(args) {
-        try {
-            const spaceId = args.space_id || DEFAULT_SPACE_ID;
-            const params = {};
-            if (spaceId)
-                params.space_id = spaceId;
-            const response = await api.get('/categories', { params });
-            const categories = response.data;
-            if (categories.length === 0) {
-                return {
-                    content: [
-                        {
-                            type: 'text',
-                            text: 'No categories found',
-                        },
-                    ],
-                };
-            }
-            const categoryText = categories.map((category, index) => `${index + 1}. ${category.name}`).join('\n');
-            return {
-                content: [
-                    {
-                        type: 'text',
-                        text: `Available categories:\n${categoryText}`,
-                    },
-                ],
-            };
+        const spaceId = await this.resolveSpaceId(args.space_id);
+        const params = {};
+        if (spaceId)
+            params.space_id = spaceId;
+        const response = await api.get('/categories', { params });
+        const categories = response.data;
+        if (categories.length === 0)
+            return this.textResult('No categories found');
+        return this.textResult(`Categories: ${categories.join(', ')}`);
+    }
+    // --- Session tools ---
+    async listSessions(args) {
+        const spaceId = await this.resolveSpaceId(args.space_id);
+        const params = {};
+        if (spaceId)
+            params.space_id = spaceId;
+        const response = await api.get('/agent/sessions', { params });
+        const sessions = response.data;
+        if (sessions.length === 0)
+            return this.textResult('No sessions found');
+        const lines = sessions.map((s, i) => `${i + 1}. "${s.title}" (ID: ${s._id}, updated: ${s.updated_at}${s.todo_id ? ', todo: ' + s.todo_id : ''})`);
+        return this.textResult(lines.join('\n'));
+    }
+    async createSession(args) {
+        const spaceId = await this.resolveSpaceId(args.space_id);
+        const response = await api.post('/agent/sessions', {
+            title: args.title,
+            space_id: spaceId,
+            todo_id: args.todo_id,
+            initial_message: args.initial_message,
+            initial_role: args.initial_role || 'user',
+        });
+        const session = response.data;
+        return this.textResult(`Created session: "${args.title}" (ID: ${session._id})`);
+    }
+    async getSession(args) {
+        const response = await api.get(`/agent/sessions/${args.session_id}`);
+        return this.jsonResult(response.data);
+    }
+    async getPendingSessions(args) {
+        const spaceId = await this.resolveSpaceId(args.space_id);
+        const params = {};
+        if (spaceId)
+            params.space_id = spaceId;
+        const response = await api.get('/agent/sessions/pending', { params });
+        const sessions = response.data;
+        if (sessions.length === 0)
+            return this.textResult('No pending sessions');
+        const lines = sessions.map((s) => {
+            const todoInfo = s.todo_id ? ` (todo: ${s.todo_id})` : '';
+            return `- "${s.title}" (ID: ${s._id})${todoInfo}`;
+        });
+        return this.textResult(`Pending sessions:\n${lines.join('\n')}`);
+    }
+    async postToSession(args) {
+        await api.post(`/agent/sessions/${args.session_id}/messages`, {
+            role: args.role || 'assistant',
+            content: args.content,
+        });
+        return this.textResult(`Posted ${args.role || 'assistant'} message to session ${args.session_id}`);
+    }
+    async claimSession(args) {
+        const response = await api.post(`/agent/sessions/${args.session_id}/claim`, {
+            agent_id: args.agent_id,
+        });
+        return this.textResult(response.data.ok ? `Claimed session ${args.session_id}` : `Failed to claim session (already claimed?)`);
+    }
+    async releaseSession(args) {
+        const response = await api.post(`/agent/sessions/${args.session_id}/release`, {
+            agent_id: args.agent_id,
+        });
+        return this.textResult(response.data.ok ? `Released session ${args.session_id}` : `Failed to release session`);
+    }
+    async deleteSession(args) {
+        await api.delete(`/agent/sessions/${args.session_id}`);
+        return this.textResult(`Deleted session ${args.session_id}`);
+    }
+    // --- Journal tools ---
+    async getJournal(args) {
+        const spaceId = await this.resolveSpaceId(args.space_id);
+        const params = {};
+        if (spaceId)
+            params.space_id = spaceId;
+        if (args.date)
+            params.date = args.date;
+        const response = await api.get('/journals', { params });
+        const data = response.data;
+        if (!data)
+            return this.textResult('No journal entry found');
+        if (Array.isArray(data)) {
+            if (data.length === 0)
+                return this.textResult('No journal entries found');
+            const lines = data.map((e) => `[${e.date}] ${e.text?.substring(0, 100)}${e.text?.length > 100 ? '...' : ''}`);
+            return this.textResult(lines.join('\n'));
         }
-        catch (error) {
-            throw new McpError(ErrorCode.InternalError, `Failed to list categories: ${error instanceof Error ? error.message : 'Unknown error'}`);
-        }
+        return this.textResult(`[${data.date}]\n${data.text}`);
+    }
+    async writeJournal(args) {
+        const spaceId = await this.resolveSpaceId(args.space_id);
+        await api.post('/journals', {
+            date: args.date,
+            text: args.text,
+            space_id: spaceId,
+        });
+        return this.textResult(`Journal entry saved for ${args.date}`);
+    }
+    // --- Utility tools ---
+    async getInsights(args) {
+        const spaceId = await this.resolveSpaceId(args.space_id);
+        const params = {};
+        if (spaceId)
+            params.space_id = spaceId;
+        const response = await api.get('/insights', { params });
+        return this.jsonResult(response.data);
+    }
+    async exportData(args) {
+        const spaceId = await this.resolveSpaceId(args.space_id);
+        if (!spaceId)
+            return this.textResult('No space found for export');
+        const params = { data: args.data, space_id: spaceId, format: args.format || 'json' };
+        const response = await api.get('/export', { params });
+        return this.textResult(typeof response.data === 'string' ? response.data : JSON.stringify(response.data, null, 2));
     }
     async run() {
         const transport = new StdioServerTransport();

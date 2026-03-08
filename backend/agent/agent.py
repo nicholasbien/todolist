@@ -22,7 +22,11 @@ from auth import verify_session  # noqa: E402
 from chat_sessions import (  # noqa: E402
     create_session,
     delete_session,
+    find_session_by_todo,
+    get_pending_sessions,
     get_session_trajectory,
+    get_todo_session_statuses,
+    get_unread_todo_ids,
     list_sessions,
     save_trajectory,
 )
@@ -747,6 +751,46 @@ async def list_chat_sessions(
     if not user_id:
         raise HTTPException(status_code=401, detail="User not authenticated")
     return await list_sessions(user_id, space_id)
+
+
+@router.get("/sessions/pending")
+async def get_pending_sessions_route(
+    space_id: Optional[str] = Query(None),
+    current_user: dict = Depends(get_current_user),
+):
+    """Get sessions awaiting agent response."""
+    return await get_pending_sessions(current_user["user_id"], space_id)
+
+
+@router.get("/sessions/unread-todos")
+async def get_unread_todos_route(
+    space_id: Optional[str] = Query(None),
+    current_user: dict = Depends(get_current_user),
+):
+    """Get todo IDs with unread agent replies."""
+    todo_ids = await get_unread_todo_ids(current_user["user_id"], space_id)
+    return {"todo_ids": todo_ids}
+
+
+@router.get("/sessions/todo-statuses")
+async def get_todo_statuses_route(
+    space_id: Optional[str] = Query(None),
+    current_user: dict = Depends(get_current_user),
+):
+    """Get session status per todo (waiting/processing/unread_reply)."""
+    return await get_todo_session_statuses(current_user["user_id"], space_id)
+
+
+@router.get("/sessions/by-todo/{todo_id}")
+async def get_session_by_todo_route(
+    todo_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    """Find the session linked to a specific todo."""
+    session = await find_session_by_todo(current_user["user_id"], todo_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="No session found for this todo")
+    return session
 
 
 @router.get("/sessions/{session_id}")
