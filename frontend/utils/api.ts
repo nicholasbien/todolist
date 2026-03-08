@@ -34,10 +34,21 @@ export async function apiRequest(endpoint: string, options: RequestInit = {}): P
   const baseUrl = getApiBaseUrl(false);
 
   // Build URL
+  // Check if service worker is active — if not, use /api proxy prefix
+  // so requests reach the Next.js proxy instead of hitting Railway edge directly
+  const swActive = typeof navigator !== 'undefined'
+    && 'serviceWorker' in navigator
+    && navigator.serviceWorker.controller;
+
   let url;
   if (baseUrl === '') {
-    // Use relative URLs - service worker will handle routing
-    url = `/${cleanEndpoint}`;
+    if (swActive) {
+      // SW will intercept and route to backend
+      url = `/${cleanEndpoint}`;
+    } else {
+      // No SW yet (first load / cleared cache) — use Next.js proxy
+      url = `/api/${cleanEndpoint}`;
+    }
   } else {
     // Direct backend call
     url = `${baseUrl}/${cleanEndpoint}`;
