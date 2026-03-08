@@ -62,13 +62,9 @@ Add the todolist MCP server to your OpenClaw config:
 
 ### 5. HEARTBEAT.md
 
-`HEARTBEAT.md` is already included in the repo root. It contains CLI-based instructions that OpenClaw follows on each heartbeat interval. No MCP required — all commands use `node cli/todolist-cli.js`.
+`HEARTBEAT.md` is already included in the repo root. It's a short checklist (per OpenClaw best practices — keep it small since it's injected every heartbeat cycle). Detailed subagent instructions are in `AGENTS.md` under "Subagent Workflow".
 
-Review and customize it if needed. The default instructions:
-- Poll for pending messages via `list-pending`
-- Claim unclaimed sessions, read conversations, do work, post responses
-- Stay claimed for follow-ups (persistent multi-turn conversations)
-- Auto-release after 10 agent responses
+**Important:** Do NOT put secrets (tokens, API keys) in HEARTBEAT.md — use env vars in the config instead.
 
 ### 6. Configure heartbeat interval
 

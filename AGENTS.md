@@ -962,6 +962,24 @@ Each worker agent handles a single session/task with persistent claim:
 10. When task is done:    release_session(session_id) — or auto-release at 10 turns
 ```
 
+#### Subagent Workflow
+
+Each subagent handles one session. The subagent should:
+
+1. Read the conversation: `node cli/todolist-cli.js get-session <session_id>`
+2. Post progress updates as it works: `node cli/todolist-cli.js post-message -s <session_id> -c "Looking into this..."`
+3. Check for follow-up messages during long tasks: `node cli/todolist-cli.js watch-session <session_id> --since <ISO timestamp>`
+4. Post its response when done: `node cli/todolist-cli.js post-message -s <session_id> -c "Here is what I found..."`
+5. Stay claimed — do NOT release unless the user says they're done
+6. Only release when complete: `node cli/todolist-cli.js release-session <session_id>`
+7. If the work involves code, use a git worktree to avoid conflicts
+
+**Session-to-subagent mapping:**
+- When you claim a session, set `agent_id` to a unique ID (e.g. `oc-<session_id_short>`)
+- `list-pending` shows `[Claimed: oc-abc123]` — resume that subagent, don't spawn a new one
+- The backend preserves `agent_id` across agent responses (NOT cleared when the agent posts)
+- After 10 agent responses, `agent_id` auto-clears (`MAX_SESSION_TURNS`)
+
 #### Webhook Integration (Recommended)
 
 Instead of polling, the orchestrator can register a webhook:
