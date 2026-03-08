@@ -210,7 +210,59 @@ const commands = {
       const cat = t.category ? ` [${t.category}]` : '';
       const pri = t.priority ? ` (${t.priority})` : '';
       const notes = t.notes ? `\n     Notes: ${t.notes}` : '';
-      console.log(`${check} ${t.text || '(no text)'}${cat}${pri} (ID: ${t._id})${notes}`);
+      const agent = t.agent_id ? ` [Agent: ${t.agent_id}]` : '';
+      console.log(`${check} ${t.text || '(no text)'}${cat}${pri}${agent} (ID: ${t._id})${notes}`);
+    }
+  },
+
+  async 'get-todo'(args) {
+    const { positional } = parseFlags(args);
+    const id = positional[0];
+    if (!id) { console.error('Usage: get-todo <todo_id>'); process.exit(1); }
+    const { data } = await request('GET', `/todos/${id}`);
+    console.log(`Todo: ${data.text || '(no text)'}`);
+    console.log(`  ID: ${data._id}`);
+    console.log(`  Category: ${data.category || 'General'}`);
+    console.log(`  Priority: ${data.priority || 'Medium'}`);
+    console.log(`  Completed: ${data.completed ? 'Yes' : 'No'}`);
+    if (data.agent_id) {
+      console.log(`  Agent: ${data.agent_id}`);
+    }
+    if (data.notes) {
+      console.log(`  Notes: ${data.notes}`);
+    }
+  },
+
+  async 'claim-todo'(args) {
+    const { flags, positional } = parseFlags(args);
+    const id = positional[0];
+    const agentId = flags['agent-id'] || flags.a || 'openclaw';
+    if (!id) { console.error('Usage: claim-todo <todo_id> [--agent-id <id>]'); process.exit(1); }
+    await request('PUT', `/todos/${id}`, { agent_id: agentId });
+    console.log(`Claimed todo ${id} for agent ${agentId}`);
+  },
+
+  async 'release-todo'(args) {
+    const { positional } = parseFlags(args);
+    const id = positional[0];
+    if (!id) { console.error('Usage: release-todo <todo_id>'); process.exit(1); }
+    await request('PUT', `/todos/${id}`, { agent_id: null });
+    console.log(`Released todo ${id}`);
+  },
+
+  async 'list-todos-by-agent'(args) {
+    const { flags } = parseFlags(args);
+    const agentId = flags['agent-id'] || flags.a;
+    if (!agentId) { console.error('Usage: list-todos-by-agent --agent-id <id>'); process.exit(1); }
+    const params = DEFAULT_SPACE_ID ? `?space_id=${DEFAULT_SPACE_ID}` : '';
+    const { data } = await request('GET', `/todos${params}`);
+    const todos = (Array.isArray(data) ? data : []).filter((t) => t.agent_id === agentId);
+    if (!todos.length) { console.log(`No todos found for agent ${agentId}.`); return; }
+    for (const t of todos) {
+      const check = t.completed ? '[x]' : '[ ]';
+      const cat = t.category ? ` [${t.category}]` : '';
+      const pri = t.priority ? ` (${t.priority})` : '';
+      console.log(`${check} ${t.text || '(no text)'}${cat}${pri} (ID: ${t._id})`);
     }
   },
 
@@ -308,10 +360,16 @@ Commands:
   release-session <session_id>     Release a session claim
   get-session-by-todo <todo_id>    Get the session linked to a todo
   watch-session <id> [--since TS]  Poll for new messages since timestamp
-  list-todos [--completed]         List todos
+
+  list-todos [--completed]         List todos (shows assigned agent)
+  get-todo <todo_id>               Show todo details including agent
   add-todo <text> [--category C] [--priority P] [--notes N]
   complete-todo <todo_id>          Mark a todo complete
   update-todo <id> [--text T] [--priority P] [--category C]
+  claim-todo <id> [--agent-id <a>] Assign an agent to a todo
+  release-todo <id>                Remove agent assignment from todo
+  list-todos-by-agent --agent-id <id>  List todos assigned to an agent
+
   create-session --title <t> [--todo-id <id>]
   list-sessions                    List all sessions
   help                             Show this help

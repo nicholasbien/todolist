@@ -1108,23 +1108,34 @@ Env vars are set: TODOLIST_API_URL, TODOLIST_AUTH_TOKEN, DEFAULT_SPACE_ID
 
 **Session-to-subagent tracking:**
 
-The orchestrator must persist the mapping between todolist sessions and subagent runs so follow-ups reach the same agent:
+Agent assignments are now tracked directly on the todo items themselves via the `agent_id` field. When a session is claimed, the agent_id is automatically synced to the linked todo. This provides a more reliable and queryable mapping than a separate JSON file.
 
-```json
-// .openclaw/session-agents.json
-{
-  "69ad0918fb5006638bc514e1": {
-    "runId": "run_xyz",
-    "agentType": "codex",
-    "spawnedAt": "2026-03-08T12:00:00Z"
-  }
-}
+The todo's `agent_id` field stores which agent is currently handling the task:
+- When `claim_session` is called, the agent_id is synced to the linked todo
+- When `release_session` is called, the agent_id is cleared from the todo
+- Use `list-todos` to see which agent is assigned to each task
+- Use `list-todos-by-agent --agent-id <agent>` to find all tasks for a specific agent
+
+```bash
+# Check agent assignments
+node cli/todolist-cli.js list-todos
+# Output: [ ] Task name [Agent: oc-agent-123] (ID: ...)
+
+# Find all tasks for a specific agent
+node cli/todolist-cli.js list-todos-by-agent --agent-id oc-agent-123
+
+# Manually assign an agent to a todo
+node cli/todolist-cli.js claim-todo <todo_id> --agent-id <agent_id>
+
+# Manually release agent from a todo
+node cli/todolist-cli.js release-todo <todo_id>
 ```
 
-On each heartbeat:
-- **New session (no mapping):** Spawn new subagent, save mapping
-- **Follow-up (has mapping):** Resume existing subagent with the new message
-- **Stale mapping (subagent finished/died):** Spawn new subagent, update mapping
+This approach provides:
+- **Persistent storage**: Agent assignments survive restarts via MongoDB
+- **Queryable state**: Easy to find all tasks assigned to a specific agent
+- **Automatic sync**: Claiming/releasing sessions automatically updates the linked todo
+- **No external file**: Eliminates the need for `.openclaw/session-agents.json`
 
 **Fallback: `codex exec` (if `sessions_spawn` unavailable):**
 

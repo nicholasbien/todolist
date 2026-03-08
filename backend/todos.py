@@ -29,6 +29,8 @@ async def init_todo_indexes() -> None:
         # Index by space for collaborative spaces
         await todos_collection.create_index("space_id")
         await todos_collection.create_index("completed")
+        # Index by agent_id for finding tasks assigned to specific agents
+        await todos_collection.create_index("agent_id")
 
         # Compound indexes for common query patterns
         # Most todos queries filter by user_id + space_id together
@@ -44,6 +46,9 @@ async def init_todo_indexes() -> None:
 
         # Queries by category within a space
         await todos_collection.create_index([("user_id", 1), ("space_id", 1), ("category", 1)])
+
+        # Compound index for finding tasks assigned to agents within a space
+        await todos_collection.create_index([("space_id", 1), ("agent_id", 1)])
 
         logger.info("Todo indexes created successfully")
     except Exception as e:
@@ -67,6 +72,7 @@ class Todo(BaseModel):
     first_name: Optional[str] = None
     space_id: Optional[str] = None
     created_offline: bool = False
+    agent_id: Optional[str] = None  # Track which agent is handling this task
 
     class Config:
         arbitrary_types_allowed = True

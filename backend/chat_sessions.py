@@ -7,12 +7,9 @@ from typing import Any, Dict, List, Optional
 from bson import ObjectId
 from db import db
 from pymongo.errors import DuplicateKeyError
-from webhook_dispatcher import (
-    notify_message_posted,
-    notify_session_claimed,
-    notify_session_created,
-    notify_session_released,
-)
+
+# Import todos collection for agent_id sync
+todos_collection = db.todos
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -29,7 +26,9 @@ SESSION_STATUS_ACTIVE = "active"
 SESSION_STATUS_ARCHIVED = "archived"
 
 
-async def create_session(user_id: str, space_id: Optional[str], title: str, todo_id: Optional[str] = None) -> str:
+async def create_session(
+    user_id: str, space_id: Optional[str], title: str, todo_id: Optional[str] = None
+) -> str:
     """Create a new chat session and return its string ID.
 
     If todo_id is provided and a session already exists for that todo,
@@ -75,18 +74,6 @@ async def create_session(user_id: str, space_id: Optional[str], title: str, todo
         }
     )
 
-    # Dispatch webhook for new session
-    try:
-        await notify_session_created(
-            session_id=session_id,
-            user_id=user_id,
-            title=title,
-            todo_id=todo_id,
-            space_id=space_id,
-        )
-    except Exception as e:
-        logger.warning(f"Failed to dispatch session created webhook: {e}")
-
     return session_id
 
 
@@ -98,7 +85,9 @@ async def find_session_by_todo(user_id: str, todo_id: str) -> Optional[str]:
     return None
 
 
-async def get_pending_sessions(user_id: str, space_id: Optional[str] = None) -> List[Dict[str, Any]]:
+async def get_pending_sessions(
+    user_id: str, space_id: Optional[str] = None
+) -> List[Dict[str, Any]]:
     """Return sessions that need an agent response.
 
     Uses the ``needs_agent_response`` flag for fast indexed queries.
@@ -117,7 +106,11 @@ async def get_pending_sessions(user_id: str, space_id: Optional[str] = None) -> 
     stale_threshold = datetime.utcnow() - timedelta(days=SESSION_STALE_DAYS)
 
     # Query 1: docs with the flag set (fast, indexed) + not stale
-    flagged_query = {**base_query, "needs_agent_response": True, "updated_at": {"$gte": stale_threshold}}
+    flagged_query = {
+        **base_query,
+        "needs_agent_response": True,
+        "updated_at": {"$gte": stale_threshold},
+    }
     # Query 2: legacy docs missing the flag — fall back to last-message check
     legacy_query = {**base_query, "needs_agent_response": {"$exists": False}}
 
@@ -158,7 +151,9 @@ async def get_pending_sessions(user_id: str, space_id: Optional[str] = None) -> 
 
     # Apply MAX_ACTIVE_SESSIONS cap
     if len(pending) > MAX_ACTIVE_SESSIONS:
-        logger.info(f"Session cap applied: {len(pending)} sessions, returning {MAX_ACTIVE_SESSIONS}")
+        logger.info(
+            f"Session cap applied: {len(pending)} sessions, returning {MAX_ACTIVE_SESSIONS}"
+        )
         return pending[:MAX_ACTIVE_SESSIONS]
 
     return pending
@@ -169,67 +164,94 @@ async def claim_session(session_id: str, user_id: str, agent_id: str) -> bool:
 
     Uses an atomic update that only succeeds if agent_id is not already set
     (or is the same agent reclaiming). This prevents duplicate dispatch.
+    Also syncs the agent_id to the linked todo if one exists.
     """
     result = await trajectories_collection.update_one(
         {
             "session_id": session_id,
             "user_id": user_id,
             "needs_agent_response": True,
-            "$or": [{"agent_id": {"$exists": False}}, {"agent_id": None}, {"agent_id": agent_id}],
+            "$or": [
+                {"agent_id": {"$exists": False}},
+                {"agent_id": None},
+                {"agent_id": agent_id},
+            ],
         },
         {"$set": {"agent_id": agent_id, "updated_at": datetime.utcnow()}},
     )
     claimed = result.modified_count > 0 or result.matched_count > 0
 
-    # Dispatch webhook for session claim
+    # Sync agent_id to linked todo if one exists
     if claimed:
         try:
-            await notify_session_claimed(
-                session_id=session_id,
-                user_id=user_id,
-                agent_id=agent_id,
+            session_doc = await sessions_collection.find_one(
+                {"_id": ObjectId(session_id), "user_id": user_id}, {"todo_id": 1}
             )
+            if session_doc and session_doc.get("todo_id"):
+                await todos_collection.update_one(
+                    {"_id": ObjectId(session_doc["todo_id"]), "user_id": user_id},
+                    {"$set": {"agent_id": agent_id}},
+                )
+                logger.info(
+                    f"Synced agent_id to todo {session_doc['todo_id']} for session {session_id}"
+                )
         except Exception as e:
-            logger.warning(f"Failed to dispatch session claimed webhook: {e}")
+            logger.warning(f"Failed to sync agent_id to linked todo: {e}")
 
     return claimed
 
 
 async def release_session(session_id: str, user_id: str, agent_id: str = "") -> None:
-    """Clear the agent_id claim on a session (called when agent finishes)."""
+    """Clear the agent_id claim on a session (called when agent finishes).
+    Also clears the agent_id from the linked todo if one exists."""
     await trajectories_collection.update_one(
         {"session_id": session_id, "user_id": user_id},
         {"$set": {"agent_id": None}},
     )
 
-    # Dispatch webhook for session release
-    if agent_id:
-        try:
-            await notify_session_released(
-                session_id=session_id,
-                user_id=user_id,
-                agent_id=agent_id,
+    # Clear agent_id from linked todo if one exists
+    try:
+        session_doc = await sessions_collection.find_one(
+            {"_id": ObjectId(session_id), "user_id": user_id}, {"todo_id": 1}
+        )
+        if session_doc and session_doc.get("todo_id"):
+            await todos_collection.update_one(
+                {"_id": ObjectId(session_doc["todo_id"]), "user_id": user_id},
+                {"$set": {"agent_id": None}},
             )
-        except Exception as e:
-            logger.warning(f"Failed to dispatch session released webhook: {e}")
+            logger.info(
+                f"Cleared agent_id from todo {session_doc['todo_id']} for session {session_id}"
+            )
+    except Exception as e:
+        logger.warning(f"Failed to clear agent_id from linked todo: {e}")
 
 
-async def list_sessions(user_id: str, space_id: Optional[str] = None, limit: int = 50) -> List[Dict[str, Any]]:
+async def list_sessions(
+    user_id: str, space_id: Optional[str] = None, limit: int = 50
+) -> List[Dict[str, Any]]:
     """List sessions for dropdown. Returns lightweight metadata only."""
     query: Dict[str, Any] = {"user_id": user_id}
     if space_id is not None:
         query["space_id"] = space_id
 
-    cursor = sessions_collection.find(query, {"user_id": 0}).sort("updated_at", -1).limit(limit)
+    cursor = (
+        sessions_collection.find(query, {"user_id": 0})
+        .sort("updated_at", -1)
+        .limit(limit)
+    )
     items = await cursor.to_list(length=limit)
     for item in items:
         item["_id"] = str(item["_id"])
     return items
 
 
-async def get_session_trajectory(session_id: str, user_id: str) -> Optional[Dict[str, Any]]:
+async def get_session_trajectory(
+    session_id: str, user_id: str
+) -> Optional[Dict[str, Any]]:
     """Load a session's trajectory and display messages. Validates ownership."""
-    doc = await trajectories_collection.find_one({"session_id": session_id, "user_id": user_id})
+    doc = await trajectories_collection.find_one(
+        {"session_id": session_id, "user_id": user_id}
+    )
     if not doc:
         return None
 
@@ -277,7 +299,9 @@ async def save_trajectory(
 MAX_SESSION_TURNS = 10
 
 
-async def append_message(session_id: str, user_id: str, role: str, content: str) -> bool:
+async def append_message(
+    session_id: str, user_id: str, role: str, content: str
+) -> bool:
     """Append a message to a session's display_messages. Returns True if found.
 
     Automatically manages ``needs_agent_response``:
@@ -335,7 +359,9 @@ async def append_message(session_id: str, user_id: str, role: str, content: str)
             # Auto-release after MAX_SESSION_TURNS exchanges
             turn_count = sum(1 for m in msgs if m.get("role") == "assistant")
             if turn_count >= MAX_SESSION_TURNS:
-                logger.info(f"Session {session_id} hit {MAX_SESSION_TURNS} turns — auto-releasing agent")
+                logger.info(
+                    f"Session {session_id} hit {MAX_SESSION_TURNS} turns — auto-releasing agent"
+                )
                 await trajectories_collection.update_one(
                     {"session_id": session_id, "user_id": user_id},
                     {"$set": {"agent_id": None}},
@@ -346,32 +372,26 @@ async def append_message(session_id: str, user_id: str, role: str, content: str)
         {"$set": {"updated_at": now}},
     )
 
-    # Dispatch webhook for user messages needing agent response
-    if role == "user":
-        try:
-            await notify_message_posted(
-                session_id=session_id,
-                user_id=user_id,
-                role=role,
-                content=content,
-            )
-        except Exception as e:
-            logger.warning(f"Failed to dispatch message posted webhook: {e}")
-
     return True
 
 
 async def delete_session(session_id: str, user_id: str) -> bool:
     """Delete a session and its trajectory. Returns True if found."""
-    result = await sessions_collection.delete_one({"_id": ObjectId(session_id), "user_id": user_id})
-    await trajectories_collection.delete_one({"session_id": session_id, "user_id": user_id})
+    result = await sessions_collection.delete_one(
+        {"_id": ObjectId(session_id), "user_id": user_id}
+    )
+    await trajectories_collection.delete_one(
+        {"session_id": session_id, "user_id": user_id}
+    )
     return result.deleted_count > 0
 
 
 async def init_chat_session_indexes() -> None:
     """Create indexes for chat sessions and trajectories."""
     try:
-        await sessions_collection.create_index([("user_id", 1), ("space_id", 1), ("updated_at", -1)])
+        await sessions_collection.create_index(
+            [("user_id", 1), ("space_id", 1), ("updated_at", -1)]
+        )
         await sessions_collection.create_index("user_id")
 
         await trajectories_collection.create_index("session_id", unique=True)

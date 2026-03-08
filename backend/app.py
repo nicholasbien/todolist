@@ -281,6 +281,34 @@ async def api_get_todos(space_id: str | None = None, current_user: dict = Depend
     return result
 
 
+@app.get("/todos/{todo_id}", response_model=Todo)
+async def api_get_todo(todo_id: str, current_user: dict = Depends(get_current_user)):
+    """Get a single todo by ID."""
+    from bson import ObjectId
+
+    try:
+        object_id = ObjectId(todo_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail=f"Invalid todo ID format: {todo_id}")
+
+    todo = await todos_collection.find_one({"_id": object_id, "user_id": current_user["user_id"]})
+    if not todo:
+        raise HTTPException(status_code=404, detail="Todo not found")
+
+    # Convert ObjectId to string
+    todo["_id"] = str(todo["_id"])
+
+    # Add user's first name for collaborative spaces
+    try:
+        user = await auth.users_collection.find_one({"_id": ObjectId(todo["user_id"])})
+        if user:
+            todo["first_name"] = user.get("first_name", "")
+    except Exception:
+        todo["first_name"] = ""
+
+    return Todo(**todo)
+
+
 @app.post("/todos", response_model=Todo)
 async def api_create_todo(request: Request, current_user: dict = Depends(get_current_user)):
     try:

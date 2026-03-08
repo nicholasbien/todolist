@@ -1,5 +1,7 @@
 # Webhook-Based Session Routing Architecture
 
+> Deprecated - webhooks not in use. The production system uses polling via `scripts/auto-claim-sessions.js`.
+
 ## User Request (2026-03-07)
 Use webhooks from todolist app to communicate instead of polling, with session ID-based routing.
 
