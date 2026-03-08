@@ -382,29 +382,6 @@ class TodolistMCPServer {
             },
           },
           {
-            name: 'claim_session',
-            description: 'Atomically claim a pending session for an agent. Returns ok=true if claimed, ok=false if already claimed by another agent. Use this before starting work on a session to prevent duplicate dispatch.',
-            inputSchema: {
-              type: 'object',
-              properties: {
-                session_id: { type: 'string', description: 'Session ID to claim' },
-                agent_id: { type: 'string', description: 'Unique identifier for the claiming agent' },
-              },
-              required: ['session_id', 'agent_id'],
-            },
-          },
-          {
-            name: 'release_session',
-            description: 'Release an agent claim on a session. Called when the agent finishes or fails.',
-            inputSchema: {
-              type: 'object',
-              properties: {
-                session_id: { type: 'string', description: 'Session ID to release' },
-              },
-              required: ['session_id'],
-            },
-          },
-          {
             name: 'delete_session',
             description: 'Delete a chat session',
             inputSchema: {
@@ -481,8 +458,6 @@ class TodolistMCPServer {
           case 'get_session': return await this.getSession(args);
           case 'post_to_session': return await this.postToSession(args);
           case 'get_pending_sessions': return await this.getPendingSessions(args);
-          case 'claim_session': return await this.claimSession(args);
-          case 'release_session': return await this.releaseSession(args);
           case 'delete_session': return await this.deleteSession2(args);
           // Insights & Export
           case 'get_insights': return await this.getInsights(args);
@@ -757,27 +732,9 @@ class TodolistMCPServer {
 
     const lines = pending.map((s: any, i: number) => {
       const todoInfo = s.todo_id ? ` [Todo: ${s.todo_id}]` : '';
-      const agentInfo = s.agent_id ? ` [Claimed by: ${s.agent_id}]` : '';
-      return `${i + 1}. ${s.title}${todoInfo}${agentInfo} (ID: ${s._id})\n   Message: ${s.last_message}`;
+      return `${i + 1}. ${s.title}${todoInfo} (ID: ${s._id})\n   Message: ${s.last_message}`;
     });
     return this.text(lines.join('\n\n'));
-  }
-
-  private async claimSession(args: any) {
-    const response = await api.post(`/agent/sessions/${args.session_id}/claim`, {
-      agent_id: args.agent_id,
-    });
-    const { ok } = response.data;
-    if (ok) {
-      return this.text(`Claimed session ${args.session_id} for agent ${args.agent_id}`);
-    } else {
-      return this.text(`Failed to claim session ${args.session_id} — already claimed by another agent`);
-    }
-  }
-
-  private async releaseSession(args: any) {
-    await api.post(`/agent/sessions/${args.session_id}/release`);
-    return this.text(`Released session ${args.session_id}`);
   }
 
   private async getSession(args: any) {

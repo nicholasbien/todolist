@@ -21,7 +21,6 @@ sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 from auth import verify_session  # noqa: E402
 from chat_sessions import (  # noqa: E402
     append_message,
-    claim_session,
     create_session,
     delete_session,
     find_session_by_todo,
@@ -31,7 +30,6 @@ from chat_sessions import (  # noqa: E402
     get_unread_todo_ids,
     list_sessions,
     mark_session_read,
-    release_session,
     save_trajectory,
     trajectories_collection,
 )
@@ -891,39 +889,6 @@ async def create_chat_session(
     return {"session_id": session_id, "title": req.title}
 
 
-class ClaimSessionRequest(BaseModel):
-    agent_id: str
-
-
-@router.post("/sessions/{session_id}/claim")
-async def claim_chat_session(
-    session_id: str,
-    req: ClaimSessionRequest,
-    current_user: dict = Depends(get_current_user),
-):
-    """Atomically claim a session for an agent. Returns ok=true if claimed."""
-    user_id = current_user.get("user_id")
-    if not user_id:
-        raise HTTPException(status_code=401, detail="User not authenticated")
-
-    claimed = await claim_session(session_id, user_id, req.agent_id)
-    return {"ok": claimed, "session_id": session_id, "agent_id": req.agent_id}
-
-
-@router.post("/sessions/{session_id}/release")
-async def release_chat_session(
-    session_id: str,
-    current_user: dict = Depends(get_current_user),
-):
-    """Release an agent's claim on a session."""
-    user_id = current_user.get("user_id")
-    if not user_id:
-        raise HTTPException(status_code=401, detail="User not authenticated")
-
-    await release_session(session_id, user_id)
-    return {"ok": True}
-
-
 @router.post("/sessions/{session_id}/messages")
 async def post_session_message(
     session_id: str,
@@ -954,7 +919,7 @@ async def watch_session(
     """Poll for new messages in a session since a given timestamp.
 
     Designed for subagents to check for follow-up user messages while working.
-    Returns only new messages and the current agent claim status.
+    Returns only new messages and the current session status.
     """
     user_id = current_user.get("user_id")
     if not user_id:

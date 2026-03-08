@@ -8,9 +8,6 @@ from bson import ObjectId
 from db import db
 from pymongo.errors import DuplicateKeyError
 
-# Import todos collection for agent_id sync
-todos_collection = db.todos
-
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -133,7 +130,6 @@ async def get_pending_sessions(user_id: str, space_id: Optional[str] = None) -> 
                         "_id": str(session_doc["_id"]),
                         "title": session_doc.get("title", ""),
                         "todo_id": session_doc.get("todo_id"),
-                        "agent_id": traj.get("agent_id"),
                         "last_message": last_msg,
                         "updated_at": session_doc.get("updated_at"),
                     }
@@ -151,69 +147,6 @@ async def get_pending_sessions(user_id: str, space_id: Optional[str] = None) -> 
         return pending[:MAX_ACTIVE_SESSIONS]
 
     return pending
-
-
-async def claim_session(session_id: str, user_id: str, agent_id: str) -> bool:
-    """Atomically claim a session for an agent. Returns True if claimed.
-
-    Uses an atomic update that only succeeds if agent_id is not already set
-    (or is the same agent reclaiming). This prevents duplicate dispatch.
-    Also syncs the agent_id to the linked todo if one exists.
-    """
-    result = await trajectories_collection.update_one(
-        {
-            "session_id": session_id,
-            "user_id": user_id,
-            "needs_agent_response": True,
-            "$or": [
-                {"agent_id": {"$exists": False}},
-                {"agent_id": None},
-                {"agent_id": agent_id},
-            ],
-        },
-        {"$set": {"agent_id": agent_id, "updated_at": datetime.utcnow()}},
-    )
-    claimed = result.modified_count > 0 or result.matched_count > 0
-
-    # Sync agent_id to linked todo if one exists
-    if claimed:
-        try:
-            session_doc = await sessions_collection.find_one(
-                {"_id": ObjectId(session_id), "user_id": user_id}, {"todo_id": 1}
-            )
-            if session_doc and session_doc.get("todo_id"):
-                await todos_collection.update_one(
-                    {"_id": ObjectId(session_doc["todo_id"]), "user_id": user_id},
-                    {"$set": {"agent_id": agent_id}},
-                )
-                logger.info(f"Synced agent_id to todo {session_doc['todo_id']} for session {session_id}")
-        except Exception as e:
-            logger.warning(f"Failed to sync agent_id to linked todo: {e}")
-
-    return claimed
-
-
-async def release_session(session_id: str, user_id: str, agent_id: str = "") -> None:
-    """Clear the agent_id claim on a session (called when agent finishes).
-    Also clears the agent_id from the linked todo if one exists."""
-    await trajectories_collection.update_one(
-        {"session_id": session_id, "user_id": user_id},
-        {"$set": {"agent_id": None}},
-    )
-
-    # Clear agent_id from linked todo if one exists
-    try:
-        session_doc = await sessions_collection.find_one(
-            {"_id": ObjectId(session_id), "user_id": user_id}, {"todo_id": 1}
-        )
-        if session_doc and session_doc.get("todo_id"):
-            await todos_collection.update_one(
-                {"_id": ObjectId(session_doc["todo_id"]), "user_id": user_id},
-                {"$set": {"agent_id": None}},
-            )
-            logger.info(f"Cleared agent_id from todo {session_doc['todo_id']} for session {session_id}")
-    except Exception as e:
-        logger.warning(f"Failed to clear agent_id from linked todo: {e}")
 
 
 async def list_sessions(user_id: str, space_id: Optional[str] = None, limit: int = 50) -> List[Dict[str, Any]]:
@@ -273,25 +206,12 @@ async def save_trajectory(
     )
 
 
-# Max back-and-forth exchanges before a session auto-releases its agent claim.
-# Each exchange = 1 user message + 1 assistant response. After this limit the
-# agent_id is cleared so the session shows up as unclaimed if the user writes again.
-MAX_SESSION_TURNS = 10
-
-
 async def append_message(session_id: str, user_id: str, role: str, content: str) -> bool:
     """Append a message to a session's display_messages. Returns True if found.
 
     Automatically manages ``needs_agent_response``:
     - user message  → needs_agent_response = True
-    - assistant msg → needs_agent_response = False (but agent_id is KEPT so the
-      same subagent stays claimed on the session for follow-ups)
-
-    Agent release policy:
-    - agent_id is only cleared when:
-      (a) release_session() is called explicitly (user says "done", or agent finishes)
-      (b) the session exceeds MAX_SESSION_TURNS exchanges — auto-released
-    - This lets subagents maintain a persistent conversation with the user.
+    - assistant msg → needs_agent_response = False
 
     Session Archival & Resurrection:
     - Sessions older than SESSION_STALE_DAYS are excluded from list-pending
@@ -316,10 +236,9 @@ async def append_message(session_id: str, user_id: str, role: str, content: str)
     if result.matched_count == 0:
         return False
 
-    # For assistant messages, clear needs_agent_response but KEEP agent_id.
-    # The subagent stays claimed so it can handle follow-up messages.
+    # For assistant messages, clear needs_agent_response and mark as unread.
     if role == "assistant":
-        # Re-read to check the last message role and turn count in one query.
+        # Re-read to check the last message role.
         # (MongoDB doesn't support negative array indices like -1 in query filters.)
         doc = await trajectories_collection.find_one(
             {"session_id": session_id, "user_id": user_id},
@@ -332,15 +251,6 @@ async def append_message(session_id: str, user_id: str, role: str, content: str)
                 await trajectories_collection.update_one(
                     {"session_id": session_id, "user_id": user_id},
                     {"$set": {"needs_agent_response": False, "has_unread_reply": True}},
-                )
-
-            # Auto-release after MAX_SESSION_TURNS exchanges
-            turn_count = sum(1 for m in msgs if m.get("role") == "assistant")
-            if turn_count >= MAX_SESSION_TURNS:
-                logger.info(f"Session {session_id} hit {MAX_SESSION_TURNS} turns — auto-releasing agent")
-                await trajectories_collection.update_one(
-                    {"session_id": session_id, "user_id": user_id},
-                    {"$set": {"agent_id": None}},
                 )
 
     await sessions_collection.update_one(
@@ -376,8 +286,7 @@ async def get_todo_session_statuses(user_id: str, space_id: Optional[str] = None
     """Return a map of todo_id → status for all todos with active sessions.
 
     Statuses:
-      - ``waiting``       – needs agent response, no agent claimed yet
-      - ``processing``    – needs agent response, agent has claimed it
+      - ``waiting``       – needs agent response
       - ``unread_reply``  – agent replied but user hasn't viewed it
     """
     base_query: Dict[str, Any] = {"user_id": user_id}
@@ -388,7 +297,7 @@ async def get_todo_session_statuses(user_id: str, space_id: Optional[str] = None
 
     async for traj in trajectories_collection.find(
         base_query,
-        {"session_id": 1, "needs_agent_response": 1, "has_unread_reply": 1, "agent_id": 1},
+        {"session_id": 1, "needs_agent_response": 1, "has_unread_reply": 1},
     ):
         session_doc = await sessions_collection.find_one({"_id": ObjectId(traj["session_id"])}, {"todo_id": 1})
         if not session_doc or not session_doc.get("todo_id"):
@@ -399,10 +308,7 @@ async def get_todo_session_statuses(user_id: str, space_id: Optional[str] = None
         if traj.get("has_unread_reply"):
             statuses[todo_id] = "unread_reply"
         elif traj.get("needs_agent_response"):
-            if traj.get("agent_id"):
-                statuses[todo_id] = "processing"
-            else:
-                statuses[todo_id] = "waiting"
+            statuses[todo_id] = "waiting"
     return statuses
 
 

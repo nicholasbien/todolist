@@ -778,7 +778,7 @@ Automated testing: `__tests__/ServiceWorkerRouteValidation.test.ts` catches miss
 - `scripts/take-screenshots.js` - Captures all modal screenshots for UI PRs (see Screenshot Requirement section)
 - `scripts/test-offline-sync.js` - Playwright E2E tests for offline/online sync flows (see Offline Testing section below)
 - `scripts/populate_sample_data.py` - Populates sample data for testing
-- `scripts/auto-claim-sessions.js` - Sequential polling worker that claims pending sessions, classifies requests, spawns handlers, posts responses, and releases claims
+- `scripts/auto-claim-sessions.js` - Sequential polling worker that checks pending sessions, classifies requests, spawns handlers, and posts responses
 - `scripts/session-classifier.js` - Deterministic classifier that routes sessions to `coding` vs `simple` handlers using keyword and code-signal heuristics
 - `scripts/subagent-spawner.js` - Handler runner that spawns `codex` for coding sessions (with timeout/retries) or generates direct simple responses
 
@@ -873,7 +873,7 @@ Edit `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS):
 
 **Journals:** `get_journal`, `write_journal`, `delete_journal`
 
-**Chat Sessions:** `list_sessions`, `create_session`, `get_session`, `post_to_session`, `get_pending_sessions`, `claim_session`, `release_session`, `delete_session`
+**Chat Sessions:** `list_sessions`, `create_session`, `get_session`, `post_to_session`, `get_pending_sessions`, `delete_session`
 
 **Other:** `get_insights`, `export_data`
 
@@ -885,24 +885,17 @@ The app uses chat sessions as an asynchronous messaging channel between the user
 1. User creates a task → backend auto-creates a linked session with task details as a `user` message
 2. User can also send messages via the Assistant tab in the web app
 3. Agent polls `get_pending_sessions` → finds sessions where `needs_agent_response` is true
-4. Agent atomically claims session ownership via `claim_session(session_id, agent_id)`
-5. Agent reads the session, does the work, posts a response via `post_to_session`
-6. **Agent stays claimed** — `agent_id` is preserved after posting so the same agent handles follow-ups
-7. User sees the response in the web app (frontend polls every 5s)
+4. Agent reads the session via `get_session`, does the work, posts a response via `post_to_session`
+5. User sees the response in the web app (frontend polls every 5s)
 
-**Persistent session lifecycle:**
-- Posting an assistant message clears `needs_agent_response` but **keeps `agent_id`**
+**Session lifecycle:**
+- Posting an assistant message clears `needs_agent_response`
 - When the user sends a follow-up, `needs_agent_response` flips back to true
-- The orchestrator should **resume the same agent** to maintain conversation context
-- Sessions auto-release after **10 assistant responses** (`MAX_SESSION_TURNS`)
-- Agents can also explicitly release via `release_session()` when the task is done
 
 **Key tools (MCP / API):**
 - `get_pending_sessions` — Returns sessions where `needs_agent_response` is true
-- `claim_session(session_id, agent_id)` — Atomically claim a session before starting work
-- `release_session(session_id)` — Explicitly release claim (only when task is truly done)
 - `get_session(session_id)` — Read full conversation history
-- `post_to_session(session_id, content)` — Post agent response (keeps agent claimed)
+- `post_to_session(session_id, content)` — Post agent response
 - `create_session(title, todo_id?)` — Create a session, optionally linked to a task
 - `GET /agent/sessions/{id}/watch?since=<ISO timestamp>` — Poll for new messages since a timestamp (for subagents checking for follow-ups during long tasks)
 
@@ -910,8 +903,6 @@ The app uses chat sessions as an asynchronous messaging channel between the user
 - `list-pending` — Show pending sessions
 - `get-session <id>` — Read session messages
 - `post-message -s <id> -c <text>` — Post a message
-- `claim-session <id> [--agent-id <name>]` — Claim a session
-- `release-session <id>` — Release a session
 - `watch-session <id> [--since <ISO timestamp>]` — Poll for new messages since timestamp
 
 ### Orchestrator Integration Guide
@@ -942,9 +933,7 @@ pending = get_pending_sessions()
 
 for session in pending:
     session_id = session["_id"]
-    claim = claim_session(session_id=session_id, agent_id="orchestrator-1")
-    if not claim["ok"]:
-        continue  # another worker already owns it
+    conversation = get_session(session_id)
 
     worker = spawn_agent(
         session_id=session_id,
@@ -957,7 +946,7 @@ for session in pending:
 
 #### Worker Agent Lifecycle
 
-Each worker agent handles a single session/task with persistent claim:
+Each worker agent handles a single session/task:
 
 ```
 1. Read full session:     get_session(session_id)
@@ -966,11 +955,10 @@ Each worker agent handles a single session/task with persistent claim:
 4. Post progress updates: post_to_session(session_id, "Working on X...")
 5. Check for follow-ups:  watch_session(session_id, since=<timestamp>)
 6. Post final response:   post_to_session(session_id, result)
-   → Agent stays claimed (agent_id preserved, needs_agent_response=false)
+   → needs_agent_response set to false
 7. When user sends follow-up → needs_agent_response flips to true
-8. Orchestrator resumes SAME agent (preserving context)
+8. Orchestrator picks up session again via get_pending_sessions
 9. Repeat from step 1
-10. When task is done:    release_session(session_id) — or auto-release at 10 turns
 ```
 
 #### Subagent Workflow
@@ -981,15 +969,7 @@ Each subagent handles one session. The subagent should:
 2. Post progress updates as it works: `node cli/todolist-cli.js post-message -s <session_id> -c "Looking into this..."`
 3. Check for follow-up messages during long tasks: `node cli/todolist-cli.js watch-session <session_id> --since <ISO timestamp>`
 4. Post its response when done: `node cli/todolist-cli.js post-message -s <session_id> -c "Here is what I found..."`
-5. Stay claimed — do NOT release unless the user says they're done
-6. Only release when complete: `node cli/todolist-cli.js release-session <session_id>`
-7. If the work involves code, use a git worktree to avoid conflicts
-
-**Session-to-subagent mapping:**
-- When you claim a session, set `agent_id` to a unique ID (e.g. `oc-<session_id_short>`)
-- `list-pending` shows `[Claimed: oc-abc123]` — resume that subagent, don't spawn a new one
-- The backend preserves `agent_id` across agent responses (NOT cleared when the agent posts)
-- After 10 agent responses, `agent_id` auto-clears (`MAX_SESSION_TURNS`)
+5. If the work involves code, use a git worktree to avoid conflicts
 
 #### Webhook Integration (Recommended)
 
@@ -1054,7 +1034,7 @@ OpenClaw acts as the **orchestrator** — it checks for pending sessions and rou
 **How it works:**
 
 1. Heartbeat fires → main agent runs `node cli/todolist-cli.js list-pending`
-2. For each pending session, main agent claims it and reads the conversation
+2. For each pending session, main agent reads the conversation
 3. Main agent spawns a coding subagent via `sessions_spawn` to handle the work
 4. Main agent saves the `runId` to a tracking file so follow-ups route to the same subagent
 5. On follow-ups, main agent resumes the same subagent with the new user message
@@ -1064,7 +1044,6 @@ OpenClaw acts as the **orchestrator** — it checks for pending sessions and rou
 ```
 Heartbeat
   ├── list-pending → found session abc123
-  ├── claim-session abc123
   ├── get-session abc123 → read user request
   ├── sessions_spawn codex "<prompt>" → returns runId: "run_xyz"
   ├── Save mapping: abc123 → run_xyz (in .openclaw/session-agents.json)
@@ -1099,8 +1078,8 @@ Session ID: <session_id>
 4. Check for follow-up messages periodically:
    node cli/todolist-cli.js watch-session <session_id> --since <ISO timestamp>
 
-5. Only release when the task is truly complete:
-   node cli/todolist-cli.js release-session <session_id>
+5. Post your final response:
+   node cli/todolist-cli.js post-message -s <session_id> -c 'Done. Here is what I did...'
 
 Env vars are set: TODOLIST_API_URL, TODOLIST_AUTH_TOKEN, DEFAULT_SPACE_ID
 "
@@ -1108,55 +1087,15 @@ Env vars are set: TODOLIST_API_URL, TODOLIST_AUTH_TOKEN, DEFAULT_SPACE_ID
 
 **Session-to-subagent tracking:**
 
-Agent assignments are now tracked directly on the todo items themselves via the `agent_id` field. When a session is claimed, the agent_id is automatically synced to the linked todo. This provides a more reliable and queryable mapping than a separate JSON file.
-
-The todo's `agent_id` field stores which agent is currently handling the task:
-- When `claim_session` is called, the agent_id is synced to the linked todo
-- When `release_session` is called, the agent_id is cleared from the todo
-- Use `list-todos` to see which agent is assigned to each task
-- Use `list-todos-by-agent --agent-id <agent>` to find all tasks for a specific agent
-
-```bash
-# Check agent assignments
-node cli/todolist-cli.js list-todos
-# Output: [ ] Task name [Agent: oc-agent-123] (ID: ...)
-
-# Find all tasks for a specific agent
-node cli/todolist-cli.js list-todos-by-agent --agent-id oc-agent-123
-
-# Manually assign an agent to a todo
-node cli/todolist-cli.js claim-todo <todo_id> --agent-id <agent_id>
-
-# Manually release agent from a todo
-node cli/todolist-cli.js release-todo <todo_id>
-```
-
-This approach provides:
-- **Persistent storage**: Agent assignments survive restarts via MongoDB
-- **Queryable state**: Easy to find all tasks assigned to a specific agent
-- **Automatic sync**: Claiming/releasing sessions automatically updates the linked todo
-- **No external file**: Eliminates the need for `.openclaw/session-agents.json`
+The orchestrator tracks which sessions have active workers using an in-memory map keyed by `session_id`. This prevents duplicate dispatches when polling returns the same pending session.
 
 **Fallback: `codex exec` (if `sessions_spawn` unavailable):**
 
 ```bash
-# Claim and dispatch directly
-node cli/todolist-cli.js claim-session <session_id> --agent-id oc-main
 codex exec --full-auto "Read session <session_id>, do the work, post response via CLI"
 ```
 
 Note: `codex exec` bypasses OpenClaw's lifecycle tracking — use `sessions_spawn` when available.
-
-**Pre-existing auto-claim scripts** (standalone alternative):
-
-The repo includes `scripts/auto-claim-sessions.js` — a standalone polling worker that classifies sessions (`scripts/session-classifier.js`) and spawns `codex exec` for coding tasks (`scripts/subagent-spawner.js`). Run it independently if you don't want OpenClaw orchestration:
-
-```bash
-export TODOLIST_API_URL="https://backend-openclaw.up.railway.app"
-export TODOLIST_AUTH_TOKEN="your-token"
-export DEFAULT_SPACE_ID="your-space-id"
-node scripts/auto-claim-sessions.js
-```
 
 **Environment setup for OpenClaw:**
 
