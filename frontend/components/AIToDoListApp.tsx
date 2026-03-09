@@ -426,11 +426,9 @@ export default function AIToDoListApp({
             title: todo.text,
             todo_id: todo._id,
             initial_message: [
-              `Task: ${todo.text}`,
-              todo.category ? `Category: ${todo.category}` : null,
-              todo.priority ? `Priority: ${todo.priority}` : null,
-              todo.due_date ? `Due: ${todo.due_date}` : null,
+              `I want to work on this task: "${todo.text}"`,
               todo.notes ? `Notes: ${todo.notes}` : null,
+              `Help me get started.`,
             ].filter(Boolean).join('\n'),
             initial_role: 'user',
           }),

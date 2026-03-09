@@ -388,6 +388,7 @@ async def stream_agent_response(
         input_messages: list[dict[str, Any]] = []
         display_messages: list[dict[str, Any]] = []
     else:
+        assert session_id is not None
         # Try in-memory cache first, then DB
         cached = _cache_get(session_id)
         if cached:
@@ -427,11 +428,18 @@ async def stream_agent_response(
                         if task_due:
                             todo_context += f"\n- Due: {task_due}"
                         todo_context += (
-                            "\nHelp the user with this task."
-                            " You can update it, break it down, or answer questions about it."
+                            "\n\nThis task ALREADY EXISTS — do NOT"
+                            " create a duplicate."
+                            " The user is chatting about this specific"
+                            " task and wants help working on it."
+                            " You can: answer questions, give advice,"
+                            " break it into subtasks, or update this"
+                            f" task (use update_task with ID {todo_id})."
                         )
                 except Exception as e:
                     logger.error(f"Failed to fetch todo context: {e}")
+
+    assert session_id is not None  # guaranteed after create or resume
 
     tool_names = list(OPENAI_TOOL_SCHEMAS.keys()) + list(mcp_tools.keys())
     ready_data = {"ok": True, "tools": tool_names, "space_id": space_id, "session_id": session_id}
