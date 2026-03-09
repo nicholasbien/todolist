@@ -49,9 +49,11 @@ Tell your agent: *"Watch my todolist for new tasks"*
 
 This creates a cron job that checks every 5 minutes for pending chat sessions on your tasks. The flow:
 
-1. **You** create a task in the app → tap it → write what you want done
-2. **OpenClaw** picks it up via cron, reads the conversation + linked task, does the work, replies
+1. **You** create a task with `#openclaw` in the text → tap it → write what you want done
+2. **OpenClaw** picks it up via cron, sees the `#openclaw` tag, does the work, replies
 3. **You** get a notification with the result
+
+Tasks **without** `#openclaw` are left for the app's built-in AI agent — no conflicts or double replies.
 
 Each cron cycle runs in an **isolated session** — no context pollution in your main chat.
 

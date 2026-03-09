@@ -203,13 +203,16 @@ curl -s -X DELETE -H "Authorization: Bearer $TODOLIST_AUTH_TOKEN" \
 
 ### Responding to Pending Sessions (Agent Loop)
 
+**Important:** The TodoList app has its own built-in AI agent. To avoid conflicts (double replies, wasted work), OpenClaw only handles tasks that contain **#openclaw** in the task text. The built-in agent handles everything else.
+
 Use this workflow to act as an autonomous agent responding to user messages on tasks:
 
 1. **Poll** for pending sessions
 2. **For each pending session**, read the conversation via get session
 3. **If `todo_id` is present**, fetch the linked todo to understand context
-4. **Do the work** — update the todo, add new tasks, write a journal entry, etc.
-5. **Reply** to the session summarizing what you did
+4. **Check the todo text for `#openclaw`** — if the tag is NOT present, **skip this session entirely** (the built-in agent will handle it)
+5. **Do the work** — update the todo, add new tasks, write a journal entry, etc.
+6. **Reply** to the session summarizing what you did
 
 ### Creating a Session for a New Task
 
@@ -240,7 +243,7 @@ openclaw cron add \
   --name "todolist-watcher" \
   --every "5m" \
   --session isolated \
-  --message "Check for pending TodoList sessions and respond to them. Use the todolist skill. Follow the 'Responding to Pending Sessions' workflow: poll pending sessions, read each conversation + linked todo, do the work, then reply. If there are no pending sessions, do nothing."
+  --message "Check for pending TodoList sessions and respond to them. Use the todolist skill. Follow the 'Responding to Pending Sessions' workflow: poll pending sessions, read each conversation + linked todo, check if the todo text contains #openclaw — only respond to those, skip all others. Do the work, then reply. If there are no pending sessions or none have #openclaw, do nothing."
 ```
 
 This creates an isolated session every 5 minutes that checks for work. Adjust the interval based on user preference.
@@ -255,8 +258,10 @@ openclaw cron remove todolist-watcher
 
 1. OpenClaw spawns an isolated session with the todolist skill loaded
 2. It polls `GET /agent/sessions/pending` for sessions needing a response
-3. For each pending session, it reads the conversation, checks the linked todo, does the requested work (web search, add tasks, update tasks, etc.), and replies
-4. The isolated session closes — no context pollution in the main chat
+3. For each pending session, it reads the conversation and checks the linked todo
+4. **If the todo text contains `#openclaw`**, it does the work and replies
+5. **If not**, it skips the session — the built-in agent will handle it
+6. The isolated session closes — no context pollution in the main chat
 
 ### Important
 

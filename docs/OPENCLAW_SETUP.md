@@ -80,6 +80,8 @@ Talk to your agent naturally:
 
 This is the powerful part — OpenClaw watches for tasks you assign in the app and executes them automatically.
 
+**Important:** To avoid conflicts with the app's built-in AI agent, OpenClaw **only** handles tasks that contain `#openclaw` in the task text. All other tasks are left for the built-in agent.
+
 #### Enable it
 
 Tell your agent:
@@ -93,7 +95,7 @@ openclaw cron add \
   --name "todolist-watcher" \
   --every "5m" \
   --session isolated \
-  --message "Check for pending TodoList sessions and respond to them. Use the todolist skill. Follow the 'Responding to Pending Sessions' workflow: poll pending sessions, read each conversation + linked todo, do the work, then reply. If there are no pending sessions, do nothing."
+  --message "Check for pending TodoList sessions and respond to them. Use the todolist skill. Follow the 'Responding to Pending Sessions' workflow: poll pending sessions, read each conversation + linked todo, check if the todo text contains #openclaw — only respond to those, skip all others. Do the work, then reply. If there are no pending sessions or none have #openclaw, do nothing."
 ```
 
 #### How it works
@@ -102,7 +104,8 @@ openclaw cron add \
 ┌─────────────────────────────────────────────────────┐
 │                  TodoList App                        │
 │                                                      │
-│  1. You create a task: "Research React frameworks"   │
+│  1. You create a task: "Research React               │
+│     frameworks #openclaw"                            │
 │  2. You tap the task → opens a chat session          │
 │  3. You write: "Compare Next.js, Remix, and Astro"  │
 │                                                      │
@@ -110,10 +113,12 @@ openclaw cron add \
 │                                                      │
 │  4. OpenClaw cron fires (every 5 min)                │
 │  5. Sees pending session + linked todo               │
-│  6. Does the research                                │
-│  7. Replies with results                             │
+│  6. Checks todo text → has #openclaw → proceeds      │
+│     (no #openclaw → skips, built-in agent handles)   │
+│  7. Does the research                                │
+│  8. Replies with results                             │
 │                                                      │
-│  8. You see a notification with the reply            │
+│  9. You see a notification with the reply            │
 └─────────────────────────────────────────────────────┘
 ```
 
