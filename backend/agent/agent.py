@@ -9,7 +9,6 @@ from collections import OrderedDict
 from typing import Any, AsyncGenerator, Dict, List, Optional
 
 import jinja2
-
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
@@ -183,8 +182,6 @@ async def get_current_user(authorization: str = Header(None), token_param: Optio
     user_info = await verify_session(token)
     user_info["token"] = token  # Add token to user info for logout
     return user_info
-
-
 
 
 def estimate_token_count(messages: List[Dict[str, Any]], tools: Optional[List[Dict[str, Any]]] = None) -> int:
@@ -738,10 +735,11 @@ async def list_chat_sessions(
 @router.get("/sessions/pending")
 async def get_pending_sessions_route(
     space_id: Optional[str] = Query(None),
+    agent_id: Optional[str] = Query(None, description="Filter by agent_id; omit for unclaimed only"),
     current_user: dict = Depends(get_current_user),
 ):
     """Get sessions awaiting agent response."""
-    return await get_pending_sessions(current_user["user_id"], space_id)
+    return await get_pending_sessions(current_user["user_id"], space_id, agent_id)
 
 
 @router.get("/sessions/unread-todos")

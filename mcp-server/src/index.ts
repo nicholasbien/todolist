@@ -216,24 +216,26 @@ class TodolistMCPServer {
           },
           {
             name: 'get_pending_sessions',
-            description: 'Get sessions that are waiting for an agent response',
+            description: 'Get sessions that are waiting for an agent response. Use agent_id to include sessions claimed by that agent alongside unclaimed ones.',
             inputSchema: {
               type: 'object',
               properties: {
                 space_id: { type: 'string', description: 'Space ID (auto-detected if not provided)' },
+                agent_id: { type: 'string', description: 'Agent ID to filter by. Returns claimed + unclaimed sessions. Omit for unclaimed only.' },
               },
               required: [],
             },
           },
           {
             name: 'post_to_session',
-            description: 'Post a message to a session',
+            description: 'Post a message to a session. Use agent_id to claim the session for future routing.',
             inputSchema: {
               type: 'object',
               properties: {
                 session_id: { type: 'string', description: 'Session ID' },
                 content: { type: 'string', description: 'Message content' },
                 role: { type: 'string', enum: ['user', 'assistant'], description: 'Message role (default: assistant)' },
+                agent_id: { type: 'string', description: 'Agent ID to claim this session (optional). Followups will route back to this agent.' },
               },
               required: ['session_id', 'content'],
             },
@@ -463,24 +465,27 @@ class TodolistMCPServer {
     return this.jsonResult(response.data);
   }
 
-  private async getPendingSessions(args: { space_id?: string }) {
+  private async getPendingSessions(args: { space_id?: string; agent_id?: string }) {
     const spaceId = await this.resolveSpaceId(args.space_id);
     const params: any = {};
     if (spaceId) params.space_id = spaceId;
+    if (args.agent_id) params.agent_id = args.agent_id;
     const response = await api.get('/agent/sessions/pending', { params });
     const sessions = response.data;
     if (sessions.length === 0) return this.textResult('No pending sessions');
     const lines = sessions.map((s: any) => {
       const todoInfo = s.todo_id ? ` (todo: ${s.todo_id})` : '';
-      return `- "${s.title}" (ID: ${s._id})${todoInfo}`;
+      const agentInfo = s.agent_id ? ` [agent: ${s.agent_id}]` : '';
+      return `- "${s.title}" (ID: ${s._id})${todoInfo}${agentInfo}`;
     });
     return this.textResult(`Pending sessions:\n${lines.join('\n')}`);
   }
 
-  private async postToSession(args: { session_id: string; content: string; role?: string }) {
+  private async postToSession(args: { session_id: string; content: string; role?: string; agent_id?: string }) {
     await api.post(`/agent/sessions/${args.session_id}/messages`, {
       role: args.role || 'assistant',
       content: args.content,
+      ...(args.agent_id && { agent_id: args.agent_id }),
     });
     return this.textResult(`Posted ${args.role || 'assistant'} message to session ${args.session_id}`);
   }

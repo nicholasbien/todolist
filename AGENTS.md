@@ -50,8 +50,8 @@ echo $RESPONSE | grep -o '"token":"[^"]*' | cut -d'"' -f4
 | `list_sessions` | List chat sessions |
 | `create_session` | Create a messaging session (optionally linked to a todo) |
 | `get_session` | Get session with messages |
-| `get_pending_sessions` | Get sessions awaiting agent response |
-| `post_to_session` | Post a message to a session |
+| `get_pending_sessions` | Get sessions awaiting agent response (supports `agent_id` filtering) |
+| `post_to_session` | Post a message to a session (supports `agent_id` to claim routing) |
 | `delete_session` | Delete a session |
 | `get_journal` | Get journal entry by date |
 | `write_journal` | Write/update a journal entry |
@@ -67,6 +67,15 @@ For agents that process user messages:
 2. `get_session` — read the conversation history
 3. Do work (add/update todos, write journals, etc.)
 4. `post_to_session` — reply with results
+
+### Multi-Agent Routing
+
+Sessions support `agent_id` for routing followups to the correct agent:
+- **Claiming:** Pass `agent_id` when calling `post_to_session` to stamp the session
+- **Filtering:** Pass `agent_id` to `get_pending_sessions` to see your claimed sessions + unclaimed ones
+- **Default:** Omitting `agent_id` from `get_pending_sessions` returns only unclaimed sessions
+
+This prevents agents from stealing each other's followup conversations.
 
 ### Rebuilding the MCP Server
 
