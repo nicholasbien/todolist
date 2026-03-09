@@ -29,6 +29,7 @@ async def create_session(
     space_id: Optional[str],
     title: str,
     todo_id: Optional[str] = None,
+    agent_id: Optional[str] = None,
 ) -> str:
     """Create a new chat session and return its string ID."""
     now = datetime.utcnow()
@@ -43,6 +44,8 @@ async def create_session(
         doc["todo_id"] = todo_id
         doc["needs_agent_response"] = False
         doc["has_unread_reply"] = False
+    if agent_id:
+        doc["agent_id"] = agent_id
 
     result = await sessions_collection.insert_one(doc)
     session_id = str(result.inserted_id)

@@ -383,11 +383,14 @@ async def api_create_todo(request: Request, current_user: dict = Depends(get_cur
 
                 # Post as assistant if agent-created, user if user-created
                 role = "assistant" if body.get("creator_type") == "agent" else "user"
+                # Auto-route #openclaw tasks to the openclaw agent
+                auto_agent_id = "openclaw" if "#openclaw" in todo_dict["text"].lower() else None
                 session_id = await create_chat_session(
                     current_user["user_id"],
                     body.get("space_id"),
                     todo_dict["text"],
                     todo_id=todo_id,
+                    agent_id=auto_agent_id,
                 )
                 await append_message(session_id, current_user["user_id"], role, initial_msg)
             except Exception as e:
@@ -901,6 +904,7 @@ class CreateSessionRequest(BaseModel):
     todo_id: Optional[str] = None
     initial_message: Optional[str] = None
     initial_role: str = "user"
+    agent_id: Optional[str] = None
 
 
 class PostMessageRequest(BaseModel):
@@ -921,7 +925,7 @@ async def api_create_agent_session(req: CreateSessionRequest, current_user: dict
             return existing
 
     title = req.title or req.initial_message or "New session"
-    session_id = await create_chat_session(user_id, req.space_id, title, todo_id=req.todo_id)
+    session_id = await create_chat_session(user_id, req.space_id, title, todo_id=req.todo_id, agent_id=req.agent_id)
 
     # Post initial message if provided
     if req.initial_message:

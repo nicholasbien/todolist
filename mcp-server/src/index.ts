@@ -199,6 +199,7 @@ class TodolistMCPServer {
                 todo_id: { type: 'string', description: 'Link session to a todo (optional)' },
                 initial_message: { type: 'string', description: 'Initial message to post (optional)' },
                 initial_role: { type: 'string', enum: ['user', 'assistant'], description: 'Role of initial message (default: user)' },
+                agent_id: { type: 'string', description: 'Agent ID to claim this session at creation (optional)' },
               },
               required: ['title'],
             },
@@ -447,7 +448,7 @@ class TodolistMCPServer {
     return this.textResult(lines.join('\n'));
   }
 
-  private async createSession(args: { title: string; space_id?: string; todo_id?: string; initial_message?: string; initial_role?: string }) {
+  private async createSession(args: { title: string; space_id?: string; todo_id?: string; initial_message?: string; initial_role?: string; agent_id?: string }) {
     const spaceId = await this.resolveSpaceId(args.space_id);
     const response = await api.post('/agent/sessions', {
       title: args.title,
@@ -455,6 +456,7 @@ class TodolistMCPServer {
       todo_id: args.todo_id,
       initial_message: args.initial_message,
       initial_role: args.initial_role || 'user',
+      ...(args.agent_id && { agent_id: args.agent_id }),
     });
     const session = response.data;
     return this.textResult(`Created session: "${args.title}" (ID: ${session._id})`);
