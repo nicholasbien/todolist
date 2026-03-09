@@ -28,7 +28,7 @@ export default function AgentChatbot({
   onSessionLoaded,
 }: ChatbotProps) {
   const [question, setQuestion] = useState('');
-  const [messages, setMessages] = useState<{ role: string; content: string; toolData?: any }[]>([]);
+  const [messages, setMessages] = useState<{ role: string; content: string; toolData?: any; agent_id?: string }[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [thinkingDots, setThinkingDots] = useState(0);
@@ -636,9 +636,13 @@ export default function AgentChatbot({
                 ? 'bg-blue-900/30 text-blue-200 border border-blue-700/50 rounded-lg'
                 : 'text-gray-100'
             }`}>
-              <div className="text-sm mb-1 opacity-75 flex justify-between items-center">
-                <span>{msg.role === 'system' ? 'Tool' : ''}</span>
-              </div>
+              {(msg.role === 'system' || msg.agent_id) && (
+                <div className="text-xs mb-1 opacity-75 flex justify-between items-center">
+                  <span className={msg.agent_id ? 'text-purple-400 font-medium' : ''}>
+                    {msg.role === 'system' ? 'Tool' : msg.agent_id ? msg.agent_id : ''}
+                  </span>
+                </div>
+              )}
               {msg.role === 'assistant' ? (
                 <MessageRenderer content={msg.content} className="text-base" />
               ) : (
