@@ -29,6 +29,7 @@ async def create_session(
     space_id: Optional[str],
     title: str,
     todo_id: Optional[str] = None,
+    agent_id: Optional[str] = None,
 ) -> str:
     """Create a new chat session and return its string ID."""
     now = datetime.utcnow()
@@ -43,6 +44,8 @@ async def create_session(
         doc["todo_id"] = todo_id
         doc["needs_agent_response"] = False
         doc["has_unread_reply"] = False
+    if agent_id:
+        doc["agent_id"] = agent_id
 
     result = await sessions_collection.insert_one(doc)
     session_id = str(result.inserted_id)
@@ -135,11 +138,15 @@ async def find_session_by_todo(user_id: str, todo_id: str) -> Optional[Dict[str,
     return doc
 
 
-async def append_message(session_id: str, user_id: str, role: str, content: str) -> Dict[str, Any]:
+async def append_message(
+    session_id: str, user_id: str, role: str, content: str, agent_id: Optional[str] = None
+) -> Dict[str, Any]:
     """Append a message to a session's display_messages and update flags.
 
     When a user posts: sets needs_agent_response=True.
     When an assistant posts: sets needs_agent_response=False, has_unread_reply=True.
+    If agent_id is provided on an assistant message, stamps the session so
+    future followups route back to that agent.
     """
     now = datetime.utcnow()
     message = {"role": role, "content": content, "timestamp": now.isoformat()}
@@ -160,6 +167,8 @@ async def append_message(session_id: str, user_id: str, role: str, content: str)
     elif role == "assistant":
         update["needs_agent_response"] = False
         update["has_unread_reply"] = True
+        if agent_id:
+            update["agent_id"] = agent_id
 
     await sessions_collection.update_one(
         {"_id": ObjectId(session_id)},
@@ -169,10 +178,17 @@ async def append_message(session_id: str, user_id: str, role: str, content: str)
     return message
 
 
-async def get_pending_sessions(user_id: str, space_id: Optional[str] = None) -> List[Dict[str, Any]]:
+async def get_pending_sessions(
+    user_id: str, space_id: Optional[str] = None, agent_id: Optional[str] = None
+) -> List[Dict[str, Any]]:
     """Get sessions that need an agent response.
 
     Filters out stale sessions and caps active session count.
+
+    agent_id routing:
+      - None  → only unclaimed sessions (no agent_id field on session)
+      - "X"   → sessions claimed by "X" **plus** unclaimed sessions
+                 (so an agent can discover new work and see its own followups)
     """
     cutoff = datetime.utcnow() - timedelta(days=SESSION_STALE_DAYS)
     query: Dict[str, Any] = {
@@ -182,6 +198,16 @@ async def get_pending_sessions(user_id: str, space_id: Optional[str] = None) -> 
     }
     if space_id is not None:
         query["space_id"] = space_id
+
+    if agent_id is not None:
+        # Return sessions claimed by this agent OR unclaimed sessions
+        query["$or"] = [
+            {"agent_id": agent_id},
+            {"agent_id": {"$exists": False}},
+        ]
+    else:
+        # Default: only unclaimed sessions
+        query["agent_id"] = {"$exists": False}
 
     cursor = sessions_collection.find(query).sort("updated_at", -1).limit(MAX_ACTIVE_SESSIONS)
     items = await cursor.to_list(length=MAX_ACTIVE_SESSIONS)

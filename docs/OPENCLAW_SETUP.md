@@ -80,7 +80,7 @@ Talk to your agent naturally:
 
 This is the powerful part — OpenClaw watches for tasks you assign in the app and executes them automatically.
 
-**Important:** To avoid conflicts with the app's built-in AI agent, OpenClaw **only** handles tasks that contain `#openclaw` in the task text. All other tasks are left for the built-in agent.
+**Important:** To avoid conflicts with the app's built-in AI agent, OpenClaw **only** handles tasks that contain `#openclaw` in the task text. All other tasks are left for the built-in agent. When OpenClaw replies, it claims the session with `agent_id=openclaw` so that followup messages route back to OpenClaw instead of the built-in agent.
 
 #### Enable it
 
@@ -95,7 +95,7 @@ openclaw cron add \
   --name "todolist-watcher" \
   --every "5m" \
   --session isolated \
-  --message "Check for pending TodoList sessions and respond to them. Use the todolist skill. Follow the 'Responding to Pending Sessions' workflow: poll pending sessions, read each conversation + linked todo, check if the todo text contains #openclaw — only respond to those, skip all others. Do the work, then reply. If there are no pending sessions or none have #openclaw, do nothing."
+  --message "Check for pending TodoList sessions and respond to them. Use the todolist skill. Follow the 'Responding to Pending Sessions' workflow: poll pending sessions with agent_id=openclaw, handle claimed followups directly, check unclaimed sessions for #openclaw in the todo text — only respond to those, skip all others. Always reply with agent_id=openclaw to claim sessions. If there are no pending sessions, do nothing."
 ```
 
 #### How it works
@@ -112,11 +112,12 @@ openclaw cron add \
 │  ─── pending session created ───                     │
 │                                                      │
 │  4. OpenClaw cron fires (every 5 min)                │
-│  5. Sees pending session + linked todo               │
+│  5. Polls pending?agent_id=openclaw                  │
 │  6. Checks todo text → has #openclaw → proceeds      │
 │     (no #openclaw → skips, built-in agent handles)   │
 │  7. Does the research                                │
-│  8. Replies with results                             │
+│  8. Replies with agent_id=openclaw (claims session)  │
+│  9. Followups route back to OpenClaw automatically   │
 │                                                      │
 │  9. You see a notification with the reply            │
 └─────────────────────────────────────────────────────┘
@@ -172,10 +173,10 @@ TodoList App (app.todolist.nyc)
          ▼
 OpenClaw Agent
     ├── Manual: responds to your chat messages
-    └── Cron: polls /agent/sessions/pending every N minutes
+    └── Cron: polls /agent/sessions/pending?agent_id=openclaw
 ```
 
-The key concept is **task-linked sessions**: every todo can have a chat thread attached. When you write a message on a task, it sets `needs_agent_response: true`. The agent picks it up (via cron or manual check), reads the conversation + task context, does the work, and replies. Posting a reply clears the pending flag.
+The key concept is **task-linked sessions**: every todo can have a chat thread attached. When you write a message on a task, it sets `needs_agent_response: true`. The agent picks it up (via cron or manual check), reads the conversation + task context, does the work, and replies with `agent_id=openclaw`. Posting a reply clears the pending flag and claims the session, so followup messages route back to OpenClaw.
 
 ## Troubleshooting
 
