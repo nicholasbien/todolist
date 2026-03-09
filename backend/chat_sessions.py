@@ -44,6 +44,7 @@ async def create_session(
         doc["todo_id"] = todo_id
         doc["needs_agent_response"] = False
         doc["has_unread_reply"] = False
+        doc["last_user_message_at"] = now
     if agent_id:
         doc["agent_id"] = agent_id
 
@@ -167,9 +168,11 @@ async def append_message(
     update: Dict[str, Any] = {"updated_at": now}
     if role == "user":
         update["needs_agent_response"] = True
+        update["last_user_message_at"] = now
     elif role == "assistant":
         update["needs_agent_response"] = False
         update["has_unread_reply"] = True
+        update["last_agent_message_at"] = now
         if agent_id:
             update["agent_id"] = agent_id
 
@@ -214,8 +217,32 @@ async def get_pending_sessions(
 
     cursor = sessions_collection.find(query).sort("updated_at", -1).limit(MAX_ACTIVE_SESSIONS)
     items = await cursor.to_list(length=MAX_ACTIVE_SESSIONS)
+
+    # Enrich each session with message count and last user message preview
     for item in items:
         item["_id"] = str(item["_id"])
+        session_id = item["_id"]
+        # Determine if this is a follow-up: the agent responded before, but the
+        # session needs a response again (user sent another message after the agent)
+        item["is_followup"] = bool(item.get("last_agent_message_at"))
+
+        # Fetch message count and last user message from trajectory
+        traj = await trajectories_collection.find_one(
+            {"session_id": session_id},
+            {"display_messages": 1},
+        )
+        if traj and traj.get("display_messages"):
+            msgs = traj["display_messages"]
+            item["message_count"] = len(msgs)
+            # Find the last user message for preview
+            for msg in reversed(msgs):
+                if msg.get("role") == "user":
+                    content = msg.get("content", "")
+                    item["last_user_message"] = content[:200] if len(content) > 200 else content
+                    break
+        else:
+            item["message_count"] = 0
+
     return items
 
 

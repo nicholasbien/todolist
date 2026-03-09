@@ -478,7 +478,10 @@ class TodolistMCPServer {
     const lines = sessions.map((s: any) => {
       const todoInfo = s.todo_id ? ` (todo: ${s.todo_id})` : '';
       const agentInfo = s.agent_id ? ` [agent: ${s.agent_id}]` : '';
-      return `- "${s.title}" (ID: ${s._id})${todoInfo}${agentInfo}`;
+      const followup = s.is_followup ? ' **FOLLOW-UP**' : '';
+      const msgCount = s.message_count !== undefined ? ` [${s.message_count} msgs]` : '';
+      const preview = s.last_user_message ? `\n  Last message: "${s.last_user_message}"` : '';
+      return `- "${s.title}" (ID: ${s._id})${todoInfo}${agentInfo}${followup}${msgCount}${preview}`;
     });
     return this.textResult(`Pending sessions:\n${lines.join('\n')}`);
   }
