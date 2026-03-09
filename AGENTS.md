@@ -126,12 +126,11 @@ A Claude Code skill and subagent are available in `.claude/skills/todolist/` for
 
 ### Quick Start
 
-**Option 1: In-session (interactive)**
+**Option 1: Start polling (recommended)**
 ```
-/todolist start          # Start polling loop
-/todolist once           # Run one cycle
+/todolist                # Check now + schedule /loop 5m /todolist check
+/todolist check          # Run one check cycle
 /todolist status         # Check assignments
-/todolist stop           # Stop polling
 ```
 
 **Option 2: Background daemon (headless)**
@@ -140,18 +139,13 @@ A Claude Code skill and subagent are available in `.claude/skills/todolist/` for
 .claude/skills/todolist/scripts/stop-daemon.sh      # Stop
 ```
 
-**Option 3: Claude Code `/loop` command**
-```
-/loop 5m Check for pending #claude tasks using the todolist skill. Poll, triage, dispatch subagents, report results.
-```
-
 ### Agent Routing
 
 The app supports multi-agent routing via `agent_id` on sessions:
 
 | Tag | Agent ID | Handler |
 |-----|----------|---------|
-| `#claude` | `claude` | Claude Code todolist skill |
+| `#claude` | `claude` | Claude Code `/todolist` skill |
 | `#openclaw` | `openclaw` | OpenClaw agent |
 | (none) | (none) | Built-in AI agent |
 
@@ -163,7 +157,7 @@ Agents only see their own claimed sessions + unclaimed ones when polling. This p
 |------|---------|
 | `.claude/skills/todolist/SKILL.md` | Skill definition (slash command) |
 | `.claude/agents/todolist.md` | Subagent definition |
-| `.claude/skills/todolist/scripts/poll-once.sh` | Single poll cycle script |
+| `.claude/skills/todolist/scripts/check.sh` | Single check cycle script |
 | `.claude/skills/todolist/scripts/start-daemon.sh` | Background daemon |
 | `.claude/skills/todolist/scripts/stop-daemon.sh` | Stop daemon |
 

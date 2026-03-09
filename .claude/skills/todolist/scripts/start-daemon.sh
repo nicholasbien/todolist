@@ -41,7 +41,7 @@ run_loop() {
   while true; do
     echo ""
     echo "[$(date)] === Poll cycle starting ==="
-    CLAUDE_HEADLESS=1 "$SCRIPT_DIR/poll-once.sh" 2>&1 || echo "[$(date)] Poll cycle failed (exit $?)"
+    CLAUDE_HEADLESS=1 "$SCRIPT_DIR/check.sh" 2>&1 || echo "[$(date)] Poll cycle failed (exit $?)"
     echo "[$(date)] === Poll cycle complete. Sleeping ${INTERVAL}s ==="
     sleep "$INTERVAL"
   done

@@ -1,14 +1,14 @@
 ---
 name: todolist
 description: >
-  Autonomous task management daemon for the TodoList app. Polls for unclaimed
-  #claude tasks every 5 minutes, picks them up with subagents, tracks which
-  subagent is working on each task, and routes follow-ups to the right subagent.
-  Use when the user says "watch for tasks", "start the task manager",
-  "manage my #claude tasks", or "run the agent loop".
+  Autonomous task management agent for the TodoList app. Polls for unclaimed
+  #claude tasks, picks them up with subagents, tracks which subagent is working
+  on each task, and routes follow-ups to the right subagent. Uses /loop for
+  recurring polling. Use when the user says "watch for tasks", "start the task
+  manager", "manage my #claude tasks", or "run the agent loop".
 disable-model-invocation: true
 user-invocable: true
-argument-hint: "[start|stop|status|once]"
+argument-hint: "[check|status]"
 allowed-tools:
   - Bash
   - Read
@@ -23,14 +23,15 @@ allowed-tools:
 
 You are an autonomous task management agent for the TodoList app. You poll for
 unclaimed `#claude` tasks, dispatch subagents to handle them, track assignments,
-and route follow-up messages to the correct subagent.
+and route follow-up messages to the correct subagent. Recurring polling is
+handled via `/loop`, not a background daemon.
 
 ## Architecture
 
 ```
 ┌─────────────────────────────────────────────────────┐
 │                  Task Manager (you)                  │
-│  - Polls pending sessions every 5 minutes            │
+│  - Polls pending sessions via /loop                  │
 │  - Dispatches subagents per task                     │
 │  - Tracks task→subagent mapping                      │
 │  - Routes follow-ups to the right subagent           │
@@ -48,11 +49,9 @@ and route follow-up messages to the correct subagent.
 
 The user invokes this skill with `/todolist [command]`:
 
-- **`/todolist start`** — Start the polling loop (every 5 minutes, max 3 days)
-- **`/todolist stop`** — Stop the polling loop
+- **`/todolist check`** — Run one poll cycle immediately (check for tasks, dispatch subagents, report results)
 - **`/todolist status`** — Show active task→subagent assignments
-- **`/todolist once`** — Run one poll cycle immediately (no loop)
-- **`/todolist`** (no args) — Same as `start`
+- **`/todolist`** (no args) — Run one check cycle, then schedule `/loop 5m /todolist check` for recurring polling
 
 ## MCP Tools Available
 
@@ -155,47 +154,21 @@ Session ID → { todo_id, task_text, subagent_id, status, started_at }
 Log each assignment to the console so the user can see what's being worked on.
 When a subagent completes, update the status to "completed".
 
-### Step 5: Loop
-
-After processing all pending sessions:
-- If running in loop mode (`start`), wait 5 minutes then go back to Step 1
-- If running once (`once`), stop after one cycle
-- Use `/loop 5m` to implement the recurring check
-
 ## Implementation
 
-### Starting the Loop
-
-When the user runs `/todolist start` or `/todolist`:
-
-1. Print a status message: "Task manager started. Polling every 5 minutes for #claude tasks."
-2. Run the first poll cycle immediately
-3. Use the built-in `/loop 5m` mechanism OR implement a manual loop:
-
-```bash
-# The loop runs as a continuous process
-while true; do
-  # Poll and dispatch (done in Claude's agentic loop, not bash)
-  sleep 300  # 5 minutes
-done
-```
-
-**Preferred approach**: Use Claude Code's `/loop` skill:
-- After the first poll cycle, tell the user to run:
-  `/loop 5m Check for pending #claude tasks and dispatch subagents. Use the todolist skill.`
-
-### Running a Single Cycle
-
-When the user runs `/todolist once`:
+### Running a Check (`/todolist check`)
 
 1. Call `mcp__todolist__get_pending_sessions` with `agent_id="claude"`
 2. For each pending session, triage and dispatch as described above
 3. Report results: "Found N pending tasks. Dispatched M subagents."
-4. Stop (no loop)
 
-### Status Check
+### Default (`/todolist` with no args)
 
-When the user runs `/todolist status`:
+1. Run one check cycle immediately (same as `/todolist check`)
+2. Schedule recurring polling via `/loop 5m /todolist check`
+3. Report: "Polling scheduled every 5 minutes. Auto-expires after 3 days."
+
+### Status Check (`/todolist status`)
 
 1. List all active/recent assignments
 2. Show which subagents are working on which tasks
@@ -227,11 +200,10 @@ The TodoList backend supports multi-agent routing via `agent_id`:
 ## Example Session
 
 ```
-User: /todolist start
+User: /todolist
 
-Claude: Task manager started. Polling every 5 minutes for #claude tasks.
+Claude: Checking for #claude tasks...
 
-[Polling cycle 1]
 Found 2 pending sessions:
   - Session abc123: "Fix login bug #claude" (unclaimed, #claude tag found)
   - Session def456: "Buy groceries" (unclaimed, no #claude tag — skipping)
@@ -239,7 +211,9 @@ Found 2 pending sessions:
 Dispatching subagent for "Fix login bug #claude"...
   → Subagent spawned (background), tracking session abc123
 
-[5 minutes later — Polling cycle 2]
+Polling scheduled every 5 minutes via /loop. Auto-expires after 3 days.
+
+[5 minutes later — /todolist check fires]
 Found 1 pending session:
   - Session abc123: Follow-up from user "Can you also add tests?"
     → Routing to existing subagent for session abc123
