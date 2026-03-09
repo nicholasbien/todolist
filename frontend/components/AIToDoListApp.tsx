@@ -1618,7 +1618,7 @@ export default function AIToDoListApp({
             onChange={(e) => {
               setNewTodo(e.target.value);
               e.target.style.height = 'auto';
-              e.target.style.height = e.target.scrollHeight + 'px';
+              e.target.style.height = Math.min(e.target.scrollHeight, 140) + 'px';
             }}
             onFocus={() => setIsNewTodoFocused(true)}
             onBlur={() => setIsNewTodoFocused(false)}
@@ -1635,7 +1635,7 @@ export default function AIToDoListApp({
             disabled={loading}
             aria-label="Add new task"
             rows={1}
-            className="flex-1 p-3 border border-gray-800 rounded-xl bg-black text-gray-100 placeholder-gray-500 focus:border-accent focus:outline-none transition-colors resize-none min-h-[48px] max-h-[200px] overflow-y-auto"
+            className="flex-1 p-3 border border-gray-800 rounded-xl bg-black text-gray-100 placeholder-gray-500 focus:border-accent focus:outline-none transition-colors resize-none min-h-[48px] max-h-[140px] overflow-y-auto"
           />
           <select
             value={newTodoAgent}
@@ -1895,16 +1895,16 @@ export default function AIToDoListApp({
               onChange={(e) => {
                 setEditText(e.target.value);
                 e.target.style.height = 'auto';
-                e.target.style.height = e.target.scrollHeight + 'px';
+                e.target.style.height = Math.min(e.target.scrollHeight, 140) + 'px';
               }}
               ref={(el) => {
                 if (el) {
                   el.style.height = 'auto';
-                  el.style.height = el.scrollHeight + 'px';
+                  el.style.height = Math.min(el.scrollHeight, 140) + 'px';
                 }
               }}
               rows={1}
-              className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 text-base focus:outline-none focus:border-accent resize-none max-h-[200px] overflow-y-auto"
+              className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 text-base focus:outline-none focus:border-accent resize-none max-h-[140px] overflow-y-auto"
             />
             <textarea
               value={editNotes}

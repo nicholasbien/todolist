@@ -737,14 +737,14 @@ export default function AgentChatbot({
       <div className="flex gap-2 flex-shrink-0 items-end mb-4 relative">
         <div className="flex-1 relative">
           <textarea
-            className={`w-full bg-gray-900 border border-gray-700 text-gray-100 rounded-lg p-3 focus:outline-none focus:border-accent resize-none min-h-[48px] max-h-[200px] overflow-y-auto ${
+            className={`w-full bg-gray-900 border border-gray-700 text-gray-100 rounded-lg p-3 focus:outline-none focus:border-accent resize-none min-h-[48px] max-h-[140px] overflow-y-auto ${
               !isOnline ? 'opacity-50 cursor-not-allowed' : ''
             }`}
             value={question}
             onChange={(e) => {
               setQuestion(e.target.value);
               e.target.style.height = 'auto';
-              e.target.style.height = e.target.scrollHeight + 'px';
+              e.target.style.height = Math.min(e.target.scrollHeight, 140) + 'px';
             }}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) {

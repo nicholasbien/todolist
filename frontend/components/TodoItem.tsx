@@ -129,7 +129,7 @@ export default function TodoItem({
     >
       <div className="flex justify-between items-center">
         <div className="flex-1">
-          <p className={`text-base transition-all duration-200 ${
+          <p className={`text-base transition-all duration-200 whitespace-pre-wrap break-words ${
             isDeleting ? "opacity-50" : ""
           }`}>
             {todo.link ? (
