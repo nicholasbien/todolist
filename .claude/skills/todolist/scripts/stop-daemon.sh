@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# stop-daemon.sh — Stop the task manager daemon
+# stop-daemon.sh — Stop the todolist daemon
 
 set -euo pipefail
 
@@ -14,7 +14,7 @@ fi
 PID=$(cat "$PID_FILE")
 
 if kill -0 "$PID" 2>/dev/null; then
-  echo "Stopping task manager daemon (PID $PID)..."
+  echo "Stopping todolist daemon (PID $PID)..."
   kill "$PID"
   rm -f "$PID_FILE"
   echo "Stopped."

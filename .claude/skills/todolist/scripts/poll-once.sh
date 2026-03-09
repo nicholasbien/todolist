@@ -15,7 +15,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(cd "$SCRIPT_DIR/../../../.." && pwd)"
 
-PROMPT='Run a single task-manager poll cycle: call mcp__todolist__get_pending_sessions with agent_id="claude", triage each session (only handle #claude tagged tasks), dispatch subagents for any new tasks, route follow-ups to existing workers, and report results. Skip sessions without #claude in the todo text. Always post replies with agent_id="claude".'
+PROMPT='Run a single todolist poll cycle: call mcp__todolist__get_pending_sessions with agent_id="claude", triage each session (only handle #claude tagged tasks), dispatch subagents for any new tasks, route follow-ups to existing workers, and report results. Skip sessions without #claude in the todo text. Always post replies with agent_id="claude".'
 
 cd "$PROJECT_DIR"
 

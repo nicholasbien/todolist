@@ -113,7 +113,7 @@ See `openclaw-skill/README.md` for full details.
 
 ## Claude Code Agent Integration
 
-A Claude Code skill and subagent are available in `.claude/skills/task-manager/` for autonomous task management using Claude Code.
+A Claude Code skill and subagent are available in `.claude/skills/todolist/` for autonomous task management using Claude Code.
 
 ### How It Works
 
@@ -128,21 +128,21 @@ A Claude Code skill and subagent are available in `.claude/skills/task-manager/`
 
 **Option 1: In-session (interactive)**
 ```
-/task-manager start          # Start polling loop
-/task-manager once           # Run one cycle
-/task-manager status         # Check assignments
-/task-manager stop           # Stop polling
+/todolist start          # Start polling loop
+/todolist once           # Run one cycle
+/todolist status         # Check assignments
+/todolist stop           # Stop polling
 ```
 
 **Option 2: Background daemon (headless)**
 ```bash
-.claude/skills/task-manager/scripts/start-daemon.sh     # Start
-.claude/skills/task-manager/scripts/stop-daemon.sh      # Stop
+.claude/skills/todolist/scripts/start-daemon.sh     # Start
+.claude/skills/todolist/scripts/stop-daemon.sh      # Stop
 ```
 
 **Option 3: Claude Code `/loop` command**
 ```
-/loop 5m Check for pending #claude tasks using the task-manager skill. Poll, triage, dispatch subagents, report results.
+/loop 5m Check for pending #claude tasks using the todolist skill. Poll, triage, dispatch subagents, report results.
 ```
 
 ### Agent Routing
@@ -151,7 +151,7 @@ The app supports multi-agent routing via `agent_id` on sessions:
 
 | Tag | Agent ID | Handler |
 |-----|----------|---------|
-| `#claude` | `claude` | Claude Code task-manager skill |
+| `#claude` | `claude` | Claude Code todolist skill |
 | `#openclaw` | `openclaw` | OpenClaw agent |
 | (none) | (none) | Built-in AI agent |
 
@@ -161,11 +161,11 @@ Agents only see their own claimed sessions + unclaimed ones when polling. This p
 
 | File | Purpose |
 |------|---------|
-| `.claude/skills/task-manager/SKILL.md` | Skill definition (slash command) |
-| `.claude/agents/task-manager.md` | Subagent definition |
-| `.claude/skills/task-manager/scripts/poll-once.sh` | Single poll cycle script |
-| `.claude/skills/task-manager/scripts/start-daemon.sh` | Background daemon |
-| `.claude/skills/task-manager/scripts/stop-daemon.sh` | Stop daemon |
+| `.claude/skills/todolist/SKILL.md` | Skill definition (slash command) |
+| `.claude/agents/todolist.md` | Subagent definition |
+| `.claude/skills/todolist/scripts/poll-once.sh` | Single poll cycle script |
+| `.claude/skills/todolist/scripts/start-daemon.sh` | Background daemon |
+| `.claude/skills/todolist/scripts/stop-daemon.sh` | Stop daemon |
 
 ---
 

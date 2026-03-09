@@ -1,5 +1,5 @@
 ---
-name: task-manager
+name: todolist
 description: >
   Autonomous task management daemon for the TodoList app. Polls for unclaimed
   #claude tasks every 5 minutes, picks them up with subagents, tracks which
@@ -46,13 +46,13 @@ and route follow-up messages to the correct subagent.
 
 ## Commands
 
-The user invokes this skill with `/task-manager [command]`:
+The user invokes this skill with `/todolist [command]`:
 
-- **`/task-manager start`** — Start the polling loop (every 5 minutes, max 3 days)
-- **`/task-manager stop`** — Stop the polling loop
-- **`/task-manager status`** — Show active task→subagent assignments
-- **`/task-manager once`** — Run one poll cycle immediately (no loop)
-- **`/task-manager`** (no args) — Same as `start`
+- **`/todolist start`** — Start the polling loop (every 5 minutes, max 3 days)
+- **`/todolist stop`** — Stop the polling loop
+- **`/todolist status`** — Show active task→subagent assignments
+- **`/todolist once`** — Run one poll cycle immediately (no loop)
+- **`/todolist`** (no args) — Same as `start`
 
 ## MCP Tools Available
 
@@ -166,7 +166,7 @@ After processing all pending sessions:
 
 ### Starting the Loop
 
-When the user runs `/task-manager start` or `/task-manager`:
+When the user runs `/todolist start` or `/todolist`:
 
 1. Print a status message: "Task manager started. Polling every 5 minutes for #claude tasks."
 2. Run the first poll cycle immediately
@@ -182,11 +182,11 @@ done
 
 **Preferred approach**: Use Claude Code's `/loop` skill:
 - After the first poll cycle, tell the user to run:
-  `/loop 5m Check for pending #claude tasks and dispatch subagents. Use the task-manager skill.`
+  `/loop 5m Check for pending #claude tasks and dispatch subagents. Use the todolist skill.`
 
 ### Running a Single Cycle
 
-When the user runs `/task-manager once`:
+When the user runs `/todolist once`:
 
 1. Call `mcp__todolist__get_pending_sessions` with `agent_id="claude"`
 2. For each pending session, triage and dispatch as described above
@@ -195,7 +195,7 @@ When the user runs `/task-manager once`:
 
 ### Status Check
 
-When the user runs `/task-manager status`:
+When the user runs `/todolist status`:
 
 1. List all active/recent assignments
 2. Show which subagents are working on which tasks
@@ -227,7 +227,7 @@ The TodoList backend supports multi-agent routing via `agent_id`:
 ## Example Session
 
 ```
-User: /task-manager start
+User: /todolist start
 
 Claude: Task manager started. Polling every 5 minutes for #claude tasks.
 

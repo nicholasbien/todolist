@@ -1,5 +1,5 @@
 ---
-name: task-manager
+name: todolist
 description: >
   Autonomous task management daemon. Use proactively when the user creates
   #claude tasks or asks to "watch for tasks", "start managing tasks",

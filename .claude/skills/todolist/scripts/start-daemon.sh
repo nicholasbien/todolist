@@ -2,13 +2,13 @@
 # start-daemon.sh — Start the task manager as a background daemon
 #
 # Runs poll-once.sh every 5 minutes via a simple loop.
-# Logs to .claude/skills/task-manager/logs/daemon.log
+# Logs to .claude/skills/todolist/logs/daemon.log
 #
 # Usage:
 #   ./start-daemon.sh          # start in background
 #   ./start-daemon.sh --fg     # start in foreground (for debugging)
 #
-# To stop: kill $(cat .claude/skills/task-manager/logs/daemon.pid)
+# To stop: kill $(cat .claude/skills/todolist/logs/daemon.pid)
 
 set -euo pipefail
 
