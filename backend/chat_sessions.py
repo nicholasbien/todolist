@@ -230,16 +230,12 @@ async def get_pending_sessions(
     for item in items:
         item["_id"] = str(item["_id"])
         session_id = item["_id"]
-        # A follow-up is when an agent previously claimed this session (agent_id set)
-        # but it needs a response again — meaning the user sent another message.
-        # New unclaimed sessions have needs_agent_response=True but no agent_id.
-        item["is_followup"] = bool(item.get("agent_id"))
-
         # Fetch message count and recent user messages from trajectory
         traj = await trajectories_collection.find_one(
             {"session_id": session_id},
             {"display_messages": 1},
         )
+        has_assistant_message = False
         if traj and traj.get("display_messages"):
             msgs = traj["display_messages"]
             item["message_count"] = len(msgs)
@@ -247,15 +243,24 @@ async def get_pending_sessions(
             recent: List[str] = []
             for msg in reversed(msgs):
                 if msg.get("role") == "assistant":
+                    has_assistant_message = True
                     break
                 if msg.get("role") == "user":
                     content = msg.get("content", "")
                     recent.append(content[:200] if len(content) > 200 else content)
+            if not has_assistant_message:
+                has_assistant_message = any(m.get("role") == "assistant" for m in msgs)
             recent.reverse()
             item["recent_messages"] = recent
         else:
             item["message_count"] = 0
             item["recent_messages"] = []
+
+        # A follow-up requires: agent_id is set AND the agent already responded
+        # at least once. Without this check, tasks pre-assigned via the agent
+        # dropdown (which sets agent_id at creation) would incorrectly appear
+        # as follow-ups before the agent has ever handled them.
+        item["is_followup"] = bool(item.get("agent_id")) and has_assistant_message
 
     return items
 
