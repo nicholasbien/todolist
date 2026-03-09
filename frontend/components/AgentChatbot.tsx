@@ -326,29 +326,8 @@ export default function AgentChatbot({
     setQuestion('');
     shouldAutoScrollRef.current = true;
 
-    if (isTaskSession && currentSessionId) {
-      // Task session mode: post message via API
-      setMessages((prev) => [...prev, { role: 'user', content: userMessage }]);
-      setWaitingForAgent(true);
-      lastMessageCountRef.current += 1;
-
-      try {
-        await fetch(`/agent/sessions/${currentSessionId}/messages`, {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ role: 'user', content: userMessage }),
-        });
-      } catch (err: any) {
-        setError(err.message || 'Failed to send message');
-        setWaitingForAgent(false);
-      }
-    } else {
-      // Streaming AI mode
-      handleStreamingAsk(userMessage);
-    }
+    // All chats use streaming AI — task sessions just have extra context
+    handleStreamingAsk(userMessage);
   };
 
   // -----------------------------------------------------------------------
