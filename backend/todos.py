@@ -45,6 +45,9 @@ async def init_todo_indexes() -> None:
         # Queries by category within a space
         await todos_collection.create_index([("user_id", 1), ("space_id", 1), ("category", 1)])
 
+        # Sub-task lookups by parent
+        await todos_collection.create_index("parent_id")
+
         logger.info("Todo indexes created successfully")
     except Exception as e:
         logger.error(f"Error creating todo indexes: {e}")
@@ -68,6 +71,7 @@ class Todo(BaseModel):
     space_id: Optional[str] = None
     created_offline: bool = False
     creator_type: str = "user"  # "user" or "agent"
+    parent_id: Optional[str] = None  # ID of parent todo for sub-tasks
 
     class Config:
         arbitrary_types_allowed = True
@@ -183,6 +187,8 @@ async def delete_todo(todo_id: str, user_id: str):
             raise HTTPException(status_code=403, detail="Not in space")
         result = await todos_collection.delete_one(query)
         if result.deleted_count == 1:
+            # Cascade delete: remove all sub-tasks if this was a parent
+            await todos_collection.delete_many({"parent_id": todo_id})
             return {"message": "Todo deleted successfully"}
         raise HTTPException(status_code=404, detail="Todo not found")
     except HTTPException as he:
@@ -227,6 +233,27 @@ async def complete_todo(todo_id: str, user_id: str):
                 query, {"$set": {"completed": False}, "$unset": {"dateCompleted": ""}}
             )
         if result.modified_count == 1:
+            # Auto-complete logic for sub-tasks
+            if new_completed_status and todo.get("parent_id"):
+                # Check if all sibling sub-tasks are now complete
+                incomplete_siblings = await todos_collection.count_documents(
+                    {
+                        "parent_id": todo["parent_id"],
+                        "completed": False,
+                    }
+                )
+                if incomplete_siblings == 0:
+                    await todos_collection.update_one(
+                        {"_id": ObjectId(todo["parent_id"])},
+                        {"$set": {"completed": True, "dateCompleted": datetime.now().isoformat()}},
+                    )
+            elif not new_completed_status and todo.get("parent_id"):
+                # Uncompleting a sub-task → uncomplete parent if it was auto-completed
+                await todos_collection.update_one(
+                    {"_id": ObjectId(todo["parent_id"]), "completed": True},
+                    {"$set": {"completed": False}, "$unset": {"dateCompleted": ""}},
+                )
+
             status = "complete" if new_completed_status else "incomplete"
             return {"message": f"Todo marked as {status}"}
         raise HTTPException(status_code=404, detail="Todo not found")

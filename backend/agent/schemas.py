@@ -52,6 +52,10 @@ class TaskAddRequest(BaseModel):
             "Additional task details or context. Keep the main task title concise and place extended details here."
         ),
     )
+    parent_id: Optional[str] = Field(
+        default=None,
+        description="Parent task ID to create this as a sub-task. Use when breaking a task into smaller steps.",
+    )
 
 
 class TaskUpdateRequest(BaseModel):
@@ -190,7 +194,7 @@ OPENAI_TOOL_SCHEMAS = {
     "add_task": {
         "type": "function",
         "name": "add_task",
-        "description": "Add a new task to user's todo list. Choose a category from the user's existing categories (provided in system context), or use 'General' if none fit well. Call when user wants to add, create, or save a new task, todo, or reminder.",  # noqa: E501
+        "description": "Add a new task to user's todo list. Choose a category from the user's existing categories (provided in system context), or use 'General' if none fit well. Call when user wants to add, create, or save a new task, todo, or reminder. To create a sub-task, pass the parent task's ID as parent_id.",  # noqa: E501
         "parameters": get_openai_tool_schema(TaskAddRequest),
     },
     "list_tasks": {

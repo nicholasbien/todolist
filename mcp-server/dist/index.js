@@ -77,6 +77,7 @@ class TodolistMCPServer {
                             properties: {
                                 text: { type: 'string', description: 'The todo item text' },
                                 space_id: { type: 'string', description: 'Space ID (auto-detected if not provided)' },
+                                parent_id: { type: 'string', description: 'Parent todo ID to create as a sub-task (optional)' },
                             },
                             required: ['text'],
                         },
@@ -335,9 +336,13 @@ class TodolistMCPServer {
     // --- Todo tools ---
     async addTodo(args) {
         const spaceId = await this.resolveSpaceId(args.space_id);
-        const response = await api.post('/todos', { text: args.text, space_id: spaceId });
+        const body = { text: args.text, space_id: spaceId };
+        if (args.parent_id)
+            body.parent_id = args.parent_id;
+        const response = await api.post('/todos', body);
         const todo = response.data;
-        return this.textResult(`Added todo: "${todo.text}" (ID: ${todo._id}, Category: ${todo.category})`);
+        const prefix = args.parent_id ? 'Added sub-task' : 'Added todo';
+        return this.textResult(`${prefix}: "${todo.text}" (ID: ${todo._id}, Category: ${todo.category})`);
     }
     async listTodos(args) {
         const spaceId = await this.resolveSpaceId(args.space_id);
@@ -351,7 +356,25 @@ class TodolistMCPServer {
         }
         if (todos.length === 0)
             return this.textResult('No todos found');
-        const lines = todos.map((t, i) => `${i + 1}. ${t.completed ? '[done]' : '[  ]'} ${t.text} [${t.category || 'General'}] (ID: ${t._id})`);
+        // Group: top-level first, then sub-tasks indented under parents
+        const parents = todos.filter((t) => !t.parent_id);
+        const childrenMap = new Map();
+        for (const t of todos) {
+            if (t.parent_id) {
+                const list = childrenMap.get(t.parent_id) || [];
+                list.push(t);
+                childrenMap.set(t.parent_id, list);
+            }
+        }
+        const lines = [];
+        let i = 1;
+        for (const t of parents) {
+            lines.push(`${i++}. ${t.completed ? '[done]' : '[  ]'} ${t.text} [${t.category || 'General'}] (ID: ${t._id})`);
+            const children = childrenMap.get(t._id) || [];
+            for (const c of children) {
+                lines.push(`   └─ ${c.completed ? '[done]' : '[  ]'} ${c.text} (ID: ${c._id})`);
+            }
+        }
         return this.textResult(lines.join('\n'));
     }
     async updateTodo(args) {

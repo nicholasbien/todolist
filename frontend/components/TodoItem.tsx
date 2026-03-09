@@ -14,6 +14,9 @@ interface TodoItemProps {
   onEdit: (todo: any) => void;
   onChat?: (todo: any) => void;
   sessionStatus?: 'waiting' | 'unread_reply';
+  isSubtask?: boolean;
+  subtaskCount?: number;
+  subtaskDoneCount?: number;
 }
 
 export default function TodoItem({
@@ -29,6 +32,9 @@ export default function TodoItem({
   onEdit,
   onChat,
   sessionStatus,
+  isSubtask,
+  subtaskCount,
+  subtaskDoneCount,
 }: TodoItemProps) {
   const [isCompleting, setIsCompleting] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -146,6 +152,11 @@ export default function TodoItem({
               todo.text
             )}
           </p>
+          {subtaskCount != null && subtaskCount > 0 && (
+            <p className="text-xs text-gray-400 mt-1">
+              {subtaskDoneCount || 0}/{subtaskCount} sub-tasks done
+            </p>
+          )}
         </div>
 
         <div className="flex items-center space-x-1 ml-3" onTouchStart={(e) => e.stopPropagation()}>

@@ -364,8 +364,8 @@ async def api_create_todo(request: Request, current_user: dict = Depends(get_cur
         result = await create_todo(todo)
         logger.info(f"Todo created successfully: {result}")
 
-        # Auto-create a linked session for the task (unless created offline)
-        if not body.get("created_offline", False):
+        # Auto-create a linked session for the task (unless created offline or a sub-task)
+        if not body.get("created_offline", False) and not body.get("parent_id"):
             try:
                 todo_dict = result.dict(by_alias=True)
                 todo_id = str(todo_dict["_id"])
