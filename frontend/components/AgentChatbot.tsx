@@ -375,7 +375,7 @@ export default function AgentChatbot({
         params.append('token', token);
       }
 
-      const agentUrl = `/agent/stream?${params.toString()}`;
+      const agentUrl = `/api/agent/stream?${params.toString()}`;
       const es = new EventSource(agentUrl);
 
       es.addEventListener('ready', (e) => {
