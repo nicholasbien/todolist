@@ -46,9 +46,6 @@ export default function AgentChatbot({
 
   // Task session mode: when viewing a task-linked session
   const [isTaskSession, setIsTaskSession] = useState(false);
-  const [waitingForAgent, setWaitingForAgent] = useState(false);
-  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const lastMessageCountRef = useRef(0);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
@@ -106,13 +103,24 @@ export default function AgentChatbot({
         if (!res.ok) throw new Error('Failed to load session');
         const data = await res.json();
         const displayMessages = data.display_messages || [];
-        setMessages(displayMessages);
         setCurrentSessionId(pendingSessionId);
-        lastMessageCountRef.current = displayMessages.length;
 
-        // Check if waiting for agent
+        // If waiting for agent (last message is user), auto-trigger streaming
         const lastMsg = displayMessages[displayMessages.length - 1];
-        setWaitingForAgent(lastMsg?.role === 'user');
+        if (lastMsg?.role === 'user') {
+          // Don't pre-populate messages — let handleStreamingAsk add the user message itself
+          // Show any earlier messages (if multi-turn), but skip the last user message
+          const earlier = displayMessages.slice(0, -1);
+          if (earlier.length > 0) {
+            setMessages(earlier);
+          }
+          setTimeout(() => {
+            handleStreamingAsk(lastMsg.content);
+          }, 0);
+        } else {
+          // Session already has agent response — just display everything
+          setMessages(displayMessages);
+        }
       } catch (err: any) {
         setError(err.message || 'Failed to load session');
       } finally {
@@ -123,49 +131,6 @@ export default function AgentChatbot({
 
     loadTaskSession();
   }, [pendingSessionId, token, onSessionLoaded]);
-
-  // -----------------------------------------------------------------------
-  // Poll for new messages in task session mode
-  // -----------------------------------------------------------------------
-  useEffect(() => {
-    if (!isTaskSession || !currentSessionId || !token || !waitingForAgent) {
-      if (pollIntervalRef.current) {
-        clearInterval(pollIntervalRef.current);
-        pollIntervalRef.current = null;
-      }
-      return;
-    }
-
-    const pollSession = async () => {
-      try {
-        const res = await fetch(`/agent/sessions/${currentSessionId}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (!res.ok) return;
-        const data = await res.json();
-        const displayMessages = data.display_messages || [];
-        if (displayMessages.length > lastMessageCountRef.current) {
-          setMessages(displayMessages);
-          lastMessageCountRef.current = displayMessages.length;
-          // Check if agent has responded
-          const lastMsg = displayMessages[displayMessages.length - 1];
-          if (lastMsg?.role === 'assistant') {
-            setWaitingForAgent(false);
-          }
-        }
-      } catch {
-        // Ignore poll errors
-      }
-    };
-
-    pollIntervalRef.current = setInterval(pollSession, 5000);
-    return () => {
-      if (pollIntervalRef.current) {
-        clearInterval(pollIntervalRef.current);
-        pollIntervalRef.current = null;
-      }
-    };
-  }, [isTaskSession, currentSessionId, token, waitingForAgent]);
 
   // -----------------------------------------------------------------------
   // Close dropdown when clicking outside
@@ -213,7 +178,7 @@ export default function AgentChatbot({
   // Thinking dots animation
   useEffect(() => {
     let interval: ReturnType<typeof setInterval>;
-    if (loading || waitingForAgent) {
+    if (loading) {
       interval = setInterval(() => {
         setThinkingDots((d) => (d + 1) % 4);
       }, 500);
@@ -223,7 +188,7 @@ export default function AgentChatbot({
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [loading, waitingForAgent]);
+  }, [loading]);
 
   // Track online/offline status
   useEffect(() => {
@@ -262,12 +227,6 @@ export default function AgentChatbot({
       setMessages(displayMessages);
       setCurrentSessionId(sessionId);
       setIsTaskSession(isTodoSession);
-      lastMessageCountRef.current = displayMessages.length;
-
-      if (isTodoSession) {
-        const lastMsg = displayMessages[displayMessages.length - 1];
-        setWaitingForAgent(lastMsg?.role === 'user');
-      }
     } catch (err: any) {
       setError(err.message || 'Failed to load chat');
     } finally {
@@ -314,7 +273,6 @@ export default function AgentChatbot({
     setMessages([]);
     setShowSessionDropdown(false);
     setIsTaskSession(false);
-    setWaitingForAgent(false);
   };
 
   // -----------------------------------------------------------------------
@@ -451,7 +409,7 @@ export default function AgentChatbot({
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   };
 
-  const isWaiting = loading || waitingForAgent;
+  const isWaiting = loading;
 
   return (
     <div className="flex flex-col h-full">
@@ -631,7 +589,7 @@ export default function AgentChatbot({
             <div className="text-gray-100 w-full px-0 py-2">
               <div className="text-xs mb-1 opacity-75"></div>
               <div className="text-sm">
-                {waitingForAgent ? `Waiting for agent${'.'.repeat(thinkingDots)}` : `Thinking${'.'.repeat(thinkingDots)}`}
+                {`Thinking${'.'.repeat(thinkingDots)}`}
               </div>
             </div>
           </div>

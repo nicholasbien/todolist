@@ -425,7 +425,13 @@ export default function AIToDoListApp({
             space_id: activeSpace?._id || null,
             title: todo.text,
             todo_id: todo._id,
-            initial_message: `Task: ${todo.text}`,
+            initial_message: [
+              `Task: ${todo.text}`,
+              todo.category ? `Category: ${todo.category}` : null,
+              todo.priority ? `Priority: ${todo.priority}` : null,
+              todo.due_date ? `Due: ${todo.due_date}` : null,
+              todo.notes ? `Notes: ${todo.notes}` : null,
+            ].filter(Boolean).join('\n'),
             initial_role: 'user',
           }),
         });
