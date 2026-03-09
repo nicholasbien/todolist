@@ -1,7 +1,7 @@
 ---
 name: todolist
 description: Manage todos, journal entries, and task-linked chat sessions via the TodoList app API. Use when the user asks about their tasks, todos, journal, or wants to add/update/complete tasks.
-allowed-tools: ["exec"]
+allowed-tools: ["exec", "cron"]
 metadata: {"openclaw": {"requires": {"bins": ["curl", "jq"], "env": ["TODOLIST_AUTH_TOKEN"]}, "primaryEnv": "TODOLIST_AUTH_TOKEN"}}
 ---
 
@@ -226,6 +226,44 @@ The user will see the session linked to their task in the app and can reply to c
 - **401 Unauthorized** — Token expired. Re-run `{baseDir}/scripts/login.sh` to get a new token.
 - **404 Not Found** — The resource doesn't exist. Tell the user.
 - **422 Validation Error** — Check the request body format.
+
+## Autonomous Mode (Cron)
+
+The user can ask you to "watch for tasks" or "check my sessions automatically." When they do, set up a cron job that polls for pending sessions and processes them.
+
+### Setting up the task watcher
+
+Tell the user you're creating a cron job, then run:
+
+```
+openclaw cron add \
+  --name "todolist-watcher" \
+  --every "5m" \
+  --session isolated \
+  --message "Check for pending TodoList sessions and respond to them. Use the todolist skill. Follow the 'Responding to Pending Sessions' workflow: poll pending sessions, read each conversation + linked todo, do the work, then reply. If there are no pending sessions, do nothing."
+```
+
+This creates an isolated session every 5 minutes that checks for work. Adjust the interval based on user preference.
+
+### Stopping the watcher
+
+```
+openclaw cron remove todolist-watcher
+```
+
+### What happens in each cycle
+
+1. OpenClaw spawns an isolated session with the todolist skill loaded
+2. It polls `GET /agent/sessions/pending` for sessions needing a response
+3. For each pending session, it reads the conversation, checks the linked todo, does the requested work (web search, add tasks, update tasks, etc.), and replies
+4. The isolated session closes — no context pollution in the main chat
+
+### Important
+
+- The cron job runs in its own session, so it won't affect your main conversation
+- Each run is independent — the agent reads the full session history each time
+- If no sessions are pending, the agent does nothing and exits cleanly
+- The user can also manually trigger a check anytime by saying "check my pending sessions"
 
 ## Rules
 
