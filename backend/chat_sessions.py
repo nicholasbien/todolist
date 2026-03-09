@@ -44,7 +44,6 @@ async def create_session(
         doc["todo_id"] = todo_id
         doc["needs_agent_response"] = False
         doc["has_unread_reply"] = False
-        doc["last_user_message_at"] = now
     if agent_id:
         doc["agent_id"] = agent_id
 
@@ -168,11 +167,9 @@ async def append_message(
     update: Dict[str, Any] = {"updated_at": now}
     if role == "user":
         update["needs_agent_response"] = True
-        update["last_user_message_at"] = now
     elif role == "assistant":
         update["needs_agent_response"] = False
         update["has_unread_reply"] = True
-        update["last_agent_message_at"] = now
         if agent_id:
             update["agent_id"] = agent_id
 
@@ -222,9 +219,10 @@ async def get_pending_sessions(
     for item in items:
         item["_id"] = str(item["_id"])
         session_id = item["_id"]
-        # Determine if this is a follow-up: the agent responded before, but the
-        # session needs a response again (user sent another message after the agent)
-        item["is_followup"] = bool(item.get("last_agent_message_at"))
+        # A follow-up is when an agent previously claimed this session (agent_id set)
+        # but it needs a response again — meaning the user sent another message.
+        # New unclaimed sessions have needs_agent_response=True but no agent_id.
+        item["is_followup"] = bool(item.get("agent_id"))
 
         # Fetch message count and last user message from trajectory
         traj = await trajectories_collection.find_one(
