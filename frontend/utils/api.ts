@@ -1,11 +1,5 @@
 import { Capacitor } from '@capacitor/core';
 
-// Configuration - keep in sync with service worker
-const CONFIG = {
-  PRODUCTION_BACKEND: 'https://backend-production-e920.up.railway.app',
-  PRODUCTION_DOMAIN: 'todolist.nyc'
-};
-
 /**
  * Get the correct API base URL for the current environment
  */

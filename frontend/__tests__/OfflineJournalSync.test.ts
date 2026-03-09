@@ -36,7 +36,7 @@ const mockServiceWorker = {
 
 // Mock CONFIG object
 const CONFIG = {
-  PRODUCTION_BACKEND: 'https://backend-production-e920.up.railway.app',
+  PRODUCTION_BACKEND: process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000',
   LOCAL_BACKEND: 'http://localhost:8000',
   PRODUCTION_DOMAIN: 'todolist.nyc'
 };
@@ -228,13 +228,13 @@ describe('Offline Journal Sync', () => {
       {
         protocol: 'https:',
         hostname: 'app.todolist.nyc',
-        expected: 'https://backend-production-e920.up.railway.app/journals'
+        expected: `${CONFIG.PRODUCTION_BACKEND}/journals`
       },
       // Capacitor mobile app
       {
         protocol: 'file:',
         hostname: '',
-        expected: 'https://backend-production-e920.up.railway.app/journals'
+        expected: `${CONFIG.PRODUCTION_BACKEND}/journals`
       }
     ];
 
