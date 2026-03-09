@@ -189,11 +189,14 @@ The TodoList backend supports multi-agent routing via `agent_id`:
 
 ## Rules
 
+- **Always call the API** — every `/todolist check` MUST call `mcp__todolist__get_pending_sessions`. Never skip the API call or assume the result from a previous cycle.
+- **Acknowledge on dispatch with `interim=true`** — when dispatching a subagent, immediately post a brief message to the session via `mcp__todolist__post_to_session` with `interim=true`. This lets the user see their task was picked up while keeping the session in the pending queue for the subagent's final response. Without `interim`, the ack clears `needs_agent_response` and the session disappears from polling.
+- **Read sessions before triaging** — for pending sessions claimed by `claude`, call `get_session` to check for new user messages. Don't assume "claimed = already handled."
 - **Never fabricate IDs** — always get session_id, todo_id, space_id from API responses
 - **Always use `agent_id="claude"`** when posting to sessions
 - **Only handle `#claude` tasks** — skip tasks without the tag
 - **Don't double-process** — if a subagent is already working on a session, don't dispatch another
-- **Log everything** — print clear status messages so the user knows what's happening
+- **Log everything** — print clear status messages so the user knows what's being worked on
 - **Handle errors gracefully** — if a subagent fails, log the error and move on
 - **Respect the user** — if the user says stop, stop immediately
 
