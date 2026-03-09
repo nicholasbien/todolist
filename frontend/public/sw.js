@@ -532,7 +532,7 @@ async function syncServerDataToLocal() {
 
     // Fetch and store todos
     try {
-      const todosResponse = await fetch(`${backendBase}/todos`, { headers });
+      const todosResponse = await fetch(`${backendBase}/todos?include_closed=true`, { headers });
       if (todosResponse.ok) {
         const serverTodos = await todosResponse.json();
         for (const todo of serverTodos) {

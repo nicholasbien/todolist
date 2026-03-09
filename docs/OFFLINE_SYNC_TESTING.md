@@ -52,6 +52,7 @@ Results: 21 passed, 0 failed
 | 5 | Journal entry offline → sync | Journal auto-save queues offline; entry reaches server with correct text |
 | 6 | Online data accessible offline | Tasks created online are cached in IDB and visible after going offline |
 | 7 | Multiple offline ops sync together | Rename + delete + create in one offline session all sync in a single batch |
+| 8 | Close completed task offline → sync | Closed-state toggle queues offline; task appears in "Show Closed" after sync |
 
 ---
 
@@ -71,7 +72,7 @@ The frontend's `OfflineContext` listens for `navigator.onLine` to become `true` 
 OfflineContext detects online
   → postMessage({ type: 'SYNC_WHEN_ONLINE' })
     → SW: syncQueue()
-      → iterates pending ops in order (CREATE, UPDATE, DELETE, etc.)
+      → iterates pending ops in order (CREATE, UPDATE, COMPLETE, CLOSE, DELETE, etc.)
       → POSTs each to the backend
       → updates IDB with server responses (replaces offline IDs with real ones)
       → posts { type: 'SYNC_COMPLETE' } to all clients

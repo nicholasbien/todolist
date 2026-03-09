@@ -35,8 +35,24 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [mounted, setMounted] = useState(false);
   const [authExpired, setAuthExpired] = useState(false);
 
+  const syncLastSpacePreference = useCallback((userData: any) => {
+    if (typeof window === 'undefined') return;
+    if (userData?.last_space_id) {
+      localStorage.setItem('active_space_id', userData.last_space_id);
+    } else {
+      localStorage.removeItem('active_space_id');
+    }
+  }, []);
 
-  const logout = async (expired: boolean = false): Promise<void> => {
+  const persistAuthState = useCallback((authToken: string, userData: any) => {
+    if (typeof window === 'undefined') return;
+    localStorage.setItem('auth_token', authToken);
+    localStorage.setItem('auth_user', JSON.stringify(userData));
+    syncLastSpacePreference(userData);
+  }, [syncLastSpacePreference]);
+
+
+  const logout = useCallback(async (expired: boolean = false): Promise<void> => {
     try {
       if (token) {
         // Call logout endpoint to invalidate token on server
@@ -51,6 +67,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       if (typeof window !== 'undefined') {
         localStorage.removeItem('auth_token');
         localStorage.removeItem('auth_user');
+        localStorage.removeItem('active_space_id');
       }
       setToken(null);
       setUser(null);
@@ -58,9 +75,9 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         setAuthExpired(true);
       }
     }
-  };
+  }, [token]);
 
-  const verifyToken = async (tokenToVerify: string) => {
+  const verifyToken = useCallback(async (tokenToVerify: string) => {
     try {
       const response = await apiRequest('auth/me', {
         headers: {
@@ -72,6 +89,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         const userData = await response.json();
         // Validate that we got user data with expected fields
         if (userData && (userData.id || userData._id || userData.user_id) && userData.email) {
+          persistAuthState(tokenToVerify, userData);
           setUser(userData);
           setToken(tokenToVerify);
           console.log('✅ Token verified successfully');
@@ -96,7 +114,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [logout, persistAuthState]);
 
   // Set mounted state on client-side
   useEffect(() => {
@@ -113,6 +131,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
       if (storedToken && storedUser) {
         const userData = JSON.parse(storedUser);
+        syncLastSpacePreference(userData);
         setToken(storedToken);
         setUser(userData);
 
@@ -141,7 +160,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     };
 
     initializeAuth();
-  }, [mounted]);
+  }, [mounted, syncLastSpacePreference, verifyToken]);
 
   const signup = async (email: string): Promise<{ success: boolean; message?: string; error?: string }> => {
     try {
@@ -176,10 +195,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         const { token: newToken, user: userData } = data;
 
         // Store in localStorage (client-side only)
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('auth_token', newToken);
-          localStorage.setItem('auth_user', JSON.stringify(userData));
-        }
+        persistAuthState(newToken, userData);
 
         // Update state
         setToken(newToken);

@@ -77,6 +77,7 @@ class User(BaseModel):
     timezone: str = "America/New_York"
     email_enabled: bool = False
     email_spaces: List[str] = []
+    last_space_id: Optional[str] = None
 
     class Config:
         arbitrary_types_allowed = True
@@ -123,6 +124,7 @@ class UserResponse(BaseModel):
     timezone: str = "America/New_York"
     email_enabled: bool = False
     email_spaces: List[str] = []
+    last_space_id: Optional[str] = None
 
     @classmethod
     def from_db(cls, user_dict: dict) -> "UserResponse":
@@ -137,6 +139,7 @@ class UserResponse(BaseModel):
             timezone=user_dict.get("timezone", "America/New_York"),
             email_enabled=user_dict.get("email_enabled", False),
             email_spaces=user_dict.get("email_spaces", []),
+            last_space_id=user_dict.get("last_space_id"),
         )
 
 
@@ -395,6 +398,7 @@ async def verify_session(token: str) -> dict:
             "timezone": user.get("timezone", "America/New_York"),
             "email_enabled": user.get("email_enabled", False),
             "email_spaces": user.get("email_spaces", []),
+            "last_space_id": user.get("last_space_id"),
         }
 
     except HTTPException:
@@ -445,6 +449,27 @@ async def update_user_name(user_id: str, first_name: str) -> dict:
     except Exception as e:
         logger.error(f"Error in update_user_name: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to update name: {str(e)}")
+
+
+async def update_user_last_space(user_id: str, space_id: Optional[str]) -> dict:
+    """Update the user's last selected space."""
+    try:
+        result = await users_collection.update_one(
+            {"_id": ObjectId(user_id)},
+            {"$set": {"last_space_id": space_id}},
+        )
+
+        if result.matched_count == 0:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        logger.info("Updated last selected space for user %s to %s", user_id, space_id)
+        return {"message": "Last selected space updated", "last_space_id": space_id}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error in update_user_last_space: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to update last selected space")
 
 
 async def delete_user_account(user_id: str) -> dict:

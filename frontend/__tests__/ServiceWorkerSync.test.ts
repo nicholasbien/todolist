@@ -91,6 +91,25 @@ describe('Todo Operations', () => {
     });
   });
 
+  test('syncQueue processes CLOSE operations correctly', async () => {
+    const sw = require('../public/sw.js');
+    await sw.putAuth('token123', 'user1');
+
+    const closeData = { _id: 'todo123', closed: true };
+
+    global.fetch = jest.fn().mockResolvedValue({ ok: true });
+    await sw.addQueue({ type: 'CLOSE', data: closeData }, 'user1');
+    await sw.syncQueue();
+
+    expect(fetch).toHaveBeenCalledWith('http://localhost/api/todos/todo123/close', {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer token123'
+      }
+    });
+  });
+
   test('syncQueue processes DELETE operations', async () => {
     const sw = require('../public/sw.js');
     await sw.putAuth('token123', 'user1');
@@ -110,13 +129,14 @@ describe('Todo Operations', () => {
     });
   });
 
-  test('syncQueue defers unmapped offline IDs for UPDATE/DELETE/COMPLETE operations', async () => {
+  test('syncQueue defers unmapped offline IDs for UPDATE/DELETE/COMPLETE/CLOSE operations', async () => {
     const sw = require('../public/sw.js');
     await sw.putAuth('token123', 'user1');
 
     await sw.addQueue({ type: 'UPDATE', data: { _id: 'offline_123', text: 'test' } }, 'user1');
     await sw.addQueue({ type: 'DELETE', data: { _id: 'offline_456' } }, 'user1');
     await sw.addQueue({ type: 'COMPLETE', data: { _id: 'offline_789' } }, 'user1');
+    await sw.addQueue({ type: 'CLOSE', data: { _id: 'offline_999', closed: true } }, 'user1');
 
     global.fetch = jest.fn().mockResolvedValue({
       ok: true,
@@ -130,7 +150,7 @@ describe('Todo Operations', () => {
 
     // Ops should remain in queue waiting for ID mapping from their CREATE
     const queue = await sw.readQueue('user1');
-    expect(queue).toHaveLength(3);
+    expect(queue).toHaveLength(4);
   });
 });
 

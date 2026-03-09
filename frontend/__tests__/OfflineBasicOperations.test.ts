@@ -125,9 +125,9 @@ describe('Offline Operations - Basic Tests', () => {
     });
 
     test('handles different operation types', () => {
-      const operations = ['CREATE', 'UPDATE', 'DELETE', 'COMPLETE'];
+      const operations = ['CREATE', 'UPDATE', 'DELETE', 'COMPLETE', 'CLOSE'];
       operations.forEach(type => {
-        expect(['CREATE', 'UPDATE', 'DELETE', 'COMPLETE']).toContain(type);
+        expect(['CREATE', 'UPDATE', 'DELETE', 'COMPLETE', 'CLOSE']).toContain(type);
       });
     });
   });

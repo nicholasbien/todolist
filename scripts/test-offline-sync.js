@@ -23,6 +23,7 @@
  *   5. Write journal entry offline → sync → server has correct text
  *   6. Data created online is accessible when offline (IndexedDB caching)
  *   7. Multiple offline ops (update + delete + create) all sync together
+ *   8. Close completed task offline → sync → appears in "Show Closed"
  *
  * See docs/SCREENSHOT_WORKFLOW.md for related Playwright patterns.
  */
@@ -99,15 +100,18 @@ async function goOnlineAndSync(page, context) {
  * Fetches todos from the server for the currently active space.
  * Mirrors how the app constructs its fetch URL: includes space_id when one is active.
  */
-function fetchTodosFromServer(page) {
-  return page.evaluate(async () => {
+function fetchTodosFromServer(page, includeClosed = false) {
+  return page.evaluate(async ({ includeClosed }) => {
     try {
       const spaceId = localStorage.getItem('active_space_id');
-      const url = spaceId ? `/todos?space_id=${encodeURIComponent(spaceId)}` : '/todos';
+      const query = [];
+      if (spaceId) query.push(`space_id=${encodeURIComponent(spaceId)}`);
+      if (includeClosed) query.push('include_closed=true');
+      const url = query.length > 0 ? `/todos?${query.join('&')}` : '/todos';
       const resp = await fetch(url);
       return resp.ok ? resp.json() : null;
     } catch { return null; }
-  });
+  }, { includeClosed });
 }
 
 // ── UI helpers ───────────────────────────────────────────────────────────────
@@ -144,6 +148,11 @@ async function completeTask(page, text) {
 
 async function deleteTask(page, text) {
   await taskRow(page, text).getByRole('button', { name: 'Delete task' }).click();
+  await page.waitForTimeout(600);
+}
+
+async function closeTask(page, text) {
+  await taskRow(page, text).getByRole('button', { name: 'Close task' }).click();
   await page.waitForTimeout(600);
 }
 
@@ -525,6 +534,53 @@ async function isVisible(page, text) {
         'New offline-created task (C) synced with real server ID');
     } catch (err) {
       fail('Test 7 error', err.message);
+    }
+    console.log();
+
+    // ──────────────────────────────────────────────────────────────────
+    // Test 8: Close completed task offline → sync → verify on server
+    // ──────────────────────────────────────────────────────────────────
+    console.log('📦 Test 8: Close completed task offline → sync online');
+    try {
+      await goToTasks(page);
+      await context.setOffline(false);
+      await page.waitForTimeout(500);
+
+      const t8 = `[E2E] Close-me ${ts}`;
+      await addTask(page, t8);
+      await page.waitForSelector(`p:has-text("${t8}")`, { timeout: 8000 });
+      await completeTask(page, t8);
+
+      // Ensure completed section is visible before going offline
+      const showCompletedBtn = page.getByRole('button', { name: /Show Completed/ });
+      if (await showCompletedBtn.count() > 0) {
+        await showCompletedBtn.click();
+        await page.waitForTimeout(300);
+      }
+
+      await context.setOffline(true);
+      await page.waitForTimeout(300);
+
+      await closeTask(page, t8);
+      await check(!await isVisible(page, t8), 'Closed task no longer visible in completed list while offline');
+
+      await goOnlineAndSync(page, context);
+      await goToTasks(page);
+
+      const showClosedBtn = page.getByRole('button', { name: /Show Closed/ });
+      if (await showClosedBtn.count() > 0) {
+        await showClosedBtn.click();
+        await page.waitForTimeout(400);
+        await check(await isVisible(page, t8), 'Closed task appears in "Show Closed" section after sync');
+      } else {
+        fail('No "Show Closed" button found — cannot verify closed task');
+      }
+
+      const todosWithClosed = await fetchTodosFromServer(page, true);
+      const closedServerTodo = todosWithClosed?.find(t => t.text === t8);
+      await check(!!closedServerTodo && closedServerTodo.closed === true, 'Closed status synced to server');
+    } catch (err) {
+      fail('Test 8 error', err.message);
     }
     console.log();
 

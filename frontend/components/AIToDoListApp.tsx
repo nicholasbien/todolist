@@ -192,6 +192,58 @@ export default function AIToDoListApp({
     [clearAuthExpired]
   );
 
+  const updateStoredUserLastSpace = useCallback((spaceId: string | null) => {
+    if (typeof window === 'undefined') return;
+
+    try {
+      const storedUser = localStorage.getItem('auth_user');
+      if (storedUser) {
+        const userData = JSON.parse(storedUser);
+        userData.last_space_id = spaceId;
+        localStorage.setItem('auth_user', JSON.stringify(userData));
+      }
+    } catch (err) {
+      console.warn('Failed to update stored user last space:', err);
+    }
+
+    if (spaceId) {
+      localStorage.setItem('active_space_id', spaceId);
+    } else {
+      localStorage.removeItem('active_space_id');
+    }
+  }, []);
+
+  const updateLastSelectedSpace = useCallback(
+    async (spaceId: string | null) => {
+      try {
+        await authenticatedFetch('/auth/last-space', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ space_id: spaceId }),
+        });
+      } catch (err) {
+        console.error('Failed to update last selected space:', err);
+      }
+    },
+    [authenticatedFetch]
+  );
+
+  const handleSpaceSelect = useCallback(
+    (space: any, persistSelection: boolean = true) => {
+      if (!space?._id) return;
+      if (space._id === activeSpaceRef.current?._id) return;
+
+      activeSpaceRef.current = space;
+      setActiveSpace(space);
+
+      if (persistSelection) {
+        updateStoredUserLastSpace(space._id);
+        void updateLastSelectedSpace(space._id);
+      }
+    },
+    [updateLastSelectedSpace, updateStoredUserLastSpace]
+  );
+
 
   // Loading state when switching spaces
   // Categories and todos load independently so we no longer gate the UI
@@ -293,18 +345,42 @@ export default function AIToDoListApp({
         const sorted = sortSpaces(data);
         setSpaces(sorted);
 
+        let profileLastSpaceId: string | null = null;
+        let hasStoredLastSpacePreference = false;
         let storedId: string | null = null;
         if (typeof window !== 'undefined') {
+          try {
+            const storedUser = localStorage.getItem('auth_user');
+            if (storedUser) {
+              const parsedUser = JSON.parse(storedUser);
+              if (Object.prototype.hasOwnProperty.call(parsedUser, 'last_space_id')) {
+                hasStoredLastSpacePreference = true;
+                profileLastSpaceId = parsedUser?.last_space_id || null;
+              }
+            }
+          } catch (err) {
+            console.warn('Failed to read stored user profile:', err);
+          }
           storedId = localStorage.getItem('active_space_id');
         }
 
-        const currentId = activeSpaceRef.current?._id || storedId;
+        if (!hasStoredLastSpacePreference) {
+          profileLastSpaceId = user?.last_space_id || null;
+        }
+
+        if (profileLastSpaceId && !sorted.some((space: any) => space._id === profileLastSpaceId)) {
+          updateStoredUserLastSpace(null);
+          void updateLastSelectedSpace(null);
+          profileLastSpaceId = null;
+        }
+
+        const currentId = profileLastSpaceId || activeSpaceRef.current?._id || storedId;
         const current = sorted.find(s => s._id === currentId) || sorted[0] || null;
         if (current?._id !== activeSpaceRef.current?._id) {
           activeSpaceRef.current = current;
           setActiveSpace(current);
         }
-        return data;
+        return sorted;
       }
     } catch (err) {
       console.error('Error loading spaces', err);
@@ -313,7 +389,7 @@ export default function AIToDoListApp({
       setLoadingSpaces(false);
     }
     return [];
-  }, [authenticatedFetch, handleError]);
+  }, [authenticatedFetch, handleError, updateLastSelectedSpace, updateStoredUserLastSpace, user?.last_space_id]);
 
   const fetchMembers = useCallback(async () => {
     const fetchId = ++membersFetchIdRef.current;
@@ -684,9 +760,9 @@ export default function AIToDoListApp({
         const spacesData = await fetchSpaces();
         if (spacesData?.length) {
           const newActive = spacesData.find((space: any) => space._id === createdSpace._id) || createdSpace;
-          setActiveSpace(newActive);
+          handleSpaceSelect(newActive);
         } else {
-          setActiveSpace(createdSpace);
+          handleSpaceSelect(createdSpace);
         }
         setShowAddSpaceModal(false);
         setNewSpaceName('');
@@ -725,10 +801,6 @@ export default function AIToDoListApp({
     try {
       await authenticatedFetch(`/spaces/${id}`, { method: 'DELETE' });
       await fetchSpaces();
-      if (activeSpace && activeSpace._id === id) {
-        const updated = spaces.filter(s => s._id !== id);
-        setActiveSpace(updated.length ? updated[0] : null);
-      }
     } catch (err) {
       console.error('Error deleting space', err);
     }
@@ -738,10 +810,6 @@ export default function AIToDoListApp({
     try {
       await authenticatedFetch(`/spaces/${id}/leave`, { method: 'POST' });
       await fetchSpaces();
-      if (activeSpace && activeSpace._id === id) {
-        const updated = spaces.filter(s => s._id !== id);
-        setActiveSpace(updated.length ? updated[0] : null);
-      }
     } catch (err) {
       console.error('Error leaving space', err);
     }
@@ -1333,7 +1401,7 @@ export default function AIToDoListApp({
               activeSpace={activeSpace}
               user={user}
               loadingSpaces={loadingSpaces}
-              onSpaceSelect={setActiveSpace}
+              onSpaceSelect={handleSpaceSelect}
               onCreateSpace={() => setShowAddSpaceModal(true)}
               onEditSpace={(space: any) => {
                 setSpaceToEdit(space);

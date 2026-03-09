@@ -19,6 +19,7 @@ from auth import (
     signup_user,
     update_user_email_instructions,
     update_user_email_spaces,
+    update_user_last_space,
     update_user_name,
     update_user_summary_time,
     verify_session,
@@ -256,6 +257,31 @@ async def api_logout(current_user: dict = Depends(get_current_user)):
 async def api_get_current_user(current_user: dict = Depends(get_current_user)):
     """Get current user info."""
     return current_user
+
+
+class UpdateLastSpaceRequest(BaseModel):
+    space_id: Optional[str] = None
+
+
+@app.get("/auth/last-space")
+async def api_get_last_space(current_user: dict = Depends(get_current_user)):
+    """Get the user's last selected space ID."""
+    return {"last_space_id": current_user.get("last_space_id")}
+
+
+@app.post("/auth/last-space")
+async def api_update_last_space(
+    request: UpdateLastSpaceRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    """Update the user's last selected space ID."""
+    if request.space_id:
+        has_access = await user_in_space(current_user["user_id"], request.space_id)
+        if not has_access:
+            raise HTTPException(status_code=403, detail="Access denied to this space")
+
+    logger.info("Last selected space update requested by %s: %s", current_user["email"], request.space_id)
+    return await update_user_last_space(current_user["user_id"], request.space_id)
 
 
 @app.post("/auth/update-name")

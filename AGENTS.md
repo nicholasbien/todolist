@@ -7,7 +7,7 @@
 ---
 
 ## Overview
-This is an AI-powered collaborative todo list application with a React/Next.js frontend and FastAPI backend. It supports multi-user spaces, email verification auth, AI task classification, offline-first PWA, AI agent with tool calling, journal entries, and daily email summaries.
+This is an AI-powered collaborative todo list application with a React/Next.js frontend and FastAPI backend. It supports multi-user spaces, email verification auth, AI task classification, offline-first PWA, AI agent with tool calling, journal entries, daily email summaries, and a closed-task archive flow.
 
 ## Quick Setup
 Run the setup script:
@@ -335,6 +335,7 @@ node scripts/test-offline-sync.js
 | 5 | Write journal offline → sync → server has correct entry text |
 | 6 | Data created online still accessible after going offline (IndexedDB cache) |
 | 7 | Multiple offline ops (update + delete + create) all sync in one batch |
+| 8 | Close completed task offline → sync → visible in "Show Closed" |
 
 ### When to run these tests
 
@@ -534,7 +535,7 @@ const API_ROUTES = [
 ### Database Schema
 
 **Users Collection:**
-`{_id, email, first_name, is_verified, verification_code, code_expires_at, created_at, last_login, email_enabled, summary_hour, summary_minute, email_instructions, timezone, email_spaces}`
+`{_id, email, first_name, is_verified, verification_code, code_expires_at, created_at, last_login, email_enabled, summary_hour, summary_minute, email_instructions, timezone, email_spaces, last_space_id}`
 
 **Sessions Collection:**
 `{_id, user_id, token, created_at, expires_at, is_active}`
@@ -544,7 +545,7 @@ const API_ROUTES = [
 > `collaborative` is a derived concept (not a stored field): a space is collaborative when `member_ids.length > 1` or `pending_emails.length > 0`. Sending `collaborative: false` on PUT clears `member_ids` to owner-only and wipes `pending_emails`. Sending `collaborative: true` is a backend no-op.
 
 **Todos Collection:**
-`{_id, text, link, category, priority, dateAdded, dueDate, sortOrder, notes, completed, dateCompleted, user_id, space_id, created_offline}`
+`{_id, text, link, category, priority, dateAdded, dueDate, sortOrder, notes, completed, dateCompleted, closed, dateClosed, user_id, space_id, created_offline}`
 
 **Categories Collection:**
 `{name, space_id}` with compound unique index on (space_id, name)
@@ -636,6 +637,8 @@ BACKEND_URL=http://localhost:8000   # Used by Next.js API proxy; defaults to loc
 - `POST /auth/login` - Verify code and login (no auth required)
 - `POST /auth/logout` - Logout and invalidate session
 - `GET /auth/me` - Get current user info
+- `GET /auth/last-space` - Get user's last selected space ID
+- `POST /auth/last-space` - Update user's last selected space ID (body: `{space_id}`)
 - `POST /auth/update-name` - Update user's display name
 - `DELETE /auth/me` - Delete user account
 
@@ -649,10 +652,11 @@ BACKEND_URL=http://localhost:8000   # Used by Next.js API proxy; defaults to loc
 - `POST /spaces/{id}/leave` - Leave a space
 
 ### Todos (Space-Aware)
-- `GET /todos?space_id={id}` - Get todos for specific space
+- `GET /todos?space_id={id}&include_closed={bool}` - Get todos for specific space (`include_closed` defaults to `false`)
 - `POST /todos` - Create todo with space_id
 - `PUT /todos/{id}` - Update todo
 - `PUT /todos/{id}/complete` - Toggle completion
+- `PUT /todos/{id}/close` - Toggle closed/reopened state (completed tasks only)
 - `PUT /todos/reorder` - Reorder todos
 - `DELETE /todos/{id}` - Delete todo
 
@@ -695,7 +699,7 @@ The app uses an offline-first PWA architecture with a sophisticated service work
 
 ### Key Features
 - **Offline Storage**: Todos, journals, categories stored in user-isolated IndexedDB stores
-- **Sync Queue**: Failed operations queued for retry when online
+- **Sync Queue**: Failed operations queued for retry when online (including close/reopen task operations)
 - **Auto-save Optimization**: Journal entries update existing queue entries to prevent duplicates
 - **ID Mapping**: Offline IDs (`offline_*`) are immediately replaced with server IDs after sync
 - **User Isolation**: All data strictly isolated by `user_id` in separate IndexedDB stores
@@ -703,7 +707,7 @@ The app uses an offline-first PWA architecture with a sophisticated service work
 ### CRITICAL: Service Worker Version Bumps
 
 **Always bump cache versions when modifying `public/sw.js`:**
-- Increment `STATIC_CACHE` version (currently `todo-static-v126`)
+- Increment `STATIC_CACHE` version (currently `todo-static-v130`)
 - Increment `DB_VERSION` if changing IndexedDB schema (currently `13`)
 
 Without version bumps, browsers continue using the old cached service worker and changes won't take effect in production.
