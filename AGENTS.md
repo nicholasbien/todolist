@@ -111,6 +111,64 @@ See `openclaw-skill/README.md` for full details.
 
 ---
 
+## Claude Code Agent Integration
+
+A Claude Code skill and subagent are available in `.claude/skills/task-manager/` for autonomous task management using Claude Code.
+
+### How It Works
+
+1. Users create tasks with `#claude` in the text (e.g., "Fix login bug #claude")
+2. The backend auto-routes these to `agent_id="claude"` (just like `#openclaw`)
+3. The task manager skill polls for pending sessions every 5 minutes
+4. Each task gets its own subagent worker (runs in background for parallelism)
+5. Follow-up messages from users route back to the correct worker
+6. Workers post results via the MCP server with `agent_id="claude"`
+
+### Quick Start
+
+**Option 1: In-session (interactive)**
+```
+/task-manager start          # Start polling loop
+/task-manager once           # Run one cycle
+/task-manager status         # Check assignments
+/task-manager stop           # Stop polling
+```
+
+**Option 2: Background daemon (headless)**
+```bash
+.claude/skills/task-manager/scripts/start-daemon.sh     # Start
+.claude/skills/task-manager/scripts/stop-daemon.sh      # Stop
+```
+
+**Option 3: Claude Code `/loop` command**
+```
+/loop 5m Check for pending #claude tasks using the task-manager skill. Poll, triage, dispatch subagents, report results.
+```
+
+### Agent Routing
+
+The app supports multi-agent routing via `agent_id` on sessions:
+
+| Tag | Agent ID | Handler |
+|-----|----------|---------|
+| `#claude` | `claude` | Claude Code task-manager skill |
+| `#openclaw` | `openclaw` | OpenClaw agent |
+| (none) | (none) | Built-in AI agent |
+
+Agents only see their own claimed sessions + unclaimed ones when polling. This prevents conflicts and double-replies.
+
+### Files
+
+| File | Purpose |
+|------|---------|
+| `.claude/skills/task-manager/SKILL.md` | Skill definition (slash command) |
+| `.claude/agents/task-manager.md` | Subagent definition |
+| `.claude/skills/task-manager/scripts/poll-once.sh` | Single poll cycle script |
+| `.claude/skills/task-manager/scripts/start-daemon.sh` | Background daemon |
+| `.claude/skills/task-manager/scripts/stop-daemon.sh` | Stop daemon |
+
+---
+
 ## Quick Setup
 
 ```bash

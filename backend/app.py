@@ -385,8 +385,13 @@ async def api_create_todo(request: Request, current_user: dict = Depends(get_cur
 
                 # Post as assistant if agent-created, user if user-created
                 role = "assistant" if body.get("creator_type") == "agent" else "user"
-                # Auto-route #openclaw tasks to the openclaw agent
-                auto_agent_id = "openclaw" if "#openclaw" in todo_dict["text"].lower() else None
+                # Auto-route tagged tasks to the appropriate agent
+                text_lower = todo_dict["text"].lower()
+                auto_agent_id = None
+                if "#openclaw" in text_lower:
+                    auto_agent_id = "openclaw"
+                elif "#claude" in text_lower:
+                    auto_agent_id = "claude"
                 session_id = await create_chat_session(
                     current_user["user_id"],
                     body.get("space_id"),
