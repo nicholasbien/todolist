@@ -380,6 +380,7 @@ async def stream_agent_response(
     # Session handling: create or resume
     # -----------------------------------------------------------------------
     is_new_session = session_id is None
+    todo_context = ""
 
     if is_new_session:
         session_id = await create_session(user_id, space_id, user_message)
@@ -401,6 +402,36 @@ async def stream_agent_response(
             input_messages = list(traj_doc.get("trajectory", []))
             display_messages = list(traj_doc.get("display_messages", []))
             logger.info(f"Loaded session {session_id} from DB ({len(input_messages)} trajectory items)")
+
+            # If session is linked to a todo, fetch task context
+            todo_id = traj_doc.get("todo_id")
+            if todo_id:
+                try:
+                    from bson import ObjectId as _ObjId
+                    from db import collections
+
+                    todo_doc = await collections.todos.find_one({"_id": _ObjId(todo_id)})
+                    if todo_doc:
+                        task_text = todo_doc.get("text", "")
+                        task_notes = todo_doc.get("notes", "")
+                        task_category = todo_doc.get("category", "")
+                        task_priority = todo_doc.get("priority", "")
+                        task_due = todo_doc.get("dueDate", "")
+                        todo_context = f"\n\nYou are discussing a specific task:\n- Task: {task_text}"
+                        if task_notes:
+                            todo_context += f"\n- Notes: {task_notes}"
+                        if task_category:
+                            todo_context += f"\n- Category: {task_category}"
+                        if task_priority:
+                            todo_context += f"\n- Priority: {task_priority}"
+                        if task_due:
+                            todo_context += f"\n- Due: {task_due}"
+                        todo_context += (
+                            "\nHelp the user with this task."
+                            " You can update it, break it down, or answer questions about it."
+                        )
+                except Exception as e:
+                    logger.error(f"Failed to fetch todo context: {e}")
 
     tool_names = list(OPENAI_TOOL_SCHEMAS.keys()) + list(mcp_tools.keys())
     ready_data = {"ok": True, "tools": tool_names, "space_id": space_id, "session_id": session_id}
@@ -442,7 +473,7 @@ Today's date: {current_date}
 
 {user_context}Current context: You are helping the user in their "{space_name}" space.
 This space has the following categories: {categories_str}.
-When adding new tasks, choose a category from this list, or use "General" if none fit well."""
+When adding new tasks, choose a category from this list, or use "General" if none fit well.{todo_context}"""
 
     # -----------------------------------------------------------------------
     # Append user message to trajectory + display_messages
