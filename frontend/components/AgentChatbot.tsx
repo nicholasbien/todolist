@@ -457,9 +457,6 @@ export default function AgentChatbot({
         const formatResult = (data: any) => {
           if (data.ok === false) return `Error: ${data.error}`;
           if (data.tasks) return `Found ${data.tasks.length} tasks`;
-          if (data.weather) return `${data.weather.location}: ${data.weather.temperature_display}`;
-          if (data.books) return `Found ${data.books.length} book recommendations`;
-          if (data.quotes) return `"${data.quotes[0]}"`;
           if (data.results) return `Found ${data.results.length} results`;
           if (data.entries) return `Found ${data.entries.length} journal entries`;
           if (data.entry) return data.entry ? `Journal entry from ${data.entry.date}` : `No journal entry found`;
@@ -646,7 +643,7 @@ export default function AgentChatbot({
                 Hi, I&apos;m your personal assistant
               </p>
               <p className="text-gray-400 text-sm leading-relaxed">
-                Ask me anything! I can help you manage your tasks, check the weather, find information, and more.
+                Ask me anything! I can help you manage your tasks, find information, and more.
               </p>
 
               <div className="text-left space-y-4 mt-4">
@@ -670,16 +667,13 @@ export default function AgentChatbot({
                   <h4 className="text-sm font-semibold text-gray-200 mb-2">Information & Resources</h4>
                   <ul className="text-sm text-gray-400 space-y-1 ml-4">
                     <li>- Search the web for current information</li>
-                    <li>- Check current weather and forecasts</li>
-                    <li>- Get book recommendations</li>
-                    <li>- Find inspirational quotes</li>
                   </ul>
                 </div>
               </div>
 
               <div className="mt-4 pt-4 border-t border-gray-800">
                 <p className="text-sm text-gray-500 italic">
-                  Try: &quot;What should I get done today?&quot;, &quot;Summarize my latest journals&quot;, or &quot;What&apos;s the weather in NYC?&quot;
+                  Try: &quot;What should I get done today?&quot; or &quot;Summarize my latest journals&quot;
                 </p>
               </div>
             </div>

@@ -4,34 +4,7 @@ Pydantic schemas for agent tool validation and OpenAI function calling.
 
 from typing import List, Literal, Optional
 
-from pydantic import BaseModel, Field, model_validator
-
-
-class WeatherCurrentRequest(BaseModel):
-    location: str = Field(
-        ...,
-        description=(
-            "Location in one of these formats: "
-            "City name (e.g., 'Tokyo'), "
-            "City,CountryCode (e.g., 'Paris,FR'), "
-            "City,StateCode,US (e.g., 'Portland,OR,US' for US cities)"
-        ),
-    )
-    units: Literal["metric", "imperial", "kelvin"] = Field(default="imperial", description="Temperature units")
-
-
-class WeatherForecastRequest(BaseModel):
-    location: str = Field(
-        ...,
-        description=(
-            "Location in one of these formats: "
-            "City name (e.g., 'Tokyo'), "
-            "City,CountryCode (e.g., 'Paris,FR'), "
-            "City,StateCode,US (e.g., 'Portland,OR,US' for US cities)"
-        ),
-    )
-    days: int = Field(default=3, ge=1, le=5, description="Number of forecast days (1-5)")
-    units: Literal["metric", "imperial", "kelvin"] = Field(default="imperial", description="Temperature units")
+from pydantic import BaseModel, Field
 
 
 class TaskAddRequest(BaseModel):
@@ -85,31 +58,6 @@ class SearchRequest(BaseModel):
     limit: int = Field(default=8, ge=1, le=50, description="Maximum results")
 
 
-class BookRecommendationRequest(BaseModel):
-    query: Optional[str] = Field(
-        None,
-        description="Short search query for books - keep it brief (e.g., 'productivity', 'Python basics', 'sci-fi')",
-    )
-    queries: Optional[List[str]] = Field(None, description="Multiple short search queries to combine results from")
-    subject: Optional[str] = Field(
-        None,
-        description="Subject-specific search using single words/topics (e.g., 'python', 'programming', 'meditation')",
-    )
-    author: Optional[str] = Field(None, description="Search for books by a specific author name")
-    limit: int = Field(default=5, ge=1, le=20, description="Number of books to return")
-
-    @model_validator(mode="after")
-    def check_parameters(self):
-        if not self.query and not self.queries and not self.subject and not self.author:
-            raise ValueError("Either query, queries, subject, or author must be provided")
-        return self
-
-
-class InspirationalQuoteRequest(BaseModel):
-    goal: Literal["productivity", "self-care", "resilience"] = Field(..., description="User's current focus area")
-    limit: int = Field(default=1, ge=1, le=5, description="Number of quotes to return")
-
-
 class WebSearchRequest(BaseModel):
     query: str = Field(..., min_length=1, description="Search query")
     count: int = Field(default=5, ge=1, le=10, description="Number of results to return")
@@ -155,38 +103,6 @@ def get_openai_tool_schema(model_class: BaseModel) -> dict:
 # Tool schema mapping for OpenAI Responses API
 # Format: {"type": "function", "name": "...", "description": "...", "parameters": {...}}
 OPENAI_TOOL_SCHEMAS = {
-    "get_current_weather": {
-        "type": "function",
-        "name": "get_current_weather",
-        "description": "Get current weather conditions for a specific location. Call when user asks about current weather, temperature, or 'what's the weather like' in any location.",  # noqa: E501
-        "parameters": get_openai_tool_schema(WeatherCurrentRequest),
-    },
-    "get_weather_forecast": {
-        "type": "function",
-        "name": "get_weather_forecast",
-        "description": "Get multi-day weather forecast for a location. Call when user asks for weather predictions, forecast, or 'weather this week'.",  # noqa: E501
-        "parameters": get_openai_tool_schema(WeatherForecastRequest),
-    },
-    "get_book_recommendations": {
-        "type": "function",
-        "name": "get_book_recommendations",
-        "description": (
-            "Search for book recommendations using SHORT queries, subjects, or authors. "
-            "KEEP QUERIES BRIEF: use 'query' for short terms like 'productivity', 'Python basics', 'sci-fi'. "
-            "Use 'queries' for multiple short searches like ['meditation', 'mindfulness', 'habits']. "
-            "Use 'subject' for topics like 'programming', 'fiction'. Use 'author' for names like 'Stephen King'."
-        ),
-        "parameters": get_openai_tool_schema(BookRecommendationRequest),
-    },
-    "get_inspirational_quotes": {
-        "type": "function",
-        "name": "get_inspirational_quotes",
-        "description": (
-            "Fetch motivational quotes or affirmations tailored to a goal. "
-            "Call when user asks for inspiration, motivation, or positive affirmations."
-        ),
-        "parameters": get_openai_tool_schema(InspirationalQuoteRequest),
-    },
     "add_task": {
         "type": "function",
         "name": "add_task",
