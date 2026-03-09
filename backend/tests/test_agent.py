@@ -808,7 +808,7 @@ class TestAgentSystemPrompt:
         assert "get_current_weather" in AGENT_SYSTEM_PROMPT
         assert "add_task" in AGENT_SYSTEM_PROMPT
         assert "get_inspirational_quotes" in AGENT_SYSTEM_PROMPT
-        assert "Always use tools when they can help" in AGENT_SYSTEM_PROMPT
+        assert "Be proactive in using tools" in AGENT_SYSTEM_PROMPT
         assert "concise, well-formatted summary" in AGENT_SYSTEM_PROMPT
 
     def test_available_tools_registry(self):

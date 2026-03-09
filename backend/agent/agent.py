@@ -50,6 +50,17 @@ _jinja_env = jinja2.Environment(
     keep_trailing_newline=True,
 )
 
+# Module-level rendered prompt for backward compatibility with existing importers.
+# Rendered with placeholder values; the live path re-renders per-request with
+# real context (date, space, categories, etc.).
+AGENT_SYSTEM_PROMPT: str = _jinja_env.get_template("agent_developer_instructions.j2").render(
+    current_date="",
+    user_context="",
+    space_name="Default",
+    categories_str="General",
+    todo_context="",
+)
+
 # Global MCP session storage
 mcp_sessions: Dict[str, ClientSession] = {}
 mcp_contexts: Dict[str, Any] = {}
