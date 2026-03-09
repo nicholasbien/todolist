@@ -97,6 +97,19 @@ async def create_todo(todo: Todo):
         if final_space_id and not await user_in_space(todo.user_id, final_space_id):
             raise HTTPException(status_code=403, detail="Not in space")
 
+        # Validate parent_id belongs to same user/space
+        if todo.parent_id:
+            parent = await todos_collection.find_one({"_id": ObjectId(todo.parent_id)})
+            if not parent:
+                raise HTTPException(status_code=404, detail="Parent todo not found")
+            if parent.get("space_id") != final_space_id:
+                raise HTTPException(status_code=403, detail="Parent todo not in same space")
+            if not parent.get("space_id") and parent.get("user_id") != todo.user_id:
+                raise HTTPException(status_code=403, detail="Parent todo not owned by user")
+            # Prevent nested sub-tasks (only one level)
+            if parent.get("parent_id"):
+                raise HTTPException(status_code=400, detail="Cannot create sub-task of a sub-task")
+
         result = await todos_collection.insert_one(todo_dict)
 
         # Get the inserted document with the new _id
@@ -234,25 +247,33 @@ async def complete_todo(todo_id: str, user_id: str):
             )
         if result.modified_count == 1:
             # Auto-complete logic for sub-tasks
-            if new_completed_status and todo.get("parent_id"):
-                # Check if all sibling sub-tasks are now complete
-                incomplete_siblings = await todos_collection.count_documents(
-                    {
-                        "parent_id": todo["parent_id"],
-                        "completed": False,
-                    }
-                )
-                if incomplete_siblings == 0:
-                    await todos_collection.update_one(
-                        {"_id": ObjectId(todo["parent_id"])},
-                        {"$set": {"completed": True, "dateCompleted": datetime.now().isoformat()}},
+            # Scope parent query to same space to prevent cross-user manipulation
+            if todo.get("parent_id"):
+                parent_query = {"_id": ObjectId(todo["parent_id"])}
+                if todo.get("space_id"):
+                    parent_query["space_id"] = todo["space_id"]
+                else:
+                    parent_query["user_id"] = user_id
+
+                if new_completed_status:
+                    # Check if all sibling sub-tasks are now complete
+                    incomplete_siblings = await todos_collection.count_documents(
+                        {
+                            "parent_id": todo["parent_id"],
+                            "completed": False,
+                        }
                     )
-            elif not new_completed_status and todo.get("parent_id"):
-                # Uncompleting a sub-task → uncomplete parent if it was auto-completed
-                await todos_collection.update_one(
-                    {"_id": ObjectId(todo["parent_id"]), "completed": True},
-                    {"$set": {"completed": False}, "$unset": {"dateCompleted": ""}},
-                )
+                    if incomplete_siblings == 0:
+                        await todos_collection.update_one(
+                            parent_query,
+                            {"$set": {"completed": True, "dateCompleted": datetime.now().isoformat()}},
+                        )
+                else:
+                    # Uncompleting a sub-task → uncomplete parent if it was auto-completed
+                    await todos_collection.update_one(
+                        {**parent_query, "completed": True},
+                        {"$set": {"completed": False}, "$unset": {"dateCompleted": ""}},
+                    )
 
             status = "complete" if new_completed_status else "incomplete"
             return {"message": f"Todo marked as {status}"}

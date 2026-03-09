@@ -1899,8 +1899,6 @@ export default function AIToDoListApp({
                       handleDeleteTodo={handleDeleteTodo}
                       isCollaborative={(activeSpace?.member_ids?.length ?? 0) > 1}
                       onEdit={handleEditTodo}
-                      onChat={handleChatAboutTodo}
-                      sessionStatus={todoSessionStatuses[child._id] as any}
                       isSubtask
                     />
                   </div>
@@ -1939,7 +1937,7 @@ export default function AIToDoListApp({
                 isCollaborative={(activeSpace?.member_ids?.length ?? 0) > 1}
                 onEdit={handleEditTodo}
               />
-              {childrenByParent.get(todo._id)?.filter(c => c.completed).map((child) => (
+              {childrenByParent.get(todo._id)?.map((child) => (
                 <div key={child._id} className="ml-8">
                   <TodoItem
                     todo={child}
