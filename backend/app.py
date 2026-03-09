@@ -370,16 +370,18 @@ async def api_create_todo(request: Request, current_user: dict = Depends(get_cur
                 todo_dict = result.dict(by_alias=True)
                 todo_id = str(todo_dict["_id"])
                 # Build initial message with task details
-                parts = [f"Task: {todo_dict['text']}"]
+                details = []
                 if todo_dict.get("category") and todo_dict["category"] != "General":
-                    parts.append(f"Category: {todo_dict['category']}")
+                    details.append(f"Category: {todo_dict['category']}")
                 if todo_dict.get("priority"):
-                    parts.append(f"Priority: {todo_dict['priority']}")
+                    details.append(f"Priority: {todo_dict['priority']}")
                 if todo_dict.get("dueDate"):
-                    parts.append(f"Due: {todo_dict['dueDate']}")
+                    details.append(f"Due: {todo_dict['dueDate']}")
                 if todo_dict.get("notes"):
-                    parts.append(f"Notes: {todo_dict['notes']}")
-                initial_msg = "\n".join(parts)
+                    details.append(f"Notes: {todo_dict['notes']}")
+                initial_msg = f"Please help me with this task: {todo_dict['text']}"
+                if details:
+                    initial_msg += "\n" + "\n".join(details)
 
                 # Post as assistant if agent-created, user if user-created
                 role = "assistant" if body.get("creator_type") == "agent" else "user"
