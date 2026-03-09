@@ -46,6 +46,7 @@ export default function AgentChatbot({
 
   // Task session mode: when viewing a task-linked session
   const [isTaskSession, setIsTaskSession] = useState(false);
+  const [taskInitialMessage, setTaskInitialMessage] = useState<string | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
@@ -106,6 +107,9 @@ export default function AgentChatbot({
         const data = await res.json();
         const displayMessages = data.display_messages || [];
         setCurrentSessionId(pendingSessionId);
+        // Save the first user message for reset functionality
+        const firstUserMsg = displayMessages.find((m: any) => m.role === 'user');
+        if (firstUserMsg) setTaskInitialMessage(firstUserMsg.content);
 
         // If waiting for agent (last message is user), auto-trigger streaming
         const lastMsg = displayMessages[displayMessages.length - 1];
@@ -275,7 +279,30 @@ export default function AgentChatbot({
     setMessages([]);
     setShowSessionDropdown(false);
     setIsTaskSession(false);
+    setTaskInitialMessage(null);
     messageQueueRef.current = [];
+  };
+
+  // -----------------------------------------------------------------------
+  // Reset task chat — delete session and restart with original message
+  // -----------------------------------------------------------------------
+  const handleResetTaskChat = async () => {
+    if (!currentSessionId || !taskInitialMessage || !token) return;
+    try {
+      // Delete the current session
+      await fetch(`/agent/sessions/${currentSessionId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      // Clear UI and start fresh
+      setMessages([]);
+      setCurrentSessionId(null);
+      messageQueueRef.current = [];
+      // Re-send the initial message (will create a new session)
+      handleStreamingAsk(taskInitialMessage);
+    } catch (err) {
+      console.error('Failed to reset task chat:', err);
+    }
   };
 
   // -----------------------------------------------------------------------
@@ -443,14 +470,23 @@ export default function AgentChatbot({
       {/* Top bar */}
       <div className="mb-2 flex items-center gap-2 flex-shrink-0">
         {isTaskSession ? (
-          // Back button when viewing a task session
-          <button
-            onClick={handleNewChat}
-            className="bg-gray-700 text-gray-200 px-3 py-1 rounded text-sm hover:bg-gray-600 transition-colors flex items-center gap-1"
-          >
-            <ArrowLeft className="w-3 h-3" />
-            Back to Assistant
-          </button>
+          // Back + Reset buttons when viewing a task session
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleNewChat}
+              className="bg-gray-700 text-gray-200 px-3 py-1 rounded text-sm hover:bg-gray-600 transition-colors flex items-center gap-1"
+            >
+              <ArrowLeft className="w-3 h-3" />
+              Back to Assistant
+            </button>
+            <button
+              onClick={handleResetTaskChat}
+              disabled={loading || !taskInitialMessage}
+              className="border border-gray-600 text-gray-400 px-3 py-1 rounded text-sm hover:bg-gray-800 hover:text-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              Reset Chat
+            </button>
+          </div>
         ) : (
           // Past Chats dropdown (main assistant mode)
           <div className="relative" ref={dropdownRef}>
