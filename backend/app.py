@@ -940,6 +940,7 @@ class PostMessageRequest(BaseModel):
     role: str = "user"
     content: str
     agent_id: Optional[str] = None
+    interim: bool = False
 
 
 @app.post("/agent/sessions")
@@ -981,7 +982,7 @@ async def api_post_session_message(
 ):
     """Post a message to a session."""
     user_id = current_user["user_id"]
-    message = await append_message(session_id, user_id, req.role, req.content, req.agent_id)
+    message = await append_message(session_id, user_id, req.role, req.content, req.agent_id, interim=req.interim)
     return {"ok": True, "message": message}
 
 

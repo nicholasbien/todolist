@@ -140,7 +140,12 @@ async def find_session_by_todo(user_id: str, todo_id: str) -> Optional[Dict[str,
 
 
 async def append_message(
-    session_id: str, user_id: str, role: str, content: str, agent_id: Optional[str] = None
+    session_id: str,
+    user_id: str,
+    role: str,
+    content: str,
+    agent_id: Optional[str] = None,
+    interim: bool = False,
 ) -> Dict[str, Any]:
     """Append a message to a session's display_messages and update flags.
 
@@ -148,6 +153,11 @@ async def append_message(
     When an assistant posts: sets needs_agent_response=False, has_unread_reply=True.
     If agent_id is provided on an assistant message, stamps the session so
     future followups route back to that agent.
+
+    If interim=True and role is "assistant", the message is posted but
+    needs_agent_response is NOT cleared.  This allows progress updates
+    (e.g. "Working on this...") without removing the session from the
+    pending queue, so the final response can be posted later.
     """
     now = datetime.utcnow()
     message: Dict[str, Any] = {"role": role, "content": content, "timestamp": now.isoformat()}
@@ -168,7 +178,8 @@ async def append_message(
     if role == "user":
         update["needs_agent_response"] = True
     elif role == "assistant":
-        update["needs_agent_response"] = False
+        if not interim:
+            update["needs_agent_response"] = False
         update["has_unread_reply"] = True
         if agent_id:
             update["agent_id"] = agent_id
@@ -214,8 +225,38 @@ async def get_pending_sessions(
 
     cursor = sessions_collection.find(query).sort("updated_at", -1).limit(MAX_ACTIVE_SESSIONS)
     items = await cursor.to_list(length=MAX_ACTIVE_SESSIONS)
+
+    # Enrich each session with message count and recent user messages
     for item in items:
         item["_id"] = str(item["_id"])
+        session_id = item["_id"]
+        # A follow-up is when an agent previously claimed this session (agent_id set)
+        # but it needs a response again — meaning the user sent another message.
+        # New unclaimed sessions have needs_agent_response=True but no agent_id.
+        item["is_followup"] = bool(item.get("agent_id"))
+
+        # Fetch message count and recent user messages from trajectory
+        traj = await trajectories_collection.find_one(
+            {"session_id": session_id},
+            {"display_messages": 1},
+        )
+        if traj and traj.get("display_messages"):
+            msgs = traj["display_messages"]
+            item["message_count"] = len(msgs)
+            # Collect all user messages since the last assistant response
+            recent: List[str] = []
+            for msg in reversed(msgs):
+                if msg.get("role") == "assistant":
+                    break
+                if msg.get("role") == "user":
+                    content = msg.get("content", "")
+                    recent.append(content[:200] if len(content) > 200 else content)
+            recent.reverse()
+            item["recent_messages"] = recent
+        else:
+            item["message_count"] = 0
+            item["recent_messages"] = []
+
     return items
 
 
