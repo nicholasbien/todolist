@@ -51,6 +51,8 @@ export default function AgentChatbot({
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const shouldAutoScrollRef = useRef(true);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const messageQueueRef = useRef<string[]>([]);
+  const isStreamingRef = useRef(false);
 
   // -----------------------------------------------------------------------
   // Fetch sessions list
@@ -273,6 +275,7 @@ export default function AgentChatbot({
     setMessages([]);
     setShowSessionDropdown(false);
     setIsTaskSession(false);
+    messageQueueRef.current = [];
   };
 
   // -----------------------------------------------------------------------
@@ -284,15 +287,32 @@ export default function AgentChatbot({
     setQuestion('');
     shouldAutoScrollRef.current = true;
 
-    // All chats use streaming AI — task sessions just have extra context
+    if (isStreamingRef.current) {
+      // Queue the message — show it in UI immediately
+      messageQueueRef.current.push(userMessage);
+      setMessages((prev) => [...prev, { role: 'user', content: userMessage }]);
+      return;
+    }
+
     handleStreamingAsk(userMessage);
   };
 
   // -----------------------------------------------------------------------
   // Streaming AI chat (main assistant mode)
   // -----------------------------------------------------------------------
-  const handleStreamingAsk = async (userQuestion: string) => {
-    setMessages((prev) => [...prev, { role: 'user', content: userQuestion }]);
+  const processQueue = () => {
+    if (messageQueueRef.current.length > 0) {
+      const next = messageQueueRef.current.shift()!;
+      // Message already shown in UI from handleSend
+      handleStreamingAsk(next, true);
+    }
+  };
+
+  const handleStreamingAsk = async (userQuestion: string, skipAddMessage?: boolean) => {
+    if (!skipAddMessage) {
+      setMessages((prev) => [...prev, { role: 'user', content: userQuestion }]);
+    }
+    isStreamingRef.current = true;
     setLoading(true);
     setError('');
 
@@ -365,17 +385,23 @@ export default function AgentChatbot({
 
       es.addEventListener('done', () => {
         es.close();
+        isStreamingRef.current = false;
         fetchSessions();
+        processQueue();
       });
 
       es.addEventListener('error', () => {
         setError('Error receiving response');
         setLoading(false);
+        isStreamingRef.current = false;
         es.close();
+        messageQueueRef.current = [];
       });
     } catch (err: any) {
       setError(err.message || 'Error');
       setLoading(false);
+      isStreamingRef.current = false;
+      messageQueueRef.current = [];
     }
   };
 
@@ -628,7 +654,7 @@ export default function AgentChatbot({
                 ? "Send a message about this task..."
                 : "Ask a question..."
             }
-            disabled={loading || !isOnline}
+            disabled={!isOnline}
             onMouseEnter={() => !isOnline && setShowOfflineMessage(true)}
             onMouseLeave={() => setShowOfflineMessage(false)}
             onClick={handleOfflineClick}
@@ -646,7 +672,7 @@ export default function AgentChatbot({
         </div>
         <button
           onClick={handleSend}
-          disabled={loading || !question.trim() || !isOnline}
+          disabled={!question.trim() || !isOnline}
           className={`border px-6 py-3 rounded-lg hover:bg-accent/10 disabled:opacity-50 disabled:cursor-not-allowed transition-colors ${
             isQuestionFocused
               ? 'border-accent text-accent'
