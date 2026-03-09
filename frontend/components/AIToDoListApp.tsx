@@ -925,6 +925,10 @@ export default function AIToDoListApp({
   // Update todo category
   const handleUpdateCategory = async (todoId, newCategory) => {
     try {
+      // Optimistic update
+      setTodos(prev => prev.map(t => t._id === todoId ? { ...t, category: newCategory } : t));
+      setEditingCategory(null);
+
       const response = await authenticatedFetch(`/todos/${todoId}`, {
         method: 'PUT',
         body: JSON.stringify({ category: newCategory }),
@@ -935,11 +939,10 @@ export default function AIToDoListApp({
         throw new Error(errorData.detail || 'Failed to update category');
       }
 
-      // Refresh todos list
-      await fetchTodos(false);
-      setEditingCategory(null);
       setError('');
     } catch (err) {
+      // Revert on failure
+      await fetchTodos(false);
       handleError(err, 'Error updating category');
     }
   };
@@ -1047,6 +1050,10 @@ export default function AIToDoListApp({
         dueDate: editDueDate || null,
         space_id: editSpaceId, // Always include space_id since todos must have a space
       };
+      // Optimistic update
+      setTodos(prev => prev.map(t => t._id === todoToEdit._id ? { ...t, ...updates } : t));
+      setShowEditTodoModal(false);
+
       const response = await authenticatedFetch(`/todos/${todoToEdit._id}`, {
         method: 'PUT',
         body: JSON.stringify(updates),
@@ -1055,10 +1062,10 @@ export default function AIToDoListApp({
         const errorData = await response.json();
         throw new Error(errorData.detail || 'Failed to update todo');
       }
-      await fetchTodos(false);
-      setShowEditTodoModal(false);
       setTodoToEdit(null);
     } catch (err) {
+      // Revert on failure
+      await fetchTodos(false);
       handleError(err, 'Error updating todo');
     }
   };
