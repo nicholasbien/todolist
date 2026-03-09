@@ -1,244 +1,236 @@
 ---
 name: todolist
-version: 1.0.0
-description: Manage your AI-powered todo list, journal, and chat sessions via the TodoList app API
-author: todolist
-triggers:
-  - todo
-  - todos
-  - task
-  - tasks
-  - add task
-  - journal
-  - write journal
-  - my todos
-  - todolist
-tools:
-  - fetch_url
-  - run_script
+description: Manage todos, journal entries, and task-linked chat sessions via the TodoList app API. Use when the user asks about their tasks, todos, journal, or wants to add/update/complete tasks.
+allowed-tools: ["exec"]
+metadata: {"openclaw": {"requires": {"bins": ["curl", "jq"], "env": ["TODOLIST_AUTH_TOKEN"]}, "primaryEnv": "TODOLIST_AUTH_TOKEN"}}
 ---
 
 # TodoList App Integration
 
-You are connected to a TodoList app — an AI-powered collaborative todo list with journaling and chat sessions.
+You are connected to a TodoList app — an AI-powered collaborative todo list with journaling and task-linked chat sessions.
 
 ## Setup
 
-Before first use, the user must set these environment variables (or you can ask them):
+Two environment variables are required:
 
 - `TODOLIST_API_URL` — The API base URL (default: `https://app.todolist.nyc`)
 - `TODOLIST_AUTH_TOKEN` — A JWT auth token
 
-If `TODOLIST_AUTH_TOKEN` is not set, help the user log in by running the `scripts/login.sh` script in this skill's directory. It will prompt for their email and verification code, then return a token.
+If `TODOLIST_AUTH_TOKEN` is not set, help the user log in by running: `bash {baseDir}/scripts/login.sh`
 
 ## Authentication
 
-All API requests require the header:
-```
-Authorization: Bearer $TODOLIST_AUTH_TOKEN
-```
+All API requests require the header: `Authorization: Bearer $TODOLIST_AUTH_TOKEN`
 
-## Available Operations
+If `TODOLIST_API_URL` is not set, default to `https://app.todolist.nyc`.
 
-### List Todos
+## Step 1: Get the Space ID
+
+Before any operation, you need a `SPACE_ID`. Call this once and reuse the result:
+
 ```bash
 curl -s -H "Authorization: Bearer $TODOLIST_AUTH_TOKEN" \
-  "$TODOLIST_API_URL/todos?space_id=$SPACE_ID"
+  "${TODOLIST_API_URL:-https://app.todolist.nyc}/spaces" | jq '.'
 ```
-Returns an array of todo objects. Each has `_id`, `text`, `completed`, `category`, `priority`, `space_id`.
+
+Use the first space's `_id` value as `SPACE_ID` for all subsequent calls. If the user has multiple spaces, ask which one to use.
+
+## Operations
+
+### List Todos
+
+```bash
+curl -s -H "Authorization: Bearer $TODOLIST_AUTH_TOKEN" \
+  "${TODOLIST_API_URL:-https://app.todolist.nyc}/todos?space_id=SPACE_ID" | jq '.'
+```
+
+Each todo has: `_id`, `text`, `completed`, `category`, `priority`, `space_id`.
 
 ### Add a Todo
+
 ```bash
 curl -s -X POST -H "Authorization: Bearer $TODOLIST_AUTH_TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"text": "Your task here", "space_id": "SPACE_ID"}' \
-  "$TODOLIST_API_URL/todos"
+  -d '{"text": "YOUR_TASK_TEXT", "space_id": "SPACE_ID"}' \
+  "${TODOLIST_API_URL:-https://app.todolist.nyc}/todos" | jq '.'
 ```
-The backend auto-classifies the category and priority using AI. You only need to provide `text` and `space_id`.
+
+Only provide `text` and `space_id`. The backend auto-classifies category and priority using AI.
 
 ### Update a Todo
+
 ```bash
 curl -s -X PUT -H "Authorization: Bearer $TODOLIST_AUTH_TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"text": "Updated text"}' \
-  "$TODOLIST_API_URL/todos/TODO_ID"
+  -d '{"text": "UPDATED_TEXT"}' \
+  "${TODOLIST_API_URL:-https://app.todolist.nyc}/todos/TODO_ID" | jq '.'
 ```
 
 ### Complete a Todo
+
 ```bash
 curl -s -X PUT -H "Authorization: Bearer $TODOLIST_AUTH_TOKEN" \
-  "$TODOLIST_API_URL/todos/TODO_ID/complete"
+  "${TODOLIST_API_URL:-https://app.todolist.nyc}/todos/TODO_ID/complete" | jq '.'
 ```
 
 ### Delete a Todo
+
 ```bash
 curl -s -X DELETE -H "Authorization: Bearer $TODOLIST_AUTH_TOKEN" \
-  "$TODOLIST_API_URL/todos/TODO_ID"
+  "${TODOLIST_API_URL:-https://app.todolist.nyc}/todos/TODO_ID"
 ```
-
-### List Spaces
-```bash
-curl -s -H "Authorization: Bearer $TODOLIST_AUTH_TOKEN" \
-  "$TODOLIST_API_URL/spaces"
-```
-Returns available spaces. Use the first space's `_id` as `SPACE_ID` if the user doesn't specify one.
 
 ### Get Journal Entry
+
 ```bash
 curl -s -H "Authorization: Bearer $TODOLIST_AUTH_TOKEN" \
-  "$TODOLIST_API_URL/journals?date=YYYY-MM-DD&space_id=$SPACE_ID"
+  "${TODOLIST_API_URL:-https://app.todolist.nyc}/journals?date=YYYY-MM-DD&space_id=SPACE_ID" | jq '.'
 ```
 
 ### Write Journal Entry
+
 ```bash
 curl -s -X POST -H "Authorization: Bearer $TODOLIST_AUTH_TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"content": "Journal content here", "date": "YYYY-MM-DD", "space_id": "SPACE_ID"}' \
-  "$TODOLIST_API_URL/journals"
+  -d '{"content": "JOURNAL_CONTENT", "date": "YYYY-MM-DD", "space_id": "SPACE_ID"}' \
+  "${TODOLIST_API_URL:-https://app.todolist.nyc}/journals" | jq '.'
 ```
 
 ### Get Insights
+
 ```bash
 curl -s -H "Authorization: Bearer $TODOLIST_AUTH_TOKEN" \
-  "$TODOLIST_API_URL/insights?space_id=$SPACE_ID"
+  "${TODOLIST_API_URL:-https://app.todolist.nyc}/insights?space_id=SPACE_ID" | jq '.'
 ```
-Returns analytics about todo completion rates, categories, and trends.
 
 ### Export Data
+
 ```bash
 curl -s -H "Authorization: Bearer $TODOLIST_AUTH_TOKEN" \
-  "$TODOLIST_API_URL/export?data=todos&space_id=$SPACE_ID&format=json"
+  "${TODOLIST_API_URL:-https://app.todolist.nyc}/export?data=todos&space_id=SPACE_ID&format=json"
 ```
+
 Supports `data=todos` or `data=journals`, and `format=json` or `format=csv`.
 
-### Chat Sessions (Task-Linked Messaging)
+## Task-Linked Chat Sessions
 
-Sessions are conversation threads that can be **linked to specific todos** via `todo_id`. This lets you track discussions, context, and progress per task. Each todo can have at most one linked session.
+Sessions are conversation threads that can be **linked to a specific todo** via `todo_id`. Each todo can have at most one linked session. This lets you track discussions and progress per task.
 
-#### List Sessions
+### List Sessions
+
 ```bash
 curl -s -H "Authorization: Bearer $TODOLIST_AUTH_TOKEN" \
-  "$TODOLIST_API_URL/agent/sessions?space_id=$SPACE_ID"
+  "${TODOLIST_API_URL:-https://app.todolist.nyc}/agent/sessions?space_id=SPACE_ID" | jq '.'
 ```
-Each session object includes: `_id`, `title`, `todo_id` (if linked), `needs_agent_response`, `has_unread_reply`, `created_at`, `updated_at`.
 
-#### Create a Session (Linked to a Todo)
+Each session includes: `_id`, `title`, `todo_id` (if linked), `needs_agent_response`, `has_unread_reply`.
+
+### Create a Session Linked to a Todo
+
 ```bash
 curl -s -X POST -H "Authorization: Bearer $TODOLIST_AUTH_TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"title": "Session title", "space_id": "SPACE_ID", "todo_id": "TODO_ID", "initial_message": "First message", "initial_role": "user"}' \
-  "$TODOLIST_API_URL/agent/sessions"
+  -d '{"title": "SESSION_TITLE", "space_id": "SPACE_ID", "todo_id": "TODO_ID", "initial_message": "FIRST_MESSAGE", "initial_role": "assistant"}' \
+  "${TODOLIST_API_URL:-https://app.todolist.nyc}/agent/sessions" | jq '.'
 ```
-- `todo_id` (optional) — Links this session to a specific todo. Omit for standalone sessions.
-- `initial_message` (optional) — Post a first message automatically on creation.
-- `initial_role` (optional) — `"user"` or `"assistant"` (default: `"user"`).
 
-#### Get a Session with Messages
+- `todo_id` is optional. Omit it for standalone sessions.
+- `initial_message` and `initial_role` are optional. Use them to post a first message on creation.
+
+### Get a Session with Messages
+
 ```bash
 curl -s -H "Authorization: Bearer $TODOLIST_AUTH_TOKEN" \
-  "$TODOLIST_API_URL/agent/sessions/SESSION_ID"
+  "${TODOLIST_API_URL:-https://app.todolist.nyc}/agent/sessions/SESSION_ID" | jq '.'
 ```
-Returns the session with its full `display_messages` array and `todo_id` link.
 
-#### Get Pending Sessions (Awaiting Response)
+Returns the session with its `display_messages` array and `todo_id`.
+
+### Get Pending Sessions (Awaiting Your Response)
+
 ```bash
 curl -s -H "Authorization: Bearer $TODOLIST_AUTH_TOKEN" \
-  "$TODOLIST_API_URL/agent/sessions/pending?space_id=$SPACE_ID"
+  "${TODOLIST_API_URL:-https://app.todolist.nyc}/agent/sessions/pending?space_id=SPACE_ID" | jq '.'
 ```
-Returns sessions where `needs_agent_response` is true — i.e., the user posted a message and is waiting for a reply. Each result includes the `todo_id` if linked.
 
-#### Post a Message to a Session
+Returns sessions where the user posted a message and is waiting for a reply. Each includes `todo_id` if linked.
+
+### Reply to a Session
+
 ```bash
 curl -s -X POST -H "Authorization: Bearer $TODOLIST_AUTH_TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"content": "Your response here", "role": "assistant"}' \
-  "$TODOLIST_API_URL/agent/sessions/SESSION_ID/messages"
+  -d '{"content": "YOUR_REPLY", "role": "assistant"}' \
+  "${TODOLIST_API_URL:-https://app.todolist.nyc}/agent/sessions/SESSION_ID/messages" | jq '.'
 ```
-- `role`: `"assistant"` (for agent replies) or `"user"` (for user messages).
-- Posting as `assistant` clears the `needs_agent_response` flag and sets `has_unread_reply` so the user sees a notification.
 
-#### Get Session Status for All Todos
+Posting as `assistant` clears the pending flag and notifies the user.
+
+### Check Session Status for All Todos
+
 ```bash
 curl -s -H "Authorization: Bearer $TODOLIST_AUTH_TOKEN" \
-  "$TODOLIST_API_URL/agent/sessions/unread-todos?space_id=$SPACE_ID"
+  "${TODOLIST_API_URL:-https://app.todolist.nyc}/agent/sessions/unread-todos?space_id=SPACE_ID" | jq '.'
 ```
-Returns a map of `todo_id` → status (`"waiting"` or `"unread_reply"`) so you can see at a glance which tasks have active conversations.
 
-#### Delete a Session
+Returns `todo_id` → status (`"waiting"` or `"unread_reply"`).
+
+### Delete a Session
+
 ```bash
 curl -s -X DELETE -H "Authorization: Bearer $TODOLIST_AUTH_TOKEN" \
-  "$TODOLIST_API_URL/agent/sessions/SESSION_ID"
+  "${TODOLIST_API_URL:-https://app.todolist.nyc}/agent/sessions/SESSION_ID"
 ```
 
 ## Workflows
 
-### Basic: Managing Todos
-1. First call **List Spaces** to get the `space_id` (cache it for subsequent calls)
-2. Then call the relevant todo endpoint
+### When the user asks about their tasks
 
-### Adding Tasks
-1. Get the space_id if not cached
-2. Call **Add a Todo** with just the text — the backend handles classification
+1. Get the space ID (step 1 above)
+2. List todos
+3. Present them clearly
 
-### Journaling
-1. Use today's date (or the date they specify) in YYYY-MM-DD format
-2. Call **Get Journal Entry** or **Write Journal Entry**
+### When the user says "add task" or similar
+
+1. Get the space ID if you don't have it
+2. Add the todo — only provide `text` and `space_id`
+3. Confirm what was added, including the auto-assigned category
+
+### When the user asks about their journal
+
+1. Use today's date or the date they specify (YYYY-MM-DD format)
+2. Call get or write journal
 
 ### Responding to Pending Sessions (Agent Loop)
 
-This is the recommended workflow for acting as an autonomous agent that responds to user messages on tasks:
+Use this workflow to act as an autonomous agent responding to user messages on tasks:
 
-1. **Poll for pending sessions:**
-   ```bash
-   curl -s -H "Authorization: Bearer $TODOLIST_AUTH_TOKEN" \
-     "$TODOLIST_API_URL/agent/sessions/pending?space_id=$SPACE_ID"
-   ```
-
-2. **For each pending session**, read the conversation:
-   ```bash
-   curl -s -H "Authorization: Bearer $TODOLIST_AUTH_TOKEN" \
-     "$TODOLIST_API_URL/agent/sessions/SESSION_ID"
-   ```
-
-3. **Check the linked todo** (if `todo_id` is present) to understand context:
-   ```bash
-   curl -s -H "Authorization: Bearer $TODOLIST_AUTH_TOKEN" \
-     "$TODOLIST_API_URL/todos/TODO_ID"
-   ```
-
+1. **Poll** for pending sessions
+2. **For each pending session**, read the conversation via get session
+3. **If `todo_id` is present**, fetch the linked todo to understand context
 4. **Do the work** — update the todo, add new tasks, write a journal entry, etc.
+5. **Reply** to the session summarizing what you did
 
-5. **Reply to the session** with a summary of what you did:
-   ```bash
-   curl -s -X POST -H "Authorization: Bearer $TODOLIST_AUTH_TOKEN" \
-     -H "Content-Type: application/json" \
-     -d '{"content": "Done! I updated the task and added 2 subtasks.", "role": "assistant"}' \
-     "$TODOLIST_API_URL/agent/sessions/SESSION_ID/messages"
-   ```
+### Creating a Session for a New Task
 
-### Creating a Session for a Task
+When you add a todo and want to track discussion:
 
-When you add or update a todo and want to track discussion on it:
+1. Add the todo and capture its `_id` from the response
+2. Create a linked session with `todo_id` set to that `_id`
+3. Include an `initial_message` explaining the plan or context
 
-1. **Add the todo** and capture its `_id` from the response.
-2. **Create a linked session:**
-   ```bash
-   curl -s -X POST -H "Authorization: Bearer $TODOLIST_AUTH_TOKEN" \
-     -H "Content-Type: application/json" \
-     -d '{"title": "Discussion: Task name", "space_id": "SPACE_ID", "todo_id": "TODO_ID", "initial_message": "Created this task. Here is the plan...", "initial_role": "assistant"}' \
-     "$TODOLIST_API_URL/agent/sessions"
-   ```
-
-Now the user will see this session linked to their task in the app, and can reply to continue the conversation.
+The user will see the session linked to their task in the app and can reply to continue the conversation.
 
 ## Error Handling
 
-- **401 Unauthorized** — Token expired. Ask the user to re-authenticate by running the login script.
-- **404 Not Found** — The resource doesn't exist. Let the user know.
+- **401 Unauthorized** — Token expired. Re-run `{baseDir}/scripts/login.sh` to get a new token.
+- **404 Not Found** — The resource doesn't exist. Tell the user.
 - **422 Validation Error** — Check the request body format.
 
-## Notes
+## Rules
 
-- The app supports multiple collaborative spaces. Always confirm which space to use if the user has more than one.
-- Todos are auto-classified by AI into categories (Work, Personal, Health, etc.) and priorities (high, medium, low).
+- Never fabricate todo IDs, session IDs, or space IDs. Always get them from API responses.
+- Always confirm which space to use if the user has more than one.
+- When creating sessions for tasks, use descriptive titles that reference the task.
+- Default to today's date for journal operations unless the user specifies otherwise.
 - The production URL is `https://app.todolist.nyc`.
