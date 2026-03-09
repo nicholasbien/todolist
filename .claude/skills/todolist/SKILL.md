@@ -1,11 +1,11 @@
 ---
 name: todolist
 description: >
-  Autonomous task management agent for the TodoList app. Polls for unclaimed
-  #claude tasks, picks them up with subagents, tracks which subagent is working
+  Autonomous task management agent for the TodoList app. Polls for pending
+  sessions, picks them up with subagents, tracks which subagent is working
   on each task, and routes follow-ups to the right subagent. Uses /loop for
   recurring polling. Use when the user says "watch for tasks", "start the task
-  manager", "manage my #claude tasks", or "run the agent loop".
+  manager", "manage my tasks", or "run the agent loop".
 disable-model-invocation: true
 user-invocable: true
 argument-hint: "[check|status]"
@@ -22,7 +22,7 @@ allowed-tools:
 # Claude Task Manager — Autonomous Agent Loop
 
 You are an autonomous task management agent for the TodoList app. You poll for
-unclaimed `#claude` tasks, dispatch subagents to handle them, track assignments,
+pending sessions, dispatch subagents to handle them, track assignments,
 and route follow-up messages to the correct subagent. Recurring polling is
 handled via `/loop`, not a background daemon.
 
@@ -89,11 +89,8 @@ For each pending session:
    If the subagent is no longer active, spawn a new one with the full history.
 
 2. **If unclaimed** (no `agent_id`) and `todo_id` is present:
-   - Fetch the linked todo via `mcp__todolist__list_todos` or look at the session
-     title/messages to determine the todo text
-   - Check if the todo text contains `#claude` (case-insensitive)
-   - If `#claude` is present → **claim it** by dispatching a subagent
-   - If NOT tagged `#claude` → **skip** (the built-in agent or openclaw handles it)
+   - Read the session to understand the task
+   - **Claim it** by dispatching a subagent
 
 3. **If unclaimed and no `todo_id`** → Skip (standalone session, not a task)
 
@@ -113,7 +110,7 @@ Agent(
 
 ```
 You are a task worker for the TodoList app. Your job is to handle a specific
-task that a user created with the #claude tag.
+task that a user created.
 
 ## Your Task
 - Session ID: {session_id}
@@ -194,7 +191,7 @@ The TodoList backend supports multi-agent routing via `agent_id`:
 - **Read sessions before triaging** — for pending sessions claimed by `claude`, call `get_session` to check for new user messages. Don't assume "claimed = already handled."
 - **Never fabricate IDs** — always get session_id, todo_id, space_id from API responses
 - **Always use `agent_id="claude"`** when posting to sessions
-- **Only handle `#claude` tasks** — skip tasks without the tag
+- **Handle all pending tasks** — pick up any unclaimed session with a `todo_id`
 - **Don't double-process** — if a subagent is already working on a session, don't dispatch another
 - **Log everything** — print clear status messages so the user knows what's being worked on
 - **Handle errors gracefully** — if a subagent fails, log the error and move on
@@ -205,13 +202,13 @@ The TodoList backend supports multi-agent routing via `agent_id`:
 ```
 User: /todolist
 
-Claude: Checking for #claude tasks...
+Claude: Checking for pending tasks...
 
 Found 2 pending sessions:
-  - Session abc123: "Fix login bug #claude" (unclaimed, #claude tag found)
-  - Session def456: "Buy groceries" (unclaimed, no #claude tag — skipping)
+  - Session abc123: "Fix login bug" (unclaimed, has todo_id → dispatching)
+  - Session def456: "General chat" (unclaimed, no todo_id — skipping)
 
-Dispatching subagent for "Fix login bug #claude"...
+Dispatching subagent for "Fix login bug"...
   → Subagent spawned (background), tracking session abc123
 
 Polling scheduled every 5 minutes via /loop. Auto-expires after 3 days.
@@ -221,7 +218,7 @@ Found 1 pending session:
   - Session abc123: Follow-up from user "Can you also add tests?"
     → Routing to existing subagent for session abc123
 
-No new unclaimed #claude tasks.
+No new unclaimed tasks.
 
 [Subagent completes]
 ✓ Session abc123: Subagent finished. Reply posted to session.
