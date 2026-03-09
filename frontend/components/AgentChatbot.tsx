@@ -117,7 +117,7 @@ export default function AgentChatbot({
             setMessages(earlier);
           }
           setTimeout(() => {
-            handleStreamingAsk(lastMsg.content);
+            handleStreamingAsk(lastMsg.content, pendingSessionId);
           }, 0);
         } else {
           // Session already has agent response — just display everything
@@ -304,11 +304,11 @@ export default function AgentChatbot({
     if (messageQueueRef.current.length > 0) {
       const next = messageQueueRef.current.shift()!;
       // Message already shown in UI from handleSend
-      handleStreamingAsk(next, true);
+      handleStreamingAsk(next, undefined, true);
     }
   };
 
-  const handleStreamingAsk = async (userQuestion: string, skipAddMessage?: boolean) => {
+  const handleStreamingAsk = async (userQuestion: string, overrideSessionId?: string, skipAddMessage?: boolean) => {
     if (!skipAddMessage) {
       setMessages((prev) => [...prev, { role: 'user', content: userQuestion }]);
     }
@@ -325,8 +325,9 @@ export default function AgentChatbot({
       if (activeSpace?._id) {
         params.append('space_id', activeSpace._id);
       }
-      if (currentSessionId) {
-        params.append('session_id', currentSessionId);
+      const sessionId = overrideSessionId || currentSessionId;
+      if (sessionId) {
+        params.append('session_id', sessionId);
       }
       if (token) {
         params.append('token', token);
@@ -338,7 +339,7 @@ export default function AgentChatbot({
 
       es.addEventListener('ready', (e) => {
         const data = JSON.parse((e as MessageEvent).data);
-        if (data.session_id && !currentSessionId) {
+        if (data.session_id && !currentSessionId && !overrideSessionId) {
           setCurrentSessionId(data.session_id);
         }
       });
