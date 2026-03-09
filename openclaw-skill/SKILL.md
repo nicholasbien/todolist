@@ -130,12 +130,13 @@ Each session includes: `_id`, `title`, `todo_id` (if linked), `needs_agent_respo
 ```bash
 curl -s -X POST -H "Authorization: Bearer $TODOLIST_AUTH_TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"title": "SESSION_TITLE", "space_id": "SPACE_ID", "todo_id": "TODO_ID", "initial_message": "FIRST_MESSAGE", "initial_role": "assistant"}' \
+  -d '{"title": "SESSION_TITLE", "space_id": "SPACE_ID", "todo_id": "TODO_ID", "initial_message": "FIRST_MESSAGE", "initial_role": "user", "agent_id": "openclaw"}' \
   "${TODOLIST_API_URL:-https://app.todolist.nyc}/agent/sessions" | jq '.'
 ```
 
 - `todo_id` is optional. Omit it for standalone sessions.
 - `initial_message` and `initial_role` are optional. Use them to post a first message on creation.
+- `agent_id` is optional. Use `"openclaw"` to claim the session at creation.
 
 ### Get a Session with Messages
 
@@ -209,12 +210,26 @@ curl -s -X DELETE -H "Authorization: Bearer $TODOLIST_AUTH_TOKEN" \
 
 Use this workflow to act as an autonomous agent responding to user messages on tasks:
 
+**Step A — Check pending sessions (followups and new session messages):**
+
 1. **Poll** for pending sessions with `agent_id=openclaw` — this returns your claimed sessions AND unclaimed ones
 2. **For each pending session**, read the conversation via get session
 3. **If the session already has `agent_id: openclaw`**, it's a followup — handle it directly
 4. **If unclaimed** (no `agent_id`) and `todo_id` is present, fetch the linked todo and **check the todo text for `#openclaw`** — if the tag is NOT present, **skip this session entirely** (the built-in agent will handle it)
 5. **Do the work** — update the todo, add new tasks, write a journal entry, etc.
 6. **Reply** to the session with `agent_id=openclaw` to claim it and send your response
+
+**Step B — Check for orphan #openclaw todos (no session yet):**
+
+Some `#openclaw` todos may not have a linked session (e.g. created offline or before auto-session creation). After checking pending sessions, also scan for these:
+
+1. **List all todos** for the space
+2. **Filter** for incomplete todos containing `#openclaw` in the text
+3. **For each**, try to look up a session via `GET /agent/sessions/by-todo/TODO_ID`
+4. **If 404** (no session exists), **create one**: `POST /agent/sessions` with `todo_id`, `title` (the task text), `agent_id=openclaw`, and an `initial_message` like "Please help me with this task: [task text]" with `initial_role=user`
+5. **Do the work** and **reply** to the new session with `agent_id=openclaw`
+
+This ensures every `#openclaw` todo gets picked up, even if no session existed when it was created.
 
 ### Creating a Session for a New Task
 
@@ -245,7 +260,7 @@ openclaw cron add \
   --name "todolist-watcher" \
   --every "5m" \
   --session isolated \
-  --message "Check for pending TodoList sessions and respond to them. Use the todolist skill. Follow the 'Responding to Pending Sessions' workflow: poll pending sessions with agent_id=openclaw, handle claimed followups directly, check unclaimed sessions for #openclaw in the todo text — only respond to those, skip all others. Always reply with agent_id=openclaw to claim sessions. If there are no pending sessions, do nothing."
+  --message "Check for pending TodoList sessions and respond to them. Use the todolist skill. Follow the 'Responding to Pending Sessions' workflow: Step A — poll pending sessions with agent_id=openclaw, handle claimed followups directly, check unclaimed sessions for #openclaw in the todo text — only respond to those, skip all others. Step B — list todos, find incomplete #openclaw todos without sessions (GET by-todo returns 404), create a session with agent_id=openclaw and do the work. Always reply with agent_id=openclaw. If nothing to do, exit cleanly."
 ```
 
 This creates an isolated session every 5 minutes that checks for work. Adjust the interval based on user preference.
@@ -259,10 +274,10 @@ openclaw cron remove todolist-watcher
 ### What happens in each cycle
 
 1. OpenClaw spawns an isolated session with the todolist skill loaded
-2. It polls `GET /agent/sessions/pending?agent_id=openclaw` for claimed + unclaimed sessions
-3. For claimed sessions (followups), it handles them directly
-4. For unclaimed sessions, it checks the linked todo for `#openclaw` — if present, does the work and replies with `agent_id=openclaw` to claim it
-5. **If not tagged**, it skips the session — the built-in agent will handle it
+2. **Step A** — Polls `GET /agent/sessions/pending?agent_id=openclaw` for claimed + unclaimed sessions
+3. For claimed sessions (followups), handles them directly
+4. For unclaimed sessions, checks the linked todo for `#openclaw` — if present, does the work and replies with `agent_id=openclaw` to claim it; if not tagged, skips
+5. **Step B** — Lists todos, finds incomplete `#openclaw` todos, checks each for an existing session (`GET /agent/sessions/by-todo/ID`). If no session (404), creates one with `agent_id=openclaw`, does the work, and replies
 6. The isolated session closes — no context pollution in the main chat
 
 ### Important

@@ -95,7 +95,7 @@ openclaw cron add \
   --name "todolist-watcher" \
   --every "5m" \
   --session isolated \
-  --message "Check for pending TodoList sessions and respond to them. Use the todolist skill. Follow the 'Responding to Pending Sessions' workflow: poll pending sessions with agent_id=openclaw, handle claimed followups directly, check unclaimed sessions for #openclaw in the todo text — only respond to those, skip all others. Always reply with agent_id=openclaw to claim sessions. If there are no pending sessions, do nothing."
+  --message "Check for pending TodoList sessions and respond to them. Use the todolist skill. Follow the 'Responding to Pending Sessions' workflow: Step A — poll pending sessions with agent_id=openclaw, handle claimed followups directly, check unclaimed sessions for #openclaw in the todo text — only respond to those, skip all others. Step B — list todos, find incomplete #openclaw todos without sessions (GET by-todo returns 404), create a session with agent_id=openclaw and do the work. Always reply with agent_id=openclaw. If nothing to do, exit cleanly."
 ```
 
 #### How it works
