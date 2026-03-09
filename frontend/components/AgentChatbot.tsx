@@ -238,6 +238,18 @@ export default function AgentChatbot({
     return () => clearInterval(poll);
   }, [isWaitingForExternalAgent, currentSessionId, token]);
 
+  // Lock body scroll when delete modal is open
+  useEffect(() => {
+    if (sessionToDelete) {
+      document.body.classList.add('modal-open');
+    } else {
+      document.body.classList.remove('modal-open');
+    }
+    return () => {
+      document.body.classList.remove('modal-open');
+    };
+  }, [sessionToDelete]);
+
   // -----------------------------------------------------------------------
   // Load a past session
   // -----------------------------------------------------------------------
@@ -593,8 +605,8 @@ export default function AgentChatbot({
       </div>
 
       {sessionToDelete && createPortal(
-        <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50">
-          <div className="bg-black border border-gray-800 p-6 rounded-xl w-80 space-y-4 shadow-2xl">
+        <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4" style={{overscrollBehavior: 'contain'}}>
+          <div className="bg-black border border-gray-800 p-6 rounded-xl w-80 space-y-4 shadow-2xl overflow-y-auto" style={{maxHeight: 'calc(100dvh - 2rem)'}}>
             <h3 className="text-gray-100 text-lg font-bold mb-2">Delete chat?</h3>
             <p className="text-sm text-gray-300">
               Delete <span className="font-medium">&quot;{sessionToDelete.title}&quot;</span>? This can&apos;t be undone.

@@ -227,6 +227,18 @@ export default function AIToDoListApp({
   const [pendingSessionId, setPendingSessionId] = useState<string | null>(null);
   const [todoSessionStatuses, setTodoSessionStatuses] = useState<Record<string, string>>({});
 
+  // Lock body scroll when any modal is open so background doesn't scroll (including when keyboard opens on mobile)
+  useEffect(() => {
+    const anyModalOpen = showAddSpaceModal || showEditSpaceModal || showAddCategoryModal || showEditCategoryModal || showEditTodoModal;
+    if (anyModalOpen) {
+      document.body.classList.add('modal-open');
+    } else {
+      document.body.classList.remove('modal-open');
+    }
+    return () => {
+      document.body.classList.remove('modal-open');
+    };
+  }, [showAddSpaceModal, showEditSpaceModal, showAddCategoryModal, showEditCategoryModal, showEditTodoModal]);
 
   const handleOpenEmailSettings = async () => {
     try {
@@ -1689,8 +1701,8 @@ export default function AIToDoListApp({
       </div>
 
       {showAddSpaceModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50">
-          <div className="bg-black border border-gray-800 p-6 rounded-xl w-80 space-y-4 shadow-2xl">
+        <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4" style={{overscrollBehavior: 'contain'}}>
+          <div className="bg-black border border-gray-800 p-6 rounded-xl w-80 space-y-4 shadow-2xl overflow-y-auto" style={{maxHeight: 'calc(100dvh - 2rem)'}}>
             <h3 className="text-gray-100 text-lg font-bold mb-2">Create Space</h3>
             <input
               type="text"
@@ -1710,8 +1722,8 @@ export default function AIToDoListApp({
       )}
 
       {showEditSpaceModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50">
-          <div className="bg-black border border-gray-800 p-6 rounded-xl w-80 space-y-4 shadow-2xl">
+        <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4" style={{overscrollBehavior: 'contain'}}>
+          <div className="bg-black border border-gray-800 p-6 rounded-xl w-80 space-y-4 shadow-2xl overflow-y-auto" style={{maxHeight: 'calc(100dvh - 2rem)'}}>
             {spaceToEdit && (spaceToEdit.owner_id === (user.id || user._id)) ? (
               <>
                 <h3 className="text-gray-100 text-lg font-bold mb-2">Edit Space</h3>
@@ -1779,8 +1791,8 @@ export default function AIToDoListApp({
 
       {/* Add Category Modal */}
       {showAddCategoryModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50">
-          <div className="bg-black border border-gray-800 p-6 rounded-xl w-80 space-y-4 shadow-2xl">
+        <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4" style={{overscrollBehavior: 'contain'}}>
+          <div className="bg-black border border-gray-800 p-6 rounded-xl w-80 space-y-4 shadow-2xl overflow-y-auto" style={{maxHeight: 'calc(100dvh - 2rem)'}}>
             <h3 className="text-gray-100 text-lg font-bold mb-2">Add New Category</h3>
             <input
               type="text"
@@ -1813,8 +1825,8 @@ export default function AIToDoListApp({
       )}
 
       {showEditCategoryModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50">
-          <div className="bg-black border border-gray-800 p-6 rounded-xl w-80 space-y-4 shadow-2xl">
+        <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4" style={{overscrollBehavior: 'contain'}}>
+          <div className="bg-black border border-gray-800 p-6 rounded-xl w-80 space-y-4 shadow-2xl overflow-y-auto" style={{maxHeight: 'calc(100dvh - 2rem)'}}>
             <h3 className="text-gray-100 text-lg font-bold mb-2">Edit Category</h3>
             <input
               type="text"
@@ -1912,8 +1924,8 @@ export default function AIToDoListApp({
 
 
       {showEditTodoModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50">
-          <div className="bg-black border border-gray-800 p-6 rounded-xl w-80 space-y-4 shadow-2xl">
+        <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4" style={{overscrollBehavior: 'contain'}}>
+          <div className="bg-black border border-gray-800 p-6 rounded-xl w-80 space-y-4 shadow-2xl overflow-y-auto" style={{maxHeight: 'calc(100dvh - 2rem)'}}>
             <h3 className="text-gray-100 text-lg font-bold mb-2">Edit Task</h3>
             <input
               type="text"
