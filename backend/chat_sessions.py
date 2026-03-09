@@ -149,7 +149,9 @@ async def append_message(
     future followups route back to that agent.
     """
     now = datetime.utcnow()
-    message = {"role": role, "content": content, "timestamp": now.isoformat()}
+    message: Dict[str, Any] = {"role": role, "content": content, "timestamp": now.isoformat()}
+    if agent_id and role == "assistant":
+        message["agent_id"] = agent_id
 
     # Update trajectory doc
     await trajectories_collection.update_one(
