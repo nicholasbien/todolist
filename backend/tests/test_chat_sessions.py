@@ -86,3 +86,64 @@ class TestPendingSessionEnrichment:
         sessions = await get_pending_sessions(user_id, space_id)
         session = next(s for s in sessions if s["_id"] == session_id)
         assert session["is_followup"] is False
+
+
+class TestInterimFlag:
+    """Tests for the interim flag on append_message."""
+
+    @pytest.mark.asyncio
+    async def test_interim_true_does_not_clear_needs_agent_response(self, client, user_id, space_id):
+        """An interim assistant message should NOT clear needs_agent_response."""
+        from chat_sessions import sessions_collection
+
+        session_id = await create_session(user_id, space_id, "Interim test", todo_id="todo_interim1")
+        await append_message(session_id, user_id, "user", "Help me")
+
+        # Verify needs_agent_response is True after user message
+        from bson import ObjectId
+
+        doc = await sessions_collection.find_one({"_id": ObjectId(session_id)})
+        assert doc["needs_agent_response"] is True
+
+        # Post interim assistant message
+        await append_message(session_id, user_id, "assistant", "Working on this...", agent_id="claude", interim=True)
+
+        doc = await sessions_collection.find_one({"_id": ObjectId(session_id)})
+        assert doc["needs_agent_response"] is True
+
+    @pytest.mark.asyncio
+    async def test_interim_false_clears_needs_agent_response(self, client, user_id, space_id):
+        """A non-interim (default) assistant message SHOULD clear needs_agent_response."""
+        from chat_sessions import sessions_collection
+
+        session_id = await create_session(user_id, space_id, "Non-interim test", todo_id="todo_interim2")
+        await append_message(session_id, user_id, "user", "Help me")
+
+        from bson import ObjectId
+
+        doc = await sessions_collection.find_one({"_id": ObjectId(session_id)})
+        assert doc["needs_agent_response"] is True
+
+        # Post non-interim assistant message (default)
+        await append_message(session_id, user_id, "assistant", "Here is the answer", agent_id="claude")
+
+        doc = await sessions_collection.find_one({"_id": ObjectId(session_id)})
+        assert doc["needs_agent_response"] is False
+
+    @pytest.mark.asyncio
+    async def test_interim_true_still_sets_unread_and_agent_id(self, client, user_id, space_id):
+        """An interim message should still set has_unread_reply and agent_id."""
+        from chat_sessions import sessions_collection
+
+        session_id = await create_session(user_id, space_id, "Interim flags test", todo_id="todo_interim3")
+        await append_message(session_id, user_id, "user", "Help me")
+
+        await append_message(
+            session_id, user_id, "assistant", "Working on this...", agent_id="test-agent", interim=True
+        )
+
+        from bson import ObjectId
+
+        doc = await sessions_collection.find_one({"_id": ObjectId(session_id)})
+        assert doc["has_unread_reply"] is True
+        assert doc["agent_id"] == "test-agent"

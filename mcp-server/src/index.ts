@@ -229,7 +229,7 @@ class TodolistMCPServer {
           },
           {
             name: 'post_to_session',
-            description: 'Post a message to a session. Use agent_id to claim the session for future routing.',
+            description: 'Post a message to a session. Use agent_id to claim the session for future routing. Set interim=true for progress updates that should not clear the pending flag (e.g. "Working on this..."). The session stays in the pending queue so the final response can be posted later.',
             inputSchema: {
               type: 'object',
               properties: {
@@ -237,6 +237,7 @@ class TodolistMCPServer {
                 content: { type: 'string', description: 'Message content' },
                 role: { type: 'string', enum: ['user', 'assistant'], description: 'Message role (default: assistant)' },
                 agent_id: { type: 'string', description: 'Agent ID to claim this session (optional). Followups will route back to this agent.' },
+                interim: { type: 'boolean', description: 'If true, post as a progress update without clearing the pending flag. Default: false.' },
               },
               required: ['session_id', 'content'],
             },
@@ -488,11 +489,12 @@ class TodolistMCPServer {
     return this.textResult(`Pending sessions:\n${lines.join('\n')}`);
   }
 
-  private async postToSession(args: { session_id: string; content: string; role?: string; agent_id?: string }) {
+  private async postToSession(args: { session_id: string; content: string; role?: string; agent_id?: string; interim?: boolean }) {
     await api.post(`/agent/sessions/${args.session_id}/messages`, {
       role: args.role || 'assistant',
       content: args.content,
       ...(args.agent_id && { agent_id: args.agent_id }),
+      ...(args.interim !== undefined && { interim: args.interim }),
     });
     return this.textResult(`Posted ${args.role || 'assistant'} message to session ${args.session_id}`);
   }

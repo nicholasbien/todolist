@@ -140,7 +140,12 @@ async def find_session_by_todo(user_id: str, todo_id: str) -> Optional[Dict[str,
 
 
 async def append_message(
-    session_id: str, user_id: str, role: str, content: str, agent_id: Optional[str] = None
+    session_id: str,
+    user_id: str,
+    role: str,
+    content: str,
+    agent_id: Optional[str] = None,
+    interim: bool = False,
 ) -> Dict[str, Any]:
     """Append a message to a session's display_messages and update flags.
 
@@ -148,6 +153,11 @@ async def append_message(
     When an assistant posts: sets needs_agent_response=False, has_unread_reply=True.
     If agent_id is provided on an assistant message, stamps the session so
     future followups route back to that agent.
+
+    If interim=True and role is "assistant", the message is posted but
+    needs_agent_response is NOT cleared.  This allows progress updates
+    (e.g. "Working on this...") without removing the session from the
+    pending queue, so the final response can be posted later.
     """
     now = datetime.utcnow()
     message: Dict[str, Any] = {"role": role, "content": content, "timestamp": now.isoformat()}
@@ -168,7 +178,8 @@ async def append_message(
     if role == "user":
         update["needs_agent_response"] = True
     elif role == "assistant":
-        update["needs_agent_response"] = False
+        if not interim:
+            update["needs_agent_response"] = False
         update["has_unread_reply"] = True
         if agent_id:
             update["agent_id"] = agent_id
