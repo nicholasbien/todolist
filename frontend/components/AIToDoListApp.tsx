@@ -1612,23 +1612,30 @@ export default function AIToDoListApp({
           <div className="px-2">
       {/* Add new todo */}
       <div className="mb-5">
-        <div className="flex gap-2">
+        <div className="flex gap-2 items-end">
           <textarea
             value={newTodo}
-            onChange={(e) => setNewTodo(e.target.value)}
+            onChange={(e) => {
+              setNewTodo(e.target.value);
+              e.target.style.height = 'auto';
+              e.target.style.height = e.target.scrollHeight + 'px';
+            }}
             onFocus={() => setIsNewTodoFocused(true)}
             onBlur={() => setIsNewTodoFocused(false)}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
                 handleAddTodo();
+                // Reset height after submit
+                const target = e.target as HTMLTextAreaElement;
+                setTimeout(() => { target.style.height = 'auto'; }, 0);
               }
             }}
             placeholder="Add task(s)… (Shift+Enter for newline)"
             disabled={loading}
             aria-label="Add new task"
             rows={1}
-            className="flex-1 p-3 border border-gray-800 rounded-xl bg-black text-gray-100 placeholder-gray-500 focus:border-accent focus:outline-none transition-colors resize-y min-h-[48px]"
+            className="flex-1 p-3 border border-gray-800 rounded-xl bg-black text-gray-100 placeholder-gray-500 focus:border-accent focus:outline-none transition-colors resize-none min-h-[48px] max-h-[200px] overflow-y-auto"
           />
           <select
             value={newTodoAgent}
@@ -1881,11 +1888,21 @@ export default function AIToDoListApp({
         <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4" style={{overscrollBehavior: 'contain'}}>
           <div className="bg-black border border-gray-800 p-6 rounded-xl w-80 space-y-4 shadow-2xl overflow-y-auto" style={{maxHeight: 'calc(100dvh - 2rem)'}}>
             <h3 className="text-gray-100 text-lg font-bold mb-2">Edit Task</h3>
-            <input
-              type="text"
+            <textarea
               value={editText}
-              onChange={(e) => setEditText(e.target.value)}
-              className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 text-base focus:outline-none focus:border-accent"
+              onChange={(e) => {
+                setEditText(e.target.value);
+                e.target.style.height = 'auto';
+                e.target.style.height = e.target.scrollHeight + 'px';
+              }}
+              ref={(el) => {
+                if (el) {
+                  el.style.height = 'auto';
+                  el.style.height = el.scrollHeight + 'px';
+                }
+              }}
+              rows={1}
+              className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 text-base focus:outline-none focus:border-accent resize-none max-h-[200px] overflow-y-auto"
             />
             <textarea
               value={editNotes}

@@ -489,13 +489,6 @@ export default function AgentChatbot({
     }
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSend();
-    }
-  };
-
   const handleOfflineClick = () => {
     if (!isOnline) {
       setShowOfflineMessage(true);
@@ -741,16 +734,27 @@ export default function AgentChatbot({
       )}
 
       {/* Input area */}
-      <div className="flex gap-2 flex-shrink-0 items-center mb-4 relative">
+      <div className="flex gap-2 flex-shrink-0 items-end mb-4 relative">
         <div className="flex-1 relative">
-          <input
-            type="text"
-            className={`w-full bg-gray-900 border border-gray-700 text-gray-100 rounded-lg p-3 focus:outline-none focus:border-accent ${
+          <textarea
+            className={`w-full bg-gray-900 border border-gray-700 text-gray-100 rounded-lg p-3 focus:outline-none focus:border-accent resize-none min-h-[48px] max-h-[200px] overflow-y-auto ${
               !isOnline ? 'opacity-50 cursor-not-allowed' : ''
             }`}
             value={question}
-            onChange={(e) => setQuestion(e.target.value)}
-            onKeyPress={handleKeyPress}
+            onChange={(e) => {
+              setQuestion(e.target.value);
+              e.target.style.height = 'auto';
+              e.target.style.height = e.target.scrollHeight + 'px';
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                handleSend();
+                // Reset height after send
+                const target = e.target as HTMLTextAreaElement;
+                setTimeout(() => { target.style.height = 'auto'; }, 0);
+              }
+            }}
             placeholder={
               !isOnline
                 ? "Assistant requires internet connection"
@@ -759,6 +763,7 @@ export default function AgentChatbot({
                 : "Ask a question..."
             }
             disabled={!isOnline}
+            rows={1}
             onMouseEnter={() => !isOnline && setShowOfflineMessage(true)}
             onMouseLeave={() => setShowOfflineMessage(false)}
             onClick={handleOfflineClick}
