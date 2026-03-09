@@ -179,6 +179,10 @@ async def get_current_user(authorization: str = Header(None), token_param: Optio
 AGENT_SYSTEM_PROMPT = """You are an AI assistant with access to tools for managing tasks, journals, weather, and
 web content.
 
+RESPONSE LENGTH: Keep responses short and concise. Aim for 1-3 sentences for simple requests.
+Use bullet points only when listing multiple items. Do not over-explain or add unnecessary context.
+If the user asks a simple question, give a simple answer. Only elaborate when explicitly asked.
+
 CRITICAL: When you search the web, you MUST ALWAYS follow up by using fetch_webpage to read the actual content.
 DO NOT just summarize search results - fetch and read the actual pages to provide detailed, accurate information.
 
