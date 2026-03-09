@@ -9,7 +9,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
 import pytest
-from agent.agent import AGENT_SYSTEM_PROMPT, format_sse_message, stream_agent_response
+from agent.agent import format_sse_message, stream_agent_response
 from agent.schemas import (
     OPENAI_TOOL_SCHEMAS,
     BookRecommendationRequest,
@@ -803,13 +803,29 @@ class TestAgentSystemPrompt:
     """Test agent system prompt and configuration."""
 
     def test_agent_system_prompt_content(self):
-        """Test system prompt contains expected guidance."""
-        assert "AI assistant with access to tools" in AGENT_SYSTEM_PROMPT
-        assert "get_current_weather" in AGENT_SYSTEM_PROMPT
-        assert "add_task" in AGENT_SYSTEM_PROMPT
-        assert "get_inspirational_quotes" in AGENT_SYSTEM_PROMPT
-        assert "Be proactive in using tools" in AGENT_SYSTEM_PROMPT
-        assert "concise, well-formatted summary" in AGENT_SYSTEM_PROMPT
+        """Test system prompt template contains expected guidance."""
+        import jinja2
+        import os
+
+        prompts_dir = os.path.join(os.path.dirname(__file__), "..", "prompts")
+        env = jinja2.Environment(
+            loader=jinja2.FileSystemLoader(prompts_dir),
+            autoescape=False,
+            keep_trailing_newline=True,
+        )
+        prompt = env.get_template("agent_developer_instructions.j2").render(
+            current_date="",
+            user_context="",
+            space_name="Default",
+            categories_str="General",
+            todo_context="",
+        )
+        assert "AI assistant with access to tools" in prompt
+        assert "get_current_weather" in prompt
+        assert "add_task" in prompt
+        assert "get_inspirational_quotes" in prompt
+        assert "Be proactive in using tools" in prompt
+        assert "concise, well-formatted summary" in prompt
 
     def test_available_tools_registry(self):
         """Test tool registry completeness."""
