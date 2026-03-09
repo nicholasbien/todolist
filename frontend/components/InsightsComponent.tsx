@@ -69,10 +69,8 @@ export default function InsightsComponent({ token, activeSpace }: InsightsProps)
   }, [authenticatedFetch, activeSpace]);
 
   useEffect(() => {
-    if (authenticatedFetch) {
-      fetchInsights();
-    }
-  }, [fetchInsights, authenticatedFetch]);
+    fetchInsights();
+  }, [fetchInsights]);
 
   const formatWeekLabel = (weekString: string) => {
     const date = new Date(weekString);

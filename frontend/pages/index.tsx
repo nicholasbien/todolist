@@ -326,8 +326,8 @@ export default function Home() {
   const [isClient, setIsClient] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isChecking, setIsChecking] = useState(true);
-  const [user, setUser] = useState(null);
-  const [token, setToken] = useState(null);
+  const [user, setUser] = useState<any>(null);
+  const [token, setToken] = useState<string | null>(null);
   const [showContactModal, setShowContactModal] = useState(false);
   const [showEmailSettings, setShowEmailSettings] = useState(false);
   const [showInsightsModal, setShowInsightsModal] = useState(false);
@@ -551,7 +551,7 @@ export default function Home() {
       <main className="h-screen h-[100dvh] overflow-hidden bg-zinc-950 text-white">
         <AIToDoListApp
           user={user}
-          token={token}
+          token={token!}
           showEmailSettings={showEmailSettings}
           onShowEmailSettings={() => setShowEmailSettings(true)}
           onCloseEmailSettings={() => setShowEmailSettings(false)}

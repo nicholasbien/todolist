@@ -637,6 +637,11 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // SSE streaming: don't intercept — let the browser connect directly
+  if (isApi && url.pathname === '/agent/stream') {
+    return;
+  }
+
   if (isApi) {
     event.respondWith(handleApiRequest(event.request));
     return;

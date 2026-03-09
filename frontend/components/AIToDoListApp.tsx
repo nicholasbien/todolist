@@ -99,10 +99,10 @@ export default function AIToDoListApp({
   isOffline,
 }: Props) {
   const { logout, clearAuthExpired, authenticatedFetch } = useAuth();
-  const [todos, setTodos] = useState([]);
+  const [todos, setTodos] = useState<any[]>([]);
   const [newTodo, setNewTodo] = useState("");
   const [isNewTodoFocused, setIsNewTodoFocused] = useState(false);
-  const [categories, setCategories] = useState([]);
+  const [categories, setCategories] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadingTodos, setLoadingTodos] = useState(false);
   const [loadingCategories, setLoadingCategories] = useState(false);
@@ -118,7 +118,7 @@ export default function AIToDoListApp({
   const [showAddCategoryModal, setShowAddCategoryModal] = useState(false);
   const [showEditCategoryModal, setShowEditCategoryModal] = useState(false);
   const [editCatName, setEditCatName] = useState("");
-  const [editingCategory, setEditingCategory] = useState(null);
+  const [editingCategory, setEditingCategory] = useState<string | null>(null);
   const [sendingEmail, setSendingEmail] = useState(false);
   const [showCompleted, setShowCompleted] = useState(false);
   const [showUpdatePrompt, setShowUpdatePrompt] = useState(false);
@@ -128,9 +128,9 @@ export default function AIToDoListApp({
   const [emailInstructions, setEmailInstructions] = useState('');
   const [emailEnabled, setEmailEnabled] = useState(false);
   const [emailSpaceIds, setEmailSpaceIds] = useState<string[]>([]);
-  const [spaces, setSpaces] = useState([]);
+  const [spaces, setSpaces] = useState<any[]>([]);
   const [loadingSpaces, setLoadingSpaces] = useState(true);
-  const [activeSpace, setActiveSpace] = useState(null);
+  const [activeSpace, setActiveSpace] = useState<any>(null);
   const activeSpaceRef = useRef<any>(null);
   const [showAddSpaceModal, setShowAddSpaceModal] = useState(false);
   const [newSpaceName, setNewSpaceName] = useState('');

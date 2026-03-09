@@ -21,6 +21,13 @@ function getApiBaseUrl(forceBackend = false): string {
 }
 
 /**
+ * Get the direct backend URL for SSE streaming (bypasses SW proxy which buffers).
+ */
+export function getStreamingBackendUrl(): string {
+  return process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000';
+}
+
+/**
  * Enhanced fetch wrapper that handles environment-specific routing
  */
 export async function apiRequest(endpoint: string, options: RequestInit = {}): Promise<Response> {
