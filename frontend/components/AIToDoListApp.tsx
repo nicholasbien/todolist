@@ -425,7 +425,11 @@ export default function AIToDoListApp({
             space_id: activeSpace?._id || null,
             title: todo.text,
             todo_id: todo._id,
-            initial_message: `Task: ${todo.text}`,
+            initial_message: [
+              `I want to work on this task: "${todo.text}"`,
+              todo.notes ? `Notes: ${todo.notes}` : null,
+              `Help me get started.`,
+            ].filter(Boolean).join('\n'),
             initial_role: 'user',
           }),
         });
