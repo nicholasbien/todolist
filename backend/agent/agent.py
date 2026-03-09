@@ -223,13 +223,6 @@ def _format_tool_display(tool_name: str, args: dict, result: dict) -> str:
             return f"❌ {d.get('error', 'Error')}"
         if "tasks" in d:
             return f"✅ Found {len(d['tasks'])} tasks"
-        if "weather" in d:
-            w = d["weather"]
-            return f"🌤️ {w.get('location', '')}: {w.get('temperature_display', '')}"
-        if "books" in d:
-            return f"📚 Found {len(d['books'])} book recommendations"
-        if "quotes" in d:
-            return f'💭 "{d["quotes"][0]}"'
         if "results" in d:
             return f"🔍 Found {len(d['results'])} results"
         if "entries" in d:

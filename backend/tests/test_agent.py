@@ -7,21 +7,16 @@ Tests all tools, streaming functionality, and edge cases.
 import os
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import httpx
 import pytest
 from agent.agent import format_sse_message, stream_agent_response
 from agent.schemas import (
     OPENAI_TOOL_SCHEMAS,
-    BookRecommendationRequest,
-    InspirationalQuoteRequest,
     JournalAddRequest,
     JournalReadRequest,
     SearchRequest,
     TaskAddRequest,
     TaskListRequest,
     TaskUpdateRequest,
-    WeatherCurrentRequest,
-    WeatherForecastRequest,
 )
 from agent.tools import (
     AVAILABLE_TOOLS,
@@ -29,10 +24,6 @@ from agent.tools import (
     _prepare_task_title_and_notes,
     add_journal_entry,
     add_task,
-    get_book_recommendations,
-    get_current_weather,
-    get_inspirational_quotes,
-    get_weather_forecast,
     list_tasks,
     read_journal_entry,
     search_content,
@@ -44,138 +35,6 @@ from .conftest import get_token
 
 class TestAgentToolsUnit:
     """Unit tests for individual agent tools."""
-
-    @pytest.mark.asyncio
-    @patch("agent.tools.httpx.AsyncClient")
-    async def test_get_current_weather_known_location(self, mock_client_class):
-        """Test weather for known location via OpenWeatherMap API."""
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        mock_response.json.return_value = {
-            "name": "New York",
-            "sys": {"country": "US"},
-            "main": {"temp": 72, "humidity": 65},
-            "weather": [{"description": "partly cloudy", "main": "Clouds"}],
-            "wind": {"speed": 8},
-        }
-        mock_response.raise_for_status.return_value = None
-        mock_client = AsyncMock()
-        mock_client.get.return_value = mock_response
-        mock_client_class.return_value.__aenter__.return_value = mock_client
-
-        with patch.dict(os.environ, {"OPENWEATHER_API_KEY": "test-key"}):
-            request = WeatherCurrentRequest(location="New York")
-            result = await get_current_weather(request, "test_user", "test_space")
-
-        assert result["ok"] is True
-        assert result["weather"]["location"] == "New York, US"
-        assert result["weather"]["temperature"] == 72
-        assert "°F" in result["weather"]["temperature_display"]
-        assert "mph" in result["weather"]["wind_speed_display"]
-
-    @pytest.mark.asyncio
-    async def test_get_current_weather_no_api_key(self):
-        """Test weather returns error when API key is not configured."""
-        with patch.dict(os.environ, {}, clear=True):
-            request = WeatherCurrentRequest(location="UnknownCity")
-            result = await get_current_weather(request, "test_user", "test_space")
-
-        assert result["ok"] is False
-        assert "not configured" in result["error"]
-
-    @pytest.mark.asyncio
-    @patch("agent.tools.httpx.AsyncClient")
-    async def test_get_current_weather_metric_units(self, mock_client_class):
-        """Test weather with metric units."""
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        mock_response.json.return_value = {
-            "name": "New York",
-            "sys": {"country": "US"},
-            "main": {"temp": 22, "humidity": 65},
-            "weather": [{"description": "partly cloudy", "main": "Clouds"}],
-            "wind": {"speed": 3},
-        }
-        mock_response.raise_for_status.return_value = None
-        mock_client = AsyncMock()
-        mock_client.get.return_value = mock_response
-        mock_client_class.return_value.__aenter__.return_value = mock_client
-
-        with patch.dict(os.environ, {"OPENWEATHER_API_KEY": "test-key"}):
-            request = WeatherCurrentRequest(location="New York", units="metric")
-            result = await get_current_weather(request, "test_user", "test_space")
-
-        assert result["ok"] is True
-        assert result["weather"]["temperature"] == 22
-        assert "°C" in result["weather"]["temperature_display"]
-        assert "m/s" in result["weather"]["wind_speed_display"]
-
-    @pytest.mark.asyncio
-    @patch("agent.tools.httpx.AsyncClient")
-    async def test_get_weather_forecast(self, mock_client_class):
-        """Test weather forecast from OpenWeatherMap API."""
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        mock_response.json.return_value = {
-            "city": {"name": "London", "country": "GB"},
-            "list": [
-                {
-                    "dt": 1700000000,
-                    "main": {"temp": 50, "humidity": 80},
-                    "weather": [{"description": "light rain", "main": "Rain"}],
-                    "wind": {"speed": 12},
-                },
-                {
-                    "dt": 1700100000,
-                    "main": {"temp": 52, "humidity": 75},
-                    "weather": [{"description": "cloudy", "main": "Clouds"}],
-                    "wind": {"speed": 10},
-                },
-                {
-                    "dt": 1700200000,
-                    "main": {"temp": 48, "humidity": 85},
-                    "weather": [{"description": "drizzle", "main": "Drizzle"}],
-                    "wind": {"speed": 8},
-                },
-            ],
-        }
-        mock_response.raise_for_status.return_value = None
-        mock_client = AsyncMock()
-        mock_client.get.return_value = mock_response
-        mock_client_class.return_value.__aenter__.return_value = mock_client
-
-        with patch.dict(os.environ, {"OPENWEATHER_API_KEY": "test-key"}):
-            request = WeatherForecastRequest(location="London", days=3)
-            result = await get_weather_forecast(request, "test_user", "test_space")
-
-        assert result["ok"] is True
-        assert result["forecast"]["location"] == "London, GB"
-        assert len(result["forecast"]["forecast"]) == 3
-
-    @pytest.mark.asyncio
-    @patch("agent.tools.httpx.AsyncClient.get", new_callable=AsyncMock)
-    async def test_get_inspirational_quotes_api_success(self, mock_get):
-        """Test inspirational quotes retrieval with successful API call."""
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        mock_response.json.return_value = {"affirmation": "You are capable"}
-        mock_get.return_value = mock_response
-
-        request = InspirationalQuoteRequest(goal="self-care", limit=1)
-        result = await get_inspirational_quotes(request, "test_user", "test_space")
-
-        assert result["ok"] is True
-        assert result["quotes"] == ["You are capable"]
-
-    @pytest.mark.asyncio
-    @patch("agent.tools.httpx.AsyncClient.get", side_effect=httpx.RequestError("fail"))
-    async def test_get_inspirational_quotes_api_failure(self, mock_get):
-        """Test inspirational quotes returns error when API call fails."""
-        request = InspirationalQuoteRequest(goal="resilience", limit=2)
-        result = await get_inspirational_quotes(request, "test_user", "test_space")
-
-        assert result["ok"] is False
-        assert "Unable to fetch quotes" in result["error"]
 
     @pytest.mark.asyncio
     @patch("agent.tools.db_create_todo", new_callable=AsyncMock)
@@ -397,55 +256,6 @@ class TestAgentToolsUnit:
         # Check journal result
         journal_result = next(r for r in result["results"] if r["type"] == "journal")
         assert "important project" in journal_result["snippet"]
-
-    @pytest.mark.asyncio
-    @patch("httpx.AsyncClient")
-    async def test_get_book_recommendations_success(self, mock_client_class):
-        """Test successful book recommendations via Subject API."""
-        # Mock the Subject API response format
-        mock_response = MagicMock()
-        mock_response.json.return_value = {
-            "works": [
-                {"title": "Test Book 1", "authors": [{"name": "Author 1"}], "first_publish_year": 2020},
-                {"title": "Test Book 2", "authors": [{"name": "Author 2"}], "first_publish_year": 2021},
-            ]
-        }
-        mock_response.raise_for_status.return_value = None
-
-        mock_client = AsyncMock()
-        mock_client.get.return_value = mock_response
-        mock_client_class.return_value.__aenter__.return_value = mock_client
-
-        # subject param uses the Subject API
-        request = BookRecommendationRequest(subject="productivity", limit=2)
-        result = await get_book_recommendations(request, "user123")
-
-        # Verify results
-        assert result["ok"] is True
-        assert len(result["books"]) == 2
-        assert result["books"][0]["title"] == "Test Book 1"
-        assert result["books"][0]["author_name"] == ["Author 1"]
-        assert result["books"][0]["year"] == 2020
-        assert result["api_used"] == "subject"
-
-        # Verify Subject API was called
-        mock_client.get.assert_called_once_with(
-            "https://openlibrary.org/subjects/productivity.json", params={"limit": 2}
-        )
-
-    @pytest.mark.asyncio
-    @patch("httpx.AsyncClient")
-    async def test_get_book_recommendations_api_error(self, mock_client_class):
-        """Test book recommendations API error handling."""
-        mock_client = AsyncMock()
-        mock_client.get.side_effect = httpx.RequestError("Network error")
-        mock_client_class.return_value.__aenter__.return_value = mock_client
-
-        request = BookRecommendationRequest(subject="productivity")
-        result = await get_book_recommendations(request, "user123")
-
-        assert result["ok"] is False
-        assert "Failed to get recommendations" in result["error"]
 
     @pytest.mark.asyncio
     @patch("agent.tools.collections")
@@ -743,17 +553,6 @@ class TestAgentIntegration:
 class TestAgentSchemas:
     """Tests for Pydantic schemas and OpenAI function schemas."""
 
-    def test_weather_current_request_validation(self):
-        """Test weather request validation."""
-        # Valid request
-        request = WeatherCurrentRequest(location="Tokyo")
-        assert request.location == "Tokyo"
-        assert request.units == "imperial"  # default
-
-        # Invalid units
-        with pytest.raises(Exception):
-            WeatherCurrentRequest(location="Tokyo", units="invalid")
-
     def test_task_add_request_validation(self):
         """Test task creation request validation."""
         # Valid request (category is now required)
@@ -786,17 +585,22 @@ class TestAgentSchemas:
 
     def test_openai_tool_schemas(self):
         """Test OpenAI function schema generation."""
-        assert "get_current_weather" in OPENAI_TOOL_SCHEMAS
         assert "add_task" in OPENAI_TOOL_SCHEMAS
         assert "list_tasks" in OPENAI_TOOL_SCHEMAS
+        assert "web_search" in OPENAI_TOOL_SCHEMAS
+
+        # Verify removed tools are gone
+        assert "get_current_weather" not in OPENAI_TOOL_SCHEMAS
+        assert "get_book_recommendations" not in OPENAI_TOOL_SCHEMAS
+        assert "get_inspirational_quotes" not in OPENAI_TOOL_SCHEMAS
 
         # Check schema structure
-        weather_schema = OPENAI_TOOL_SCHEMAS["get_current_weather"]
-        assert weather_schema["name"] == "get_current_weather"
-        assert "description" in weather_schema
-        assert "parameters" in weather_schema
-        assert weather_schema["parameters"]["type"] == "object"
-        assert "location" in weather_schema["parameters"]["properties"]
+        task_schema = OPENAI_TOOL_SCHEMAS["add_task"]
+        assert task_schema["name"] == "add_task"
+        assert "description" in task_schema
+        assert "parameters" in task_schema
+        assert task_schema["parameters"]["type"] == "object"
+        assert "text" in task_schema["parameters"]["properties"]
 
 
 class TestAgentSystemPrompt:
@@ -804,8 +608,9 @@ class TestAgentSystemPrompt:
 
     def test_agent_system_prompt_content(self):
         """Test system prompt template contains expected guidance."""
-        import jinja2
         import os
+
+        import jinja2
 
         prompts_dir = os.path.join(os.path.dirname(__file__), "..", "prompts")
         env = jinja2.Environment(
@@ -821,25 +626,19 @@ class TestAgentSystemPrompt:
             todo_context="",
         )
         assert "AI assistant with access to tools" in prompt
-        assert "get_current_weather" in prompt
         assert "add_task" in prompt
-        assert "get_inspirational_quotes" in prompt
         assert "Be proactive in using tools" in prompt
         assert "concise, well-formatted summary" in prompt
 
     def test_available_tools_registry(self):
         """Test tool registry completeness."""
         expected_tools = {
-            "get_current_weather",
-            "get_weather_forecast",
             "add_task",
             "list_tasks",
             "update_task",
             "add_journal_entry",
             "read_journal_entry",
             "search_content",
-            "get_book_recommendations",
-            "get_inspirational_quotes",
             "web_search",
             "send_email_to_user",
             "web_scraping",
@@ -906,11 +705,11 @@ class TestAgentSystemPrompt:
         assert f"Today's date: {current_date}" in captured_instructions
 
         # Verify space context is included (defaults to "Default" when no space_id lookup succeeds)
-        assert 'in their "Default" space' in captured_instructions or 'in their "Work" space' in captured_instructions
+        assert '"Default" space' in captured_instructions or '"Work" space' in captured_instructions
 
         # Verify categories are included
         assert "Work, Personal, Health" in captured_instructions
-        assert 'choose a category from this list, or use "General"' in captured_instructions
+        assert 'choose a category from that list, or use "General"' in captured_instructions
 
 
 class TestAgentErrorHandling:
