@@ -385,13 +385,14 @@ async def api_create_todo(request: Request, current_user: dict = Depends(get_cur
 
                 # Post as assistant if agent-created, user if user-created
                 role = "assistant" if body.get("creator_type") == "agent" else "user"
-                # Auto-route tagged tasks to the appropriate agent
-                text_lower = todo_dict["text"].lower()
-                auto_agent_id = None
-                if "#openclaw" in text_lower:
-                    auto_agent_id = "openclaw"
-                elif "#claude" in text_lower:
-                    auto_agent_id = "claude"
+                # Use explicit agent_id from request, fallback to hashtag detection for backwards compat
+                auto_agent_id = body.get("agent_id") or None
+                if not auto_agent_id:
+                    text_lower = todo_dict["text"].lower()
+                    if "#openclaw" in text_lower:
+                        auto_agent_id = "openclaw"
+                    elif "#claude" in text_lower:
+                        auto_agent_id = "claude"
                 session_id = await create_chat_session(
                     current_user["user_id"],
                     body.get("space_id"),
@@ -465,13 +466,34 @@ async def api_update_todo(todo_id: str, request: Request, current_user: dict = D
             if new_space_id and not await user_in_space(current_user["user_id"], new_space_id):
                 raise HTTPException(status_code=403, detail="Not authorized to move to target space")
             updates["space_id"] = new_space_id
+        if "agent_id" in body:
+            updates["agent_id"] = body["agent_id"]
 
         if not updates:
             raise HTTPException(status_code=400, detail="No valid fields to update")
 
         logger.info(f"Updating todo {todo_id} with: {updates} for user: {current_user['email']}")
         logger.info(f"CURRENT_USER DEBUG: {current_user}")
-        return await update_todo_fields(todo_id, updates, current_user["user_id"])
+        result = await update_todo_fields(todo_id, updates, current_user["user_id"])
+
+        # If agent_id changed, update the linked session
+        if "agent_id" in body:
+            try:
+                session = await find_session_by_todo(current_user["user_id"], todo_id)
+                if session:
+                    from bson import ObjectId as _ObjId
+                    from db import db
+
+                    if body["agent_id"]:
+                        await db.sessions.update_one(
+                            {"_id": _ObjId(str(session["_id"]))}, {"$set": {"agent_id": body["agent_id"]}}
+                        )
+                    else:
+                        await db.sessions.update_one({"_id": _ObjId(str(session["_id"]))}, {"$unset": {"agent_id": 1}})
+            except Exception as e:
+                logger.error(f"Failed to update session agent_id: {e}")
+
+        return result
     except HTTPException:
         # Re-raise HTTP exceptions (like 403, 404) without converting to 500
         raise

@@ -204,6 +204,7 @@ export default function AIToDoListApp({
   const [editDueDate, setEditDueDate] = useState<string>('');
   const [editSpaceId, setEditSpaceId] = useState<string>('');
   const [editSpaceCategories, setEditSpaceCategories] = useState<string[]>([]);
+  const [newTodoAgent, setNewTodoAgent] = useState<string>('');
 
   // Long-press to edit category
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -825,7 +826,8 @@ export default function AIToDoListApp({
           text: line,
           dateAdded: localISOString,
           completed: false,
-          space_id: activeSpace ? activeSpace._id : null
+          space_id: activeSpace ? activeSpace._id : null,
+          agent_id: newTodoAgent || null,
         };
 
         // If a category is selected (not "All"), skip AI classification on backend
@@ -860,6 +862,7 @@ export default function AIToDoListApp({
       // Refresh todos list
       await fetchTodos(false);
       setNewTodo('');
+      setNewTodoAgent('');
     } catch (err) {
       if (err.name === 'AbortError') {
         setError('Request timed out. Please try again.');
@@ -968,6 +971,7 @@ export default function AIToDoListApp({
       handleError(err, 'Error updating priority');
     }
   };
+
 
   const handleEditTodo = async (todo) => {
     setTodoToEdit(todo);
@@ -1626,6 +1630,15 @@ export default function AIToDoListApp({
             rows={1}
             className="flex-1 p-3 border border-gray-800 rounded-xl bg-black text-gray-100 placeholder-gray-500 focus:border-accent focus:outline-none transition-colors resize-y min-h-[48px]"
           />
+          <select
+            value={newTodoAgent}
+            onChange={(e) => setNewTodoAgent(e.target.value)}
+            className="h-12 px-2 rounded-xl bg-gray-900 border border-gray-700 text-gray-200 text-sm focus:border-accent focus:outline-none transition-colors appearance-none cursor-pointer"
+          >
+            <option value="">Built-in</option>
+            <option value="openclaw">OpenClaw</option>
+            <option value="claude">Claude</option>
+          </select>
           <button
             onClick={handleAddTodo}
             disabled={loading}
@@ -1817,6 +1830,7 @@ export default function AIToDoListApp({
                   setEditingCategory={setEditingCategory}
                   handleUpdateCategory={handleUpdateCategory}
                   handleUpdatePriority={handleUpdatePriority}
+
                   handleCompleteTodo={handleCompleteTodo}
                   handleDeleteTodo={handleDeleteTodo}
                   isCollaborative={(activeSpace?.member_ids?.length ?? 0) > 1}

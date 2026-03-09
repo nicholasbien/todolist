@@ -279,6 +279,13 @@ export default function TodoItem({
           <option value="Medium">Medium</option>
           <option value="Low">Low</option>
         </select>
+        {todo.agent_id && (
+          <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full ${
+            todo.completed ? 'bg-blue-900/20 text-gray-500' : 'bg-blue-900/30 text-blue-300'
+          }`}>
+            {todo.agent_id === 'claude' ? 'Claude' : todo.agent_id === 'openclaw' ? 'OpenClaw' : todo.agent_id}
+          </span>
+        )}
         {todo.dueDate && (
           <span className={`text-sm ${todo.completed ? "text-gray-500" : "text-gray-300"}`}>
             Due: {(() => {
