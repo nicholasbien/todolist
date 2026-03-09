@@ -215,7 +215,7 @@ async def get_pending_sessions(
     cursor = sessions_collection.find(query).sort("updated_at", -1).limit(MAX_ACTIVE_SESSIONS)
     items = await cursor.to_list(length=MAX_ACTIVE_SESSIONS)
 
-    # Enrich each session with message count and last user message preview
+    # Enrich each session with message count and recent user messages
     for item in items:
         item["_id"] = str(item["_id"])
         session_id = item["_id"]
@@ -224,7 +224,7 @@ async def get_pending_sessions(
         # New unclaimed sessions have needs_agent_response=True but no agent_id.
         item["is_followup"] = bool(item.get("agent_id"))
 
-        # Fetch message count and last user message from trajectory
+        # Fetch message count and recent user messages from trajectory
         traj = await trajectories_collection.find_one(
             {"session_id": session_id},
             {"display_messages": 1},
@@ -232,14 +232,19 @@ async def get_pending_sessions(
         if traj and traj.get("display_messages"):
             msgs = traj["display_messages"]
             item["message_count"] = len(msgs)
-            # Find the last user message for preview
+            # Collect all user messages since the last assistant response
+            recent: List[str] = []
             for msg in reversed(msgs):
+                if msg.get("role") == "assistant":
+                    break
                 if msg.get("role") == "user":
                     content = msg.get("content", "")
-                    item["last_user_message"] = content[:200] if len(content) > 200 else content
-                    break
+                    recent.append(content[:200] if len(content) > 200 else content)
+            recent.reverse()
+            item["recent_messages"] = recent
         else:
             item["message_count"] = 0
+            item["recent_messages"] = []
 
     return items
 
