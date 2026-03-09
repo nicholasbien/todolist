@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { Settings, ArrowUpDown, GripVertical, Search, X } from "lucide-react";
+import { ArrowUpDown, GripVertical, Search, X } from "lucide-react";
 import TodoItem from "./TodoItem";
 import AgentChatbot from "./AgentChatbot";
 import { useAuth } from "../context/AuthContext";
@@ -140,9 +140,7 @@ export default function AIToDoListApp({
   const [inviteEmails, setInviteEmails] = useState<string[]>(['']);
   const [spaceToEdit, setSpaceToEdit] = useState<any>(null);
   const [spaceMembers, setSpaceMembers] = useState<any[]>([]);
-  const [showSettingsDropdown, setShowSettingsDropdown] = useState(false);
   const [showOfflineTooltip, setShowOfflineTooltip] = useState(false);
-  const settingsDropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     activeSpaceRef.current = activeSpace;
@@ -614,19 +612,6 @@ export default function AIToDoListApp({
     }
   };
 
-  // Close settings dropdown when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (settingsDropdownRef.current && !settingsDropdownRef.current.contains(event.target as Node)) {
-        setShowSettingsDropdown(false);
-      }
-    };
-
-    if (showSettingsDropdown) {
-      document.addEventListener('mousedown', handleClickOutside);
-      return () => document.removeEventListener('mousedown', handleClickOutside);
-    }
-  }, [showSettingsDropdown]);
 
   // Close offline tooltip after delay
   useEffect(() => {
@@ -1351,74 +1336,29 @@ export default function AIToDoListApp({
                 setShowEditSpaceModal(true);
               }}
             />
-            <div className="relative" ref={settingsDropdownRef}>
-              <button
-                onClick={() => setShowSettingsDropdown(!showSettingsDropdown)}
-                className="text-gray-100 hover:text-white text-base px-2 py-1 flex items-center justify-center rounded-lg hover:bg-gray-900 transition-colors"
-                title="Settings"
-              >
-                <Settings className="w-5 h-5" />
-              </button>
-
-              {showSettingsDropdown && (
-                <div className="absolute right-0 mt-2 w-48 bg-black border border-gray-800 rounded-lg shadow-2xl z-50">
-                  <button
-                    onClick={() => {
-                      setShowSettingsDropdown(false);
-                      onShowAccountSettings?.();
-                    }}
-                    className="w-full text-left px-4 py-3 text-gray-300 hover:bg-gray-900 hover:text-gray-100 transition-colors rounded-t-lg"
-                  >
-                    Account
-                  </button>
-                  <button
-                    onClick={() => {
-                      setShowSettingsDropdown(false);
-                      onShowEmailSettings?.();
-                    }}
-                    className="w-full text-left px-4 py-3 text-gray-300 hover:bg-gray-900 hover:text-gray-100 transition-colors"
-                  >
-                    Email Settings
-                  </button>
-                  <button
-                    onClick={() => {
-                      setShowSettingsDropdown(false);
-                      onShowInsights?.();
-                    }}
-                    className="w-full text-left px-4 py-3 text-gray-300 hover:bg-gray-900 hover:text-gray-100 transition-colors"
-                  >
-                    Insights
-                  </button>
-                  <button
-                    onClick={() => {
-                      setShowSettingsDropdown(false);
-                      onShowExportModal?.();
-                    }}
-                    className="w-full text-left px-4 py-3 text-gray-300 hover:bg-gray-900 hover:text-gray-100 transition-colors"
-                  >
-                    Export Data
-                  </button>
-                  <button
-                    onClick={() => {
-                      setShowSettingsDropdown(false);
-                      onShowContactModal?.();
-                    }}
-                    className="w-full text-left px-4 py-3 text-gray-300 hover:bg-gray-900 hover:text-gray-100 transition-colors"
-                  >
-                    Contact
-                  </button>
-                  <button
-                    onClick={() => {
-                      setShowSettingsDropdown(false);
-                      onLogout?.();
-                    }}
-                    className="w-full text-left px-4 py-3 text-red-400 hover:bg-red-900/20 hover:text-red-300 transition-colors rounded-b-lg"
-                  >
-                    Logout
-                  </button>
-                </div>
-              )}
-            </div>
+            <select
+              defaultValue=""
+              onChange={(e) => {
+                const action = e.target.value;
+                e.target.value = '';
+                if (action === 'account') onShowAccountSettings?.();
+                else if (action === 'email') onShowEmailSettings?.();
+                else if (action === 'insights') onShowInsights?.();
+                else if (action === 'export') onShowExportModal?.();
+                else if (action === 'contact') onShowContactModal?.();
+                else if (action === 'logout') onLogout?.();
+              }}
+              className="bg-transparent text-gray-100 text-sm rounded border-0 focus:outline-none cursor-pointer"
+              title="Settings"
+            >
+              <option value="" disabled>Settings</option>
+              <option value="account">Account</option>
+              <option value="email">Email Settings</option>
+              <option value="insights">Insights</option>
+              <option value="export">Export Data</option>
+              <option value="contact">Contact</option>
+              <option value="logout">Logout</option>
+            </select>
           </div>
         </div>
       </div>
