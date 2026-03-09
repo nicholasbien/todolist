@@ -77,6 +77,31 @@ cd mcp-server && npm run build
 
 ---
 
+## OpenClaw Integration
+
+An OpenClaw skill is available in `openclaw-skill/` for connecting [OpenClaw](https://openclaw.ai/) agents to the app.
+
+### Quick Setup
+
+```bash
+# Copy skill to OpenClaw workspace
+cp -r openclaw-skill ~/.openclaw/workspace/skills/todolist
+
+# Login and get a token
+cd ~/.openclaw/workspace/skills/todolist
+./scripts/login.sh
+
+# Set env vars (or add to OpenClaw config)
+export TODOLIST_API_URL="https://app.todolist.nyc"
+export TODOLIST_AUTH_TOKEN="your_token_here"
+```
+
+Then just tell your OpenClaw agent things like "show my todos" or "add task: Buy groceries".
+
+See `openclaw-skill/README.md` for full details.
+
+---
+
 ## Quick Setup
 
 ```bash
