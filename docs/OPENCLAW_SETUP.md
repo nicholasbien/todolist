@@ -80,7 +80,7 @@ Talk to your agent naturally:
 
 This is the powerful part — OpenClaw watches for tasks you assign in the app and executes them automatically.
 
-**Important:** To avoid conflicts with the app's built-in AI agent, OpenClaw **only** handles tasks that contain `#openclaw` in the task text. All other tasks are left for the built-in agent. When OpenClaw replies, it claims the session with `agent_id=openclaw` so that followup messages route back to OpenClaw instead of the built-in agent.
+**How tasks get assigned:** Users assign tasks to OpenClaw by selecting "OpenClaw" from the agent dropdown when creating a task, or by including `#openclaw` in the task text (backwards-compatible fallback). Either way, the session arrives pre-routed with `agent_id=openclaw`. When OpenClaw replies, it claims the session so that followup messages route back to OpenClaw instead of the built-in agent.
 
 #### Enable it
 
@@ -95,7 +95,7 @@ openclaw cron add \
   --name "todolist-watcher" \
   --every "5m" \
   --session isolated \
-  --message "Check for pending TodoList sessions and respond to them. Use the todolist skill. Follow the 'Responding to Pending Sessions' workflow: poll pending sessions with agent_id=openclaw, handle claimed followups directly, check unclaimed sessions for #openclaw in the todo text — only respond to those, skip all others. Always reply with agent_id=openclaw to claim sessions. If there are no pending sessions, do nothing."
+  --message "Check for pending TodoList sessions and respond to them. Use the todolist skill. Follow the 'Responding to Pending Sessions' workflow: poll pending sessions with agent_id=openclaw. Handle sessions where is_followup is true (check recent_messages for context). Handle new sessions with agent_id=openclaw (pre-routed via dropdown). For unclaimed sessions, check todo text for #openclaw — skip if absent. Post an interim ack before starting work. Always reply with agent_id=openclaw to claim sessions. If there are no pending sessions, do nothing."
 ```
 
 #### How it works
@@ -104,19 +104,19 @@ openclaw cron add \
 ┌─────────────────────────────────────────────────────┐
 │                  TodoList App                        │
 │                                                      │
-│  1. You create a task: "Research React               │
-│     frameworks #openclaw"                            │
+│  1. You create a task: "Research React frameworks"   │
+│     and select "OpenClaw" from the agent dropdown    │
 │  2. You tap the task → opens a chat session          │
 │  3. You write: "Compare Next.js, Remix, and Astro"  │
 │                                                      │
-│  ─── pending session created ───                     │
+│  ─── pending session created (agent_id=openclaw) ──  │
 │                                                      │
 │  4. OpenClaw cron fires (every 5 min)                │
 │  5. Polls pending?agent_id=openclaw                  │
-│  6. Checks todo text → has #openclaw → proceeds      │
-│     (no #openclaw → skips, built-in agent handles)   │
-│  7. Does the research                                │
-│  8. Replies with agent_id=openclaw (claims session)  │
+│  6. Session has agent_id=openclaw → proceeds         │
+│     (also checks #openclaw tag as fallback)          │
+│  7. Posts interim ack, then does the research        │
+│  8. Replies with agent_id=openclaw (final response)  │
 │  9. Followups route back to OpenClaw automatically   │
 │                                                      │
 │  9. You see a notification with the reply            │
