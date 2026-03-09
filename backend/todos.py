@@ -68,6 +68,7 @@ class Todo(BaseModel):
     space_id: Optional[str] = None
     created_offline: bool = False
     creator_type: str = "user"  # "user" or "agent"
+    agent_id: Optional[str] = None
 
     class Config:
         arbitrary_types_allowed = True

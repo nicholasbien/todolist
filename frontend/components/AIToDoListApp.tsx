@@ -204,6 +204,7 @@ export default function AIToDoListApp({
   const [editDueDate, setEditDueDate] = useState<string>('');
   const [editSpaceId, setEditSpaceId] = useState<string>('');
   const [editSpaceCategories, setEditSpaceCategories] = useState<string[]>([]);
+  const [editAgentId, setEditAgentId] = useState<string>('');
 
   // Long-press to edit category
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -969,12 +970,27 @@ export default function AIToDoListApp({
     }
   };
 
+  const handleUpdateAgent = async (todoId, newAgentId) => {
+    try {
+      setTodos(prev => prev.map(t => t._id === todoId ? { ...t, agent_id: newAgentId || null } : t));
+      const response = await authenticatedFetch(`/todos/${todoId}`, {
+        method: 'PUT',
+        body: JSON.stringify({ agent_id: newAgentId || null }),
+      });
+      if (!response.ok) throw new Error('Failed to update agent');
+    } catch (err) {
+      await fetchTodos(false);
+      handleError(err, 'Error updating agent');
+    }
+  };
+
   const handleEditTodo = async (todo) => {
     setTodoToEdit(todo);
     setEditText(todo.text);
     setEditNotes(todo.notes || '');
     setEditCategoryVal(todo.category);
     setEditPriorityVal(todo.priority);
+    setEditAgentId(todo.agent_id || '');
 
     // Initialize space - use fallback chain
     const initialSpaceId = todo.space_id || activeSpace?._id || '';
@@ -1050,6 +1066,7 @@ export default function AIToDoListApp({
         priority: editPriorityVal,
         dueDate: editDueDate || null,
         space_id: editSpaceId, // Always include space_id since todos must have a space
+        agent_id: editAgentId || null,
       };
       // Optimistic update
       setTodos(prev => prev.map(t => t._id === todoToEdit._id ? { ...t, ...updates } : t));
@@ -1817,6 +1834,7 @@ export default function AIToDoListApp({
                   setEditingCategory={setEditingCategory}
                   handleUpdateCategory={handleUpdateCategory}
                   handleUpdatePriority={handleUpdatePriority}
+                  handleUpdateAgent={handleUpdateAgent}
                   handleCompleteTodo={handleCompleteTodo}
                   handleDeleteTodo={handleDeleteTodo}
                   isCollaborative={(activeSpace?.member_ids?.length ?? 0) > 1}
@@ -1853,6 +1871,7 @@ export default function AIToDoListApp({
               setEditingCategory={setEditingCategory}
               handleUpdateCategory={handleUpdateCategory}
               handleUpdatePriority={handleUpdatePriority}
+              handleUpdateAgent={handleUpdateAgent}
               handleCompleteTodo={handleCompleteTodo}
               handleDeleteTodo={handleDeleteTodo}
               isCollaborative={(activeSpace?.member_ids?.length ?? 0) > 1}
@@ -1921,6 +1940,18 @@ export default function AIToDoListApp({
               <option value="Medium">Medium</option>
               <option value="Low">Low</option>
             </select>
+            <div>
+              <label className="block text-sm text-gray-300 mb-2">Agent</label>
+              <select
+                value={editAgentId}
+                onChange={(e) => setEditAgentId(e.target.value)}
+                className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 text-base focus:outline-none"
+              >
+                <option value="">Built-in</option>
+                <option value="openclaw">OpenClaw</option>
+                <option value="claude">Claude</option>
+              </select>
+            </div>
             <div className="relative">
               <input
                 type="date"
