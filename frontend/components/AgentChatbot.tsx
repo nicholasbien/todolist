@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronDown, ArrowLeft } from 'lucide-react';
-import { Capacitor } from '@capacitor/core';
 import { MessageRenderer, PlainTextRenderer } from './MessageRenderer';
+import { getStreamingBackendUrl } from '../utils/api';
 
 interface ChatbotProps {
   activeSpace: any;
@@ -375,7 +375,8 @@ export default function AgentChatbot({
         params.append('token', token);
       }
 
-      const agentUrl = `/agent/stream?${params.toString()}`;
+      const backendUrl = getStreamingBackendUrl();
+      const agentUrl = `${backendUrl}/agent/stream?${params.toString()}`;
       const es = new EventSource(agentUrl);
 
       es.addEventListener('ready', (e) => {
