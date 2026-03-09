@@ -14,7 +14,6 @@ interface TodoItemProps {
   onEdit: (todo: any) => void;
   onChat?: (todo: any) => void;
   sessionStatus?: 'waiting' | 'unread_reply';
-  handleUpdateAgent?: (id: string, agentId: string) => void;
 }
 
 export default function TodoItem({
@@ -30,7 +29,6 @@ export default function TodoItem({
   onEdit,
   onChat,
   sessionStatus,
-  handleUpdateAgent,
 }: TodoItemProps) {
   const [isCompleting, setIsCompleting] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -281,19 +279,12 @@ export default function TodoItem({
           <option value="Medium">Medium</option>
           <option value="Low">Low</option>
         </select>
-        {handleUpdateAgent && (
-          <select
-            value={todo.agent_id || ''}
-            onChange={(e) => handleUpdateAgent(todo._id, e.target.value)}
-            onClick={(e) => e.stopPropagation()}
-            className={`px-3 py-1.5 rounded-lg cursor-pointer text-sm appearance-none min-w-16 transition-colors ${
-              todo.completed ? "bg-black border border-gray-800 text-gray-500" : "bg-black border border-gray-700 text-gray-200 hover:border-gray-600"
-            }`}
-          >
-            <option value="">Built-in</option>
-            <option value="openclaw">OpenClaw</option>
-            <option value="claude">Claude</option>
-          </select>
+        {todo.agent_id && (
+          <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full ${
+            todo.completed ? 'bg-blue-900/20 text-gray-500' : 'bg-blue-900/30 text-blue-300'
+          }`}>
+            {todo.agent_id === 'claude' ? 'Claude' : todo.agent_id === 'openclaw' ? 'OpenClaw' : todo.agent_id}
+          </span>
         )}
         {todo.dueDate && (
           <span className={`text-sm ${todo.completed ? "text-gray-500" : "text-gray-300"}`}>
