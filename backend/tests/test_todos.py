@@ -48,6 +48,13 @@ async def test_todo_crud_flow(client, test_email):
     complete_resp = await client.put(f"/todos/{todo_id}/complete", headers=headers)
     assert complete_resp.status_code == 200
 
+    # Create "Work" category before updating todo to use it
+    await client.post(
+        "/categories",
+        json={"name": "Work", "space_id": default_space["_id"]},
+        headers=headers,
+    )
+
     # Update todo fields
     update_resp = await client.put(
         f"/todos/{todo_id}",
@@ -116,10 +123,23 @@ async def test_add_todo_with_selected_category(client, test_email):
     """Ensure classification is skipped when category provided."""
     token = await get_token(client, test_email)
     headers = {"Authorization": f"Bearer {token}"}
+
+    # Get default space
+    spaces_resp = await client.get("/spaces", headers=headers)
+    default_space = spaces_resp.json()[0]["_id"]
+
+    # Create "Work" category first
+    await client.post(
+        "/categories",
+        json={"name": "Work", "space_id": default_space},
+        headers=headers,
+    )
+
     todo_payload = {
         "text": "Walk the dog",
         "dateAdded": datetime.now().isoformat(),
         "category": "Work",
+        "space_id": default_space,
     }
     create_resp = await client.post("/todos", json=todo_payload, headers=headers)
     assert create_resp.status_code == 200
@@ -127,3 +147,81 @@ async def test_add_todo_with_selected_category(client, test_email):
     # Category should be preserved as-is (not overridden by classification)
     assert todo["category"] == "Work"
     assert todo["priority"] == "Medium"
+
+
+@pytest.mark.asyncio
+async def test_update_todo_rejects_nonexistent_category(client, test_email):
+    """Updating a todo to a non-existent category should return 400."""
+    token = await get_token(client, test_email)
+    headers = {"Authorization": f"Bearer {token}"}
+
+    # Create a todo (no explicit category, will be classified or default)
+    todo_payload = {
+        "text": "Test task",
+        "dateAdded": datetime.now().isoformat(),
+    }
+    create_resp = await client.post("/todos", json=todo_payload, headers=headers)
+    assert create_resp.status_code == 200
+    todo_id = create_resp.json()["_id"]
+
+    # Try to update category to one that doesn't exist
+    update_resp = await client.put(
+        f"/todos/{todo_id}",
+        json={"category": "NonExistentCategory"},
+        headers=headers,
+    )
+    assert update_resp.status_code == 400
+    assert "does not exist" in update_resp.json()["detail"]
+    assert "create the category first" in update_resp.json()["detail"].lower()
+
+
+@pytest.mark.asyncio
+async def test_update_todo_allows_existing_category(client, test_email):
+    """Updating a todo to an existing category should succeed."""
+    token = await get_token(client, test_email)
+    headers = {"Authorization": f"Bearer {token}"}
+
+    # Get default space
+    spaces_resp = await client.get("/spaces", headers=headers)
+    default_space = spaces_resp.json()[0]["_id"]
+
+    # Create "Shopping" category
+    await client.post(
+        "/categories",
+        json={"name": "Shopping", "space_id": default_space},
+        headers=headers,
+    )
+
+    # Create a todo
+    todo_payload = {
+        "text": "Buy groceries",
+        "dateAdded": datetime.now().isoformat(),
+    }
+    create_resp = await client.post("/todos", json=todo_payload, headers=headers)
+    assert create_resp.status_code == 200
+    todo_id = create_resp.json()["_id"]
+
+    # Update to existing category should work
+    update_resp = await client.put(
+        f"/todos/{todo_id}",
+        json={"category": "Shopping"},
+        headers=headers,
+    )
+    assert update_resp.status_code == 200
+    assert update_resp.json()["category"] == "Shopping"
+
+
+@pytest.mark.asyncio
+async def test_create_todo_rejects_nonexistent_category(client, test_email):
+    """Creating a todo with a non-existent explicit category should return 400."""
+    token = await get_token(client, test_email)
+    headers = {"Authorization": f"Bearer {token}"}
+
+    todo_payload = {
+        "text": "Test task",
+        "dateAdded": datetime.now().isoformat(),
+        "category": "FakeCategory",
+    }
+    create_resp = await client.post("/todos", json=todo_payload, headers=headers)
+    assert create_resp.status_code == 400
+    assert "does not exist" in create_resp.json()["detail"]

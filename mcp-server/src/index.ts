@@ -334,8 +334,13 @@ class TodolistMCPServer {
           default:
             throw new McpError(ErrorCode.MethodNotFound, `Unknown tool: ${name}`);
         }
-      } catch (error) {
+      } catch (error: any) {
         if (error instanceof McpError) throw error;
+        // Surface API error details (e.g. category validation errors)
+        const detail = error?.response?.data?.detail;
+        if (detail) {
+          throw new McpError(ErrorCode.InvalidRequest, detail);
+        }
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
         throw new McpError(ErrorCode.InternalError, `Tool execution failed: ${errorMessage}`);
       }

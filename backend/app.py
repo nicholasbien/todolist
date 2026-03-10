@@ -322,6 +322,20 @@ async def api_create_todo(request: Request, current_user: dict = Depends(get_cur
                 print(f"Exception fetching {text}: {e}")
                 logger.error(f"Failed to fetch title for {text}: {e}")
 
+        # Validate explicitly-provided category exists before proceeding
+        if body.get("category"):
+            from categories import categories_collection
+
+            cat_exists = await categories_collection.find_one(
+                {"name": body["category"], "space_id": body.get("space_id")}
+            )
+            if not cat_exists:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Category '{body['category']}' does not exist. "
+                    f"Please create the category first, then assign the task to it.",
+                )
+
         # Only classify if not created offline and no category provided
         if not body.get("created_offline", False) and not body.get("category"):
             try:
@@ -405,6 +419,8 @@ async def api_create_todo(request: Request, current_user: dict = Depends(get_cur
                 logger.error(f"Failed to auto-create session for todo: {e}")
 
         return result
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error creating todo: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error creating todo: {str(e)}")

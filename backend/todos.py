@@ -258,6 +258,21 @@ async def update_todo_fields(todo_id: str, updates: dict, user_id: str):
         if todo.get("space_id") and not await user_in_space(user_id, todo["space_id"]):
             raise HTTPException(status_code=403, detail="Not in space")
 
+        # Validate category exists before allowing update
+        if "category" in updates:
+            from categories import categories_collection
+
+            space_id = updates.get("space_id", todo.get("space_id"))
+            cat_exists = await categories_collection.find_one(
+                {"name": updates["category"], "space_id": space_id}
+            )
+            if not cat_exists:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Category '{updates['category']}' does not exist. "
+                    f"Please create the category first, then reassign the task.",
+                )
+
         result = await todos_collection.update_one(query, {"$set": updates})
         if result.matched_count == 1:
             # Get the updated todo document
