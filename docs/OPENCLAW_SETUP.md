@@ -80,7 +80,9 @@ Talk to your agent naturally:
 
 This is the powerful part — OpenClaw watches for tasks you assign in the app and executes them automatically.
 
-**How tasks get assigned:** Users assign tasks to OpenClaw by selecting "OpenClaw" from the agent dropdown when creating a task, or by including `#openclaw` in the task text (backwards-compatible fallback). Either way, the session arrives pre-routed with `agent_id=openclaw`. When OpenClaw replies, it claims the session so that followup messages route back to OpenClaw instead of the built-in agent.
+**How tasks get assigned:** Use `agent_id=openclaw` routing as the source of truth. Sessions assigned to OpenClaw arrive routed with `agent_id=openclaw`, and OpenClaw replies also stamp `agent_id=openclaw` so followups route back correctly.
+
+Backend behavior: polling `GET /agent/sessions/pending?agent_id=openclaw` returns sessions claimed by OpenClaw plus unclaimed sessions.
 
 #### Enable it
 
@@ -95,7 +97,7 @@ openclaw cron add \
   --name "todolist-watcher" \
   --every "5m" \
   --session isolated \
-  --message "Check for pending TodoList sessions and respond to them. Use the todolist skill. Follow the 'Responding to Pending Sessions' workflow: poll pending sessions with agent_id=openclaw. Handle sessions where is_followup is true (check recent_messages for context). Handle new sessions with agent_id=openclaw (pre-routed via dropdown). For unclaimed sessions, check todo text for #openclaw — skip if absent. Post an interim ack before starting work. Always reply with agent_id=openclaw to claim sessions. If there are no pending sessions, do nothing."
+  --message "Check for pending TodoList sessions and respond to them. Use the todolist skill. Follow the 'Responding to Pending Sessions' workflow: poll pending sessions with agent_id=openclaw. Do not apply hashtag filtering. Use is_followup/recent_messages for followups, post an interim ack before starting work, and always reply with agent_id=openclaw to claim routing. If there are no pending sessions, do nothing."
 ```
 
 #### How it works
@@ -113,8 +115,8 @@ openclaw cron add \
 │                                                      │
 │  4. OpenClaw cron fires (every 5 min)                │
 │  5. Polls pending?agent_id=openclaw                  │
-│  6. Session has agent_id=openclaw → proceeds         │
-│     (also checks #openclaw tag as fallback)          │
+│  6. Uses agent_id routing as source of truth         │
+│     (no extra hashtag filtering)                     │
 │  7. Posts interim ack, then does the research        │
 │  8. Replies with agent_id=openclaw (final response)  │
 │  9. Followups route back to OpenClaw automatically   │
