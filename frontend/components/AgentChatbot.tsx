@@ -28,7 +28,7 @@ export default function AgentChatbot({
   onSessionLoaded,
 }: ChatbotProps) {
   const [question, setQuestion] = useState('');
-  const [messages, setMessages] = useState<{ role: string; content: string; toolData?: any; agent_id?: string }[]>([]);
+  const [messages, setMessages] = useState<{ role: string; content: string; toolData?: any; agent_id?: string; timestamp?: string }[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [thinkingDots, setThinkingDots] = useState(0);
@@ -360,7 +360,7 @@ export default function AgentChatbot({
     // If session is owned by an external agent, post via messaging API
     // so the external agent picks it up (don't stream to built-in agent)
     if (sessionAgentId && currentSessionId) {
-      setMessages((prev) => [...prev, { role: 'user', content: userMessage }]);
+      setMessages((prev) => [...prev, { role: 'user', content: userMessage, timestamp: new Date().toISOString() }]);
       try {
         await fetch(`/agent/sessions/${currentSessionId}/messages`, {
           method: 'POST',
@@ -376,7 +376,7 @@ export default function AgentChatbot({
     if (isStreamingRef.current) {
       // Queue the message — show it in UI immediately
       messageQueueRef.current.push(userMessage);
-      setMessages((prev) => [...prev, { role: 'user', content: userMessage }]);
+      setMessages((prev) => [...prev, { role: 'user', content: userMessage, timestamp: new Date().toISOString() }]);
       return;
     }
 
@@ -396,13 +396,13 @@ export default function AgentChatbot({
 
   const handleStreamingAsk = async (userQuestion: string, skipAddMessage?: boolean, overrideSessionId?: string) => {
     if (!skipAddMessage) {
-      setMessages((prev) => [...prev, { role: 'user', content: userQuestion }]);
+      setMessages((prev) => [...prev, { role: 'user', content: userQuestion, timestamp: new Date().toISOString() }]);
     }
     isStreamingRef.current = true;
     setLoading(true);
     setError('');
 
-    let assistantResponse = { role: 'assistant', content: '' };
+    let assistantResponse = { role: 'assistant', content: '', timestamp: new Date().toISOString() };
     let assistantMessageAdded = false;
 
     try {
@@ -464,7 +464,7 @@ export default function AgentChatbot({
         };
 
         const toolMessage = `Tool ${tool}${formatArgs(args)}: ${formatResult(data)}`;
-        setMessages((prev) => [...prev, { role: 'system', content: toolMessage, toolData: { tool, args, data } }]);
+        setMessages((prev) => [...prev, { role: 'system', content: toolMessage, toolData: { tool, args, data }, timestamp: new Date().toISOString() }]);
       });
 
       es.addEventListener('done', () => {
@@ -496,6 +496,25 @@ export default function AgentChatbot({
         setShowOfflineMessage(false);
       }, 3000);
     }
+  };
+
+  // Format timestamp for individual messages
+  const formatMessageTime = (timestamp?: string) => {
+    if (!timestamp) return null;
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    const time = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+
+    if (diffDays === 0) return time;
+    if (diffDays === 1) return `Yesterday ${time}`;
+    if (diffDays < 7) {
+      const day = date.toLocaleDateString('en-US', { weekday: 'short' });
+      return `${day} ${time}`;
+    }
+    const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    return `${dateStr} ${time}`;
   };
 
   // Format date for session list
@@ -675,24 +694,31 @@ export default function AgentChatbot({
 
         {messages.map((msg, idx) => (
           <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-            <div className={`${msg.role === 'assistant' ? 'w-full px-0' : 'max-w-xs lg:max-w-md px-4'} py-2 ${
-              msg.role === 'user'
-                ? 'bg-gray-800 text-gray-100 border border-gray-700 rounded-lg'
-                : msg.role === 'system'
-                ? 'bg-blue-900/30 text-blue-200 border border-blue-700/50 rounded-lg'
-                : 'text-gray-100'
-            }`}>
-              {(msg.role === 'system' || msg.agent_id) && (
-                <div className="text-xs mb-1 opacity-75 flex justify-between items-center">
-                  <span className={msg.agent_id ? 'text-purple-400 font-medium' : ''}>
-                    {msg.role === 'system' ? 'Tool' : msg.agent_id ? msg.agent_id : ''}
-                  </span>
+            <div className={msg.role === 'assistant' ? 'w-full' : ''}>
+              <div className={`${msg.role === 'assistant' ? 'w-full px-0' : 'max-w-xs lg:max-w-md px-4'} py-2 ${
+                msg.role === 'user'
+                  ? 'bg-gray-800 text-gray-100 border border-gray-700 rounded-lg'
+                  : msg.role === 'system'
+                  ? 'bg-blue-900/30 text-blue-200 border border-blue-700/50 rounded-lg'
+                  : 'text-gray-100'
+              }`}>
+                {(msg.role === 'system' || msg.agent_id) && (
+                  <div className="text-xs mb-1 opacity-75 flex justify-between items-center">
+                    <span className={msg.agent_id ? 'text-purple-400 font-medium' : ''}>
+                      {msg.role === 'system' ? 'Tool' : msg.agent_id ? msg.agent_id : ''}
+                    </span>
+                  </div>
+                )}
+                {msg.role === 'assistant' ? (
+                  <MessageRenderer content={msg.content} className="text-base" />
+                ) : (
+                  <PlainTextRenderer content={msg.content} className="text-sm" />
+                )}
+              </div>
+              {msg.timestamp && (
+                <div className={`text-xs text-gray-500 mt-1 ${msg.role === 'user' ? 'text-right' : 'text-left'}`}>
+                  {formatMessageTime(msg.timestamp)}
                 </div>
-              )}
-              {msg.role === 'assistant' ? (
-                <MessageRenderer content={msg.content} className="text-base" />
-              ) : (
-                <PlainTextRenderer content={msg.content} className="text-sm" />
               )}
             </div>
           </div>
