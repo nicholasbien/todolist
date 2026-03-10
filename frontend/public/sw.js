@@ -25,7 +25,8 @@ const DEFAULT_CATEGORIES = ['General'];
 // Single source of truth — used by the fetch listener, tests, and route validation.
 const API_ROUTES = [
   '/todos', '/categories', '/spaces', '/journals', '/insights',
-  '/agent', '/auth', '/email', '/contact', '/export', '/health'
+  '/agent', '/auth', '/email', '/contact', '/export', '/health',
+  '/portfolio'
 ];
 
 function isApiPath(pathname) {

@@ -6,6 +6,7 @@ import { useAuth } from "../context/AuthContext";
 import Link from "next/link";
 import InsightsComponent from "./InsightsComponent";
 import JournalComponent from "./JournalComponent";
+import PortfolioComponent from "./PortfolioComponent";
 import SpaceDropdown from "./SpaceDropdown";
 import { sortSpaces } from "../utils/spaceUtils";
 import { loadSortModePreference, saveSortModePreference, type SortMode } from "../utils/sortPreferences";
@@ -216,11 +217,12 @@ export default function AIToDoListApp({
   const membersFetchIdRef = useRef(0);
 
   // Tab state
-  const [activeTab, setActiveTab] = useState<'tasks' | 'agent' | 'journal'>('tasks');
-  const [tabIndex, setTabIndex] = useState(0); // 0=tasks, 1=agent, 2=journal
+  const [activeTab, setActiveTab] = useState<'tasks' | 'agent' | 'journal' | 'portfolio'>('tasks');
+  const [tabIndex, setTabIndex] = useState(0); // 0=tasks, 1=agent, 2=journal, 3=portfolio
   const tasksTabRef = useRef<HTMLDivElement>(null);
   const agentTabRef = useRef<HTMLDivElement>(null);
   const journalTabRef = useRef<HTMLDivElement>(null);
+  const portfolioTabRef = useRef<HTMLDivElement>(null);
 
   // Session state for task-linked chats
   const [pendingSessionId, setPendingSessionId] = useState<string | null>(null);
@@ -459,7 +461,7 @@ export default function AIToDoListApp({
 
   // Handle tab change (from button click only - swiping is disabled)
   const handleTabChange = useCallback((index: number) => {
-    const tabs: ('tasks' | 'agent' | 'journal')[] = ['tasks', 'agent', 'journal'];
+    const tabs: ('tasks' | 'agent' | 'journal' | 'portfolio')[] = ['tasks', 'agent', 'journal', 'portfolio'];
     setTabIndex(index);
     setActiveTab(tabs[index]);
   }, []);
@@ -469,7 +471,8 @@ export default function AIToDoListApp({
     const refMap = {
       tasks: tasksTabRef,
       agent: agentTabRef,
-      journal: journalTabRef
+      journal: journalTabRef,
+      portfolio: portfolioTabRef,
     };
     const ref = refMap[activeTab];
     if (ref?.current) {
@@ -1436,6 +1439,16 @@ export default function AIToDoListApp({
         >
           Journal
         </button>
+        <button
+          onClick={() => handleTabChange(3)}
+          className={`flex-1 py-3 px-2 sm:px-6 font-medium text-sm transition-colors ${
+            activeTab === 'portfolio'
+              ? 'text-accent border-b-2 border-accent'
+              : 'text-gray-400 hover:text-gray-300'
+          }`}
+        >
+          Portfolio
+        </button>
       </div>
 
       {/* Tab Content */}
@@ -2019,6 +2032,15 @@ export default function AIToDoListApp({
           <div style={{ flex: 1, minHeight: 0 }}>
             <JournalComponent token={token} activeSpace={activeSpace} />
           </div>
+        </div>
+
+        {/* Portfolio Tab */}
+        <div
+          ref={portfolioTabRef}
+          style={{ height: '100%', overflowY: 'auto', overflowX: 'hidden', touchAction: 'pan-y', WebkitOverflowScrolling: 'touch' }}
+          className="custom-scrollbar"
+        >
+          <PortfolioComponent token={token} />
         </div>
       </SwipeableViews>
       </div>

@@ -78,6 +78,22 @@ from todos import (
     update_todo_fields,
 )
 
+# Import portfolio functions
+from portfolio import (
+    HoldingCreate,
+    HoldingUpdate,
+    TransactionCreate,
+    create_holding,
+    create_transaction,
+    delete_holding,
+    get_holdings,
+    get_portfolio_summary,
+    get_sources,
+    get_transactions,
+    init_portfolio_indexes,
+    update_holding,
+)
+
 # Set up logging with more detail
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -125,6 +141,7 @@ async def lifespan(app: FastAPI):
             ("init_journal_indexes", init_journal_indexes),
             ("init_chat_indexes", init_chat_indexes),
             ("init_chat_session_indexes", init_chat_session_indexes),
+            ("init_portfolio_indexes", init_portfolio_indexes),
             ("init_default_categories", init_default_categories),
             ("cleanup_expired_sessions", cleanup_expired_sessions),
         ]
@@ -1024,6 +1041,82 @@ async def api_get_single_todo(
     except Exception:
         doc["first_name"] = ""
     return doc
+
+
+# ---------------------------------------------------------------------------
+# Portfolio endpoints
+# ---------------------------------------------------------------------------
+
+
+@app.get("/portfolio/summary")
+async def api_portfolio_summary(
+    source: Optional[str] = None,
+    current_user: dict = Depends(get_current_user),
+):
+    """Get portfolio summary with values by source and top contributors."""
+    return await get_portfolio_summary(current_user["user_id"], source)
+
+
+@app.get("/portfolio/sources")
+async def api_portfolio_sources(current_user: dict = Depends(get_current_user)):
+    """Get distinct sources for user's holdings."""
+    return await get_sources(current_user["user_id"])
+
+
+@app.get("/portfolio/holdings")
+async def api_get_holdings(
+    source: Optional[str] = None,
+    current_user: dict = Depends(get_current_user),
+):
+    """Get all holdings, optionally filtered by source."""
+    return await get_holdings(current_user["user_id"], source)
+
+
+@app.post("/portfolio/holdings")
+async def api_create_holding(
+    data: HoldingCreate,
+    current_user: dict = Depends(get_current_user),
+):
+    """Create or update a holding (upserts on symbol + source)."""
+    return await create_holding(current_user["user_id"], data)
+
+
+@app.put("/portfolio/holdings/{holding_id}")
+async def api_update_holding(
+    holding_id: str,
+    data: HoldingUpdate,
+    current_user: dict = Depends(get_current_user),
+):
+    """Update specific fields of a holding."""
+    return await update_holding(current_user["user_id"], holding_id, data)
+
+
+@app.delete("/portfolio/holdings/{holding_id}")
+async def api_delete_holding(
+    holding_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    """Delete a holding."""
+    return await delete_holding(current_user["user_id"], holding_id)
+
+
+@app.get("/portfolio/transactions")
+async def api_get_transactions(
+    source: Optional[str] = None,
+    days: Optional[int] = None,
+    current_user: dict = Depends(get_current_user),
+):
+    """Get transactions, optionally filtered by source and time window."""
+    return await get_transactions(current_user["user_id"], source, days)
+
+
+@app.post("/portfolio/transactions")
+async def api_create_transaction(
+    data: TransactionCreate,
+    current_user: dict = Depends(get_current_user),
+):
+    """Record a transaction."""
+    return await create_transaction(current_user["user_id"], data)
 
 
 if __name__ == "__main__":

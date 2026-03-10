@@ -38,6 +38,8 @@ async def client():
     db.db = db.client.todo_db
 
     # Update all module collection references to use the new shared connection
+    import portfolio
+
     auth.users_collection = db.db.users
     auth.sessions_collection = db.db.sessions
     todos.todos_collection = db.db.todos
@@ -48,6 +50,8 @@ async def client():
     journals.journals_collection = db.db.journals
     chat_sessions.sessions_collection = db.db.chat_sessions
     chat_sessions.trajectories_collection = db.db.chat_trajectories
+    portfolio.holdings_collection = db.db.holdings
+    portfolio.transactions_collection = db.db.transactions
 
     # Clear global MCP session state to prevent stale connections across tests
     from agent.agent import mcp_contexts, mcp_sessions
