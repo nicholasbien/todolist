@@ -56,6 +56,21 @@ export default function AgentChatbot({
   const dropdownRef = useRef<HTMLDivElement>(null);
   const messageQueueRef = useRef<string[]>([]);
   const isStreamingRef = useRef(false);
+  const eventSourceRef = useRef<EventSource | null>(null);
+  const streamSessionIdRef = useRef<string | null>(null);
+
+  // -----------------------------------------------------------------------
+  // Close any active EventSource stream
+  // -----------------------------------------------------------------------
+  const closeActiveStream = useCallback(() => {
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close();
+      eventSourceRef.current = null;
+    }
+    isStreamingRef.current = false;
+    streamSessionIdRef.current = null;
+    messageQueueRef.current = [];
+  }, []);
 
   // -----------------------------------------------------------------------
   // Fetch sessions list
@@ -85,11 +100,13 @@ export default function AgentChatbot({
   // Fetch sessions on mount and when space changes
   useEffect(() => {
     if (!isTaskSession) {
+      closeActiveStream();
       setCurrentSessionId(null);
       setMessages([]);
+      setLoading(false);
     }
     fetchSessions();
-  }, [fetchSessions]);
+  }, [fetchSessions, closeActiveStream]);
 
   // -----------------------------------------------------------------------
   // Handle pendingSessionId — load a task-linked session
@@ -98,6 +115,7 @@ export default function AgentChatbot({
     if (!pendingSessionId || !token) return;
 
     const loadTaskSession = async () => {
+      closeActiveStream();
       setLoading(true);
       setError('');
       setIsTaskSession(true);
@@ -141,7 +159,7 @@ export default function AgentChatbot({
     };
 
     loadTaskSession();
-  }, [pendingSessionId, token, onSessionLoaded]);
+  }, [pendingSessionId, token, onSessionLoaded, closeActiveStream]);
 
   // -----------------------------------------------------------------------
   // Close dropdown when clicking outside
@@ -255,6 +273,7 @@ export default function AgentChatbot({
   // -----------------------------------------------------------------------
   const loadSession = async (sessionId: string) => {
     if (!token) return;
+    closeActiveStream();
     setShowSessionDropdown(false);
     setLoading(true);
     setError('');
@@ -317,13 +336,13 @@ export default function AgentChatbot({
   // Start a new chat / go back to main assistant
   // -----------------------------------------------------------------------
   const handleNewChat = () => {
+    closeActiveStream();
     setCurrentSessionId(null);
     setMessages([]);
     setShowSessionDropdown(false);
     setIsTaskSession(false);
     setSessionAgentId(null);
     setTaskInitialMessage(null);
-    messageQueueRef.current = [];
   };
 
   // -----------------------------------------------------------------------
@@ -398,9 +417,20 @@ export default function AgentChatbot({
     if (!skipAddMessage) {
       setMessages((prev) => [...prev, { role: 'user', content: userQuestion }]);
     }
+
+    // Close any previous stream before starting a new one
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close();
+      eventSourceRef.current = null;
+    }
+
     isStreamingRef.current = true;
     setLoading(true);
     setError('');
+
+    // Track which session this stream belongs to
+    const targetSessionId = overrideSessionId || currentSessionId;
+    const streamId = `${Date.now()}`;
 
     let assistantResponse = { role: 'assistant', content: '' };
     let assistantMessageAdded = false;
@@ -411,9 +441,8 @@ export default function AgentChatbot({
       if (activeSpace?._id) {
         params.append('space_id', activeSpace._id);
       }
-      const sessionId = overrideSessionId || currentSessionId;
-      if (sessionId) {
-        params.append('session_id', sessionId);
+      if (targetSessionId) {
+        params.append('session_id', targetSessionId);
       }
       if (token) {
         params.append('token', token);
@@ -422,15 +451,33 @@ export default function AgentChatbot({
       const backendUrl = getStreamingBackendUrl();
       const agentUrl = `${backendUrl}/agent/stream?${params.toString()}`;
       const es = new EventSource(agentUrl);
+      eventSourceRef.current = es;
+      streamSessionIdRef.current = streamId;
 
       es.addEventListener('ready', (e) => {
+        // If this stream was superseded by a new one, ignore events
+        if (streamSessionIdRef.current !== streamId) {
+          es.close();
+          return;
+        }
         const data = JSON.parse((e as MessageEvent).data);
-        if (data.session_id && !currentSessionId && !overrideSessionId) {
-          setCurrentSessionId(data.session_id);
+        if (data.session_id) {
+          // Always track the session_id from the backend for this stream.
+          // Only update currentSessionId if we don't already have one
+          // (new session) and no override was provided.
+          if (!currentSessionId && !overrideSessionId) {
+            setCurrentSessionId(data.session_id);
+          }
+          streamSessionIdRef.current = data.session_id;
         }
       });
 
       es.addEventListener('token', (e) => {
+        // If this stream was superseded, ignore events
+        if (eventSourceRef.current !== es) {
+          es.close();
+          return;
+        }
         const { token: responseToken } = JSON.parse((e as MessageEvent).data);
         assistantResponse.content += responseToken;
 
@@ -444,6 +491,11 @@ export default function AgentChatbot({
       });
 
       es.addEventListener('tool_result', (e) => {
+        // If this stream was superseded, ignore events
+        if (eventSourceRef.current !== es) {
+          es.close();
+          return;
+        }
         const { tool, args, data } = JSON.parse((e as MessageEvent).data);
 
         const formatArgs = (args: any) => {
@@ -469,6 +521,10 @@ export default function AgentChatbot({
 
       es.addEventListener('done', () => {
         es.close();
+        if (eventSourceRef.current === es) {
+          eventSourceRef.current = null;
+          streamSessionIdRef.current = null;
+        }
         isStreamingRef.current = false;
         fetchSessions();
         processQueue();
@@ -479,12 +535,18 @@ export default function AgentChatbot({
         setLoading(false);
         isStreamingRef.current = false;
         es.close();
+        if (eventSourceRef.current === es) {
+          eventSourceRef.current = null;
+          streamSessionIdRef.current = null;
+        }
         messageQueueRef.current = [];
       });
     } catch (err: any) {
       setError(err.message || 'Error');
       setLoading(false);
       isStreamingRef.current = false;
+      eventSourceRef.current = null;
+      streamSessionIdRef.current = null;
       messageQueueRef.current = [];
     }
   };
