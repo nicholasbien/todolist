@@ -94,6 +94,7 @@ class TodolistMCPServer {
               type: 'object',
               properties: {
                 text: { type: 'string', description: 'The todo item text' },
+                category: { type: 'string', description: 'Category to assign (optional, auto-categorized if not provided)' },
                 space_id: { type: 'string', description: 'Space ID (auto-detected if not provided)' },
               },
               required: ['text'],
@@ -121,6 +122,9 @@ class TodolistMCPServer {
                 text: { type: 'string', description: 'New todo text (optional)' },
                 completed: { type: 'boolean', description: 'Completion status (optional)' },
                 category: { type: 'string', description: 'Todo category (optional)' },
+                priority: { type: 'string', description: 'Priority level: High, Medium, or Low (optional)' },
+                notes: { type: 'string', description: 'Todo notes (optional)' },
+                dueDate: { type: 'string', description: 'Due date in ISO format (optional)' },
               },
               required: ['id'],
             },
@@ -359,9 +363,11 @@ class TodolistMCPServer {
 
   // --- Todo tools ---
 
-  private async addTodo(args: { text: string; space_id?: string }) {
+  private async addTodo(args: { text: string; category?: string; space_id?: string }) {
     const spaceId = await this.resolveSpaceId(args.space_id);
-    const response = await api.post('/todos', { text: args.text, space_id: spaceId });
+    const body: any = { text: args.text, space_id: spaceId };
+    if (args.category) body.category = args.category;
+    const response = await api.post('/todos', body);
     const todo = response.data;
     return this.textResult(`Added todo: "${todo.text}" (ID: ${todo._id}, Category: ${todo.category})`);
   }
@@ -382,17 +388,29 @@ class TodolistMCPServer {
     return this.textResult(lines.join('\n'));
   }
 
-  private async updateTodo(args: { id: string; text?: string; completed?: boolean; category?: string }) {
+  private async updateTodo(args: { id: string; text?: string; completed?: boolean; category?: string; priority?: string; notes?: string; dueDate?: string }) {
     const updateData: any = {};
     if (args.text !== undefined) updateData.text = args.text;
     if (args.completed !== undefined) updateData.completed = args.completed;
     if (args.category !== undefined) updateData.category = args.category;
-    await api.put(`/todos/${args.id}`, updateData);
-    const changes = [];
-    if (args.text) changes.push(`text to "${args.text}"`);
-    if (args.completed !== undefined) changes.push(`status to ${args.completed ? 'completed' : 'pending'}`);
-    if (args.category) changes.push(`category to "${args.category}"`);
-    return this.textResult(`Updated todo: ${changes.join(', ')}`);
+    if (args.priority !== undefined) updateData.priority = args.priority;
+    if (args.notes !== undefined) updateData.notes = args.notes;
+    if (args.dueDate !== undefined) updateData.dueDate = args.dueDate;
+    try {
+      const response = await api.put(`/todos/${args.id}`, updateData);
+      const updated = response.data;
+      const changes = [];
+      if (args.text) changes.push(`text to "${args.text}"`);
+      if (args.completed !== undefined) changes.push(`status to ${args.completed ? 'completed' : 'pending'}`);
+      if (args.category) changes.push(`category to "${updated.category}"`);
+      if (args.priority) changes.push(`priority to "${updated.priority}"`);
+      if (args.notes !== undefined) changes.push(`notes updated`);
+      if (args.dueDate !== undefined) changes.push(`due date to "${args.dueDate}"`);
+      return this.textResult(`Updated todo (ID: ${args.id}): ${changes.join(', ')}`);
+    } catch (error: any) {
+      const detail = error.response?.data?.detail || error.message || 'Unknown error';
+      throw new Error(`Failed to update todo ${args.id}: ${detail}`);
+    }
   }
 
   private async completeTodo(args: { id: string }) {

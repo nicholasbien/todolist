@@ -466,6 +466,12 @@ async def api_update_todo(todo_id: str, request: Request, current_user: dict = D
             if new_space_id and not await user_in_space(current_user["user_id"], new_space_id):
                 raise HTTPException(status_code=403, detail="Not authorized to move to target space")
             updates["space_id"] = new_space_id
+        if "completed" in body:
+            updates["completed"] = body["completed"]
+            if body["completed"]:
+                updates["dateCompleted"] = datetime.now().isoformat()
+            else:
+                updates["dateCompleted"] = None
         if "agent_id" in body:
             updates["agent_id"] = body["agent_id"]
 
