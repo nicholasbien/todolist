@@ -1660,95 +1660,6 @@ export default function AIToDoListApp({
         </div>
       </div>
 
-      {showAddSpaceModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4" style={{overscrollBehavior: 'contain'}}>
-          <div className="bg-black border border-gray-800 p-6 rounded-xl w-80 space-y-4 shadow-2xl overflow-y-auto" style={{maxHeight: 'calc(100dvh - 2rem)'}}>
-            <h3 className="text-gray-100 text-lg font-bold mb-2">Create Space</h3>
-            <input
-              type="text"
-              placeholder="Space name"
-              value={newSpaceName}
-              onChange={e => setNewSpaceName(e.target.value)}
-              onKeyPress={e => e.key === 'Enter' && handleAddSpace()}
-              className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 placeholder-gray-500 text-base focus:outline-none focus:border-accent"
-              autoFocus
-            />
-            <div className="flex justify-center space-x-3">
-              <button onClick={handleAddSpace} className="border border-accent text-accent hover:bg-accent/10 px-6 py-2 rounded-lg transition-colors">Create</button>
-              <button onClick={() => { setShowAddSpaceModal(false); setNewSpaceName(''); }} className="border border-gray-600 text-gray-300 hover:bg-gray-800 px-6 py-2 rounded-lg transition-colors">Cancel</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {showEditSpaceModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4" style={{overscrollBehavior: 'contain'}}>
-          <div className="bg-black border border-gray-800 p-6 rounded-xl w-80 space-y-4 shadow-2xl overflow-y-auto" style={{maxHeight: 'calc(100dvh - 2rem)'}}>
-            {spaceToEdit && (spaceToEdit.owner_id === (user.id || user._id)) ? (
-              <>
-                <h3 className="text-gray-100 text-lg font-bold mb-2">Edit Space</h3>
-                <input
-                  type="text"
-                  value={editSpaceName}
-                  onChange={e => setEditSpaceName(e.target.value)}
-                  className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 text-base focus:outline-none focus:border-accent"
-                />
-                <label className="flex items-center space-x-2 text-gray-300">
-                  <input
-                    type="checkbox"
-                    checked={editSpaceCollaborative}
-                    onChange={e => setEditSpaceCollaborative(e.target.checked)}
-                  />
-                  <span>Collaborative</span>
-                </label>
-                {editSpaceCollaborative && (
-                  <div className="space-y-2">
-                    {inviteEmails.map((email, idx) => (
-                      <input
-                        key={idx}
-                        type="text"
-                        placeholder="Invite email"
-                        value={email}
-                        onChange={e => {
-                          const updated = [...inviteEmails];
-                          updated[idx] = e.target.value;
-                          setInviteEmails(updated);
-                        }}
-                        className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 placeholder-gray-500 text-base focus:outline-none focus:border-accent"
-                      />
-                    ))}
-                    <button
-                      type="button"
-                      onClick={() => setInviteEmails([...inviteEmails, ''])}
-                      className="text-gray-300 border border-gray-700 px-2 py-1 rounded-lg hover:bg-gray-800"
-                    >
-                      +
-                    </button>
-                  </div>
-                )}
-                <div className="flex justify-center space-x-3">
-                  <button onClick={handleUpdateSpace} className="border border-accent text-accent hover:bg-accent/10 px-6 py-2 rounded-lg transition-colors">Save</button>
-                  {spaceToEdit && (
-                    <button onClick={() => { handleDeleteSpace(spaceToEdit._id); setShowEditSpaceModal(false); }} className="border border-red-500 text-red-400 hover:bg-red-900/20 px-6 py-2 rounded-lg transition-colors">Delete</button>
-                  )}
-                  <button onClick={() => setShowEditSpaceModal(false)} className="border border-gray-600 text-gray-300 hover:bg-gray-800 px-6 py-2 rounded-lg transition-colors">Cancel</button>
-                </div>
-              </>
-            ) : (
-              <>
-                <h3 className="text-gray-100 text-lg font-bold mb-2">Space Options</h3>
-                <div className="flex justify-center space-x-3">
-                  {spaceToEdit && (
-                    <button onClick={() => { handleLeaveSpace(spaceToEdit._id); setShowEditSpaceModal(false); }} className="border border-red-500 text-red-400 hover:bg-red-900/20 px-6 py-2 rounded-lg transition-colors">Leave</button>
-                  )}
-                  <button onClick={() => setShowEditSpaceModal(false)} className="border border-gray-600 text-gray-300 hover:bg-gray-800 px-6 py-2 rounded-lg transition-colors">Cancel</button>
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-      )}
-
       {/* Add Category Modal */}
       {showAddCategoryModal && (
         <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4" style={{overscrollBehavior: 'contain'}}>
@@ -2022,6 +1933,97 @@ export default function AIToDoListApp({
         </div>
       </SwipeableViews>
       </div>
+
+      {/* Add Space Modal */}
+      {showAddSpaceModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4" style={{overscrollBehavior: 'contain'}}>
+          <div className="bg-black border border-gray-800 p-6 rounded-xl w-80 space-y-4 shadow-2xl overflow-y-auto" style={{maxHeight: 'calc(100dvh - 2rem)'}}>
+            <h3 className="text-gray-100 text-lg font-bold mb-2">Create Space</h3>
+            <input
+              type="text"
+              placeholder="Space name"
+              value={newSpaceName}
+              onChange={e => setNewSpaceName(e.target.value)}
+              onKeyPress={e => e.key === 'Enter' && handleAddSpace()}
+              className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 placeholder-gray-500 text-base focus:outline-none focus:border-accent"
+              autoFocus
+            />
+            <div className="flex justify-center space-x-3">
+              <button onClick={handleAddSpace} className="border border-accent text-accent hover:bg-accent/10 px-6 py-2 rounded-lg transition-colors">Create</button>
+              <button onClick={() => { setShowAddSpaceModal(false); setNewSpaceName(''); }} className="border border-gray-600 text-gray-300 hover:bg-gray-800 px-6 py-2 rounded-lg transition-colors">Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Space Modal */}
+      {showEditSpaceModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4" style={{overscrollBehavior: 'contain'}}>
+          <div className="bg-black border border-gray-800 p-6 rounded-xl w-80 space-y-4 shadow-2xl overflow-y-auto" style={{maxHeight: 'calc(100dvh - 2rem)'}}>
+            {spaceToEdit && (spaceToEdit.owner_id === (user.id || user._id)) ? (
+              <>
+                <h3 className="text-gray-100 text-lg font-bold mb-2">Edit Space</h3>
+                <input
+                  type="text"
+                  value={editSpaceName}
+                  onChange={e => setEditSpaceName(e.target.value)}
+                  className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 text-base focus:outline-none focus:border-accent"
+                />
+                <label className="flex items-center space-x-2 text-gray-300">
+                  <input
+                    type="checkbox"
+                    checked={editSpaceCollaborative}
+                    onChange={e => setEditSpaceCollaborative(e.target.checked)}
+                  />
+                  <span>Collaborative</span>
+                </label>
+                {editSpaceCollaborative && (
+                  <div className="space-y-2">
+                    {inviteEmails.map((email, idx) => (
+                      <input
+                        key={idx}
+                        type="text"
+                        placeholder="Invite email"
+                        value={email}
+                        onChange={e => {
+                          const updated = [...inviteEmails];
+                          updated[idx] = e.target.value;
+                          setInviteEmails(updated);
+                        }}
+                        className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 placeholder-gray-500 text-base focus:outline-none focus:border-accent"
+                      />
+                    ))}
+                    <button
+                      type="button"
+                      onClick={() => setInviteEmails([...inviteEmails, ''])}
+                      className="text-gray-300 border border-gray-700 px-2 py-1 rounded-lg hover:bg-gray-800"
+                    >
+                      +
+                    </button>
+                  </div>
+                )}
+                <div className="flex justify-center space-x-3">
+                  <button onClick={handleUpdateSpace} className="border border-accent text-accent hover:bg-accent/10 px-6 py-2 rounded-lg transition-colors">Save</button>
+                  {spaceToEdit && (
+                    <button onClick={() => { handleDeleteSpace(spaceToEdit._id); setShowEditSpaceModal(false); }} className="border border-red-500 text-red-400 hover:bg-red-900/20 px-6 py-2 rounded-lg transition-colors">Delete</button>
+                  )}
+                  <button onClick={() => setShowEditSpaceModal(false)} className="border border-gray-600 text-gray-300 hover:bg-gray-800 px-6 py-2 rounded-lg transition-colors">Cancel</button>
+                </div>
+              </>
+            ) : (
+              <>
+                <h3 className="text-gray-100 text-lg font-bold mb-2">Space Options</h3>
+                <div className="flex justify-center space-x-3">
+                  {spaceToEdit && (
+                    <button onClick={() => { handleLeaveSpace(spaceToEdit._id); setShowEditSpaceModal(false); }} className="border border-red-500 text-red-400 hover:bg-red-900/20 px-6 py-2 rounded-lg transition-colors">Leave</button>
+                  )}
+                  <button onClick={() => setShowEditSpaceModal(false)} className="border border-gray-600 text-gray-300 hover:bg-gray-800 px-6 py-2 rounded-lg transition-colors">Cancel</button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Insights Modal */}
       {showInsights && (
