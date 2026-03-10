@@ -247,7 +247,7 @@ Either way, the session arrives pre-routed when you poll. The built-in agent han
 
 Use this workflow to act as an autonomous agent responding to user messages:
 
-1. **Poll** for pending sessions with `agent_id=openclaw` — this returns your claimed sessions AND unclaimed ones
+1. **Poll** — fetch all spaces, then for each space query pending sessions with `agent_id=openclaw&space_id=SPACE_ID`. This returns sessions already claimed by openclaw (follow-ups) AND unclaimed sessions (new work)
 2. **Triage using enrichment fields** — each session includes `is_followup`, `recent_messages`, `message_count`, `todo_id`, and `agent_id` so you can triage without reading the full session history
 3. **If `is_followup` is true** — the user sent a new message to a session you previously handled. Check `recent_messages` for what they said and handle accordingly
 4. **If `agent_id` is `openclaw` and no `todo_id`** — this is a direct chat session. The user started a conversation with you directly from the Assistant tab (not linked to a task). Respond conversationally. Do not create or update todos unless the user explicitly asks
@@ -363,7 +363,7 @@ openclaw cron add \
   --name "todolist-watcher" \
   --every "5m" \
   --session isolated \
-  --message "Check for pending TodoList sessions and respond to them. Use the todolist skill. Follow the 'Responding to Pending Sessions' workflow: poll pending sessions with agent_id=openclaw. Handle sessions where is_followup is true (check recent_messages for context). Handle new sessions with agent_id=openclaw (pre-routed via dropdown). For unclaimed sessions, check todo text for #openclaw — skip if absent. Post an interim ack before starting work. Always reply with agent_id=openclaw to claim sessions. If there are no pending sessions, do nothing."
+  --message "Check for pending TodoList sessions and respond to them. Use the todolist skill. Follow the 'Responding to Pending Sessions' workflow: first fetch all spaces (GET /spaces), then for each space poll pending sessions with agent_id=openclaw and space_id=SPACE_ID. This ensures you see sessions already claimed by openclaw (follow-ups) plus unclaimed sessions. Handle sessions where is_followup is true (check recent_messages for context). Handle new sessions with agent_id=openclaw (pre-routed via dropdown). For unclaimed sessions, check todo text for #openclaw — skip if absent. Post an interim ack before starting work. Always reply with agent_id=openclaw to claim sessions. If there are no pending sessions, do nothing."
 ```
 
 This creates an isolated session every 5 minutes that checks for work. Adjust the interval based on user preference.
@@ -377,7 +377,7 @@ openclaw cron remove todolist-watcher
 ### What happens in each cycle
 
 1. OpenClaw spawns an isolated session with the todolist skill loaded
-2. It polls `GET /agent/sessions/pending?agent_id=openclaw` for claimed + unclaimed sessions
+2. It fetches all spaces (`GET /spaces`), then for each space polls `GET /agent/sessions/pending?agent_id=openclaw&space_id=SPACE_ID` — this returns sessions claimed by openclaw (follow-ups) plus unclaimed sessions
 3. For sessions where `is_followup` is true, it checks `recent_messages` and handles the followup
 4. For direct-chat sessions (`agent_id=openclaw`, no `todo_id`), it responds conversationally
 5. For new task sessions with `agent_id=openclaw` and `todo_id` (pre-routed via dropdown), it posts an interim ack and does the work
