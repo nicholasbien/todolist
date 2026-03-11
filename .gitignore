@@ -1,17 +1,37 @@
+# Environment files
 .env
-backend/venv/*
+.env.*
 backend/.env
+frontend/.env.local
+
+# Python
+backend/venv/
 **/__pycache__/
+
+# Node / Frontend
 frontend/node_modules/
 frontend/.next/
-frontend/.env.local
 frontend/out/
 frontend/coverage/
-frontend/.DS_Store
-frontend/.claude/
-frontend/ios/App/.DS_Store
 frontend/tsconfig.tsbuildinfo
 mcp-server/node_modules/
+
+# OS files
+.DS_Store
+**/.DS_Store
+
+# Claude / AI tooling
+.claude/worktrees/
+.claude/scheduled_tasks.lock
+frontend/.claude/
+.mcp.json
+
+# Playwright / testing artifacts
 .pw-offline-profile/
 .playwright-mcp/
-.mcp.json
+
+# Screenshots (dev artifacts, not app assets)
+/screenshots/
+
+# iOS build artifacts
+frontend/ios/App/.DS_Store
