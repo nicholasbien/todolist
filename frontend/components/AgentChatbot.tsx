@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { ChevronDown, ArrowLeft } from 'lucide-react';
+import { ChevronDown, ArrowLeft, CheckCircle2 } from 'lucide-react';
 import { MessageRenderer, PlainTextRenderer } from './MessageRenderer';
 import { getStreamingBackendUrl } from '../utils/api';
 
@@ -59,6 +59,9 @@ export default function AgentChatbot({
   // Task session mode: when viewing a task-linked session
   const [isTaskSession, setIsTaskSession] = useState(false);
   const [taskInitialMessage, setTaskInitialMessage] = useState<string | null>(null);
+  const [activeTodoId, setActiveTodoId] = useState<string | null>(null);
+  const [taskCompleted, setTaskCompleted] = useState(false);
+  const [completingTask, setCompletingTask] = useState(false);
   // External agent ownership: when session is claimed by an agent like openclaw
   const [sessionAgentId, setSessionAgentId] = useState<string | null>(null);
   // Whether the agent is waiting for a human response
@@ -163,6 +166,9 @@ export default function AgentChatbot({
         const data = await res.json();
         const displayMessages = data.display_messages || [];
         setCurrentSessionId(pendingSessionId);
+        // Track the linked todo ID for complete action
+        if (data.todo_id) setActiveTodoId(data.todo_id);
+        setTaskCompleted(false);
         // Save the first user message for reset functionality
         const firstUserMsg = displayMessages.find((m: any) => m.role === 'user');
         if (firstUserMsg) setTaskInitialMessage(firstUserMsg.content);
@@ -332,6 +338,8 @@ export default function AgentChatbot({
       setMessages(displayMessages);
       setCurrentSessionId(sessionId);
       setIsTaskSession(isTodoSession);
+      setActiveTodoId(data.todo_id || null);
+      setTaskCompleted(false);
       setSessionAgentId(data.agent_id || null);
       setNeedsHumanResponse(!!data.needs_human_response);
     } catch (err: any) {
@@ -381,6 +389,9 @@ export default function AgentChatbot({
     setMessages([]);
     setShowSessionDropdown(false);
     setIsTaskSession(false);
+    setActiveTodoId(null);
+    setTaskCompleted(false);
+    setCompletingTask(false);
     setSessionAgentId(null);
     setNeedsHumanResponse(false);
     setSelectedAgentId(null);
@@ -407,6 +418,26 @@ export default function AgentChatbot({
       handleStreamingAsk(taskInitialMessage);
     } catch (err) {
       console.error('Failed to reset task chat:', err);
+    }
+  };
+
+  // -----------------------------------------------------------------------
+  // Complete the linked task from within the chat
+  // -----------------------------------------------------------------------
+  const handleCompleteTask = async () => {
+    if (!activeTodoId || !token || completingTask || taskCompleted) return;
+    setCompletingTask(true);
+    try {
+      const res = await fetch(`/todos/${activeTodoId}/complete`, {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error('Failed to complete task');
+      setTaskCompleted(true);
+    } catch (err: any) {
+      setError(err.message || 'Failed to complete task');
+    } finally {
+      setCompletingTask(false);
     }
   };
 
@@ -607,8 +638,8 @@ export default function AgentChatbot({
       {/* Top bar */}
       <div className="mb-2 flex items-center gap-2 flex-shrink-0">
         {isTaskSession ? (
-          // Back + Reset buttons when viewing a task session
-          <div className="flex items-center gap-2">
+          // Back + Reset + Complete buttons when viewing a task session
+          <div className="flex items-center gap-2 flex-1">
             <button
               onClick={handleNewChat}
               className="bg-gray-700 text-gray-200 px-3 py-1 rounded text-sm hover:bg-gray-600 transition-colors flex items-center gap-1"
@@ -623,6 +654,20 @@ export default function AgentChatbot({
             >
               Reset Chat
             </button>
+            {activeTodoId && (
+              <button
+                onClick={handleCompleteTask}
+                disabled={completingTask || taskCompleted}
+                className={`ml-auto px-3 py-1 rounded text-sm flex items-center gap-1.5 transition-colors ${
+                  taskCompleted
+                    ? 'bg-green-600/20 text-green-300 border border-green-500/30 cursor-default'
+                    : 'bg-green-600/20 text-green-300 border border-green-500/30 hover:bg-green-600/30 disabled:opacity-50 disabled:cursor-not-allowed'
+                }`}
+              >
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                {completingTask ? 'Completing...' : taskCompleted ? 'Completed' : 'Complete Task'}
+              </button>
+            )}
           </div>
         ) : sessionAgentId && !isTaskSession && currentSessionId ? (
           // Back button + agent badge for direct agent chat sessions
