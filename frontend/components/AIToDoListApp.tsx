@@ -101,6 +101,7 @@ export default function AIToDoListApp({
   const { logout, clearAuthExpired, authenticatedFetch } = useAuth();
   const [todos, setTodos] = useState<any[]>([]);
   const [newTodo, setNewTodo] = useState("");
+  const [newTodoNotes, setNewTodoNotes] = useState("");
   const [isNewTodoFocused, setIsNewTodoFocused] = useState(false);
   const [categories, setCategories] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -811,11 +812,8 @@ export default function AIToDoListApp({
 
   // Add new todo(s)
   const handleAddTodo = async () => {
-    const lines = newTodo
-      .split('\n')
-      .map((line) => line.trim())
-      .filter(Boolean);
-    if (lines.length === 0) return;
+    const title = newTodo.trim();
+    if (!title) return;
 
     setLoading(true);
     setError('');
@@ -827,47 +825,52 @@ export default function AIToDoListApp({
       const localTimeString = now.toLocaleTimeString('en-GB', { hour12: false }); // HH:MM:SS format
       const localISOString = `${localDateString}T${localTimeString}`;
 
-      for (const line of lines) {
-        const todo: any = {
-          text: line,
-          dateAdded: localISOString,
-          completed: false,
-          space_id: activeSpace ? activeSpace._id : null,
-          agent_id: newTodoAgent || null,
-        };
+      const todo: any = {
+        text: title,
+        dateAdded: localISOString,
+        completed: false,
+        space_id: activeSpace ? activeSpace._id : null,
+        agent_id: newTodoAgent || null,
+      };
 
-        // If a category is selected (not "All"), skip AI classification on backend
-        if (activeCat !== 'All') {
-          todo.category = activeCat;
-          todo.priority = 'Medium';
-        }
+      // Include notes if provided
+      const notes = newTodoNotes.trim();
+      if (notes) {
+        todo.notes = notes;
+      }
 
-        // Store link if it's a URL so backend can fetch title
-        if (isUrl(line)) {
-          todo.link = line;
-        }
+      // If a category is selected (not "All"), skip AI classification on backend
+      if (activeCat !== 'All') {
+        todo.category = activeCat;
+        todo.priority = 'Medium';
+      }
 
-        // Save to MongoDB with timeout
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+      // Store link if it's a URL so backend can fetch title
+      if (isUrl(title)) {
+        todo.link = title;
+      }
 
-        const response = await authenticatedFetch('/todos', {
-          method: 'POST',
-          body: JSON.stringify(todo),
-          signal: controller.signal
-        });
+      // Save to MongoDB with timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
 
-        clearTimeout(timeoutId);
+      const response = await authenticatedFetch('/todos', {
+        method: 'POST',
+        body: JSON.stringify(todo),
+        signal: controller.signal
+      });
 
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.detail || 'Failed to save todo');
-        }
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to save todo');
       }
 
       // Refresh todos list
       await fetchTodos(false);
       setNewTodo('');
+      setNewTodoNotes('');
       setNewTodoAgent('');
     } catch (err) {
       if (err.name === 'AbortError') {
@@ -1672,29 +1675,22 @@ export default function AIToDoListApp({
       {/* Add new todo */}
       <div className="mb-5">
         <div className="flex gap-2 items-end">
-          <textarea
+          <input
+            type="text"
             value={newTodo}
-            onChange={(e) => {
-              setNewTodo(e.target.value);
-              e.target.style.height = 'auto';
-              e.target.style.height = Math.min(e.target.scrollHeight, 140) + 'px';
-            }}
+            onChange={(e) => setNewTodo(e.target.value)}
             onFocus={() => setIsNewTodoFocused(true)}
             onBlur={() => setIsNewTodoFocused(false)}
             onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
+              if (e.key === 'Enter') {
                 e.preventDefault();
                 handleAddTodo();
-                // Reset height after submit
-                const target = e.target as HTMLTextAreaElement;
-                setTimeout(() => { target.style.height = 'auto'; }, 0);
               }
             }}
-            placeholder="Add task(s)… (Shift+Enter for newline)"
+            placeholder="Task title…"
             disabled={loading}
-            aria-label="Add new task"
-            rows={1}
-            className="flex-1 p-3 border border-gray-800 rounded-xl bg-black text-gray-100 placeholder-gray-500 focus:border-accent focus:outline-none transition-colors resize-none min-h-[48px] max-h-[140px] overflow-y-auto"
+            aria-label="Task title"
+            className="flex-1 p-3 border border-gray-800 rounded-xl bg-black text-gray-100 placeholder-gray-500 focus:border-accent focus:outline-none transition-colors h-12"
           />
           <select
             value={newTodoAgent}
@@ -1720,6 +1716,19 @@ export default function AIToDoListApp({
             {loading ? '...' : '+'}
           </button>
         </div>
+        <textarea
+          value={newTodoNotes}
+          onChange={(e) => {
+            setNewTodoNotes(e.target.value);
+            e.target.style.height = 'auto';
+            e.target.style.height = Math.min(e.target.scrollHeight, 140) + 'px';
+          }}
+          placeholder="Notes (optional)"
+          disabled={loading}
+          aria-label="Task notes"
+          rows={1}
+          className="w-full mt-2 p-3 border border-gray-800 rounded-xl bg-black text-gray-100 placeholder-gray-500 focus:border-accent focus:outline-none transition-colors resize-none min-h-[40px] max-h-[140px] overflow-y-auto text-sm"
+        />
       </div>
 
       {showAddSpaceModal && (
