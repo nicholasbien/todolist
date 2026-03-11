@@ -115,6 +115,11 @@ class MemoryDeleteRequest(BaseModel):
     key: str = Field(..., min_length=1, description="Key of the memory fact to delete")
 
 
+class SearchSessionsRequest(BaseModel):
+    query: str = Field(..., min_length=1, description="Search query text")
+    limit: int = Field(default=20, ge=1, le=50, description="Maximum number of results to return")
+
+
 # OpenAI function schema generators
 def get_openai_tool_schema(model_class: BaseModel) -> dict:
     """Convert Pydantic model to OpenAI function schema format."""
@@ -219,5 +224,15 @@ OPENAI_TOOL_SCHEMAS = {
             "Call when the user asks to forget something or correct outdated information."
         ),
         "parameters": get_openai_tool_schema(MemoryDeleteRequest),
+    },
+    "search_sessions": {
+        "type": "function",
+        "name": "search_sessions",
+        "description": (
+            "Search chat sessions by title and message content. "
+            "Call when the user wants to find a past conversation, look up what was discussed, "
+            "or locate a session related to a specific topic. Returns matching sessions with preview snippets."
+        ),
+        "parameters": get_openai_tool_schema(SearchSessionsRequest),
     },
 }
