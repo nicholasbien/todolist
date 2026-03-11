@@ -204,6 +204,7 @@ export default function AIToDoListApp({
   const [editDueDate, setEditDueDate] = useState<string>('');
   const [editSpaceId, setEditSpaceId] = useState<string>('');
   const [editSpaceCategories, setEditSpaceCategories] = useState<string[]>([]);
+  const [showPermanentDeleteConfirm, setShowPermanentDeleteConfirm] = useState(false);
   const [newTodoAgent, setNewTodoAgent] = useState<string>(() => {
     if (typeof window !== 'undefined') {
       return localStorage.getItem('lastSelectedAgent') || '';
@@ -879,7 +880,7 @@ export default function AIToDoListApp({
     }
   };
 
-  // Delete todo
+  // Delete todo (soft-delete: marks as closed)
   const handleDeleteTodo = async (id) => {
     try {
       // Validate ID
@@ -894,14 +895,43 @@ export default function AIToDoListApp({
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.detail || 'Failed to delete todo');
+        throw new Error(errorData.detail || 'Failed to close todo');
       }
 
       // Refresh todos list
       await fetchTodos(false);
       setError(''); // Clear any existing errors on success
     } catch (err) {
-      handleError(err, 'Error deleting todo');
+      handleError(err, 'Error closing todo');
+    }
+  };
+
+  // Permanently delete todo (removes from database)
+  const handlePermanentDeleteTodo = async (id) => {
+    try {
+      // Validate ID
+      if (!id || id === "None" || id === "undefined") {
+        setError('Invalid todo ID');
+        return;
+      }
+
+      const response = await authenticatedFetch(`/todos/${id}/permanent`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to permanently delete todo');
+      }
+
+      // Close modal and refresh
+      setShowEditTodoModal(false);
+      setShowPermanentDeleteConfirm(false);
+      setTodoToEdit(null);
+      await fetchTodos(false);
+      setError(''); // Clear any existing errors on success
+    } catch (err) {
+      handleError(err, 'Error permanently deleting todo');
     }
   };
 
@@ -980,6 +1010,7 @@ export default function AIToDoListApp({
 
   const handleEditTodo = async (todo) => {
     setTodoToEdit(todo);
+    setShowPermanentDeleteConfirm(false);
     setEditText(todo.text);
     setEditNotes(todo.notes || '');
     setEditCategoryVal(todo.category);
@@ -2020,6 +2051,35 @@ export default function AIToDoListApp({
             <div className="flex justify-center space-x-3">
               <button onClick={handleSaveTodoEdit} className="border border-accent text-accent hover:bg-accent/10 px-6 py-2 rounded-lg transition-colors">Save</button>
               <button onClick={() => setShowEditTodoModal(false)} className="border border-gray-600 text-gray-300 hover:bg-gray-800 px-6 py-2 rounded-lg transition-colors">Cancel</button>
+            </div>
+            {/* Permanently Delete */}
+            <div className="pt-3 border-t border-gray-800 mt-2">
+              {!showPermanentDeleteConfirm ? (
+                <button
+                  onClick={() => setShowPermanentDeleteConfirm(true)}
+                  className="w-full text-center text-red-400 hover:text-red-300 text-sm py-2 transition-colors"
+                >
+                  Permanently Delete
+                </button>
+              ) : (
+                <div className="space-y-2">
+                  <p className="text-center text-red-400 text-sm">Are you sure? This cannot be undone.</p>
+                  <div className="flex justify-center space-x-3">
+                    <button
+                      onClick={() => todoToEdit && handlePermanentDeleteTodo(todoToEdit._id)}
+                      className="border border-red-500 text-red-400 hover:bg-red-900/20 px-6 py-2 rounded-lg transition-colors text-sm"
+                    >
+                      Yes, Delete Forever
+                    </button>
+                    <button
+                      onClick={() => setShowPermanentDeleteConfirm(false)}
+                      className="border border-gray-600 text-gray-300 hover:bg-gray-800 px-4 py-2 rounded-lg transition-colors text-sm"
+                    >
+                      No
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>

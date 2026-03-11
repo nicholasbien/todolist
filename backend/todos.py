@@ -75,6 +75,8 @@ class Todo(BaseModel):
     parent_id: Optional[str] = None  # ID of parent todo for sub-tasks
     subtask_ids: list[str] = []  # Ordered array of child todo IDs (on the parent)
     depends_on: list[str] = []  # IDs of sibling subtasks this task depends on
+    closed: bool = False  # Soft-deleted: hidden from active view, visible in completed
+    dateClosed: Optional[str] = None  # ISO timestamp when the todo was closed
 
     class Config:
         arbitrary_types_allowed = True
@@ -283,6 +285,47 @@ async def get_todos(user_id: str, space_id: Optional[str] | None = None):
 
 
 async def delete_todo(todo_id: str, user_id: str):
+    """Soft-delete: mark the todo as closed instead of removing from the database."""
+    try:
+        # Check if todo_id is valid
+        if not todo_id or todo_id == "None" or todo_id == "undefined":
+            raise HTTPException(status_code=400, detail="Invalid todo ID")
+
+        try:
+            object_id = ObjectId(todo_id)
+        except Exception:
+            raise HTTPException(status_code=400, detail=f"Invalid todo ID format: {todo_id}")
+
+        query = {"_id": object_id}
+        todo = await todos_collection.find_one(query)
+        if not todo:
+            raise HTTPException(status_code=404, detail="Todo not found")
+        if todo.get("space_id") and not await user_in_space(user_id, todo["space_id"]):
+            raise HTTPException(status_code=403, detail="Not in space")
+
+        now = datetime.now().isoformat()
+        result = await todos_collection.update_one(
+            query,
+            {"$set": {"closed": True, "dateClosed": now, "completed": True, "dateCompleted": now}},
+        )
+        if result.modified_count == 1:
+            # Also close all sub-tasks if this was a parent
+            if todo.get("subtask_ids"):
+                await todos_collection.update_many(
+                    {"parent_id": todo_id},
+                    {"$set": {"closed": True, "dateClosed": now, "completed": True, "dateCompleted": now}},
+                )
+            return {"message": "Todo closed successfully"}
+        raise HTTPException(status_code=404, detail="Todo not found")
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        logger.error(f"Error closing todo: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error closing todo: {str(e)}")
+
+
+async def permanent_delete_todo(todo_id: str, user_id: str):
+    """Permanently remove the todo from the database."""
     try:
         # Check if todo_id is valid
         if not todo_id or todo_id == "None" or todo_id == "undefined":
@@ -315,13 +358,13 @@ async def delete_todo(todo_id: str, user_id: str):
                 )
             # Cascade delete: remove all sub-tasks if this was a parent
             await todos_collection.delete_many({"parent_id": todo_id})
-            return {"message": "Todo deleted successfully"}
+            return {"message": "Todo permanently deleted"}
         raise HTTPException(status_code=404, detail="Todo not found")
     except HTTPException as he:
         raise he
     except Exception as e:
-        logger.error(f"Error deleting todo: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error deleting todo: {str(e)}")
+        logger.error(f"Error permanently deleting todo: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error permanently deleting todo: {str(e)}")
 
 
 async def complete_todo(todo_id: str, user_id: str):
@@ -475,6 +518,14 @@ async def migrate_legacy_todos() -> None:
         )
         if result.modified_count > 0:
             logger.info("Migrated %d legacy todos to have depends_on: []", result.modified_count)
+
+        # Ensure closed field exists on all todos (default: false)
+        result = await todos_collection.update_many(
+            {"closed": {"$exists": False}},
+            {"$set": {"closed": False}},
+        )
+        if result.modified_count > 0:
+            logger.info("Migrated %d legacy todos to have closed: false", result.modified_count)
     except Exception as e:
         logger.error(f"Error migrating legacy todos: {str(e)}")
 

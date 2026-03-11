@@ -238,7 +238,7 @@ export default function TodoItem({
                 ? "text-red-300 bg-red-900/20"
                 : "text-red-400"
             }`}
-            aria-label="Delete task"
+            aria-label="Close task"
           >
             <X className="w-6 h-6" />
           </button>
