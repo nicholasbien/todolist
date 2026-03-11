@@ -4,6 +4,7 @@ import { ChevronDown, ArrowLeft, CheckCircle2, RotateCcw } from 'lucide-react';
 import { MessageRenderer, PlainTextRenderer } from './MessageRenderer';
 import { getStreamingBackendUrl } from '../utils/api';
 import AgentMemoryViewer from './AgentMemoryViewer';
+import ImageUploader, { type UploadedImage } from './ImageUploader';
 
 interface ChatbotProps {
   activeSpace: any;
@@ -37,7 +38,8 @@ export default function AgentChatbot({
   onNavigateToTasks,
 }: ChatbotProps) {
   const [question, setQuestion] = useState('');
-  const [messages, setMessages] = useState<{ role: string; content: string; toolData?: any; agent_id?: string }[]>([]);
+  const [messages, setMessages] = useState<{ role: string; content: string; toolData?: any; agent_id?: string; image_ids?: string[] }[]>([]);
+  const [attachedImages, setAttachedImages] = useState<UploadedImage[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [thinkingDots, setThinkingDots] = useState(0);
@@ -371,8 +373,25 @@ export default function AgentChatbot({
       setCurrentSessionId(sessionId);
       setIsTaskSession(isTodoSession);
       setActiveTodoId(data.todo_id || null);
-      setTaskCompleted(false);
       setSessionAgentId(data.agent_id || null);
+      // Fetch the linked todo's actual completion status (like the pendingSessionId flow)
+      if (data.todo_id) {
+        try {
+          const todoRes = await fetch(`/todos/${data.todo_id}`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (todoRes.ok) {
+            const todoData = await todoRes.json();
+            setTaskCompleted(!!todoData.completed);
+          } else {
+            setTaskCompleted(false);
+          }
+        } catch {
+          setTaskCompleted(false);
+        }
+      } else {
+        setTaskCompleted(false);
+      }
       setNeedsHumanResponse(!!data.needs_human_response);
     } catch (err: any) {
       setError(err.message || 'Failed to load chat');
@@ -474,14 +493,17 @@ export default function AgentChatbot({
   // Send a message
   // -----------------------------------------------------------------------
   const handleSend = async () => {
-    if (!question.trim()) return;
+    if (!question.trim() && attachedImages.length === 0) return;
     const userMessage = question;
+    const currentImages = [...attachedImages];
+    const imageIds = currentImages.map((img) => img.id);
     setQuestion('');
+    setAttachedImages([]);
     shouldAutoScrollRef.current = true;
 
     // Direct agent chat: create a new session for the selected agent
     if (selectedAgentId && !currentSessionId) {
-      setMessages((prev) => [...prev, { role: 'user', content: userMessage }]);
+      setMessages((prev) => [...prev, { role: 'user', content: userMessage, image_ids: imageIds.length > 0 ? imageIds : undefined }]);
       try {
         const res = await fetch('/agent/sessions', {
           method: 'POST',
@@ -507,13 +529,13 @@ export default function AgentChatbot({
     // If session is owned by an external agent, post via messaging API
     // so the external agent picks it up (don't stream to built-in agent)
     if (sessionAgentId && currentSessionId) {
-      setMessages((prev) => [...prev, { role: 'user', content: userMessage }]);
+      setMessages((prev) => [...prev, { role: 'user', content: userMessage, image_ids: imageIds.length > 0 ? imageIds : undefined }]);
       setNeedsHumanResponse(false);
       try {
         await fetch(`/agent/sessions/${currentSessionId}/messages`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-          body: JSON.stringify({ role: 'user', content: userMessage }),
+          body: JSON.stringify({ role: 'user', content: userMessage, image_ids: imageIds.length > 0 ? imageIds : undefined }),
         });
       } catch (err: any) {
         setError(err.message || 'Failed to send message');
@@ -1002,6 +1024,20 @@ export default function AgentChatbot({
               ) : (
                 <PlainTextRenderer content={msg.content} className="text-sm" />
               )}
+              {msg.image_ids && msg.image_ids.length > 0 && (
+                <div className="flex gap-2 mt-2 flex-wrap">
+                  {msg.image_ids.map((imgId) => (
+                    <a key={imgId} href={`/images/${imgId}`} target="_blank" rel="noopener noreferrer">
+                      <img
+                        src={`/images/${imgId}`}
+                        alt="Attached image"
+                        className="max-w-[200px] max-h-[200px] rounded-lg border border-gray-700 object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                        loading="lazy"
+                      />
+                    </a>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         ))}
@@ -1049,7 +1085,18 @@ export default function AgentChatbot({
       )}
 
       {/* Input area */}
-      <div className="flex gap-2 flex-shrink-0 items-end mb-4 relative">
+      <div className="flex-shrink-0 mb-4 relative">
+        {/* Image previews and uploader */}
+        {token && isOnline && (
+          <ImageUploader
+            token={token}
+            spaceId={activeSpace?._id}
+            images={attachedImages}
+            onImagesChange={setAttachedImages}
+            compact
+          />
+        )}
+        <div className="flex gap-2 items-end">
         <div className="flex-1 relative">
           <textarea
             className={`w-full bg-gray-900 border border-gray-700 text-gray-100 rounded-lg p-3 focus:outline-none focus:border-accent resize-none min-h-[48px] max-h-[140px] overflow-y-auto ${
@@ -1100,7 +1147,7 @@ export default function AgentChatbot({
         </div>
         <button
           onClick={handleSend}
-          disabled={!question.trim() || !isOnline}
+          disabled={(!question.trim() && attachedImages.length === 0) || !isOnline}
           className={`border px-6 py-3 rounded-lg hover:bg-accent/10 disabled:opacity-50 disabled:cursor-not-allowed transition-colors ${
             isQuestionFocused
               ? 'border-accent text-accent'
@@ -1111,6 +1158,7 @@ export default function AgentChatbot({
         >
           Send
         </button>
+        </div>
       </div>
     </div>
   );

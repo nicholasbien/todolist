@@ -86,6 +86,7 @@ class Todo(BaseModel):
     dateClosed: Optional[str] = None  # ISO timestamp when the todo was closed
     recurrence_rule: Optional[str] = None  # "daily", "weekly", "monthly", or None
     recurrence_next: Optional[str] = None  # ISO datetime string for next occurrence
+    image_ids: list[str] = []  # IDs of attached images (stored in GridFS)
 
     class Config:
         arbitrary_types_allowed = True
@@ -628,6 +629,16 @@ async def migrate_legacy_todos() -> None:
         if result.modified_count > 0:
             logger.info(
                 "Migrated %d legacy todos to have recurrence fields",
+                result.modified_count,
+            )
+
+        result = await todos_collection.update_many(
+            {"image_ids": {"$exists": False}},
+            {"$set": {"image_ids": []}},
+        )
+        if result.modified_count > 0:
+            logger.info(
+                "Migrated %d legacy todos to have image_ids: []",
                 result.modified_count,
             )
     except Exception as e:

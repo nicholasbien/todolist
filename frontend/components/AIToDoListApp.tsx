@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import { ArrowUpDown, GripVertical, Search, X } from "lucide-react";
 import TodoItem from "./TodoItem";
 import AgentChatbot from "./AgentChatbot";
+import ImageUploader, { type UploadedImage } from "./ImageUploader";
 import { useAuth } from "../context/AuthContext";
 import Link from "next/link";
 import InsightsComponent from "./InsightsComponent";
@@ -216,6 +217,8 @@ export default function AIToDoListApp({
     }
     return '';
   });
+  const [newTodoRecurrence, setNewTodoRecurrence] = useState<string>('');
+  const [newTodoImages, setNewTodoImages] = useState<UploadedImage[]>([]);
 
   // Long-press to edit category
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -837,6 +840,8 @@ export default function AIToDoListApp({
         completed: false,
         space_id: activeSpace ? activeSpace._id : null,
         agent_id: newTodoAgent || null,
+        recurrence_rule: newTodoRecurrence || null,
+        image_ids: newTodoImages.length > 0 ? newTodoImages.map((img) => img.id) : undefined,
       };
 
       // Include notes if provided
@@ -878,6 +883,8 @@ export default function AIToDoListApp({
       setNewTodo('');
       setNewTodoNotes('');
       setNewTodoAgent('');
+      setNewTodoRecurrence('');
+      setNewTodoImages([]);
     } catch (err) {
       if (err.name === 'AbortError') {
         setError('Request timed out. Please try again.');
@@ -1712,6 +1719,18 @@ export default function AIToDoListApp({
             <option value="openclaw">OpenClaw</option>
             <option value="claude">Claude</option>
           </select>
+          <select
+            value={newTodoRecurrence}
+            onChange={(e) => setNewTodoRecurrence(e.target.value)}
+            className={`h-12 px-2 rounded-xl bg-gray-900 border text-sm focus:border-accent focus:outline-none transition-colors appearance-none cursor-pointer ${
+              newTodoRecurrence ? 'border-accent text-accent' : 'border-gray-700 text-gray-200'
+            }`}
+          >
+            <option value="">Once</option>
+            <option value="daily">Daily</option>
+            <option value="weekly">Weekly</option>
+            <option value="monthly">Monthly</option>
+          </select>
           <button
             onClick={handleAddTodo}
             disabled={loading}
@@ -1737,6 +1756,14 @@ export default function AIToDoListApp({
           rows={1}
           className="w-full mt-2 p-3 border border-gray-800 rounded-xl bg-black text-gray-100 placeholder-gray-500 focus:border-accent focus:outline-none transition-colors resize-none min-h-[40px] max-h-[140px] overflow-y-auto text-sm"
         />
+        <div className="mt-2">
+          <ImageUploader
+            token={token}
+            spaceId={activeSpace?._id}
+            images={newTodoImages}
+            onImagesChange={setNewTodoImages}
+          />
+        </div>
       </div>
 
       {showAddSpaceModal && (

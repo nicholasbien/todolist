@@ -168,6 +168,20 @@ export default function TodoItem({
               {subtaskDoneCount || 0}/{subtaskCount} sub-tasks done
             </p>
           )}
+          {todo.image_ids && todo.image_ids.length > 0 && (
+            <div className="flex gap-2 mt-2 flex-wrap">
+              {todo.image_ids.map((imgId: string) => (
+                <a key={imgId} href={`/images/${imgId}`} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
+                  <img
+                    src={`/images/${imgId}`}
+                    alt="Task attachment"
+                    className="w-12 h-12 rounded-lg border border-gray-700 object-cover hover:opacity-90 transition-opacity"
+                    loading="lazy"
+                  />
+                </a>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="flex items-center space-x-1 ml-3" onTouchStart={(e) => e.stopPropagation()}>

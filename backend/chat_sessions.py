@@ -168,6 +168,7 @@ async def append_message(
     agent_id: Optional[str] = None,
     interim: bool = False,
     needs_human_response: bool = False,
+    image_ids: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
     """Append a message to a session's display_messages and update flags.
 
@@ -196,6 +197,8 @@ async def append_message(
         message["agent_id"] = agent_id
     if needs_human_response:
         message["needs_human_response"] = True
+    if image_ids:
+        message["image_ids"] = image_ids
 
     # Update trajectory doc
     await trajectories_collection.update_one(

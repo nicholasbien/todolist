@@ -50,7 +50,7 @@ describe('API_ROUTES and isApiPath', () => {
     const expected = [
       '/todos', '/categories', '/spaces', '/journals', '/insights',
       '/agent', '/auth', '/email', '/contact', '/export', '/health',
-      '/briefings', '/activity-feed', '/memories', '/memory-logs'
+      '/briefings', '/activity-feed', '/memories', '/memory-logs', '/images'
     ];
     expect(sw.API_ROUTES).toEqual(expected);
   });

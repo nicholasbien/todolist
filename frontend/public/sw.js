@@ -1,6 +1,6 @@
 // IMPORTANT: Always increment these versions when modifying this service worker file
 // This forces browsers to download and use the updated service worker
-const STATIC_CACHE = 'todo-static-v129';
+const STATIC_CACHE = 'todo-static-v130';
 
 const GLOBAL_DB_NAME = 'TodoGlobalDB';
 const USER_DB_PREFIX = 'TodoUserDB_';
@@ -48,7 +48,7 @@ const DEFAULT_CATEGORIES = ['General'];
 const API_ROUTES = [
   '/todos', '/categories', '/spaces', '/journals', '/insights',
   '/agent', '/auth', '/email', '/contact', '/export', '/health',
-  '/briefings', '/activity-feed', '/memories', '/memory-logs'
+  '/briefings', '/activity-feed', '/memories', '/memory-logs', '/images'
 ];
 
 function isApiPath(pathname) {
