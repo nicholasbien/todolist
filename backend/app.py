@@ -453,6 +453,8 @@ async def api_create_todo(request: Request, current_user: dict = Depends(get_cur
                 logger.error(f"Failed to auto-create session for todo: {e}")
 
         return result
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error creating todo: {str(e)}")
         raise HTTPException(status_code=500, detail="Error creating todo")
@@ -478,9 +480,11 @@ async def api_reorder_todos(request: Request, current_user: dict = Depends(get_c
             space_docs = await todos_collection.find({"_id": {"$in": oid_list}}, {"space_id": 1}).to_list(
                 length=len(oid_list)
             )
+            if len(space_docs) != len(oid_list):
+                raise HTTPException(status_code=403, detail="Not authorized to reorder these todos")
             for doc in space_docs:
                 sid = doc.get("space_id")
-                if sid and not await user_in_space(user_id, sid):
+                if not sid or not await user_in_space(user_id, sid):
                     raise HTTPException(status_code=403, detail="Not authorized to reorder these todos")
 
         for i, todo_id in enumerate(todo_ids):
