@@ -55,6 +55,7 @@ from journals import (
     journals_collection,
 )
 from pydantic import BaseModel
+from rate_limit import rate_limit_by_ip, rate_limit_by_user
 from scheduler import get_scheduler_status, start_scheduler, update_schedule_time
 from spaces import (
     Space,
@@ -251,15 +252,17 @@ async def root():
 
 # Authentication endpoints
 @app.post("/auth/signup")
-async def api_signup(request: SignupRequest):
+async def api_signup(request: SignupRequest, raw_request: Request):
     """Send verification code to email for signup/login."""
+    rate_limit_by_ip(raw_request, max_requests=5, window_seconds=60, endpoint="signup")
     logger.info(f"Signup request for email: {request.email}")
     return await signup_user(request.email)
 
 
 @app.post("/auth/login")
-async def api_login(request: LoginRequest):
+async def api_login(request: LoginRequest, raw_request: Request):
     """Verify code and create session."""
+    rate_limit_by_ip(raw_request, max_requests=10, window_seconds=60, endpoint="login")
     logger.info(f"Login request for email: {request.email}")
     return await login_user(request.email, request.code)
 
@@ -303,6 +306,7 @@ async def api_get_todos(space_id: str | None = None, current_user: dict = Depend
 @app.post("/todos", response_model=Todo)
 async def api_create_todo(request: Request, current_user: dict = Depends(get_current_user)):
     try:
+        rate_limit_by_user(current_user["user_id"], max_requests=30, window_seconds=60, endpoint="create_todo")
         body = await request.json()
 
         body["user_id"] = current_user["user_id"]
@@ -1071,6 +1075,7 @@ class PostMessageRequest(BaseModel):
 @app.post("/agent/sessions")
 async def api_create_agent_session(req: CreateSessionRequest, current_user: dict = Depends(get_current_user)):
     """Create a new messaging session, optionally linked to a todo."""
+    rate_limit_by_user(current_user["user_id"], max_requests=10, window_seconds=60, endpoint="create_session")
     user_id = current_user["user_id"]
 
     # If todo_id provided, check for existing session
