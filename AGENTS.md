@@ -3,6 +3,12 @@
 ## Overview
 AI-powered collaborative todo list with React/Next.js frontend, FastAPI backend, MongoDB, offline-first PWA, and an MCP server for agent integration.
 
+## Git Branching Rules
+
+- **Always fetch latest main before starting any work** — before creating a branch, always run `git fetch origin && git checkout -b your-branch origin/main`. This ensures your branch is based on the latest remote main, not a stale local copy. This is a mandatory first step for every new task.
+- **Always branch from `main`** — every new feature, fix, or docs branch must be created from the latest `main`. Never branch from other feature branches (e.g., `openclaw`).
+- **Always target `main` in PRs** — unless explicitly told otherwise by the user.
+
 ## Using the MCP Server
 
 The MCP server lets AI agents (like Claude Code) manage todos, sessions, journals, and spaces directly. It's configured in `.mcp.json`.

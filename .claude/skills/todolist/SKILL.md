@@ -384,6 +384,7 @@ The managing agent should:
 - **Filter description from action** — only create subtasks for actionable work. Context, explanations, and motivational text belong in session messages or task notes, not as subtasks.
 - **Keep task titles short** — when creating tasks with `add_todo`, the `text` field should be a concise one-line title (a few words). Put all details, context, descriptions, and instructions in the `notes` field instead. Short titles are easier to scan in the task list.
 - **Use worktree isolation for code-modifying subagents** — always pass `isolation: "worktree"` when dispatching subagents that will modify code (creating PRs, fixing bugs, resolving conflicts, rebasing, running/fixing tests). This prevents subagents from interfering with each other or the main working directory. Only skip for read-only tasks like auditing or posting summaries.
+- **Always fetch latest main before branching** — before starting any new work that involves creating a branch, run `git fetch origin && git checkout -b <branch-name> origin/main` to ensure the branch is based on the latest remote main. Never branch from a stale local main. This applies to both the task manager and all subagents.
 
 ## Example Session
 
