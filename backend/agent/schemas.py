@@ -88,6 +88,33 @@ class SendEmailRequest(BaseModel):
     )
 
 
+class MemorySaveRequest(BaseModel):
+    key: str = Field(
+        ...,
+        min_length=1,
+        description=(
+            "Short identifier for this memory fact, e.g. 'preferred_name', "
+            "'work_schedule', 'communication_style', 'project_context'"
+        ),
+    )
+    value: str = Field(..., min_length=1, description="The value or description to remember")
+    category: Optional[str] = Field(
+        default=None,
+        description="Optional category: 'preference', 'context', 'workflow', or 'personal'",
+    )
+
+
+class MemoryListRequest(BaseModel):
+    category: Optional[str] = Field(
+        default=None,
+        description="Optional category filter: 'preference', 'context', 'workflow', or 'personal'",
+    )
+
+
+class MemoryDeleteRequest(BaseModel):
+    key: str = Field(..., min_length=1, description="Key of the memory fact to delete")
+
+
 # OpenAI function schema generators
 def get_openai_tool_schema(model_class: BaseModel) -> dict:
     """Convert Pydantic model to OpenAI function schema format."""
@@ -162,5 +189,35 @@ OPENAI_TOOL_SCHEMAS = {
             "Call when the user asks the assistant to email them information or a recap."
         ),
         "parameters": get_openai_tool_schema(SendEmailRequest),
+    },
+    "save_memory": {
+        "type": "function",
+        "name": "save_memory",
+        "description": (
+            "Save a fact or preference about the user to persistent memory. "
+            "Use this proactively when the user shares preferences, context about themselves, "
+            "their work style, project details, or anything worth remembering across sessions. "
+            "Examples: preferred name, communication style, recurring projects, timezone, "
+            "tools they use, team structure. The memory persists across all future conversations."
+        ),
+        "parameters": get_openai_tool_schema(MemorySaveRequest),
+    },
+    "list_memories": {
+        "type": "function",
+        "name": "list_memories",
+        "description": (
+            "List all saved memory facts about the user. "
+            "Call when the user asks what you know about them, or to review stored preferences."
+        ),
+        "parameters": get_openai_tool_schema(MemoryListRequest),
+    },
+    "delete_memory": {
+        "type": "function",
+        "name": "delete_memory",
+        "description": (
+            "Delete a specific memory fact by key. "
+            "Call when the user asks to forget something or correct outdated information."
+        ),
+        "parameters": get_openai_tool_schema(MemoryDeleteRequest),
     },
 }

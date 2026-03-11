@@ -49,6 +49,11 @@ async def client():
     chat_sessions.sessions_collection = db.db.chat_sessions
     chat_sessions.trajectories_collection = db.db.chat_trajectories
 
+    import agent_memory
+
+    agent_memory.memories_collection = db.db.agent_memories
+    agent_memory.memory_logs_collection = db.db.agent_memory_logs
+
     # Clear global MCP session state to prevent stale connections across tests
     from agent.agent import mcp_contexts, mcp_sessions
 

@@ -624,6 +624,7 @@ class TestAgentSystemPrompt:
             space_name="Default",
             categories_str="General",
             todo_context="",
+            memory_context="",
         )
         assert "AI assistant with access to tools" in prompt
         assert "add_task" in prompt
@@ -642,6 +643,9 @@ class TestAgentSystemPrompt:
             "web_search",
             "send_email_to_user",
             "web_scraping",
+            "save_memory",
+            "list_memories",
+            "delete_memory",
         }
 
         assert set(AVAILABLE_TOOLS.keys()) == expected_tools
