@@ -33,7 +33,8 @@ interface ActivityFeedProps {
 }
 
 function formatRelativeTime(isoString: string): string {
-  const date = new Date(isoString);
+  const normalizedTimestamp = isoString.replace(/\.(\d{3})\d*/, '.$1');
+  const date = new Date(normalizedTimestamp);
   const now = new Date();
   const diffMs = now.getTime() - date.getTime();
   const diffMin = Math.floor(diffMs / 60000);
@@ -48,7 +49,8 @@ function formatRelativeTime(isoString: string): string {
 }
 
 function formatFullTime(isoString: string): string {
-  const date = new Date(isoString);
+  const normalizedTimestamp = isoString.replace(/\.(\d{3})\d*/, '.$1');
+  const date = new Date(normalizedTimestamp);
   return date.toLocaleString('en-US', {
     month: 'short',
     day: 'numeric',
@@ -61,7 +63,8 @@ function formatFullTime(isoString: string): string {
 function groupByDate(events: ActivityEvent[]): Map<string, ActivityEvent[]> {
   const groups = new Map<string, ActivityEvent[]>();
   for (const event of events) {
-    const date = new Date(event.timestamp);
+    const normalizedTimestamp = event.timestamp.replace(/\.(\d{3})\d*/, '.$1');
+    const date = new Date(normalizedTimestamp);
     const key = date.toLocaleDateString('en-US', {
       weekday: 'long',
       month: 'long',
