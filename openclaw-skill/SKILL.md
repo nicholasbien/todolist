@@ -172,6 +172,19 @@ curl -s -X POST -H "Authorization: Bearer $TODOLIST_AUTH_TOKEN" \
 
 Posting as `assistant` clears the pending flag and notifies the user. The `agent_id` claims the session so followups route back to openclaw.
 
+### Pause Polling Until Human Responds
+
+When asking the user a question and you need their answer before continuing, pass `needs_human_response: true`:
+
+```bash
+curl -s -X POST -H "Authorization: Bearer $TODOLIST_AUTH_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"content": "Which option do you prefer: A or B?", "role": "assistant", "agent_id": "openclaw", "needs_human_response": true}' \
+  "${TODOLIST_API_URL:-https://app.todolist.nyc}/agent/sessions/SESSION_ID/messages" | jq '.'
+```
+
+This sets `needs_human_response=true` on the session and clears `needs_agent_response`, effectively removing the session from the pending queue. When the human replies, `needs_human_response` is cleared and `needs_agent_response` is set back to true, so the session reappears in your next poll.
+
 ### Post a Progress Update (Interim)
 
 ```bash

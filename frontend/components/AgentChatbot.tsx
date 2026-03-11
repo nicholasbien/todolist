@@ -49,6 +49,8 @@ export default function AgentChatbot({
   const [taskInitialMessage, setTaskInitialMessage] = useState<string | null>(null);
   // External agent ownership: when session is claimed by an agent like openclaw
   const [sessionAgentId, setSessionAgentId] = useState<string | null>(null);
+  // Whether the agent is waiting for a human response
+  const [needsHumanResponse, setNeedsHumanResponse] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
@@ -118,6 +120,7 @@ export default function AgentChatbot({
         const lastMsg = displayMessages[displayMessages.length - 1];
         const agentId = data.agent_id || null;
         setSessionAgentId(agentId);
+        setNeedsHumanResponse(!!data.needs_human_response);
         if (lastMsg?.role === 'user' && !agentId) {
           // Don't pre-populate messages — let handleStreamingAsk add the user message itself
           // Show any earlier messages (if multi-turn), but skip the last user message
@@ -218,7 +221,9 @@ export default function AgentChatbot({
     };
   }, []);
   useEffect(() => {
-    if (!isWaitingForExternalAgent || !token) return;
+    if ((!isWaitingForExternalAgent && !needsHumanResponse) || !token) return;
+    // Don't poll when agent is waiting for human response
+    if (needsHumanResponse) return;
     const poll = setInterval(async () => {
       try {
         const res = await fetch(`/agent/sessions/${currentSessionId}`, {
@@ -231,12 +236,13 @@ export default function AgentChatbot({
         if (lastMsg?.role === 'assistant') {
           setMessages(displayMessages);
         }
+        setNeedsHumanResponse(!!data.needs_human_response);
       } catch {
         // ignore polling errors
       }
     }, 5000);
     return () => clearInterval(poll);
-  }, [isWaitingForExternalAgent, currentSessionId, token]);
+  }, [isWaitingForExternalAgent, needsHumanResponse, currentSessionId, token]);
 
   // Lock body scroll when delete modal is open
   useEffect(() => {
@@ -274,6 +280,7 @@ export default function AgentChatbot({
       setCurrentSessionId(sessionId);
       setIsTaskSession(isTodoSession);
       setSessionAgentId(data.agent_id || null);
+      setNeedsHumanResponse(!!data.needs_human_response);
     } catch (err: any) {
       setError(err.message || 'Failed to load chat');
     } finally {
@@ -322,6 +329,7 @@ export default function AgentChatbot({
     setShowSessionDropdown(false);
     setIsTaskSession(false);
     setSessionAgentId(null);
+    setNeedsHumanResponse(false);
     setTaskInitialMessage(null);
     messageQueueRef.current = [];
   };
@@ -361,6 +369,7 @@ export default function AgentChatbot({
     // so the external agent picks it up (don't stream to built-in agent)
     if (sessionAgentId && currentSessionId) {
       setMessages((prev) => [...prev, { role: 'user', content: userMessage }]);
+      setNeedsHumanResponse(false);
       try {
         await fetch(`/agent/sessions/${currentSessionId}/messages`, {
           method: 'POST',
@@ -707,7 +716,14 @@ export default function AgentChatbot({
             </div>
           </div>
         )}
-        {isWaitingForExternalAgent && !isWaiting && (
+        {needsHumanResponse && !isWaiting && (
+          <div className="flex justify-start">
+            <div className="w-full px-3 py-2 bg-amber-900/20 border border-amber-700/50 rounded-lg">
+              <p className="text-sm text-amber-300">Agent is waiting for your response</p>
+            </div>
+          </div>
+        )}
+        {isWaitingForExternalAgent && !isWaiting && !needsHumanResponse && (
           <div className="flex justify-start">
             <div className="text-purple-400 w-full px-0 py-2">
               <div className="text-xs mb-1 font-medium">{sessionAgentId}</div>

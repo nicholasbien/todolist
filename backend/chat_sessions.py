@@ -93,6 +93,7 @@ async def get_session_trajectory(session_id: str, user_id: str) -> Optional[Dict
         "title": title,
         "todo_id": session_doc.get("todo_id") if session_doc else None,
         "agent_id": session_doc.get("agent_id") if session_doc else None,
+        "needs_human_response": session_doc.get("needs_human_response", False) if session_doc else False,
         "display_messages": doc.get("display_messages", []),
         "trajectory": doc.get("trajectory", []),
         "created_at": doc.get("created_at"),
@@ -146,10 +147,11 @@ async def append_message(
     content: str,
     agent_id: Optional[str] = None,
     interim: bool = False,
+    needs_human_response: bool = False,
 ) -> Dict[str, Any]:
     """Append a message to a session's display_messages and update flags.
 
-    When a user posts: sets needs_agent_response=True.
+    When a user posts: sets needs_agent_response=True, clears needs_human_response.
     When an assistant posts: sets needs_agent_response=False, has_unread_reply=True.
     If agent_id is provided on an assistant message, stamps the session so
     future followups route back to that agent.
@@ -158,11 +160,18 @@ async def append_message(
     needs_agent_response is NOT cleared.  This allows progress updates
     (e.g. "Working on this...") without removing the session from the
     pending queue, so the final response can be posted later.
+
+    If needs_human_response=True and role is 'assistant', the session is marked
+    as needing a human reply before the agent should continue. This sets
+    needs_human_response=True and needs_agent_response=False, effectively
+    pausing agent polling until the human responds.
     """
     now = datetime.utcnow()
     message: Dict[str, Any] = {"role": role, "content": content, "timestamp": now.isoformat()}
     if agent_id and role == "assistant":
         message["agent_id"] = agent_id
+    if needs_human_response:
+        message["needs_human_response"] = True
 
     # Update trajectory doc
     await trajectories_collection.update_one(
@@ -177,12 +186,16 @@ async def append_message(
     update: Dict[str, Any] = {"updated_at": now}
     if role == "user":
         update["needs_agent_response"] = True
+        update["needs_human_response"] = False
     elif role == "assistant":
         if not interim:
             update["needs_agent_response"] = False
         update["has_unread_reply"] = True
         if agent_id:
             update["agent_id"] = agent_id
+        if needs_human_response:
+            update["needs_human_response"] = True
+            update["needs_agent_response"] = False
 
     await sessions_collection.update_one(
         {"_id": ObjectId(session_id)},
@@ -209,6 +222,7 @@ async def get_pending_sessions(
         "user_id": user_id,
         "needs_agent_response": True,
         "updated_at": {"$gte": cutoff},
+        "needs_human_response": {"$ne": True},
     }
     if space_id is not None:
         query["space_id"] = space_id
@@ -294,7 +308,7 @@ async def get_todo_session_statuses(user_id: str, space_id: Optional[str] = None
 
     cursor = sessions_collection.find(
         query,
-        {"todo_id": 1, "needs_agent_response": 1, "has_unread_reply": 1},
+        {"todo_id": 1, "needs_agent_response": 1, "has_unread_reply": 1, "needs_human_response": 1},
     )
     items = await cursor.to_list(length=200)
 
@@ -303,7 +317,9 @@ async def get_todo_session_statuses(user_id: str, space_id: Optional[str] = None
         todo_id = item.get("todo_id")
         if not todo_id:
             continue
-        if item.get("has_unread_reply"):
+        if item.get("needs_human_response"):
+            statuses[todo_id] = "needs_human_response"
+        elif item.get("has_unread_reply"):
             statuses[todo_id] = "unread_reply"
         elif item.get("needs_agent_response"):
             statuses[todo_id] = "waiting"

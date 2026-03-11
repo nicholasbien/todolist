@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Check, RotateCcw, X, MessageCircle, Clock, User, Bot } from "lucide-react";
+import { Check, RotateCcw, X, MessageCircle, Clock, User, Bot, UserCircle } from "lucide-react";
 
 interface SubtaskItem {
   _id: string;
@@ -20,12 +20,12 @@ interface TodoItemProps {
   isCollaborative: boolean;
   onEdit: (todo: any) => void;
   onChat?: (todo: any) => void;
-  sessionStatus?: 'waiting' | 'unread_reply';
+  sessionStatus?: 'waiting' | 'unread_reply' | 'needs_human_response';
   isSubtask?: boolean;
   subtaskCount?: number;
   subtaskDoneCount?: number;
   subtasks?: SubtaskItem[];
-  subtaskSessionStatuses?: Record<string, 'waiting' | 'unread_reply'>;
+  subtaskSessionStatuses?: Record<string, 'waiting' | 'unread_reply' | 'needs_human_response'>;
 }
 
 export default function TodoItem({
@@ -176,7 +176,9 @@ export default function TodoItem({
             <button
               onClick={(e) => { e.stopPropagation(); onChat(todo); }}
               className={`relative text-lg w-11 h-11 flex items-center justify-center rounded-lg transition-all duration-200 focus:outline-none ${
-                sessionStatus === 'unread_reply'
+                sessionStatus === 'needs_human_response'
+                  ? 'text-amber-400'
+                  : sessionStatus === 'unread_reply'
                   ? 'text-accent'
                   : sessionStatus === 'waiting'
                   ? 'text-gray-400'
@@ -184,10 +186,15 @@ export default function TodoItem({
               }`}
               aria-label="Chat about this task"
             >
-              {sessionStatus === 'waiting' ? (
+              {sessionStatus === 'needs_human_response' ? (
+                <UserCircle className="w-5 h-5" />
+              ) : sessionStatus === 'waiting' ? (
                 <Clock className="w-5 h-5" />
               ) : (
                 <MessageCircle className="w-5 h-5" />
+              )}
+              {sessionStatus === 'needs_human_response' && (
+                <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-amber-400 rounded-full animate-pulse" />
               )}
               {sessionStatus === 'unread_reply' && (
                 <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-accent rounded-full animate-pulse" />
@@ -405,7 +412,9 @@ export default function TodoItem({
                 <button
                   onClick={(e) => { e.stopPropagation(); onChat(st); }}
                   className={`flex-shrink-0 w-7 h-7 flex items-center justify-center rounded transition-colors ${
-                    subtaskSessionStatuses?.[st._id] === 'unread_reply'
+                    subtaskSessionStatuses?.[st._id] === 'needs_human_response'
+                      ? 'text-amber-400'
+                      : subtaskSessionStatuses?.[st._id] === 'unread_reply'
                       ? 'text-accent'
                       : subtaskSessionStatuses?.[st._id] === 'waiting'
                       ? 'text-gray-400'
@@ -413,7 +422,9 @@ export default function TodoItem({
                   }`}
                   aria-label="Chat about subtask"
                 >
-                  {subtaskSessionStatuses?.[st._id] === 'waiting' ? (
+                  {subtaskSessionStatuses?.[st._id] === 'needs_human_response' ? (
+                    <UserCircle className="w-3.5 h-3.5" />
+                  ) : subtaskSessionStatuses?.[st._id] === 'waiting' ? (
                     <Clock className="w-3.5 h-3.5" />
                   ) : (
                     <MessageCircle className="w-3.5 h-3.5" />

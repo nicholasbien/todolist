@@ -272,7 +272,7 @@ Sessions can be:
 1. **Streaming AI sessions** — used by the Assistant tab, have trajectories
 2. **Task-linked messaging sessions** — linked to a todo via `todo_id`, use post-and-poll
 
-Session flags: `needs_agent_response` (user posted, awaiting reply), `has_unread_reply` (agent replied, user hasn't seen it).
+Session flags: `needs_agent_response` (user posted, awaiting reply), `has_unread_reply` (agent replied, user hasn't seen it), `needs_human_response` (agent asked a question, pauses polling until human replies).
 
 ### Service Worker
 
