@@ -15,10 +15,23 @@ function getApiBaseUrl(forceBackend = false): string {
 }
 
 /**
- * Get the direct backend URL for SSE streaming (bypasses SW proxy which buffers).
+ * Get the base URL for SSE streaming (EventSource).
+ *
+ * On web (including production), returns '' so the EventSource uses a
+ * same-origin relative URL.  A Next.js rewrite in next.config.js forwards
+ * /agent/stream to the real backend, which avoids CORS issues (EventSource
+ * cannot set custom headers, so cross-origin requests fail unless the
+ * backend explicitly allows the frontend origin).
+ *
+ * On Capacitor (native mobile), the origin is file:// so we must use the
+ * absolute backend URL directly.
  */
 export function getStreamingBackendUrl(): string {
-  return process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000';
+  if (Capacitor.isNativePlatform()) {
+    return process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000';
+  }
+  // Web: use same-origin relative URL — Next.js rewrite proxies to backend
+  return '';
 }
 
 /**
