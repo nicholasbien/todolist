@@ -1471,6 +1471,7 @@ async def api_create_agent_session(
     if req.todo_id:
         existing = await find_session_by_todo(user_id, req.todo_id)
         if existing:
+            existing["session_id"] = existing.get("_id")
             return existing
 
     title = req.title or req.initial_message or "New session"
@@ -1492,6 +1493,10 @@ async def api_create_agent_session(
         if doc:
             doc["_id"] = str(doc["_id"])
             session = doc
+
+    # Include session_id in response for frontend compatibility
+    if session:
+        session["session_id"] = session.get("_id") or session_id
 
     return session
 
