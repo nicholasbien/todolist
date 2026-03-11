@@ -628,6 +628,17 @@ async def api_complete_todo(
     return result
 
 
+@app.post("/todos/{todo_id}/restore", response_model=Todo)
+async def api_restore_todo(
+    todo_id: str, current_user: dict = Depends(get_current_user)
+):
+    """Restore a soft-deleted (closed) todo by setting closed=false."""
+    logger.info(
+        f"Restoring soft-deleted todo {todo_id} for user: {current_user['email']}"
+    )
+    return await update_todo_fields(todo_id, {"closed": False}, current_user["user_id"])
+
+
 @app.put("/todos/{todo_id}", response_model=Todo)
 async def api_update_todo(
     todo_id: str, request: Request, current_user: dict = Depends(get_current_user)
@@ -688,6 +699,9 @@ async def api_update_todo(
                 updates["recurrence_next"] = _compute_next_occurrence(rule)
             else:
                 updates["recurrence_next"] = None
+
+        if "closed" in body:
+            updates["closed"] = bool(body["closed"])
 
         if not updates:
             raise HTTPException(status_code=400, detail="No valid fields to update")
