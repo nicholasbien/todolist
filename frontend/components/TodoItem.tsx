@@ -1,22 +1,15 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Bot, Check, Clock, Loader2, MessageCircle, RotateCcw, User, X } from "lucide-react";
+import { Check, RotateCcw, X, MessageCircle, Clock, User, Bot, UserCircle, Repeat } from "lucide-react";
 
-type CreatorType = "user" | "agent";
-
-interface TodoItemData {
+interface SubtaskItem {
   _id: string;
   text: string;
-  link?: string | null;
-  category: string;
-  priority: string;
-  dueDate?: string | null;
   completed: boolean;
-  first_name?: string | null;
-  creator_type?: CreatorType;
+  [key: string]: any;
 }
 
 interface TodoItemProps {
-  todo: TodoItemData;
+  todo: any;
   categories: string[];
   editingCategory: string | null;
   setEditingCategory: (id: string | null) => void;
@@ -25,9 +18,14 @@ interface TodoItemProps {
   handleCompleteTodo: (id: string) => void;
   handleDeleteTodo: (id: string) => void;
   isCollaborative: boolean;
-  onEdit: (todo: TodoItemData) => void;
-  onChat: (todo: TodoItemData) => void;
-  sessionStatus?: 'waiting' | 'processing' | 'unread_reply';
+  onEdit: (todo: any) => void;
+  onChat?: (todo: any) => void;
+  sessionStatus?: 'waiting' | 'unread_reply' | 'needs_human_response';
+  isSubtask?: boolean;
+  subtaskCount?: number;
+  subtaskDoneCount?: number;
+  subtasks?: SubtaskItem[];
+  subtaskSessionStatuses?: Record<string, 'waiting' | 'unread_reply' | 'needs_human_response'>;
 }
 
 export default function TodoItem({
@@ -43,6 +41,11 @@ export default function TodoItem({
   onEdit,
   onChat,
   sessionStatus,
+  isSubtask,
+  subtaskCount,
+  subtaskDoneCount,
+  subtasks,
+  subtaskSessionStatuses,
 }: TodoItemProps) {
   const [isCompleting, setIsCompleting] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -51,15 +54,6 @@ export default function TodoItem({
   const containerRef = React.useRef<HTMLDivElement>(null);
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const longPressTriggeredRef = useRef(false);
-  const creatorType: CreatorType = todo.creator_type === "agent" ? "agent" : "user";
-  const isAgentTask = creatorType === "agent";
-  const CreatorIcon = isAgentTask ? Bot : User;
-  const creatorLabel = isAgentTask ? "Created by assistant" : "Created by you";
-  const creatorBadgeStyles = todo.completed
-    ? "text-gray-500 border-gray-800 bg-black"
-    : isAgentTask
-    ? "text-purple-300 border-purple-700/60 bg-purple-500/10"
-    : "text-sky-300 border-sky-700/60 bg-sky-500/10";
 
   useEffect(() => {
     setShouldAnimate(true);
@@ -152,7 +146,7 @@ export default function TodoItem({
     >
       <div className="flex justify-between items-center">
         <div className="flex-1">
-          <p className={`text-base transition-all duration-200 ${
+          <p className={`text-base transition-all duration-200 whitespace-pre-wrap break-words ${
             isDeleting ? "opacity-50" : ""
           }`}>
             {todo.link ? (
@@ -169,37 +163,44 @@ export default function TodoItem({
               todo.text
             )}
           </p>
+          {subtaskCount != null && subtaskCount > 0 && (
+            <p className="text-xs text-gray-400 mt-1">
+              {subtaskDoneCount || 0}/{subtaskCount} sub-tasks done
+            </p>
+          )}
         </div>
 
-        <div className="flex items-center space-x-2 ml-3" onTouchStart={(e) => e.stopPropagation()}>
-          <button
-            onClick={(e) => { e.stopPropagation(); onChat(todo); }}
-            onMouseEnter={() => setHoveredButton('chat')}
-            onMouseLeave={() => setHoveredButton(null)}
-            className={`relative text-lg w-11 h-11 flex items-center justify-center rounded-lg transition-all duration-200 focus:outline-none ${
-              sessionStatus === 'unread_reply'
-                ? "text-accent"
-                : sessionStatus === 'processing'
-                ? "text-yellow-400"
-                : sessionStatus === 'waiting'
-                ? "text-gray-500"
-                : hoveredButton === 'chat'
-                ? "text-accent bg-accent/10"
-                : "text-gray-400"
-            }`}
-            aria-label="Chat about this task"
-          >
-            {sessionStatus === 'waiting' ? (
-              <Clock className="w-5 h-5" />
-            ) : sessionStatus === 'processing' ? (
-              <Loader2 className="w-5 h-5 animate-spin" />
-            ) : (
-              <MessageCircle className="w-5 h-5" />
-            )}
-            {sessionStatus === 'unread_reply' && (
-              <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-accent rounded-full animate-pulse" />
-            )}
-          </button>
+        <div className="flex items-center space-x-1 ml-3" onTouchStart={(e) => e.stopPropagation()}>
+          {/* Chat button */}
+          {onChat && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onChat(todo); }}
+              className={`relative text-lg w-11 h-11 flex items-center justify-center rounded-lg transition-all duration-200 focus:outline-none ${
+                sessionStatus === 'needs_human_response'
+                  ? 'text-amber-400'
+                  : sessionStatus === 'unread_reply'
+                  ? 'text-accent'
+                  : sessionStatus === 'waiting'
+                  ? 'text-gray-400'
+                  : 'text-gray-500 hover:text-gray-300'
+              }`}
+              aria-label="Chat about this task"
+            >
+              {sessionStatus === 'needs_human_response' ? (
+                <UserCircle className="w-5 h-5" />
+              ) : sessionStatus === 'waiting' ? (
+                <Clock className="w-5 h-5" />
+              ) : (
+                <MessageCircle className="w-5 h-5" />
+              )}
+              {sessionStatus === 'needs_human_response' && (
+                <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-amber-400 rounded-full animate-pulse" />
+              )}
+              {sessionStatus === 'unread_reply' && (
+                <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-accent rounded-full animate-pulse" />
+              )}
+            </button>
+          )}
           {!todo.completed ? (
             <button
               onClick={(e) => { e.stopPropagation(); handleCompleteClick(e); }}
@@ -244,7 +245,7 @@ export default function TodoItem({
                 ? "text-red-300 bg-red-900/20"
                 : "text-red-400"
             }`}
-            aria-label="Delete task"
+            aria-label="Close task"
           >
             <X className="w-6 h-6" />
           </button>
@@ -307,14 +308,13 @@ export default function TodoItem({
           <option value="Medium">Medium</option>
           <option value="Low">Low</option>
         </select>
-        <span
-          className={`inline-flex items-center gap-1 px-2 py-1 rounded-md border text-xs font-medium ${creatorBadgeStyles}`}
-          aria-label={creatorLabel}
-          title={creatorLabel}
-        >
-          <CreatorIcon className="w-3.5 h-3.5" />
-          <span>{isAgentTask ? "AI" : "You"}</span>
-        </span>
+        {todo.agent_id && (
+          <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full ${
+            todo.completed ? 'bg-blue-900/20 text-gray-500' : 'bg-blue-900/30 text-blue-300'
+          }`}>
+            {todo.agent_id === 'claude' ? 'Claude' : todo.agent_id === 'openclaw' ? 'OpenClaw' : todo.agent_id}
+          </span>
+        )}
         {todo.dueDate && (
           <span className={`text-sm ${todo.completed ? "text-gray-500" : "text-gray-300"}`}>
             Due: {(() => {
@@ -359,12 +359,99 @@ export default function TodoItem({
             })()}
           </span>
         )}
+        {todo.recurrence_rule && (
+          <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full ${
+            todo.completed ? 'bg-indigo-900/20 text-gray-500' : 'bg-indigo-900/30 text-indigo-300'
+          }`}>
+            <Repeat className="w-3 h-3" />
+            {todo.recurrence_rule === 'daily' ? 'Daily' : todo.recurrence_rule === 'weekly' ? 'Weekly' : 'Monthly'}
+          </span>
+        )}
+        {todo.creator_type === 'agent' && (
+          <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full ${
+            todo.completed ? 'bg-purple-900/20 text-gray-500' : 'bg-purple-900/30 text-purple-300'
+          }`}>
+            <Bot className="w-3 h-3" />
+            AI
+          </span>
+        )}
         {isCollaborative && todo.first_name && (
           <span className={`text-sm ${todo.completed ? "text-gray-500" : "text-gray-300"}`}>
             Added by: {todo.first_name}
           </span>
         )}
       </div>
+
+      {/* Subtasks rendered inside parent card */}
+      {subtasks && subtasks.length > 0 && (
+        <div className="mt-3 pt-3 border-t border-gray-800 space-y-1.5">
+          {subtasks.map((st, idx) => (
+            <div
+              key={st._id}
+              className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${
+                st.completed
+                  ? 'bg-black/40 text-gray-500'
+                  : 'bg-gray-800/50 text-gray-200'
+              }`}
+            >
+              {/* Subtask complete/uncomplete button */}
+              <button
+                onClick={(e) => { e.stopPropagation(); handleCompleteTodo(st._id); }}
+                className={`flex-shrink-0 w-5 h-5 rounded border transition-colors flex items-center justify-center ${
+                  st.completed
+                    ? 'bg-green-900/40 border-green-700 text-green-400'
+                    : 'border-gray-600 hover:border-green-500 text-transparent hover:text-green-400'
+                }`}
+                aria-label={st.completed ? "Mark subtask incomplete" : "Mark subtask complete"}
+              >
+                <Check className="w-3 h-3" />
+              </button>
+
+              {/* Subtask text */}
+              <span
+                className={`flex-1 text-sm cursor-pointer`}
+                onClick={(e) => { e.stopPropagation(); onEdit(st); }}
+              >
+                {st.text}
+              </span>
+
+              {/* Subtask chat button */}
+              {onChat && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); onChat(st); }}
+                  className={`flex-shrink-0 w-7 h-7 flex items-center justify-center rounded transition-colors ${
+                    subtaskSessionStatuses?.[st._id] === 'needs_human_response'
+                      ? 'text-amber-400'
+                      : subtaskSessionStatuses?.[st._id] === 'unread_reply'
+                      ? 'text-accent'
+                      : subtaskSessionStatuses?.[st._id] === 'waiting'
+                      ? 'text-gray-400'
+                      : 'text-gray-600 hover:text-gray-400'
+                  }`}
+                  aria-label="Chat about subtask"
+                >
+                  {subtaskSessionStatuses?.[st._id] === 'needs_human_response' ? (
+                    <UserCircle className="w-3.5 h-3.5" />
+                  ) : subtaskSessionStatuses?.[st._id] === 'waiting' ? (
+                    <Clock className="w-3.5 h-3.5" />
+                  ) : (
+                    <MessageCircle className="w-3.5 h-3.5" />
+                  )}
+                </button>
+              )}
+
+              {/* Subtask delete */}
+              <button
+                onClick={(e) => { e.stopPropagation(); handleDeleteTodo(st._id); }}
+                className="flex-shrink-0 w-7 h-7 flex items-center justify-center rounded text-gray-600 hover:text-red-400 transition-colors"
+                aria-label="Delete subtask"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

@@ -82,25 +82,23 @@ describe('API Proxy Fallback Tests', () => {
   });
 
   test('environment-based backend URL selection works', () => {
-    // Test the backend URL selection logic
-    const originalEnv = process.env.NODE_ENV;
+    // Test the backend URL selection logic (uses BACKEND_URL env var with localhost fallback)
+    const originalBackendUrl = process.env.BACKEND_URL;
 
-    // Test production
-    process.env.NODE_ENV = 'production';
-    const prodUrl = process.env.NODE_ENV === 'production'
-      ? 'https://todolist-backend-production-a83b.up.railway.app'
-      : 'http://localhost:8000';
-    expect(prodUrl).toBe('https://todolist-backend-production-a83b.up.railway.app');
+    // Test with BACKEND_URL set
+    process.env.BACKEND_URL = 'https://my-backend.example.com';
+    const configuredUrl = (process.env.BACKEND_URL || 'http://localhost:8000').replace(/\/$/, '');
+    expect(configuredUrl).toBe('https://my-backend.example.com');
 
-    // Test development
-    process.env.NODE_ENV = 'development';
-    const devUrl = process.env.NODE_ENV === 'production'
-      ? 'https://todolist-backend-production-a83b.up.railway.app'
-      : 'http://localhost:8000';
-    expect(devUrl).toBe('http://localhost:8000');
+    // Test without BACKEND_URL (falls back to localhost)
+    delete process.env.BACKEND_URL;
+    const fallbackUrl = (process.env.BACKEND_URL || 'http://localhost:8000').replace(/\/$/, '');
+    expect(fallbackUrl).toBe('http://localhost:8000');
 
     // Restore original environment
-    process.env.NODE_ENV = originalEnv;
+    if (originalBackendUrl !== undefined) {
+      process.env.BACKEND_URL = originalBackendUrl;
+    }
   });
 
   test('proxy handles all required API endpoints', () => {

@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { Settings, ArrowUpDown, GripVertical, Search, X } from "lucide-react";
+import { ArrowUpDown, GripVertical, Search, X } from "lucide-react";
 import TodoItem from "./TodoItem";
 import AgentChatbot from "./AgentChatbot";
 import { useAuth } from "../context/AuthContext";
 import Link from "next/link";
 import InsightsComponent from "./InsightsComponent";
 import JournalComponent from "./JournalComponent";
+import BriefingSettings from "./BriefingSettings";
+import ActivityFeed from "./ActivityFeed";
 import SpaceDropdown from "./SpaceDropdown";
 import { sortSpaces } from "../utils/spaceUtils";
 import { loadSortModePreference, saveSortModePreference, type SortMode } from "../utils/sortPreferences";
@@ -99,10 +101,11 @@ export default function AIToDoListApp({
   isOffline,
 }: Props) {
   const { logout, clearAuthExpired, authenticatedFetch } = useAuth();
-  const [todos, setTodos] = useState([]);
+  const [todos, setTodos] = useState<any[]>([]);
   const [newTodo, setNewTodo] = useState("");
+  const [newTodoNotes, setNewTodoNotes] = useState("");
   const [isNewTodoFocused, setIsNewTodoFocused] = useState(false);
-  const [categories, setCategories] = useState([]);
+  const [categories, setCategories] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadingTodos, setLoadingTodos] = useState(false);
   const [loadingCategories, setLoadingCategories] = useState(false);
@@ -118,7 +121,7 @@ export default function AIToDoListApp({
   const [showAddCategoryModal, setShowAddCategoryModal] = useState(false);
   const [showEditCategoryModal, setShowEditCategoryModal] = useState(false);
   const [editCatName, setEditCatName] = useState("");
-  const [editingCategory, setEditingCategory] = useState(null);
+  const [editingCategory, setEditingCategory] = useState<string | null>(null);
   const [sendingEmail, setSendingEmail] = useState(false);
   const [showCompleted, setShowCompleted] = useState(false);
   const [showUpdatePrompt, setShowUpdatePrompt] = useState(false);
@@ -128,9 +131,9 @@ export default function AIToDoListApp({
   const [emailInstructions, setEmailInstructions] = useState('');
   const [emailEnabled, setEmailEnabled] = useState(false);
   const [emailSpaceIds, setEmailSpaceIds] = useState<string[]>([]);
-  const [spaces, setSpaces] = useState([]);
+  const [spaces, setSpaces] = useState<any[]>([]);
   const [loadingSpaces, setLoadingSpaces] = useState(true);
-  const [activeSpace, setActiveSpace] = useState(null);
+  const [activeSpace, setActiveSpace] = useState<any>(null);
   const activeSpaceRef = useRef<any>(null);
   const [showAddSpaceModal, setShowAddSpaceModal] = useState(false);
   const [newSpaceName, setNewSpaceName] = useState('');
@@ -140,9 +143,8 @@ export default function AIToDoListApp({
   const [inviteEmails, setInviteEmails] = useState<string[]>(['']);
   const [spaceToEdit, setSpaceToEdit] = useState<any>(null);
   const [spaceMembers, setSpaceMembers] = useState<any[]>([]);
-  const [showSettingsDropdown, setShowSettingsDropdown] = useState(false);
   const [showOfflineTooltip, setShowOfflineTooltip] = useState(false);
-  const settingsDropdownRef = useRef<HTMLDivElement>(null);
+  const [showBriefingSettings, setShowBriefingSettings] = useState(false);
 
   useEffect(() => {
     activeSpaceRef.current = activeSpace;
@@ -192,58 +194,6 @@ export default function AIToDoListApp({
     [clearAuthExpired]
   );
 
-  const updateStoredUserLastSpace = useCallback((spaceId: string | null) => {
-    if (typeof window === 'undefined') return;
-
-    try {
-      const storedUser = localStorage.getItem('auth_user');
-      if (storedUser) {
-        const userData = JSON.parse(storedUser);
-        userData.last_space_id = spaceId;
-        localStorage.setItem('auth_user', JSON.stringify(userData));
-      }
-    } catch (err) {
-      console.warn('Failed to update stored user last space:', err);
-    }
-
-    if (spaceId) {
-      localStorage.setItem('active_space_id', spaceId);
-    } else {
-      localStorage.removeItem('active_space_id');
-    }
-  }, []);
-
-  const updateLastSelectedSpace = useCallback(
-    async (spaceId: string | null) => {
-      try {
-        await authenticatedFetch('/auth/last-space', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ space_id: spaceId }),
-        });
-      } catch (err) {
-        console.error('Failed to update last selected space:', err);
-      }
-    },
-    [authenticatedFetch]
-  );
-
-  const handleSpaceSelect = useCallback(
-    (space: any, persistSelection: boolean = true) => {
-      if (!space?._id) return;
-      if (space._id === activeSpaceRef.current?._id) return;
-
-      activeSpaceRef.current = space;
-      setActiveSpace(space);
-
-      if (persistSelection) {
-        updateStoredUserLastSpace(space._id);
-        void updateLastSelectedSpace(space._id);
-      }
-    },
-    [updateLastSelectedSpace, updateStoredUserLastSpace]
-  );
-
 
   // Loading state when switching spaces
   // Categories and todos load independently so we no longer gate the UI
@@ -258,6 +208,15 @@ export default function AIToDoListApp({
   const [editDueDate, setEditDueDate] = useState<string>('');
   const [editSpaceId, setEditSpaceId] = useState<string>('');
   const [editSpaceCategories, setEditSpaceCategories] = useState<string[]>([]);
+  const [showPermanentDeleteConfirm, setShowPermanentDeleteConfirm] = useState(false);
+  const [editRecurrenceRule, setEditRecurrenceRule] = useState<string>('');
+  const [newTodoAgent, setNewTodoAgent] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('lastSelectedAgent') || '';
+    }
+    return '';
+  });
+  const [newTodoRecurrence, setNewTodoRecurrence] = useState<string>('');
 
   // Long-press to edit category
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -269,35 +228,29 @@ export default function AIToDoListApp({
   const membersFetchIdRef = useRef(0);
 
   // Tab state
-  const [pendingSessionId, setPendingSessionId] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'tasks' | 'agent' | 'journal'>('tasks');
-  const [tabIndex, setTabIndex] = useState(0); // 0=tasks, 1=agent, 2=journal
+  const [activeTab, setActiveTab] = useState<'tasks' | 'agent' | 'activity' | 'journal'>('tasks');
+  const [tabIndex, setTabIndex] = useState(0); // 0=tasks, 1=agent, 2=activity
   const tasksTabRef = useRef<HTMLDivElement>(null);
   const agentTabRef = useRef<HTMLDivElement>(null);
+  const activityTabRef = useRef<HTMLDivElement>(null);
   const journalTabRef = useRef<HTMLDivElement>(null);
 
-  // Todo session statuses: todo_id → 'waiting' | 'processing' | 'unread_reply'
-  type SessionStatus = 'waiting' | 'processing' | 'unread_reply';
-  const [todoSessionStatuses, setTodoSessionStatuses] = useState<Record<string, SessionStatus>>({});
+  // Session state for task-linked chats
+  const [pendingSessionId, setPendingSessionId] = useState<string | null>(null);
+  const [todoSessionStatuses, setTodoSessionStatuses] = useState<Record<string, string>>({});
 
+  // Lock body scroll when any modal is open so background doesn't scroll (including when keyboard opens on mobile)
   useEffect(() => {
-    if (!token || !activeSpace?._id) return;
-    let cancelled = false;
-    const poll = async () => {
-      try {
-        const res = await fetch(`/agent/sessions/todo-statuses?space_id=${activeSpace._id}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (res.ok && !cancelled) {
-          const data = await res.json();
-          setTodoSessionStatuses(data.statuses || {});
-        }
-      } catch {}
+    const anyModalOpen = showAddSpaceModal || showEditSpaceModal || showAddCategoryModal || showEditCategoryModal || showEditTodoModal;
+    if (anyModalOpen) {
+      document.body.classList.add('modal-open');
+    } else {
+      document.body.classList.remove('modal-open');
+    }
+    return () => {
+      document.body.classList.remove('modal-open');
     };
-    poll();
-    const interval = setInterval(poll, 10000);
-    return () => { cancelled = true; clearInterval(interval); };
-  }, [token, activeSpace?._id]);
+  }, [showAddSpaceModal, showEditSpaceModal, showAddCategoryModal, showEditCategoryModal, showEditTodoModal]);
 
   const handleOpenEmailSettings = async () => {
     try {
@@ -345,42 +298,18 @@ export default function AIToDoListApp({
         const sorted = sortSpaces(data);
         setSpaces(sorted);
 
-        let profileLastSpaceId: string | null = null;
-        let hasStoredLastSpacePreference = false;
         let storedId: string | null = null;
         if (typeof window !== 'undefined') {
-          try {
-            const storedUser = localStorage.getItem('auth_user');
-            if (storedUser) {
-              const parsedUser = JSON.parse(storedUser);
-              if (Object.prototype.hasOwnProperty.call(parsedUser, 'last_space_id')) {
-                hasStoredLastSpacePreference = true;
-                profileLastSpaceId = parsedUser?.last_space_id || null;
-              }
-            }
-          } catch (err) {
-            console.warn('Failed to read stored user profile:', err);
-          }
           storedId = localStorage.getItem('active_space_id');
         }
 
-        if (!hasStoredLastSpacePreference) {
-          profileLastSpaceId = user?.last_space_id || null;
-        }
-
-        if (profileLastSpaceId && !sorted.some((space: any) => space._id === profileLastSpaceId)) {
-          updateStoredUserLastSpace(null);
-          void updateLastSelectedSpace(null);
-          profileLastSpaceId = null;
-        }
-
-        const currentId = profileLastSpaceId || activeSpaceRef.current?._id || storedId;
+        const currentId = activeSpaceRef.current?._id || storedId;
         const current = sorted.find(s => s._id === currentId) || sorted[0] || null;
         if (current?._id !== activeSpaceRef.current?._id) {
           activeSpaceRef.current = current;
           setActiveSpace(current);
         }
-        return sorted;
+        return data;
       }
     } catch (err) {
       console.error('Error loading spaces', err);
@@ -389,7 +318,7 @@ export default function AIToDoListApp({
       setLoadingSpaces(false);
     }
     return [];
-  }, [authenticatedFetch, handleError, updateLastSelectedSpace, updateStoredUserLastSpace, user?.last_space_id]);
+  }, [authenticatedFetch, handleError]);
 
   const fetchMembers = useCallback(async () => {
     const fetchId = ++membersFetchIdRef.current;
@@ -474,67 +403,86 @@ export default function AIToDoListApp({
     fetchMembers();
   }, [fetchCategories, fetchTodos, fetchMembers]);
 
-  // Handle tab change (from button click only - swiping is disabled)
-  const handleTabChange = useCallback((index: number) => {
-    const tabs: ('tasks' | 'agent' | 'journal')[] = ['tasks', 'agent', 'journal'];
-    setTabIndex(index);
-    setActiveTab(tabs[index]);
-  }, []);
+  // Poll todo session statuses every 10 seconds
+  useEffect(() => {
+    if (!token || !activeSpace) return;
+    const fetchStatuses = async () => {
+      try {
+        const params = new URLSearchParams();
+        if (activeSpace?._id) params.append('space_id', activeSpace._id);
+        const res = await authenticatedFetch(`/agent/sessions/todo-statuses?${params.toString()}`);
+        if (res.ok) {
+          const data = await res.json();
+          setTodoSessionStatuses(data);
+        }
+      } catch {
+        // Silently ignore
+      }
+    };
+    fetchStatuses();
+    const interval = setInterval(fetchStatuses, 10000);
+    return () => clearInterval(interval);
+  }, [token, activeSpace, authenticatedFetch]);
 
+  // Handle opening a task-linked chat session
   const handleChatAboutTodo = useCallback(async (todo: any) => {
-    if (!token) return;
     try {
-      // Check if a session already exists for this todo
-      const res = await fetch(`/agent/sessions/by-todo/${todo._id}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      // Check for existing session
+      const res = await authenticatedFetch(`/agent/sessions/by-todo/${todo._id}`);
       if (res.ok) {
-        const data = await res.json();
-        if (data.session_id) {
-          // Mark as read and clear status
-          fetch(`/agent/sessions/${data.session_id}/mark-read`, {
-            method: 'POST',
-            headers: { Authorization: `Bearer ${token}` },
-          }).catch(() => {});
+        const session = await res.json();
+        // Mark as read if needed
+        if (session.has_unread_reply) {
+          await authenticatedFetch(`/agent/sessions/${session._id}/mark-read`, { method: 'POST' });
           setTodoSessionStatuses(prev => {
             const next = { ...prev };
             delete next[todo._id];
             return next;
           });
-          setPendingSessionId(data.session_id);
-          handleTabChange(1);
-          return;
+        }
+        setPendingSessionId(session._id);
+      } else if (res.status === 404) {
+        // Create new session linked to this todo
+        const createRes = await authenticatedFetch('/agent/sessions', {
+          method: 'POST',
+          body: JSON.stringify({
+            space_id: activeSpace?._id || null,
+            title: todo.text,
+            todo_id: todo._id,
+            initial_message: [
+              `I want to work on this task: "${todo.text}"`,
+              todo.notes ? `Notes: ${todo.notes}` : null,
+              `Help me get started.`,
+            ].filter(Boolean).join('\n'),
+            initial_role: 'user',
+          }),
+        });
+        if (createRes.ok) {
+          const session = await createRes.json();
+          setPendingSessionId(session._id);
         }
       }
-
-      // Create a new session linked to this todo
-      const createRes = await fetch('/agent/sessions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          title: todo.text.slice(0, 60),
-          space_id: activeSpace?._id,
-          todo_id: todo._id,
-          message: `Task: ${todo.text}\nCategory: ${todo.category}\nPriority: ${todo.priority}${todo.dueDate ? `\nDue: ${todo.dueDate}` : ''}${todo.notes ? `\nNotes: ${todo.notes}` : ''}`,
-        }),
-      });
-      if (!createRes.ok) throw new Error('Failed to create session');
-      const createData = await createRes.json();
-      setPendingSessionId(createData.session_id);
-      handleTabChange(1);
+      // Switch to agent tab
+      setTabIndex(1);
+      setActiveTab('agent');
     } catch (err) {
-      console.error('Failed to open chat for todo:', err);
+      console.error('Error opening task chat:', err);
     }
-  }, [token, activeSpace?._id, handleTabChange]);
+  }, [authenticatedFetch, activeSpace]);
+
+  // Handle tab change (from button click only - swiping is disabled)
+  const handleTabChange = useCallback((index: number) => {
+    const tabs: ('tasks' | 'agent' | 'activity' | 'journal')[] = ['tasks', 'agent', 'activity'];
+    setTabIndex(index);
+    setActiveTab(tabs[index]);
+  }, []);
 
   // Scroll to top when clicking header
   const handleScrollToTop = useCallback(() => {
     const refMap = {
       tasks: tasksTabRef,
       agent: agentTabRef,
+      activity: activityTabRef,
       journal: journalTabRef
     };
     const ref = refMap[activeTab];
@@ -691,19 +639,6 @@ export default function AIToDoListApp({
     }
   };
 
-  // Close settings dropdown when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (settingsDropdownRef.current && !settingsDropdownRef.current.contains(event.target as Node)) {
-        setShowSettingsDropdown(false);
-      }
-    };
-
-    if (showSettingsDropdown) {
-      document.addEventListener('mousedown', handleClickOutside);
-      return () => document.removeEventListener('mousedown', handleClickOutside);
-    }
-  }, [showSettingsDropdown]);
 
   // Close offline tooltip after delay
   useEffect(() => {
@@ -760,9 +695,9 @@ export default function AIToDoListApp({
         const spacesData = await fetchSpaces();
         if (spacesData?.length) {
           const newActive = spacesData.find((space: any) => space._id === createdSpace._id) || createdSpace;
-          handleSpaceSelect(newActive);
+          setActiveSpace(newActive);
         } else {
-          handleSpaceSelect(createdSpace);
+          setActiveSpace(createdSpace);
         }
         setShowAddSpaceModal(false);
         setNewSpaceName('');
@@ -801,6 +736,10 @@ export default function AIToDoListApp({
     try {
       await authenticatedFetch(`/spaces/${id}`, { method: 'DELETE' });
       await fetchSpaces();
+      if (activeSpace && activeSpace._id === id) {
+        const updated = spaces.filter(s => s._id !== id);
+        setActiveSpace(updated.length ? updated[0] : null);
+      }
     } catch (err) {
       console.error('Error deleting space', err);
     }
@@ -810,6 +749,10 @@ export default function AIToDoListApp({
     try {
       await authenticatedFetch(`/spaces/${id}/leave`, { method: 'POST' });
       await fetchSpaces();
+      if (activeSpace && activeSpace._id === id) {
+        const updated = spaces.filter(s => s._id !== id);
+        setActiveSpace(updated.length ? updated[0] : null);
+      }
     } catch (err) {
       console.error('Error leaving space', err);
     }
@@ -876,11 +819,8 @@ export default function AIToDoListApp({
 
   // Add new todo(s)
   const handleAddTodo = async () => {
-    const lines = newTodo
-      .split('\n')
-      .map((line) => line.trim())
-      .filter(Boolean);
-    if (lines.length === 0) return;
+    const title = newTodo.trim();
+    if (!title) return;
 
     setLoading(true);
     setError('');
@@ -892,46 +832,55 @@ export default function AIToDoListApp({
       const localTimeString = now.toLocaleTimeString('en-GB', { hour12: false }); // HH:MM:SS format
       const localISOString = `${localDateString}T${localTimeString}`;
 
-      for (const line of lines) {
-        const todo: any = {
-          text: line,
-          dateAdded: localISOString,
-          completed: false,
-          space_id: activeSpace ? activeSpace._id : null
-        };
+      const todo: any = {
+        text: title,
+        dateAdded: localISOString,
+        completed: false,
+        space_id: activeSpace ? activeSpace._id : null,
+        agent_id: newTodoAgent || null,
+        recurrence_rule: newTodoRecurrence || null,
+      };
 
-        // If a category is selected (not "All"), skip AI classification on backend
-        if (activeCat !== 'All') {
-          todo.category = activeCat;
-          todo.priority = 'Medium';
-        }
+      // Include notes if provided
+      const notes = newTodoNotes.trim();
+      if (notes) {
+        todo.notes = notes;
+      }
 
-        // Store link if it's a URL so backend can fetch title
-        if (isUrl(line)) {
-          todo.link = line;
-        }
+      // If a category is selected (not "All"), skip AI classification on backend
+      if (activeCat !== 'All') {
+        todo.category = activeCat;
+        todo.priority = 'Medium';
+      }
 
-        // Save to MongoDB with timeout
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+      // Store link if it's a URL so backend can fetch title
+      if (isUrl(title)) {
+        todo.link = title;
+      }
 
-        const response = await authenticatedFetch('/todos', {
-          method: 'POST',
-          body: JSON.stringify(todo),
-          signal: controller.signal
-        });
+      // Save to MongoDB with timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
 
-        clearTimeout(timeoutId);
+      const response = await authenticatedFetch('/todos', {
+        method: 'POST',
+        body: JSON.stringify(todo),
+        signal: controller.signal
+      });
 
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.detail || 'Failed to save todo');
-        }
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to save todo');
       }
 
       // Refresh todos list
       await fetchTodos(false);
       setNewTodo('');
+      setNewTodoNotes('');
+      setNewTodoAgent('');
+      setNewTodoRecurrence('');
     } catch (err) {
       if (err.name === 'AbortError') {
         setError('Request timed out. Please try again.');
@@ -943,7 +892,7 @@ export default function AIToDoListApp({
     }
   };
 
-  // Delete todo
+  // Delete todo (soft-delete: marks as closed)
   const handleDeleteTodo = async (id) => {
     try {
       // Validate ID
@@ -958,14 +907,43 @@ export default function AIToDoListApp({
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.detail || 'Failed to delete todo');
+        throw new Error(errorData.detail || 'Failed to close todo');
       }
 
       // Refresh todos list
       await fetchTodos(false);
       setError(''); // Clear any existing errors on success
     } catch (err) {
-      handleError(err, 'Error deleting todo');
+      handleError(err, 'Error closing todo');
+    }
+  };
+
+  // Permanently delete todo (removes from database)
+  const handlePermanentDeleteTodo = async (id) => {
+    try {
+      // Validate ID
+      if (!id || id === "None" || id === "undefined") {
+        setError('Invalid todo ID');
+        return;
+      }
+
+      const response = await authenticatedFetch(`/todos/${id}/permanent`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to permanently delete todo');
+      }
+
+      // Close modal and refresh
+      setShowEditTodoModal(false);
+      setShowPermanentDeleteConfirm(false);
+      setTodoToEdit(null);
+      await fetchTodos(false);
+      setError(''); // Clear any existing errors on success
+    } catch (err) {
+      handleError(err, 'Error permanently deleting todo');
     }
   };
 
@@ -998,6 +976,10 @@ export default function AIToDoListApp({
   // Update todo category
   const handleUpdateCategory = async (todoId, newCategory) => {
     try {
+      // Optimistic update
+      setTodos(prev => prev.map(t => t._id === todoId ? { ...t, category: newCategory } : t));
+      setEditingCategory(null);
+
       const response = await authenticatedFetch(`/todos/${todoId}`, {
         method: 'PUT',
         body: JSON.stringify({ category: newCategory }),
@@ -1008,11 +990,10 @@ export default function AIToDoListApp({
         throw new Error(errorData.detail || 'Failed to update category');
       }
 
-      // Refresh todos list
-      await fetchTodos(false);
-      setEditingCategory(null);
       setError('');
     } catch (err) {
+      // Revert on failure
+      await fetchTodos(false);
       handleError(err, 'Error updating category');
     }
   };
@@ -1038,8 +1019,10 @@ export default function AIToDoListApp({
     }
   };
 
+
   const handleEditTodo = async (todo) => {
     setTodoToEdit(todo);
+    setShowPermanentDeleteConfirm(false);
     setEditText(todo.text);
     setEditNotes(todo.notes || '');
     setEditCategoryVal(todo.category);
@@ -1081,6 +1064,7 @@ export default function AIToDoListApp({
       }
     }
     setEditDueDate(formattedDate);
+    setEditRecurrenceRule(todo.recurrence_rule || '');
 
     setShowEditTodoModal(true);
   };
@@ -1119,7 +1103,12 @@ export default function AIToDoListApp({
         priority: editPriorityVal,
         dueDate: editDueDate || null,
         space_id: editSpaceId, // Always include space_id since todos must have a space
+        recurrence_rule: editRecurrenceRule || null,
       };
+      // Optimistic update
+      setTodos(prev => prev.map(t => t._id === todoToEdit._id ? { ...t, ...updates } : t));
+      setShowEditTodoModal(false);
+
       const response = await authenticatedFetch(`/todos/${todoToEdit._id}`, {
         method: 'PUT',
         body: JSON.stringify(updates),
@@ -1128,10 +1117,10 @@ export default function AIToDoListApp({
         const errorData = await response.json();
         throw new Error(errorData.detail || 'Failed to update todo');
       }
-      await fetchTodos(false);
-      setShowEditTodoModal(false);
       setTodoToEdit(null);
     } catch (err) {
+      // Revert on failure
+      await fetchTodos(false);
       handleError(err, 'Error updating todo');
     }
   };
@@ -1339,15 +1328,36 @@ export default function AIToDoListApp({
     }
   };
 
-  // Separate completed and uncompleted todos
+  // Build parent→children map for sub-tasks
+  const childrenByParent = new Map<string, any[]>();
+  for (const todo of allFilteredTodos) {
+    if (todo.parent_id) {
+      const siblings = childrenByParent.get(todo.parent_id) || [];
+      siblings.push(todo);
+      childrenByParent.set(todo.parent_id, siblings);
+    }
+  }
+  // Sort children by their position in the parent's subtask_ids array
+  childrenByParent.forEach((children, parentId) => {
+    const parent = allFilteredTodos.find((t: any) => t._id === parentId);
+    const subtaskIds: string[] = parent?.subtask_ids || [];
+    children.sort((a: any, b: any) => {
+      const aIdx = subtaskIds.indexOf(a._id);
+      const bIdx = subtaskIds.indexOf(b._id);
+      // Items not in subtask_ids go to the end
+      return (aIdx === -1 ? Infinity : aIdx) - (bIdx === -1 ? Infinity : bIdx);
+    });
+  });
+
+  // Separate completed and uncompleted todos (top-level only, sub-tasks rendered inline)
   const uncompletedTodos = allFilteredTodos
-    .filter(todo => !todo.completed)
+    .filter(todo => !todo.completed && !todo.parent_id)
     .sort(sortTodos);
 
   const uncompletedTodoIds = uncompletedTodos.map(t => t._id);
 
   const completedTodos = allFilteredTodos
-    .filter((todo) => todo.completed)
+    .filter((todo) => todo.completed && !todo.parent_id)
     .sort((a, b) => {
       // Sort completed todos by completion date (most recent first)
       const dateA = a.dateCompleted || a.dateAdded;
@@ -1401,7 +1411,7 @@ export default function AIToDoListApp({
               activeSpace={activeSpace}
               user={user}
               loadingSpaces={loadingSpaces}
-              onSpaceSelect={handleSpaceSelect}
+              onSpaceSelect={setActiveSpace}
               onCreateSpace={() => setShowAddSpaceModal(true)}
               onEditSpace={(space: any) => {
                 setSpaceToEdit(space);
@@ -1413,74 +1423,31 @@ export default function AIToDoListApp({
                 setShowEditSpaceModal(true);
               }}
             />
-            <div className="relative" ref={settingsDropdownRef}>
-              <button
-                onClick={() => setShowSettingsDropdown(!showSettingsDropdown)}
-                className="text-gray-100 hover:text-white text-base px-2 py-1 flex items-center justify-center rounded-lg hover:bg-gray-900 transition-colors"
-                title="Settings"
-              >
-                <Settings className="w-5 h-5" />
-              </button>
-
-              {showSettingsDropdown && (
-                <div className="absolute right-0 mt-2 w-48 bg-black border border-gray-800 rounded-lg shadow-2xl z-50">
-                  <button
-                    onClick={() => {
-                      setShowSettingsDropdown(false);
-                      onShowAccountSettings?.();
-                    }}
-                    className="w-full text-left px-4 py-3 text-gray-300 hover:bg-gray-900 hover:text-gray-100 transition-colors rounded-t-lg"
-                  >
-                    Account
-                  </button>
-                  <button
-                    onClick={() => {
-                      setShowSettingsDropdown(false);
-                      onShowEmailSettings?.();
-                    }}
-                    className="w-full text-left px-4 py-3 text-gray-300 hover:bg-gray-900 hover:text-gray-100 transition-colors"
-                  >
-                    Email Settings
-                  </button>
-                  <button
-                    onClick={() => {
-                      setShowSettingsDropdown(false);
-                      onShowInsights?.();
-                    }}
-                    className="w-full text-left px-4 py-3 text-gray-300 hover:bg-gray-900 hover:text-gray-100 transition-colors"
-                  >
-                    Insights
-                  </button>
-                  <button
-                    onClick={() => {
-                      setShowSettingsDropdown(false);
-                      onShowExportModal?.();
-                    }}
-                    className="w-full text-left px-4 py-3 text-gray-300 hover:bg-gray-900 hover:text-gray-100 transition-colors"
-                  >
-                    Export Data
-                  </button>
-                  <button
-                    onClick={() => {
-                      setShowSettingsDropdown(false);
-                      onShowContactModal?.();
-                    }}
-                    className="w-full text-left px-4 py-3 text-gray-300 hover:bg-gray-900 hover:text-gray-100 transition-colors"
-                  >
-                    Contact
-                  </button>
-                  <button
-                    onClick={() => {
-                      setShowSettingsDropdown(false);
-                      onLogout?.();
-                    }}
-                    className="w-full text-left px-4 py-3 text-red-400 hover:bg-red-900/20 hover:text-red-300 transition-colors rounded-b-lg"
-                  >
-                    Logout
-                  </button>
-                </div>
-              )}
-            </div>
+            <select
+              defaultValue=""
+              onChange={(e) => {
+                const action = e.target.value;
+                e.target.value = '';
+                if (action === 'account') onShowAccountSettings?.();
+                else if (action === 'email') onShowEmailSettings?.();
+                else if (action === 'briefings') setShowBriefingSettings(true);
+                else if (action === 'insights') onShowInsights?.();
+                else if (action === 'export') onShowExportModal?.();
+                else if (action === 'contact') onShowContactModal?.();
+                else if (action === 'logout') onLogout?.();
+              }}
+              className="bg-transparent text-gray-100 text-sm rounded border-0 focus:outline-none cursor-pointer"
+              title="Settings"
+            >
+              <option value="" disabled>Settings</option>
+              <option value="account">Account</option>
+              <option value="email">Email Settings</option>
+              <option value="briefings">Briefings</option>
+              <option value="insights">Insights</option>
+              <option value="export">Export Data</option>
+              <option value="contact">Contact</option>
+              <option value="logout">Logout</option>
+            </select>
           </div>
         </div>
       </div>
@@ -1535,12 +1502,12 @@ export default function AIToDoListApp({
         <button
           onClick={() => handleTabChange(2)}
           className={`flex-1 py-3 px-2 sm:px-6 font-medium text-sm transition-colors ${
-            activeTab === 'journal'
+            activeTab === 'activity'
               ? 'text-accent border-b-2 border-accent'
               : 'text-gray-400 hover:text-gray-300'
           }`}
         >
-          Journal
+          Activity
         </button>
       </div>
 
@@ -1718,24 +1685,48 @@ export default function AIToDoListApp({
           <div className="px-2">
       {/* Add new todo */}
       <div className="mb-5">
-        <div className="flex gap-2">
-          <textarea
+        <div className="flex gap-2 items-end">
+          <input
+            type="text"
             value={newTodo}
             onChange={(e) => setNewTodo(e.target.value)}
             onFocus={() => setIsNewTodoFocused(true)}
             onBlur={() => setIsNewTodoFocused(false)}
             onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
+              if (e.key === 'Enter') {
                 e.preventDefault();
                 handleAddTodo();
               }
             }}
-            placeholder="Add task(s)… (Shift+Enter for newline)"
+            placeholder="Task title…"
             disabled={loading}
-            aria-label="Add new task"
-            rows={1}
-            className="flex-1 p-3 border border-gray-800 rounded-xl bg-black text-gray-100 placeholder-gray-500 focus:border-accent focus:outline-none transition-colors resize-y min-h-[48px]"
+            aria-label="Task title"
+            className="flex-1 p-3 border border-gray-800 rounded-xl bg-black text-gray-100 placeholder-gray-500 focus:border-accent focus:outline-none transition-colors h-12"
           />
+          <select
+            value={newTodoAgent}
+            onChange={(e) => {
+              setNewTodoAgent(e.target.value);
+              localStorage.setItem('lastSelectedAgent', e.target.value);
+            }}
+            className="h-12 px-2 rounded-xl bg-gray-900 border border-gray-700 text-gray-200 text-sm focus:border-accent focus:outline-none transition-colors appearance-none cursor-pointer"
+          >
+            <option value="">Built-in</option>
+            <option value="openclaw">OpenClaw</option>
+            <option value="claude">Claude</option>
+          </select>
+          <select
+            value={newTodoRecurrence}
+            onChange={(e) => setNewTodoRecurrence(e.target.value)}
+            className={`h-12 px-2 rounded-xl bg-gray-900 border text-sm focus:border-accent focus:outline-none transition-colors appearance-none cursor-pointer ${
+              newTodoRecurrence ? 'border-accent text-accent' : 'border-gray-700 text-gray-200'
+            }`}
+          >
+            <option value="">Once</option>
+            <option value="daily">Daily</option>
+            <option value="weekly">Weekly</option>
+            <option value="monthly">Monthly</option>
+          </select>
           <button
             onClick={handleAddTodo}
             disabled={loading}
@@ -1748,11 +1739,24 @@ export default function AIToDoListApp({
             {loading ? '...' : '+'}
           </button>
         </div>
+        <textarea
+          value={newTodoNotes}
+          onChange={(e) => {
+            setNewTodoNotes(e.target.value);
+            e.target.style.height = 'auto';
+            e.target.style.height = Math.min(e.target.scrollHeight, 140) + 'px';
+          }}
+          placeholder="Notes (optional)"
+          disabled={loading}
+          aria-label="Task notes"
+          rows={1}
+          className="w-full mt-2 p-3 border border-gray-800 rounded-xl bg-black text-gray-100 placeholder-gray-500 focus:border-accent focus:outline-none transition-colors resize-none min-h-[40px] max-h-[140px] overflow-y-auto text-sm"
+        />
       </div>
 
       {showAddSpaceModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50">
-          <div className="bg-black border border-gray-800 p-6 rounded-xl w-80 space-y-4 shadow-2xl">
+        <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4" style={{overscrollBehavior: 'contain'}}>
+          <div className="bg-black border border-gray-800 p-6 rounded-xl w-80 space-y-4 shadow-2xl overflow-y-auto" style={{maxHeight: 'calc(100dvh - 2rem)'}}>
             <h3 className="text-gray-100 text-lg font-bold mb-2">Create Space</h3>
             <input
               type="text"
@@ -1772,8 +1776,8 @@ export default function AIToDoListApp({
       )}
 
       {showEditSpaceModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50">
-          <div className="bg-black border border-gray-800 p-6 rounded-xl w-80 space-y-4 shadow-2xl">
+        <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4" style={{overscrollBehavior: 'contain'}}>
+          <div className="bg-black border border-gray-800 p-6 rounded-xl w-80 space-y-4 shadow-2xl overflow-y-auto" style={{maxHeight: 'calc(100dvh - 2rem)'}}>
             {spaceToEdit && (spaceToEdit.owner_id === (user.id || user._id)) ? (
               <>
                 <h3 className="text-gray-100 text-lg font-bold mb-2">Edit Space</h3>
@@ -1841,8 +1845,8 @@ export default function AIToDoListApp({
 
       {/* Add Category Modal */}
       {showAddCategoryModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50">
-          <div className="bg-black border border-gray-800 p-6 rounded-xl w-80 space-y-4 shadow-2xl">
+        <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4" style={{overscrollBehavior: 'contain'}}>
+          <div className="bg-black border border-gray-800 p-6 rounded-xl w-80 space-y-4 shadow-2xl overflow-y-auto" style={{maxHeight: 'calc(100dvh - 2rem)'}}>
             <h3 className="text-gray-100 text-lg font-bold mb-2">Add New Category</h3>
             <input
               type="text"
@@ -1875,8 +1879,8 @@ export default function AIToDoListApp({
       )}
 
       {showEditCategoryModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50">
-          <div className="bg-black border border-gray-800 p-6 rounded-xl w-80 space-y-4 shadow-2xl">
+        <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4" style={{overscrollBehavior: 'contain'}}>
+          <div className="bg-black border border-gray-800 p-6 rounded-xl w-80 space-y-4 shadow-2xl overflow-y-auto" style={{maxHeight: 'calc(100dvh - 2rem)'}}>
             <h3 className="text-gray-100 text-lg font-bold mb-2">Edit Category</h3>
             <input
               type="text"
@@ -1919,22 +1923,28 @@ export default function AIToDoListApp({
         <SortableContext items={uncompletedTodoIds} strategy={verticalListSortingStrategy}>
           <div className="space-y-3">
             {uncompletedTodos.map((todo) => (
-              <SortableItem key={todo._id} id={todo._id} disabled={!isSortModeActive}>
-                <TodoItem
-                  todo={todo}
-                  categories={categories}
-                  editingCategory={editingCategory}
-                  setEditingCategory={setEditingCategory}
-                  handleUpdateCategory={handleUpdateCategory}
-                  handleUpdatePriority={handleUpdatePriority}
-                  handleCompleteTodo={handleCompleteTodo}
-                  handleDeleteTodo={handleDeleteTodo}
-                  isCollaborative={(activeSpace?.member_ids?.length ?? 0) > 1}
-                  onEdit={handleEditTodo}
-                  onChat={handleChatAboutTodo}
-                  sessionStatus={todoSessionStatuses[todo._id]}
-                />
-              </SortableItem>
+              <React.Fragment key={todo._id}>
+                <SortableItem id={todo._id} disabled={!isSortModeActive}>
+                  <TodoItem
+                    todo={todo}
+                    categories={categories}
+                    editingCategory={editingCategory}
+                    setEditingCategory={setEditingCategory}
+                    handleUpdateCategory={handleUpdateCategory}
+                    handleUpdatePriority={handleUpdatePriority}
+                    handleCompleteTodo={handleCompleteTodo}
+                    handleDeleteTodo={handleDeleteTodo}
+                    isCollaborative={(activeSpace?.member_ids?.length ?? 0) > 1}
+                    onEdit={handleEditTodo}
+                    onChat={handleChatAboutTodo}
+                    sessionStatus={todoSessionStatuses[todo._id] as any}
+                    subtaskCount={childrenByParent.get(todo._id)?.length}
+                    subtaskDoneCount={childrenByParent.get(todo._id)?.filter(c => c.completed).length}
+                    subtasks={childrenByParent.get(todo._id)}
+                    subtaskSessionStatuses={todoSessionStatuses as any}
+                  />
+                </SortableItem>
+              </React.Fragment>
             ))}
           </div>
         </SortableContext>
@@ -1955,35 +1965,50 @@ export default function AIToDoListApp({
       {showCompleted && completedTodos.length > 0 && (
         <div className="mt-6 mb-4 space-y-3">
           {completedTodos.map((todo) => (
-            <TodoItem
-              key={todo._id}
-              todo={todo}
-              categories={categories}
-              editingCategory={editingCategory}
-              setEditingCategory={setEditingCategory}
-              handleUpdateCategory={handleUpdateCategory}
-              handleUpdatePriority={handleUpdatePriority}
-              handleCompleteTodo={handleCompleteTodo}
-              handleDeleteTodo={handleDeleteTodo}
-              isCollaborative={(activeSpace?.member_ids?.length ?? 0) > 1}
-              onEdit={handleEditTodo}
-              onChat={handleChatAboutTodo}
-              sessionStatus={todoSessionStatuses[todo._id]}
-            />
+            <React.Fragment key={todo._id}>
+              <TodoItem
+                todo={todo}
+                categories={categories}
+                editingCategory={editingCategory}
+                setEditingCategory={setEditingCategory}
+                handleUpdateCategory={handleUpdateCategory}
+                handleUpdatePriority={handleUpdatePriority}
+                handleCompleteTodo={handleCompleteTodo}
+                handleDeleteTodo={handleDeleteTodo}
+                isCollaborative={(activeSpace?.member_ids?.length ?? 0) > 1}
+                onEdit={handleEditTodo}
+                onChat={handleChatAboutTodo}
+                sessionStatus={todoSessionStatuses[todo._id] as any}
+                subtaskCount={childrenByParent.get(todo._id)?.length}
+                subtaskDoneCount={childrenByParent.get(todo._id)?.filter(c => c.completed).length}
+                subtasks={childrenByParent.get(todo._id)}
+                subtaskSessionStatuses={todoSessionStatuses as any}
+              />
+            </React.Fragment>
           ))}
         </div>
       )}
 
 
       {showEditTodoModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50">
-          <div className="bg-black border border-gray-800 p-6 rounded-xl w-80 space-y-4 shadow-2xl">
+        <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4" style={{overscrollBehavior: 'contain'}}>
+          <div className="bg-black border border-gray-800 p-6 rounded-xl w-80 space-y-4 shadow-2xl overflow-y-auto" style={{maxHeight: 'calc(100dvh - 2rem)'}}>
             <h3 className="text-gray-100 text-lg font-bold mb-2">Edit Task</h3>
-            <input
-              type="text"
+            <textarea
               value={editText}
-              onChange={(e) => setEditText(e.target.value)}
-              className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 text-base focus:outline-none focus:border-accent"
+              onChange={(e) => {
+                setEditText(e.target.value);
+                e.target.style.height = 'auto';
+                e.target.style.height = Math.min(e.target.scrollHeight, 140) + 'px';
+              }}
+              ref={(el) => {
+                if (el) {
+                  el.style.height = 'auto';
+                  el.style.height = Math.min(el.scrollHeight, 140) + 'px';
+                }
+              }}
+              rows={1}
+              className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 text-base focus:outline-none focus:border-accent resize-none max-h-[140px] overflow-y-auto"
             />
             <textarea
               value={editNotes}
@@ -2055,9 +2080,51 @@ export default function AIToDoListApp({
                 </button>
               )}
             </div>
+            <div>
+              <label className="block text-sm text-gray-300 mb-2">Repeat</label>
+              <select
+                value={editRecurrenceRule}
+                onChange={(e) => setEditRecurrenceRule(e.target.value)}
+                className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 text-base focus:outline-none focus:border-accent"
+              >
+                <option value="">No repeat</option>
+                <option value="daily">Daily</option>
+                <option value="weekly">Weekly</option>
+                <option value="monthly">Monthly</option>
+              </select>
+            </div>
             <div className="flex justify-center space-x-3">
               <button onClick={handleSaveTodoEdit} className="border border-accent text-accent hover:bg-accent/10 px-6 py-2 rounded-lg transition-colors">Save</button>
               <button onClick={() => setShowEditTodoModal(false)} className="border border-gray-600 text-gray-300 hover:bg-gray-800 px-6 py-2 rounded-lg transition-colors">Cancel</button>
+            </div>
+            {/* Permanently Delete */}
+            <div className="pt-3 border-t border-gray-800 mt-2">
+              {!showPermanentDeleteConfirm ? (
+                <button
+                  onClick={() => setShowPermanentDeleteConfirm(true)}
+                  className="w-full text-center text-red-400 hover:text-red-300 text-sm py-2 transition-colors"
+                >
+                  Permanently Delete
+                </button>
+              ) : (
+                <div className="space-y-2">
+                  <p className="text-center text-red-400 text-sm">Are you sure? This cannot be undone.</p>
+                  <div className="flex justify-center space-x-3">
+                    <button
+                      onClick={() => todoToEdit && handlePermanentDeleteTodo(todoToEdit._id)}
+                      className="border border-red-500 text-red-400 hover:bg-red-900/20 px-6 py-2 rounded-lg transition-colors text-sm"
+                    >
+                      Yes, Delete Forever
+                    </button>
+                    <button
+                      onClick={() => setShowPermanentDeleteConfirm(false)}
+                      className="border border-gray-600 text-gray-300 hover:bg-gray-800 px-4 py-2 rounded-lg transition-colors text-sm"
+                    >
+                      No
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -2082,21 +2149,32 @@ export default function AIToDoListApp({
               isActive={activeTab === 'agent'}
               pendingSessionId={pendingSessionId}
               onSessionLoaded={() => setPendingSessionId(null)}
+              onNavigateToTasks={() => {
+                setTabIndex(0);
+                setActiveTab('tasks');
+              }}
             />
           </div>
         </div>
 
-        {/* Journal Tab */}
+        {/* Activity Tab */}
         <div
-          ref={journalTabRef}
+          ref={activityTabRef}
           style={{ padding: '16px 16px 0 16px', height: '100%', display: 'flex', flexDirection: 'column', touchAction: 'pan-y' }}
         >
-          {/* Header Row with Page Title */}
-          {/* <div className="mb-6" style={{ flexShrink: 0 }}>
-            <h2 className="text-xl font-semibold text-gray-100">Journal</h2>
-          </div> */}
           <div style={{ flex: 1, minHeight: 0 }}>
-            <JournalComponent token={token} activeSpace={activeSpace} />
+            <ActivityFeed
+              activeSpace={activeSpace}
+              token={token}
+              isActive={activeTab === 'activity'}
+              onOpenTaskChat={(todoId: string) => {
+                // Find the todo and open its chat
+                const todo = todos.find((t: any) => t._id === todoId);
+                if (todo) {
+                  handleChatAboutTodo(todo);
+                }
+              }}
+            />
           </div>
         </div>
       </SwipeableViews>
@@ -2126,6 +2204,15 @@ export default function AIToDoListApp({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Briefing Settings Modal */}
+      {showBriefingSettings && (
+        <BriefingSettings
+          token={token}
+          authenticatedFetch={authenticatedFetch}
+          onClose={() => setShowBriefingSettings(false)}
+        />
       )}
 
       {/* Email Settings Modal */}
