@@ -98,12 +98,19 @@ For each pending session:
 
 ### Step 3: Dispatch a Subagent
 
-For each task to handle, spawn a **task-worker** subagent using the Agent tool:
+For each task to handle, spawn a **task-worker** subagent using the Agent tool.
+
+**Always use `isolation: "worktree"`** for subagents that may modify code (fixing
+bugs, creating PRs, resolving conflicts, rebasing branches, running/fixing tests,
+etc.). This gives each subagent an isolated git worktree so they don't interfere
+with each other or the main working directory. Only skip worktree isolation for
+read-only tasks (e.g., auditing PRs, checking CI status, posting summaries).
 
 ```
 Agent(
   description: "Handle task: <brief task description>",
   subagent_type: "general-purpose",
+  isolation: "worktree",  // always use for code-modifying tasks
   prompt: <see prompt template below>
 )
 ```
@@ -159,7 +166,8 @@ without parent_id, it creates a standalone top-level task — NOT a subtask.
 ```
 
 **Run subagents in the background** when handling multiple tasks so they work
-in parallel. Track which session_id maps to which subagent.
+in parallel. **Use `isolation: "worktree"`** for any subagent that modifies code.
+Track which session_id maps to which subagent.
 
 **Direct-chat subagent prompt template:**
 
@@ -374,6 +382,8 @@ The managing agent should:
 - **Respect the user** — if the user says stop, stop immediately
 - **Subtasks MUST have parent_id** — never call `add_todo` without `parent_id` when creating subtasks. Orphaned top-level tasks break the orchestration flow and clutter the task list.
 - **Filter description from action** — only create subtasks for actionable work. Context, explanations, and motivational text belong in session messages or task notes, not as subtasks.
+- **Keep task titles short** — when creating tasks with `add_todo`, the `text` field should be a concise one-line title (a few words). Put all details, context, descriptions, and instructions in the `notes` field instead. Short titles are easier to scan in the task list.
+- **Use worktree isolation for code-modifying subagents** — always pass `isolation: "worktree"` when dispatching subagents that will modify code (creating PRs, fixing bugs, resolving conflicts, rebasing, running/fixing tests). This prevents subagents from interfering with each other or the main working directory. Only skip for read-only tasks like auditing or posting summaries.
 
 ## Example Session
 
