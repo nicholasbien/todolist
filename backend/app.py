@@ -44,7 +44,7 @@ from categories import (
 )
 from chat_sessions import append_message
 from chat_sessions import create_session as create_chat_session
-from chat_sessions import find_session_by_todo, mark_session_read
+from chat_sessions import find_session_by_todo, mark_session_read, sessions_collection
 
 # Import the classification function and todo management
 from classify import classify_task
@@ -58,6 +58,13 @@ from journals import (
     get_journal_entries,
     get_journal_entry_by_date,
     journals_collection,
+)
+from push_notifications import (
+    VAPID_PUBLIC_KEY,
+    delete_push_subscription,
+    init_push_subscription_indexes,
+    notify_agent_reply,
+    save_push_subscription,
 )
 from scheduler import get_scheduler_status, start_scheduler, update_schedule_time
 from spaces import (
@@ -136,6 +143,7 @@ async def lifespan(app: FastAPI):
             ("init_chat_indexes", init_chat_indexes),
             ("init_chat_session_indexes", init_chat_session_indexes),
             ("init_memory_indexes", init_memory_indexes),
+            ("init_push_subscription_indexes", init_push_subscription_indexes),
             ("init_default_categories", init_default_categories),
             ("cleanup_expired_sessions", cleanup_expired_sessions),
         ]
@@ -1499,6 +1507,27 @@ async def api_post_session_message(
         interim=req.interim,
         needs_human_response=req.needs_human_response,
     )
+
+    # Send push notification for non-interim assistant messages
+    if req.role == "assistant" and not req.interim:
+        try:
+            from bson import ObjectId
+
+            session_doc = await sessions_collection.find_one(
+                {"_id": ObjectId(session_id)}
+            )
+            session_title = (
+                session_doc.get("title", "Session") if session_doc else "Session"
+            )
+            await notify_agent_reply(
+                user_id=user_id,
+                session_id=session_id,
+                session_title=session_title,
+                agent_id=req.agent_id,
+                content_preview=req.content[:200] if req.content else None,
+            )
+        except Exception as e:
+            logger.warning(f"Failed to send push notification: {e}")
     return {"ok": True, "message": message}
 
 
@@ -1510,6 +1539,50 @@ async def api_mark_session_read(
     """Mark a session's agent replies as read."""
     ok = await mark_session_read(session_id, current_user["user_id"])
     return {"ok": ok}
+
+
+# --- Push notification endpoints ---
+
+
+class PushSubscriptionRequest(BaseModel):
+    endpoint: str
+    keys: dict
+    expirationTime: Optional[str] = None
+
+
+class PushUnsubscribeRequest(BaseModel):
+    endpoint: str
+
+
+@app.get("/push/vapid-key")
+async def get_vapid_public_key():
+    """Return the VAPID public key for push subscription."""
+    return {"vapid_public_key": VAPID_PUBLIC_KEY}
+
+
+@app.post("/push/subscribe")
+async def push_subscribe(
+    req: PushSubscriptionRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    """Register a push subscription for the current user."""
+    subscription = {
+        "endpoint": req.endpoint,
+        "keys": req.keys,
+        "expirationTime": req.expirationTime,
+    }
+    sub_id = await save_push_subscription(current_user["user_id"], subscription)
+    return {"ok": True, "subscription_id": sub_id}
+
+
+@app.post("/push/unsubscribe")
+async def push_unsubscribe(
+    req: PushUnsubscribeRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    """Remove a push subscription."""
+    deleted = await delete_push_subscription(current_user["user_id"], req.endpoint)
+    return {"ok": deleted}
 
 
 @app.get("/todos/{todo_id}/subtasks")
