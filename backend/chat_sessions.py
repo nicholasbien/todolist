@@ -42,10 +42,13 @@ async def create_session(
     }
     if todo_id:
         doc["todo_id"] = todo_id
-        doc["needs_agent_response"] = False
-        doc["has_unread_reply"] = False
     if agent_id:
         doc["agent_id"] = agent_id
+    # Initialize messaging flags for any session that uses the post-and-poll
+    # pattern (task-linked or direct-chat with an agent).
+    if todo_id or agent_id:
+        doc["needs_agent_response"] = False
+        doc["has_unread_reply"] = False
 
     result = await sessions_collection.insert_one(doc)
     session_id = str(result.inserted_id)

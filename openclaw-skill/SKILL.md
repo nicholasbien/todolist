@@ -112,9 +112,12 @@ curl -s -H "Authorization: Bearer $TODOLIST_AUTH_TOKEN" \
 
 Supports `data=todos` or `data=journals`, and `format=json` or `format=csv`.
 
-## Task-Linked Chat Sessions
+## Chat Sessions
 
-Sessions are conversation threads that can be **linked to a specific todo** via `todo_id`. Each todo can have at most one linked session. This lets you track discussions and progress per task.
+Sessions are conversation threads. There are two types:
+
+1. **Task-linked sessions** — linked to a specific todo via `todo_id`. Each todo can have at most one linked session. These let you track discussions and progress per task.
+2. **Direct-chat sessions** — have `agent_id` set but no `todo_id`. These are direct conversations a user started with a specific agent from the Assistant tab. Treat these as conversational exchanges and do not create/update todos unless explicitly asked.
 
 ### List Sessions
 
@@ -242,16 +245,17 @@ Either way, the session arrives pre-routed when you poll. The built-in agent han
 
 **Agent routing:** Sessions support an `agent_id` field. When you reply to a session, always include `agent_id=openclaw` — this claims the session so that followup messages from the user route back to you instead of the built-in agent.
 
-Use this workflow to act as an autonomous agent responding to user messages on tasks:
+Use this workflow to act as an autonomous agent responding to user messages:
 
 1. **Poll** for pending sessions with `agent_id=openclaw` — this returns your claimed sessions AND unclaimed ones
-2. **Triage using enrichment fields** — each session includes `is_followup`, `recent_messages`, and `message_count` so you can triage without reading the full session history
+2. **Triage using enrichment fields** — each session includes `is_followup`, `recent_messages`, `message_count`, `todo_id`, and `agent_id` so you can triage without reading the full session history
 3. **If `is_followup` is true** — the user sent a new message to a session you previously handled. Check `recent_messages` for what they said and handle accordingly
-4. **If not a followup** and the session has `agent_id: openclaw` — this is a new task pre-routed to you via the agent dropdown. Claim it by posting an interim ack, then do the work
-5. **If unclaimed** (no `agent_id`) and `todo_id` is present — check the todo text for `#openclaw`. If present, claim it. If not, **skip** (the built-in agent will handle it)
-6. **Post an interim ack** — immediately reply with `interim=true` so the user sees the task was picked up while you work on it
-7. **Do the work** — update the todo, add new tasks, write a journal entry, etc.
-8. **Reply** to the session with `agent_id=openclaw` (without `interim`) to post the final response
+4. **If `agent_id` is `openclaw` and no `todo_id`** — this is a direct chat session. The user started a conversation with you directly from the Assistant tab (not linked to a task). Respond conversationally. Do not create or update todos unless the user explicitly asks
+5. **If not a followup** and the session has `agent_id: openclaw` and `todo_id` — this is a new task pre-routed to you via the agent dropdown. Claim it by posting an interim ack, then do the work
+6. **If unclaimed** (no `agent_id`) and `todo_id` is present — check the todo text for `#openclaw`. If present, claim it. If not, **skip** (the built-in agent will handle it)
+7. **Post an interim ack** — immediately reply with `interim=true` so the user sees the task was picked up while you work on it
+8. **Do the work** — update the todo, add new tasks, write a journal entry, etc.
+9. **Reply** to the session with `agent_id=openclaw` (without `interim`) to post the final response
 
 ### Creating a Session for a New Task
 
@@ -375,10 +379,11 @@ openclaw cron remove todolist-watcher
 1. OpenClaw spawns an isolated session with the todolist skill loaded
 2. It polls `GET /agent/sessions/pending?agent_id=openclaw` for claimed + unclaimed sessions
 3. For sessions where `is_followup` is true, it checks `recent_messages` and handles the followup
-4. For new sessions with `agent_id=openclaw` (pre-routed via dropdown), it posts an interim ack and does the work
-5. For unclaimed sessions, it checks the linked todo for `#openclaw` — if present, claims and handles it
-6. **If not tagged or routed**, it skips the session — the built-in agent will handle it
-7. The isolated session closes — no context pollution in the main chat
+4. For direct-chat sessions (`agent_id=openclaw`, no `todo_id`), it responds conversationally
+5. For new task sessions with `agent_id=openclaw` and `todo_id` (pre-routed via dropdown), it posts an interim ack and does the work
+6. For unclaimed sessions, it checks the linked todo for `#openclaw` — if present, claims and handles it
+7. **If not tagged or routed**, it skips the session — the built-in agent will handle it
+8. The isolated session closes — no context pollution in the main chat
 
 ### Important
 

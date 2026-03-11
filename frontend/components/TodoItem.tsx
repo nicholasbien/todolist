@@ -401,7 +401,7 @@ export default function TodoItem({
 
               {/* Subtask text */}
               <span
-                className={`flex-1 text-sm cursor-pointer ${st.completed ? 'line-through' : ''}`}
+                className={`flex-1 text-sm cursor-pointer`}
                 onClick={(e) => { e.stopPropagation(); onEdit(st); }}
               >
                 {st.text}

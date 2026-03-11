@@ -62,7 +62,7 @@ protocol (they will be available as `mcp__todolist__<tool_name>`):
 |------|---------|
 | `get_pending_sessions` | Poll for sessions needing response (`agent_id=claude`) |
 | `get_session` | Read a session's full conversation history |
-| `post_to_session` | Reply to a session (always pass `agent_id=claude`) |
+| `post_to_session` | Reply to a session (always pass `agent_id=claude`). Pass `needs_human_response=true` to pause polling until human replies. |
 | `list_todos` | List all todos |
 | `update_todo` | Update a todo's text, category, priority, or notes |
 | `complete_todo` | Mark a todo as done |
@@ -85,14 +85,16 @@ This returns:
 
 For each pending session:
 
-1. **If `agent_id` is `"claude"`** → This is a follow-up. Route to the subagent
+1. **If `agent_id` is `"claude"` and `todo_id` is present** → This is a follow-up. Route to the subagent
    that originally handled this task (look up by session ID in your tracking).
    If the subagent is no longer active, spawn a new one with the full history.
 
-2. **If unclaimed** (no `agent_id`) and `todo_id` is present:
+2. **If `agent_id` is `"claude"` and no `todo_id`** → This is a direct chat session. The user started a conversation with you directly (not linked to a task). Treat it as a conversational exchange. Dispatch a subagent with the direct-chat prompt template.
+
+3. **If unclaimed** (no `agent_id`) and `todo_id` is present:
    - This is a new task assigned to you — **claim it** by dispatching a subagent
 
-3. **If unclaimed and no `todo_id`** → Skip (standalone session, not a task)
+4. **If unclaimed and no `todo_id`** → Skip (standalone session, not a task)
 
 ### Step 3: Dispatch a Subagent
 
@@ -149,6 +151,33 @@ from your subtasks rather than trying to do all the work yourself.
 
 **Run subagents in the background** when handling multiple tasks so they work
 in parallel. Track which session_id maps to which subagent.
+
+**Direct-chat subagent prompt template:**
+
+```
+You are a conversational assistant for the TodoList app. The user started a
+direct chat with you (not linked to any specific task).
+
+## Session
+- Session ID: {session_id}
+
+## Conversation History
+{formatted_messages}
+
+## Instructions
+1. Read and understand the user's message(s)
+2. Respond conversationally — be helpful, friendly, and concise
+3. You can use tools to look up information (list todos, read journals, etc.)
+4. Do NOT create or update todos unless the user explicitly asks you to
+5. When done, post your response using mcp__todolist__post_to_session:
+   - session_id: "{session_id}"
+   - content: Your response
+   - role: "assistant"
+   - agent_id: "claude"
+
+IMPORTANT: Always include agent_id="claude" when posting to claim/maintain
+routing. The user will see your reply in their TodoList app.
+```
 
 ### Step 4: Track Assignments
 
