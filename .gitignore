@@ -15,22 +15,3 @@ mcp-server/node_modules/
 .pw-offline-profile/
 .playwright-mcp/
 .mcp.json
-
-# Python virtualenv
-backend/.venv/
-
-# Scripts dependencies
-scripts/node_modules/
-
-# Playwright artifacts
-frontend/playwright-profiles/
-frontend/playwright-report/
-frontend/.pw-live-profile/
-frontend/test-results/
-
-# Ephemeral agent files
-CLAUDE_TASK.txt
-
-# Test screenshots (exploratory)
-frontend/public/screenshots/exploratory/
-ui-smoke/

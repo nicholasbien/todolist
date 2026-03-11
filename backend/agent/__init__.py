@@ -1,5 +1,5 @@
 """
-Agent module for AI-powered task management and weather information.
+Agent module for AI-powered task management.
 
 This module provides direct tool implementations and agent orchestration
 to replace the previous Node.js MCP implementation with a simpler,

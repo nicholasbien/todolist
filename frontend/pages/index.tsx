@@ -326,8 +326,8 @@ export default function Home() {
   const [isClient, setIsClient] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isChecking, setIsChecking] = useState(true);
-  const [user, setUser] = useState(null);
-  const [token, setToken] = useState(null);
+  const [user, setUser] = useState<any>(null);
+  const [token, setToken] = useState<string | null>(null);
   const [showContactModal, setShowContactModal] = useState(false);
   const [showEmailSettings, setShowEmailSettings] = useState(false);
   const [showInsightsModal, setShowInsightsModal] = useState(false);
@@ -346,6 +346,19 @@ export default function Home() {
   const [deleteConfirmation, setDeleteConfirmation] = useState('');
   const [deletingAccount, setDeletingAccount] = useState(false);
   const isOffline = useOffline();
+
+  // Lock body scroll when any modal is open so background doesn't scroll (including when keyboard opens on mobile)
+  useEffect(() => {
+    const anyModalOpen = showExportModal || showContactModal || showAccountSettings;
+    if (anyModalOpen) {
+      document.body.classList.add('modal-open');
+    } else {
+      document.body.classList.remove('modal-open');
+    }
+    return () => {
+      document.body.classList.remove('modal-open');
+    };
+  }, [showExportModal, showContactModal, showAccountSettings]);
 
   useEffect(() => {
     setIsClient(true);
@@ -551,7 +564,7 @@ export default function Home() {
       <main className="h-screen h-[100dvh] overflow-hidden bg-zinc-950 text-white">
         <AIToDoListApp
           user={user}
-          token={token}
+          token={token!}
           showEmailSettings={showEmailSettings}
           onShowEmailSettings={() => setShowEmailSettings(true)}
           onCloseEmailSettings={() => setShowEmailSettings(false)}
@@ -571,8 +584,8 @@ export default function Home() {
         />
         {/* Export Modal */}
         {showExportModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50">
-            <div className="bg-black border border-gray-800 p-6 rounded-xl w-80 space-y-4 shadow-2xl">
+          <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4" style={{overscrollBehavior: 'contain'}}>
+            <div className="bg-black border border-gray-800 p-6 rounded-xl w-80 space-y-4 shadow-2xl overflow-y-auto" style={{maxHeight: 'calc(100dvh - 2rem)'}}>
               <h3 className="text-gray-100 text-lg font-bold mb-2">Export Data</h3>
               <div>
                 <label className="block text-sm text-gray-300 mb-2">Data Type</label>
@@ -631,8 +644,8 @@ export default function Home() {
 
         {/* Contact Modal */}
         {showContactModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50">
-            <div className="bg-black border border-gray-800 p-6 rounded-xl w-96 space-y-4 shadow-2xl">
+          <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4" style={{overscrollBehavior: 'contain'}}>
+            <div className="bg-black border border-gray-800 p-6 rounded-xl w-96 space-y-4 shadow-2xl overflow-y-auto" style={{maxHeight: 'calc(100dvh - 2rem)'}}>
               <h3 className="text-gray-100 text-lg font-bold mb-2">Contact</h3>
               <textarea
                 value={contactMessage}
@@ -664,8 +677,8 @@ export default function Home() {
 
         {/* Account Settings Modal */}
         {showAccountSettings && (
-          <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4">
-            <div className="bg-black border border-gray-800 p-6 rounded-xl w-full max-w-md space-y-6 shadow-2xl">
+          <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4" style={{overscrollBehavior: 'contain'}}>
+            <div className="bg-black border border-gray-800 p-6 rounded-xl w-full max-w-md space-y-6 shadow-2xl overflow-y-auto" style={{maxHeight: 'calc(100dvh - 2rem)'}}>
               <h3 className="text-gray-100 text-lg font-bold">Account Settings</h3>
 
               {/* Email Display */}

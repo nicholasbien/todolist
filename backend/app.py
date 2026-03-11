@@ -8,7 +8,9 @@ from io import StringIO
 from typing import List, Optional, Union
 
 import httpx
+from activity_feed import get_activity_feed
 from agent import agent_router
+from agent_memory import get_recent_memory_logs
 from auth import (
     LoginRequest,
     SignupRequest,
@@ -19,7 +21,6 @@ from auth import (
     signup_user,
     update_user_email_instructions,
     update_user_email_spaces,
-    update_user_last_space,
     update_user_name,
     update_user_summary_time,
     verify_session,
@@ -35,6 +36,9 @@ from categories import (
     migrate_legacy_categories,
     rename_category,
 )
+from chat_sessions import append_message
+from chat_sessions import create_session as create_chat_session
+from chat_sessions import find_session_by_todo, mark_session_read
 
 # Import the classification function and todo management
 from classify import classify_task
@@ -65,13 +69,17 @@ from spaces import (
     update_space,
     user_in_space,
 )
+from starlette.middleware.base import BaseHTTPMiddleware
 from todos import (
     Todo,
     complete_todo,
     create_todo,
     delete_todo,
+    get_subtasks,
     get_todos,
+    handle_subtask_completion,
     health_check,
+    permanent_delete_todo,
     todos_collection,
     update_todo_fields,
 )
@@ -96,6 +104,7 @@ async def lifespan(app: FastAPI):
         logger.info("Starting initialization tasks...")
 
         # Import initialization functions
+        from agent_memory import init_memory_indexes
         from auth import cleanup_expired_sessions, init_auth_indexes
         from categories import init_category_indexes
         from chat_sessions import init_chat_session_indexes
@@ -123,6 +132,7 @@ async def lifespan(app: FastAPI):
             ("init_journal_indexes", init_journal_indexes),
             ("init_chat_indexes", init_chat_indexes),
             ("init_chat_session_indexes", init_chat_session_indexes),
+            ("init_memory_indexes", init_memory_indexes),
             ("init_default_categories", init_default_categories),
             ("cleanup_expired_sessions", cleanup_expired_sessions),
         ]
@@ -146,12 +156,6 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.error(f"✗ Scheduler failed to start: {e}")
             failed_steps.append("scheduler")
-
-        # Auto-claim worker disabled — it was clearing needs_agent_response
-        # before real agents could pick up sessions. OpenClaw/Claude Code
-        # handle acknowledgment themselves.
-        # from auto_claim_worker import run_worker
-        # asyncio.create_task(run_worker())
 
         if failed_steps:
             logger.warning(f"⚠️  Startup completed with {len(failed_steps)} failed steps: {', '.join(failed_steps)}")
@@ -180,13 +184,32 @@ app.include_router(agent_router)
 MAX_HISTORY = 10
 
 
+# Security headers middleware
+
+
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request, call_next):
+        response = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        return response
+
+
+app.add_middleware(SecurityHeadersMiddleware)
+
+
 # Enable CORS - specifically for the Next.js frontend
+_allowed_origins = os.getenv(
+    "CORS_ORIGINS",
+    "http://localhost:3000,https://app.todolist.nyc,capacitor://localhost,ionic://localhost",
+).split(",")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins in development
+    allow_origins=_allowed_origins,
     allow_credentials=True,
-    allow_methods=["*"],  # Allow all methods including DELETE and PUT
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"],
 )
 
 
@@ -259,31 +282,6 @@ async def api_get_current_user(current_user: dict = Depends(get_current_user)):
     return current_user
 
 
-class UpdateLastSpaceRequest(BaseModel):
-    space_id: Optional[str] = None
-
-
-@app.get("/auth/last-space")
-async def api_get_last_space(current_user: dict = Depends(get_current_user)):
-    """Get the user's last selected space ID."""
-    return {"last_space_id": current_user.get("last_space_id")}
-
-
-@app.post("/auth/last-space")
-async def api_update_last_space(
-    request: UpdateLastSpaceRequest,
-    current_user: dict = Depends(get_current_user),
-):
-    """Update the user's last selected space ID."""
-    if request.space_id:
-        has_access = await user_in_space(current_user["user_id"], request.space_id)
-        if not has_access:
-            raise HTTPException(status_code=403, detail="Access denied to this space")
-
-    logger.info("Last selected space update requested by %s: %s", current_user["email"], request.space_id)
-    return await update_user_last_space(current_user["user_id"], request.space_id)
-
-
 @app.post("/auth/update-name")
 async def api_update_name(request: UpdateNameRequest, current_user: dict = Depends(get_current_user)):
     """Update user's first name."""
@@ -307,78 +305,77 @@ async def api_get_todos(space_id: str | None = None, current_user: dict = Depend
     return result
 
 
-@app.get("/todos/{todo_id}", response_model=Todo)
-async def api_get_todo(todo_id: str, current_user: dict = Depends(get_current_user)):
-    """Get a single todo by ID."""
-    from bson import ObjectId
-
-    try:
-        object_id = ObjectId(todo_id)
-    except Exception:
-        raise HTTPException(status_code=400, detail=f"Invalid todo ID format: {todo_id}")
-
-    todo = await todos_collection.find_one({"_id": object_id, "user_id": current_user["user_id"]})
-    if not todo:
-        raise HTTPException(status_code=404, detail="Todo not found")
-
-    # Convert ObjectId to string
-    todo["_id"] = str(todo["_id"])
-
-    # Add user's first name for collaborative spaces
-    try:
-        user = await auth.users_collection.find_one({"_id": ObjectId(todo["user_id"])})
-        if user:
-            todo["first_name"] = user.get("first_name", "")
-    except Exception:
-        todo["first_name"] = ""
-
-    return Todo(**todo)
-
-
 @app.post("/todos", response_model=Todo)
 async def api_create_todo(request: Request, current_user: dict = Depends(get_current_user)):
     try:
-        # Log the raw request body for debugging
         body = await request.json()
-        logger.info(f"Received todo creation request: {json.dumps(body)}")
 
         body["user_id"] = current_user["user_id"]
         if "space_id" not in body:
             body["space_id"] = None
-        body["creator_type"] = "user"
+
+        # Input length validation
+        text = body.get("text", "").strip()
+        if not text:
+            raise HTTPException(status_code=400, detail="Task text is required")
+        if len(text) > 2000:
+            raise HTTPException(status_code=400, detail="Task text too long (max 2000 chars)")
+        notes = body.get("notes", "")
+        if notes and len(notes) > 10000:
+            raise HTTPException(status_code=400, detail="Notes too long (max 10000 chars)")
 
         # Determine the text to classify
-        text = body.get("text", "").strip()
         classify_text = text
 
         # Detect if text is a URL and fetch page title
         if text.startswith("http://") or text.startswith("https://"):
             body["link"] = text
             try:
-                headers = {
-                    "User-Agent": (
-                        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-                        "(KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
-                    )
-                }
-                async with httpx.AsyncClient(timeout=5, headers=headers, follow_redirects=True) as client:
-                    resp = await client.get(text)
-                    print(f"URL fetch response: {resp.status_code} for {text}")
-                    if resp.status_code == 200:
-                        soup = BeautifulSoup(resp.text, "html.parser")
-                        title_tag = soup.find("title")
-                        if title_tag and title_tag.text:
-                            page_title = title_tag.text.strip()
-                            print(f"Extracted title: '{page_title}' from {text}")
-                            body["text"] = page_title
-                            classify_text = page_title
-                        else:
-                            print(f"No title found for {text}")
-                    else:
-                        print(f"HTTP error {resp.status_code} for {text}")
+                from urllib.parse import urlparse
+
+                parsed = urlparse(text)
+                hostname = parsed.hostname or ""
+
+                # Block requests to private/internal networks (SSRF protection)
+                import ipaddress
+
+                _blocked = False
+                try:
+                    ip = ipaddress.ip_address(hostname)
+                    if ip.is_private or ip.is_loopback or ip.is_reserved or ip.is_link_local:
+                        _blocked = True
+                except ValueError:
+                    # hostname is not an IP — block common internal names
+                    if hostname in ("localhost",) or hostname.endswith(".local") or hostname.endswith(".internal"):
+                        _blocked = True
+
+                if _blocked:
+                    logger.warning(f"Blocked URL fetch to private/internal host: {hostname}")
+                else:
+                    req_headers = {
+                        "User-Agent": (
+                            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                            "(KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+                        )
+                    }
+                    async with httpx.AsyncClient(
+                        timeout=5,
+                        headers=req_headers,
+                        follow_redirects=True,
+                        max_redirects=5,
+                    ) as client:
+                        resp = await client.get(text)
+                        if resp.status_code == 200:
+                            # Only parse a limited amount of response body
+                            body_text = resp.text[:100_000]
+                            soup = BeautifulSoup(body_text, "html.parser")
+                            title_tag = soup.find("title")
+                            if title_tag and title_tag.text:
+                                page_title = title_tag.text.strip()[:500]
+                                body["text"] = page_title
+                                classify_text = page_title
             except Exception as e:
-                print(f"Exception fetching {text}: {e}")
-                logger.error(f"Failed to fetch title for {text}: {e}")
+                logger.error(f"Failed to fetch title for URL: {e}")
 
         # Only classify if not created offline and no category provided
         if not body.get("created_offline", False) and not body.get("category"):
@@ -411,6 +408,9 @@ async def api_create_todo(request: Request, current_user: dict = Depends(get_cur
         # Ensure dateAdded exists (frontend should provide this)
         body.setdefault("dateAdded", datetime.now().isoformat())
 
+        # Pass through creator_type if provided
+        body.setdefault("creator_type", "user")
+
         # Create Todo object from request data
         todo = Todo(**body)
         logger.info(f"Created Todo object: {todo}")
@@ -419,36 +419,87 @@ async def api_create_todo(request: Request, current_user: dict = Depends(get_cur
         result = await create_todo(todo)
         logger.info(f"Todo created successfully: {result}")
 
-        # Create a linked chat session so agents can see the new task
-        try:
-            from chat_sessions import append_message, create_session
+        # Auto-create a linked session for the task (unless created offline)
+        if not body.get("created_offline", False):
+            try:
+                todo_dict = result.dict(by_alias=True)
+                todo_id = str(todo_dict["_id"])
+                is_subtask = bool(body.get("parent_id"))
 
-            todo_id = str(result.id) if result.id else ""
-            if todo_id and not body.get("created_offline", False):
-                session_id = await create_session(
-                    user_id=body["user_id"],
-                    space_id=body.get("space_id"),
-                    title=body.get("text", "New task")[:60],
+                # Build initial message with task details
+                details = []
+                if todo_dict.get("category") and todo_dict["category"] != "General":
+                    details.append(f"Category: {todo_dict['category']}")
+                if todo_dict.get("priority"):
+                    details.append(f"Priority: {todo_dict['priority']}")
+                if todo_dict.get("dueDate"):
+                    details.append(f"Due: {todo_dict['dueDate']}")
+                if todo_dict.get("notes"):
+                    details.append(f"Notes: {todo_dict['notes']}")
+
+                if is_subtask:
+                    # For subtasks, include parent context
+                    from bson import ObjectId as _ObjId
+
+                    parent_doc = await todos_collection.find_one({"_id": _ObjId(body["parent_id"])})
+                    parent_text = parent_doc.get("text", "") if parent_doc else ""
+                    initial_msg = f"Subtask of: \"{parent_text}\"\n\nTask: {todo_dict['text']}"
+                    if details:
+                        initial_msg += "\n" + "\n".join(details)
+                else:
+                    initial_msg = f"Please help me with this task: {todo_dict['text']}"
+                    if details:
+                        initial_msg += "\n" + "\n".join(details)
+
+                # Post as assistant if agent-created, user if user-created
+                role = "assistant" if body.get("creator_type") == "agent" else "user"
+                # Use explicit agent_id from request, fallback to hashtag detection for backwards compat
+                auto_agent_id = body.get("agent_id") or None
+                if not auto_agent_id:
+                    text_lower = todo_dict["text"].lower()
+                    if "#openclaw" in text_lower:
+                        auto_agent_id = "openclaw"
+                    elif "#claude" in text_lower:
+                        auto_agent_id = "claude"
+
+                # For subtasks, inherit agent_id from parent session if not set
+                if is_subtask and not auto_agent_id and parent_doc:
+                    parent_session = await find_session_by_todo(current_user["user_id"], body["parent_id"])
+                    if parent_session and parent_session.get("agent_id"):
+                        auto_agent_id = parent_session["agent_id"]
+
+                session_id = await create_chat_session(
+                    current_user["user_id"],
+                    body.get("space_id"),
+                    todo_dict["text"],
                     todo_id=todo_id,
+                    agent_id=auto_agent_id,
                 )
-                task_details = f"New task: {body.get('text', '')}"
-                if body.get("category"):
-                    task_details += f"\nCategory: {body['category']}"
-                if body.get("priority"):
-                    task_details += f"\nPriority: {body['priority']}"
-                if body.get("dueDate"):
-                    task_details += f"\nDue: {body['dueDate']}"
-                if body.get("notes"):
-                    task_details += f"\nNotes: {body['notes']}"
-                msg_role = "assistant" if body.get("created_by_agent") else "user"
-                await append_message(session_id, body["user_id"], msg_role, task_details)
-        except Exception as e:
-            logger.error(f"Failed to create session for todo: {e}")
+                await append_message(session_id, current_user["user_id"], role, initial_msg)
+
+                # For subtasks with dependencies, make session dormant
+                # (will be activated when all dependencies complete)
+                # Subtasks without dependencies start active (parallel by default)
+                if is_subtask:
+                    from bson import ObjectId as _ObjId
+                    from chat_sessions import sessions_collection as sess_coll
+
+                    depends_on = body.get("depends_on", [])
+                    if depends_on:
+                        # This subtask has dependencies — start dormant
+                        await sess_coll.update_one(
+                            {"_id": _ObjId(session_id)},
+                            {"$set": {"needs_agent_response": False}},
+                        )
+            except Exception as e:
+                logger.error(f"Failed to auto-create session for todo: {e}")
 
         return result
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error creating todo: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error creating todo: {str(e)}")
+        raise HTTPException(status_code=500, detail="Error creating todo")
 
 
 @app.put("/todos/reorder")
@@ -458,7 +509,25 @@ async def api_reorder_todos(request: Request, current_user: dict = Depends(get_c
         todo_ids = body.get("todoIds", [])
         if not todo_ids:
             raise HTTPException(status_code=400, detail="todoIds required")
+        if len(todo_ids) > 500:
+            raise HTTPException(status_code=400, detail="Too many items to reorder")
         from bson import ObjectId
+
+        user_id = current_user["user_id"]
+        # Verify the user owns all the todos being reordered
+        oid_list = [ObjectId(tid) for tid in todo_ids]
+        owned_count = await todos_collection.count_documents({"_id": {"$in": oid_list}, "user_id": user_id})
+        if owned_count != len(oid_list):
+            # Fall back to checking space membership for collaborative todos
+            space_docs = await todos_collection.find({"_id": {"$in": oid_list}}, {"space_id": 1}).to_list(
+                length=len(oid_list)
+            )
+            if len(space_docs) != len(oid_list):
+                raise HTTPException(status_code=403, detail="Not authorized to reorder these todos")
+            for doc in space_docs:
+                sid = doc.get("space_id")
+                if not sid or not await user_in_space(user_id, sid):
+                    raise HTTPException(status_code=403, detail="Not authorized to reorder these todos")
 
         for i, todo_id in enumerate(todo_ids):
             await todos_collection.update_one({"_id": ObjectId(todo_id)}, {"$set": {"sortOrder": i}})
@@ -466,26 +535,46 @@ async def api_reorder_todos(request: Request, current_user: dict = Depends(get_c
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error reordering todos: {repr(e)}")
-        raise HTTPException(status_code=500, detail=f"Error reordering todos: {repr(e)}")
+        logger.error(f"Error reordering todos: {e}")
+        raise HTTPException(status_code=500, detail="Error reordering todos")
 
 
 @app.delete("/todos/{todo_id}")
 async def api_delete_todo(todo_id: str, current_user: dict = Depends(get_current_user)):
-    logger.info(f"Deleting todo with ID: {todo_id} for user: {current_user['email']}")
+    logger.info(f"Soft-deleting (closing) todo with ID: {todo_id} for user: {current_user['email']}")
     return await delete_todo(todo_id, current_user["user_id"])
+
+
+@app.delete("/todos/{todo_id}/permanent")
+async def api_permanent_delete_todo(todo_id: str, current_user: dict = Depends(get_current_user)):
+    logger.info(f"Permanently deleting todo with ID: {todo_id} for user: {current_user['email']}")
+    return await permanent_delete_todo(todo_id, current_user["user_id"])
 
 
 @app.put("/todos/{todo_id}/complete")
 async def api_complete_todo(todo_id: str, current_user: dict = Depends(get_current_user)):
     logger.info(f"Marking todo as complete with ID: {todo_id} for user: {current_user['email']}")
-    return await complete_todo(todo_id, current_user["user_id"])
+    result = await complete_todo(todo_id, current_user["user_id"])
+    # Trigger subtask orchestration (activate next subtask, post final results)
+    try:
+        await handle_subtask_completion(todo_id, current_user["user_id"])
+    except Exception as e:
+        logger.error(f"Subtask orchestration error: {e}")
+    return result
 
 
 @app.put("/todos/{todo_id}", response_model=Todo)
 async def api_update_todo(todo_id: str, request: Request, current_user: dict = Depends(get_current_user)):
     try:
         body = await request.json()
+
+        # Input length validation
+        if "text" in body and len(body["text"]) > 2000:
+            raise HTTPException(status_code=400, detail="Task text too long (max 2000 chars)")
+        if "notes" in body and body["notes"] and len(body["notes"]) > 10000:
+            raise HTTPException(status_code=400, detail="Notes too long (max 10000 chars)")
+        if "category" in body and len(body["category"]) > 100:
+            raise HTTPException(status_code=400, detail="Category name too long")
 
         # Build updates dict from request body
         updates = {}
@@ -507,19 +596,53 @@ async def api_update_todo(todo_id: str, request: Request, current_user: dict = D
             if new_space_id and not await user_in_space(current_user["user_id"], new_space_id):
                 raise HTTPException(status_code=403, detail="Not authorized to move to target space")
             updates["space_id"] = new_space_id
+        if "agent_id" in body:
+            updates["agent_id"] = body["agent_id"]
+        if "recurrence_rule" in body:
+            rule = body["recurrence_rule"]
+            if rule not in (None, "daily", "weekly", "monthly"):
+                raise HTTPException(
+                    status_code=400, detail="Invalid recurrence_rule. Must be daily, weekly, monthly, or null"
+                )
+            updates["recurrence_rule"] = rule
+            # Compute next occurrence when setting a rule
+            if rule:
+                from todos import _compute_next_occurrence
+
+                updates["recurrence_next"] = _compute_next_occurrence(rule)
+            else:
+                updates["recurrence_next"] = None
 
         if not updates:
             raise HTTPException(status_code=400, detail="No valid fields to update")
 
-        logger.info(f"Updating todo {todo_id} with: {updates} for user: {current_user['email']}")
-        logger.info(f"CURRENT_USER DEBUG: {current_user}")
-        return await update_todo_fields(todo_id, updates, current_user["user_id"])
+        logger.info(f"Updating todo {todo_id} for user: {current_user['email']}")
+        result = await update_todo_fields(todo_id, updates, current_user["user_id"])
+
+        # If agent_id changed, update the linked session
+        if "agent_id" in body:
+            try:
+                session = await find_session_by_todo(current_user["user_id"], todo_id)
+                if session:
+                    from bson import ObjectId as _ObjId
+                    from db import db
+
+                    if body["agent_id"]:
+                        await db.sessions.update_one(
+                            {"_id": _ObjId(str(session["_id"]))}, {"$set": {"agent_id": body["agent_id"]}}
+                        )
+                    else:
+                        await db.sessions.update_one({"_id": _ObjId(str(session["_id"]))}, {"$unset": {"agent_id": 1}})
+            except Exception as e:
+                logger.error(f"Failed to update session agent_id: {e}")
+
+        return result
     except HTTPException:
         # Re-raise HTTP exceptions (like 403, 404) without converting to 500
         raise
     except Exception as e:
-        logger.error(f"Error updating todo - Exception type: {type(e)}, Exception args: {e.args}, Exception: {repr(e)}")
-        raise HTTPException(status_code=500, detail=f"Error updating todo: {repr(e)}")
+        logger.error(f"Error updating todo: {repr(e)}")
+        raise HTTPException(status_code=500, detail="Error updating todo")
 
 
 @app.get("/health")
@@ -732,6 +855,95 @@ async def api_update_email_spaces(
     return await update_user_email_spaces(current_user["user_id"], req.space_ids)
 
 
+# ---------------------------------------------------------------------------
+# Proactive Agent Briefings
+# ---------------------------------------------------------------------------
+
+
+class UpdateBriefingRequest(BaseModel):
+    briefing_enabled: bool = False
+    briefing_hour: int = 8
+    briefing_minute: int = 0
+    stale_task_days: int = 3
+    timezone: str = "America/New_York"
+
+
+@app.get("/briefings/preferences")
+async def api_get_briefing_preferences(
+    current_user: dict = Depends(get_current_user),
+):
+    """Get the current user's briefing preferences."""
+    from briefings import get_briefing_preferences
+
+    return await get_briefing_preferences(current_user["user_id"])
+
+
+@app.post("/briefings/preferences")
+async def api_update_briefing_preferences(
+    req: UpdateBriefingRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    """Update the current user's briefing preferences and reschedule jobs."""
+    from briefings import update_briefing_preferences
+    from scheduler import remove_briefing_schedule, update_briefing_schedule
+
+    logger.info(
+        "Briefing update requested by %s: enabled=%s hour=%02d:%02d stale_days=%d",
+        current_user["email"],
+        req.briefing_enabled,
+        req.briefing_hour,
+        req.briefing_minute,
+        req.stale_task_days,
+    )
+
+    prefs = await update_briefing_preferences(
+        current_user["user_id"],
+        briefing_enabled=req.briefing_enabled,
+        briefing_hour=req.briefing_hour,
+        briefing_minute=req.briefing_minute,
+        stale_task_days=req.stale_task_days,
+        timezone=req.timezone,
+    )
+
+    if req.briefing_enabled:
+        update_briefing_schedule(
+            current_user["user_id"],
+            req.briefing_hour,
+            req.briefing_minute,
+            req.timezone,
+        )
+    else:
+        remove_briefing_schedule(current_user["user_id"])
+
+    return {"message": "Briefing preferences updated", "preferences": prefs}
+
+
+@app.post("/briefings/trigger")
+async def api_trigger_briefing(
+    current_user: dict = Depends(get_current_user),
+):
+    """Manually trigger a morning briefing for the current user (for testing)."""
+    from briefings import post_morning_briefing
+
+    session_id = await post_morning_briefing(current_user["user_id"])
+    if session_id:
+        return {"ok": True, "session_id": session_id}
+    raise HTTPException(status_code=500, detail="Failed to generate briefing")
+
+
+@app.post("/briefings/trigger-nudges")
+async def api_trigger_nudges(
+    current_user: dict = Depends(get_current_user),
+):
+    """Manually trigger stale task nudges for the current user (for testing)."""
+    from briefings import get_briefing_preferences, post_stale_task_nudges
+
+    prefs = await get_briefing_preferences(current_user["user_id"])
+    stale_days = prefs.get("stale_task_days", 3)
+    nudged = await post_stale_task_nudges(current_user["user_id"], stale_days=stale_days)
+    return {"ok": True, "nudged_sessions": nudged, "count": len(nudged)}
+
+
 class ContactRequest(BaseModel):
     message: str
 
@@ -743,6 +955,9 @@ async def api_contact(
 ):
     """Send contact message to admin email."""
     try:
+        if len(req.message) > 5000:
+            raise HTTPException(status_code=400, detail="Message too long (max 5000 chars)")
+
         logger.info("Contact message from %s", current_user["email"])
 
         # Import email sending function
@@ -803,6 +1018,27 @@ async def get_insights(
         raise HTTPException(status_code=500, detail="Failed to get insights")
 
 
+@app.get("/activity-feed")
+async def api_get_activity_feed(
+    space_id: Optional[str] = None,
+    limit: int = 50,
+    before: Optional[str] = None,
+    current_user: dict = Depends(get_current_user),
+):
+    """Get a chronological activity feed of all events (tasks, messages, journals)."""
+    try:
+        events = await get_activity_feed(
+            user_id=current_user["user_id"],
+            space_id=space_id,
+            limit=min(limit, 100),
+            before=before,
+        )
+        return events
+    except Exception as e:
+        logger.error(f"Error getting activity feed: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get activity feed")
+
+
 class JournalCreateRequest(BaseModel):
     date: str  # YYYY-MM-DD format
     text: str
@@ -840,6 +1076,10 @@ async def api_get_journal_entries(
 async def api_create_journal_entry(request: JournalCreateRequest, current_user: dict = Depends(get_current_user)):
     """Create or update a journal entry."""
     try:
+        # Input length validation
+        if len(request.text) > 50000:
+            raise HTTPException(status_code=400, detail="Journal text too long (max 50000 chars)")
+
         # Check space access if space_id provided
         if request.space_id is not None and not await user_in_space(current_user["user_id"], request.space_id):
             raise HTTPException(status_code=403, detail="Access denied to this space")
@@ -876,6 +1116,83 @@ async def api_delete_journal_entry(entry_id: str, current_user: dict = Depends(g
     except Exception as e:
         logger.error(f"Error deleting journal entry: {e}")
         raise HTTPException(status_code=500, detail="Failed to delete journal entry")
+
+
+# ── Agent Memory Endpoints ────────────────────────────────────────────
+
+
+@app.get("/memories")
+async def api_list_memories(
+    space_id: Optional[str] = None,
+    category: Optional[str] = None,
+    current_user: dict = Depends(get_current_user),
+):
+    """List all agent memory facts for the current user/space."""
+    from agent_memory import list_memories
+
+    facts = await list_memories(current_user["user_id"], space_id, category)
+    return [
+        {
+            "_id": f.id,
+            "key": f.key,
+            "value": f.value,
+            "category": f.category,
+            "agent_id": f.agent_id,
+            "created_at": f.created_at.isoformat() if f.created_at else None,
+            "updated_at": f.updated_at.isoformat() if f.updated_at else None,
+        }
+        for f in facts
+    ]
+
+
+@app.put("/memories")
+async def api_save_memory(
+    request: Request,
+    space_id: Optional[str] = None,
+    current_user: dict = Depends(get_current_user),
+):
+    """Save or update a memory fact."""
+    from agent_memory import save_memory
+
+    body = await request.json()
+    key = body.get("key", "").strip()
+    value = body.get("value", "").strip()
+    category = body.get("category")
+
+    if not key or not value:
+        raise HTTPException(status_code=400, detail="key and value are required")
+
+    fact = await save_memory(current_user["user_id"], key, value, space_id, category)
+    return {"key": fact.key, "value": fact.value, "category": fact.category}
+
+
+@app.delete("/memories/{memory_id}")
+async def api_delete_memory(
+    memory_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    """Delete a specific memory fact by its _id."""
+    from agent_memory import delete_memory, delete_memory_by_key
+
+    # Try deleting by ObjectId first, then fall back to key-based delete
+    deleted = await delete_memory(memory_id, current_user["user_id"])
+    if not deleted:
+        deleted = await delete_memory_by_key(current_user["user_id"], memory_id)
+    if deleted:
+        return {"ok": True}
+    raise HTTPException(status_code=404, detail="Memory not found")
+
+
+@app.delete("/memories")
+async def api_delete_all_memories(
+    space_id: Optional[str] = None,
+    current_user: dict = Depends(get_current_user),
+):
+    """Delete all memory facts for the current user/space."""
+    from agent_memory import delete_all_memories
+
+    count = await delete_all_memories(current_user["user_id"], space_id)
+    return {"deleted_count": count}
 
 
 @app.get("/export")
@@ -940,6 +1257,153 @@ async def export_data(
         )
 
     raise HTTPException(status_code=400, detail="Invalid format")
+
+
+# ---------------------------------------------------------------------------
+# Agent session messaging endpoints
+# ---------------------------------------------------------------------------
+
+
+class CreateSessionRequest(BaseModel):
+    space_id: Optional[str] = None
+    title: Optional[str] = None
+    todo_id: Optional[str] = None
+    initial_message: Optional[str] = None
+    initial_role: str = "user"
+    agent_id: Optional[str] = None
+
+
+class PostMessageRequest(BaseModel):
+    role: str = "user"
+    content: str
+    agent_id: Optional[str] = None
+    interim: bool = False
+    needs_human_response: bool = False
+
+
+@app.post("/agent/sessions")
+async def api_create_agent_session(req: CreateSessionRequest, current_user: dict = Depends(get_current_user)):
+    """Create a new messaging session, optionally linked to a todo."""
+    user_id = current_user["user_id"]
+
+    # If todo_id provided, check for existing session
+    if req.todo_id:
+        existing = await find_session_by_todo(user_id, req.todo_id)
+        if existing:
+            return existing
+
+    title = req.title or req.initial_message or "New session"
+    session_id = await create_chat_session(user_id, req.space_id, title, todo_id=req.todo_id, agent_id=req.agent_id)
+
+    # Post initial message if provided
+    if req.initial_message:
+        await append_message(session_id, user_id, req.initial_role, req.initial_message)
+
+    session = await find_session_by_todo(user_id, req.todo_id) if req.todo_id else None
+    if not session:
+        from bson import ObjectId as _ObjId
+        from chat_sessions import sessions_collection
+
+        doc = await sessions_collection.find_one({"_id": _ObjId(session_id)})
+        if doc:
+            doc["_id"] = str(doc["_id"])
+            session = doc
+
+    return session
+
+
+@app.post("/agent/sessions/{session_id}/messages")
+async def api_post_session_message(
+    session_id: str,
+    req: PostMessageRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    """Post a message to a session."""
+    user_id = current_user["user_id"]
+    message = await append_message(
+        session_id,
+        user_id,
+        req.role,
+        req.content,
+        req.agent_id,
+        interim=req.interim,
+        needs_human_response=req.needs_human_response,
+    )
+    return {"ok": True, "message": message}
+
+
+@app.post("/agent/sessions/{session_id}/mark-read")
+async def api_mark_session_read(
+    session_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    """Mark a session's agent replies as read."""
+    ok = await mark_session_read(session_id, current_user["user_id"])
+    return {"ok": ok}
+
+
+@app.get("/todos/{todo_id}/subtasks")
+async def api_get_subtasks(
+    todo_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    """Get subtasks of a parent todo, ordered by the parent's subtask_ids array."""
+    return await get_subtasks(todo_id)
+
+
+@app.get("/todos/{todo_id}")
+async def api_get_single_todo(
+    todo_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    """Get a single todo by ID."""
+    from bson import ObjectId as _ObjId
+
+    try:
+        doc = await todos_collection.find_one({"_id": _ObjId(todo_id)})
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid todo ID")
+    if not doc:
+        raise HTTPException(status_code=404, detail="Todo not found")
+    # Check ownership: user must own the todo or be in the same space
+    is_owner = doc.get("user_id") == current_user["user_id"]
+    is_space_member = doc.get("space_id") and await user_in_space(current_user["user_id"], doc["space_id"])
+    if not is_owner and not is_space_member:
+        raise HTTPException(status_code=403, detail="Not authorized")
+    doc["_id"] = str(doc["_id"])
+    # Add first_name
+    try:
+        import auth
+
+        user = await auth.users_collection.find_one({"_id": _ObjId(doc["user_id"])})
+        if user:
+            doc["first_name"] = user.get("first_name", "")
+    except Exception:
+        doc["first_name"] = ""
+    return doc
+
+
+@app.get("/memory-logs")
+async def api_get_memory_logs(
+    space_id: Optional[str] = None,
+    limit: int = 14,
+    current_user: dict = Depends(get_current_user),
+):
+    """Return recent daily memory logs for the current user."""
+    sid = space_id or current_user.get("active_space_id", "")
+    logs = await get_recent_memory_logs(current_user["user_id"], sid, limit=min(limit, 30))
+    result = []
+    for log in logs:
+        result.append(
+            {
+                "_id": log.id,
+                "date": log.date,
+                "entries": log.entries,
+                "created_at": log.created_at.isoformat() if log.created_at else None,
+                "updated_at": log.updated_at.isoformat() if log.updated_at else None,
+            }
+        )
+    return result
 
 
 if __name__ == "__main__":

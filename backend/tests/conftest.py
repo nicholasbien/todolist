@@ -22,8 +22,10 @@ async def client():
     os.environ.setdefault("USE_MOCK_DB", "true")
 
     # Reset database connections to avoid event loop issues between tests
+    import activity_feed
     import auth
     import categories
+    import chat_sessions
     import chats
     import db
     import journals
@@ -36,6 +38,8 @@ async def client():
     db.client = AsyncMongoMockClient()
     db.db = db.client.todo_db
 
+    import briefings
+
     # Update all module collection references to use the new shared connection
     auth.users_collection = db.db.users
     auth.sessions_collection = db.db.sessions
@@ -45,6 +49,27 @@ async def client():
     spaces.spaces_collection = db.db.spaces
     chats.chats_collection = db.db.chats
     journals.journals_collection = db.db.journals
+    chat_sessions.sessions_collection = db.db.chat_sessions
+    chat_sessions.trajectories_collection = db.db.chat_trajectories
+    briefings.users_collection = db.db.users
+    briefings.todos_collection = db.db.todos
+    briefings.journals_collection = db.db.journals
+
+    import agent_memory
+
+    agent_memory.memories_collection = db.db.agent_memories
+    agent_memory.memory_logs_collection = db.db.agent_memory_logs
+
+    activity_feed.todos_collection = db.db.todos
+    activity_feed.sessions_collection = db.db.chat_sessions
+    activity_feed.trajectories_collection = db.db.chat_trajectories
+    activity_feed.journals_collection = db.db.journals
+
+    # Clear global MCP session state to prevent stale connections across tests
+    from agent.agent import mcp_contexts, mcp_sessions
+
+    mcp_sessions.clear()
+    mcp_contexts.clear()
 
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://testserver") as async_client:
         yield async_client

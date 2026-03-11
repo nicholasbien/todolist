@@ -1,9 +1,9 @@
-# flake8: noqa: E501
 import logging
 import os
 import time
 from typing import Any, Dict, List
 
+import jinja2
 from categories import DEFAULT_CATEGORIES
 from dateparse import manual_parse_due_date
 from dotenv import load_dotenv
@@ -27,6 +27,14 @@ if not api_key:
 # 4 second timeout - must be less than frontend timeout (5s) to prevent duplicate todos
 # If classification times out, we fall back to default classification (General/Medium)
 client = OpenAI(api_key=api_key, timeout=4.0, max_retries=0)
+
+# Jinja2 environment for loading prompt templates
+_prompts_dir = os.path.join(os.path.dirname(__file__), "prompts")
+_jinja_env = jinja2.Environment(
+    loader=jinja2.FileSystemLoader(_prompts_dir),
+    autoescape=True,
+    keep_trailing_newline=True,
+)
 
 
 # Pydantic model for structured output
@@ -85,22 +93,11 @@ async def classify_task(text: str, categories: List[str], date_added: str) -> Di
             day_of_week = None
             date_only = date_added.split("T")[0] if "T" in date_added else date_added
 
-        system_prompt = f"""You are a task classifier.
-
-Today's date: {day_of_week + ', ' if day_of_week else ''}{date_only}
-
-Classify the task into one of these categories: {categories_str}.
-Set priority: High (urgent/critical), Medium (regular), Low (optional).
-Remove all date keywords from the text field (words like: today, tomorrow, on, by, due, etc.).
-
-Date extraction rules (use exact dates, not interpretations):
-- "today" → {date_only}
-- "tomorrow" → the day after {date_only}
-- Weekday names (Monday-Sunday) → the soonest upcoming occurrence of that weekday from {date_only} (if today is that weekday, use today; if that weekday has passed this week, use next week)
-- Explicit dates (2025-12-15, Dec 15, etc.) → use the exact date provided
-- "in X days/weeks" → calculate from {date_only}
-
-Return dueDate in YYYY-MM-DD format or null if no date mentioned."""
+        system_prompt = _jinja_env.get_template("classify_system.j2").render(
+            day_of_week=day_of_week,
+            date_only=date_only,
+            categories_str=categories_str,
+        )
 
         logger.info(f'Full prompt:\n{system_prompt}\n\nUser input: "{text}"')
 

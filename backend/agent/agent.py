@@ -8,6 +8,7 @@ import time
 from collections import OrderedDict
 from typing import Any, AsyncGenerator, Dict, List, Optional
 
+import jinja2
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
@@ -20,8 +21,6 @@ sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
 from auth import verify_session  # noqa: E402
 from chat_sessions import (  # noqa: E402
-    append_message,
-    claim_session,
     create_session,
     delete_session,
     find_session_by_todo,
@@ -30,21 +29,26 @@ from chat_sessions import (  # noqa: E402
     get_todo_session_statuses,
     get_unread_todo_ids,
     list_sessions,
-    mark_session_read,
-    release_session,
     save_trajectory,
-    trajectories_collection,
+    search_sessions,
 )
 from chats import ChatMessage, save_chat_message  # noqa: E402
 from fastapi import APIRouter, Depends, Header, HTTPException, Query  # noqa: E402
 from fastapi.responses import StreamingResponse  # noqa: E402
 from openai import AsyncOpenAI  # noqa: E402
-from pydantic import BaseModel  # noqa: E402
 
 from .schemas import OPENAI_TOOL_SCHEMAS  # noqa: E402
 from .tools import AVAILABLE_TOOLS  # noqa: E402
 
 router = APIRouter(prefix="/agent")
+
+# Jinja2 environment for loading prompt templates
+_prompts_dir = os.path.join(os.path.dirname(__file__), "..", "prompts")
+_jinja_env = jinja2.Environment(
+    loader=jinja2.FileSystemLoader(_prompts_dir),
+    autoescape=True,
+    keep_trailing_newline=True,
+)
 
 # Global MCP session storage
 mcp_sessions: Dict[str, ClientSession] = {}
@@ -181,73 +185,6 @@ async def get_current_user(authorization: str = Header(None), token_param: Optio
     return user_info
 
 
-# System prompt for the agent
-AGENT_SYSTEM_PROMPT = """You are an AI assistant with access to tools for managing tasks, journals, weather, and
-web content.
-
-CRITICAL: When you search the web, you MUST ALWAYS follow up by using fetch_webpage to read the actual content.
-DO NOT just summarize search results - fetch and read the actual pages to provide detailed, accurate information.
-
-Available tools include:
-- web_search: Search the web using Brave API (returns URLs and snippets only)
-- fetch_webpage: Extract full content from any URL (ALWAYS USE THIS after web_search!)
-- fetch_json: Get JSON data from APIs
-- extract_links: Extract all links from a webpage
-- Task management, journal, weather, and recommendation tools
-
-MANDATORY WORKFLOW FOR WEB SEARCHES:
-1. Use web_search to find relevant URLs
-2. ALWAYS use fetch_webpage on at least the top 2-3 most relevant results
-3. Read and analyze the actual fetched content
-4. Provide a comprehensive answer based on the ACTUAL CONTENT you fetched, not just search snippets
-
-Example: If asked about "geology of Kilimanjaro":
-- First: web_search for "geology of Kilimanjaro"
-- Then: fetch_webpage on Wikipedia and other authoritative results
-- Finally: Provide detailed answer from the fetched content
-
-You can call multiple tools in sequence to gather information before providing comprehensive responses.
-Be proactive in using tools to personalize your responses based on the user's data.
-
-FORMATTING GUIDELINES:
-- Output responses directly in markdown format (without wrapping in code blocks)
-- Never start responses with ```markdown or similar code fence markers
-- Use **bold** sparingly - only for critical warnings or key takeaways
-  (avoid bolding task names, numbers, or general emphasis)
-- Use bullet points (- or *) for lists
-- Use numbered lists (1. 2. 3.) for sequential steps
-- Use `code formatting` ONLY for actual code snippets, NOT for regular words or technical terms
-- Use headers (##) to organize longer responses
-- Use tables when presenting comparative data
-- Keep formatting clean and minimal - prefer plain text over excessive formatting
-- NEVER include database IDs (like id: 6843b5ec75d3e8a7ca776f05) in your responses to users
-- Only show task names, priorities, categories, and due dates - not internal IDs
-
-Available tools:
-- add_task: create new tasks
-- list_tasks: show existing tasks (call liberally to understand user's current work;
-  always use completed=false by default — only use completed=true when user asks about
-  past accomplishments, finished tasks, or wants to revisit/undo a completed task)
-- update_task: modify or complete tasks
-- add_journal_entry: save journal entries
-- read_journal_entry: read journal entries for specific dates or recent entries
-- search_content: search through tasks and journal entries
-- get_current_weather: current weather for any location
-- get_weather_forecast: multi-day weather forecasts
-- get_book_recommendations: search for books using flexible queries (subjects, authors, titles, detailed descriptions)
-- get_inspirational_quotes: get motivational quotes for productivity/self-care/resilience
-
-Personalization Strategy:
-For recommendations (books, quotes, etc.), first call list_tasks and read_journal_entry to understand:
-- What the user is currently working on
-- Their interests and goals from recent tasks/journals
-- Their activity patterns and preferences
-Then provide tailored suggestions based on this context.
-
-Always use tools when they can help. After all tool calls complete, provide a concise, well-formatted summary
-addressing the user's request."""
-
-
 def estimate_token_count(messages: List[Dict[str, Any]], tools: Optional[List[Dict[str, Any]]] = None) -> int:
     """Rough estimate of token count for messages and tools."""
     # Very rough approximation: ~4 characters per token on average
@@ -287,13 +224,6 @@ def _format_tool_display(tool_name: str, args: dict, result: dict) -> str:
             return f"❌ {d.get('error', 'Error')}"
         if "tasks" in d:
             return f"✅ Found {len(d['tasks'])} tasks"
-        if "weather" in d:
-            w = d["weather"]
-            return f"🌤️ {w.get('location', '')}: {w.get('temperature_display', '')}"
-        if "books" in d:
-            return f"📚 Found {len(d['books'])} book recommendations"
-        if "quotes" in d:
-            return f'💭 "{d["quotes"][0]}"'
         if "results" in d:
             return f"🔍 Found {len(d['results'])} results"
         if "entries" in d:
@@ -301,6 +231,13 @@ def _format_tool_display(tool_name: str, args: dict, result: dict) -> str:
         if "entry" in d:
             entry = d["entry"]
             return f"📖 Journal entry from {entry['date']}" if entry else "📖 No journal entry found"
+        if "memory" in d:
+            mem = d["memory"]
+            return f"🧠 Saved: {mem.get('key', '')} = {mem.get('value', '')}"
+        if "memories" in d:
+            return f"🧠 Found {d.get('count', len(d['memories']))} memories"
+        if "deleted_key" in d:
+            return f"🧠 Forgot: {d['deleted_key']}"
         return "✅ Success"
 
     return f"🔧 {tool_name}{fmt_args(args)}: {fmt_result(result)}"
@@ -385,12 +322,16 @@ async def stream_agent_response(
     # -----------------------------------------------------------------------
     # Session handling: create or resume
     # -----------------------------------------------------------------------
-    if session_id is None:
+    is_new_session = session_id is None
+    todo_context = ""
+
+    if is_new_session:
         session_id = await create_session(user_id, space_id, user_message)
         logger.info(f"Created new session {session_id}")
         input_messages: list[dict[str, Any]] = []
         display_messages: list[dict[str, Any]] = []
     else:
+        assert session_id is not None
         # Try in-memory cache first, then DB
         cached = _cache_get(session_id)
         if cached:
@@ -405,6 +346,50 @@ async def stream_agent_response(
             input_messages = list(traj_doc.get("trajectory", []))
             display_messages = list(traj_doc.get("display_messages", []))
             logger.info(f"Loaded session {session_id} from DB ({len(input_messages)} trajectory items)")
+
+            # If session is linked to a todo, fetch task context
+            todo_id = traj_doc.get("todo_id")
+            if todo_id:
+                try:
+                    from bson import ObjectId as _ObjId
+                    from db import collections
+
+                    todo_doc = await collections.todos.find_one({"_id": _ObjId(todo_id)})
+                    if todo_doc:
+                        task_text = todo_doc.get("text", "")
+                        task_notes = todo_doc.get("notes", "")
+                        task_category = todo_doc.get("category", "")
+                        task_priority = todo_doc.get("priority", "")
+                        task_due = todo_doc.get("dueDate", "")
+                        todo_context = f"\n\nYou are discussing a specific task:\n- Task: {task_text}"
+                        if task_notes:
+                            todo_context += f"\n- Notes: {task_notes}"
+                        if task_category:
+                            todo_context += f"\n- Category: {task_category}"
+                        if task_priority:
+                            todo_context += f"\n- Priority: {task_priority}"
+                        if task_due:
+                            todo_context += f"\n- Due: {task_due}"
+                        todo_context += (
+                            f"\n\nThis task ALREADY EXISTS (ID: {todo_id}) — do NOT"
+                            " create a duplicate."
+                            " The user is chatting about this specific"
+                            " task and wants help working on it."
+                            " You can: answer questions, give advice,"
+                            f" update this task (use update_task with ID {todo_id}),"
+                            " or break it into sub-tasks (use add_task with"
+                            f' parent_id="{todo_id}").'
+                            " When creating sub-tasks, each one should be a"
+                            " concrete, actionable step with clear notes."
+                            " Sub-tasks execute in linear order — completing"
+                            " all sub-tasks auto-completes the parent."
+                            " Each sub-task gets its own session for an agent"
+                            " to work on."
+                        )
+                except Exception as e:
+                    logger.error(f"Failed to fetch todo context: {e}")
+
+    assert session_id is not None  # guaranteed after create or resume
 
     tool_names = list(OPENAI_TOOL_SCHEMAS.keys()) + list(mcp_tools.keys())
     ready_data = {"ok": True, "tools": tool_names, "space_id": space_id, "session_id": session_id}
@@ -436,17 +421,25 @@ async def stream_agent_response(
     categories_str = ", ".join(category_names)
 
     # Build context with user name if available
-    user_context = ""
-    if user_name:
-        user_context = f"You are helping {user_name}.\n"
+    user_context = f"You are helping {user_name}.\n" if user_name else ""
 
-    developer_instructions = f"""{AGENT_SYSTEM_PROMPT}
+    # Build memory context
+    memory_context = ""
+    try:
+        from agent_memory import build_memory_context
 
-Today's date: {current_date}
+        memory_context = await build_memory_context(user_id, space_id)
+    except Exception as e:
+        logger.error(f"Failed to build memory context: {e}")
 
-{user_context}Current context: You are helping the user in their "{space_name}" space.
-This space has the following categories: {categories_str}.
-When adding new tasks, choose a category from this list, or use "General" if none fit well."""
+    developer_instructions = _jinja_env.get_template("agent_developer_instructions.j2").render(
+        current_date=current_date,
+        user_context=user_context,
+        space_name=space_name,
+        categories_str=categories_str,
+        todo_context=todo_context,
+        memory_context=memory_context,
+    )
 
     # -----------------------------------------------------------------------
     # Append user message to trajectory + display_messages
@@ -480,15 +473,9 @@ When adding new tasks, choose a category from this list, or use "General" if non
                     stream=True,
                 )
             except Exception as api_error:
-                logger.error(f"OpenAI API Error: {type(api_error).__name__}")
-                logger.error(f"Error details: {str(api_error)}")
-                if hasattr(api_error, "response"):
-                    logger.error(f"Response status: {api_error.response.status_code}")
-                    logger.error(f"Response body: {api_error.response.text}")
-                if hasattr(api_error, "body"):
-                    logger.error(f"Error body: {api_error.body}")
+                logger.error(f"OpenAI API Error: {type(api_error).__name__}: {api_error}")
                 yield format_sse_message(
-                    "error", {"message": f"API Error: {str(api_error)}", "type": type(api_error).__name__}
+                    "error", {"message": "An error occurred while processing your request. Please try again."}
                 )
                 return
 
@@ -692,15 +679,9 @@ When adding new tasks, choose a category from this list, or use "General" if non
                     stream=True,
                 )
             except Exception as api_error:
-                logger.error(f"OpenAI API Error (final response): {type(api_error).__name__}")
-                logger.error(f"Error details: {str(api_error)}")
-                if hasattr(api_error, "response"):
-                    logger.error(f"Response status: {api_error.response.status_code}")
-                    logger.error(f"Response body: {api_error.response.text}")
-                if hasattr(api_error, "body"):
-                    logger.error(f"Error body: {api_error.body}")
+                logger.error(f"OpenAI API Error (final response): {type(api_error).__name__}: {api_error}")
                 yield format_sse_message(
-                    "error", {"message": f"API Error: {str(api_error)}", "type": type(api_error).__name__}
+                    "error", {"message": "An error occurred while processing your request. Please try again."}
                 )
                 return
 
@@ -757,71 +738,59 @@ async def list_chat_sessions(
     return await list_sessions(user_id, space_id)
 
 
-@router.get("/sessions/by-todo/{todo_id}")
-async def get_session_by_todo(
-    todo_id: str,
-    current_user: dict = Depends(get_current_user),
-):
-    """Find the chat session linked to a specific todo, if any."""
-    user_id = current_user.get("user_id")
-    if not user_id:
-        raise HTTPException(status_code=401, detail="User not authenticated")
-
-    session_id = await find_session_by_todo(user_id, todo_id)
-    if not session_id:
-        return {"session_id": None}
-    return {"session_id": session_id}
-
-
 @router.get("/sessions/pending")
-async def get_pending_chat_sessions(
+async def get_pending_sessions_route(
     space_id: Optional[str] = Query(None),
+    agent_id: Optional[str] = Query(None, description="Filter by agent_id; omit for unclaimed only"),
     current_user: dict = Depends(get_current_user),
 ):
-    """Return sessions with pending user messages awaiting agent response."""
-    user_id = current_user.get("user_id")
-    if not user_id:
-        raise HTTPException(status_code=401, detail="User not authenticated")
-    return await get_pending_sessions(user_id, space_id)
+    """Get sessions awaiting agent response."""
+    return await get_pending_sessions(current_user["user_id"], space_id, agent_id)
 
 
 @router.get("/sessions/unread-todos")
-async def get_unread_todos(
+async def get_unread_todos_route(
     space_id: Optional[str] = Query(None),
     current_user: dict = Depends(get_current_user),
 ):
-    """Return todo_ids that have unread agent replies."""
-    user_id = current_user.get("user_id")
-    if not user_id:
-        raise HTTPException(status_code=401, detail="User not authenticated")
-    todo_ids = await get_unread_todo_ids(user_id, space_id)
+    """Get todo IDs with unread agent replies."""
+    todo_ids = await get_unread_todo_ids(current_user["user_id"], space_id)
     return {"todo_ids": todo_ids}
 
 
 @router.get("/sessions/todo-statuses")
-async def get_todo_statuses(
+async def get_todo_statuses_route(
     space_id: Optional[str] = Query(None),
     current_user: dict = Depends(get_current_user),
 ):
-    """Return session status for each todo: waiting, processing, or unread_reply."""
-    user_id = current_user.get("user_id")
-    if not user_id:
-        raise HTTPException(status_code=401, detail="User not authenticated")
-    statuses = await get_todo_session_statuses(user_id, space_id)
-    return {"statuses": statuses}
+    """Get session status per todo (waiting/processing/unread_reply)."""
+    return await get_todo_session_statuses(current_user["user_id"], space_id)
 
 
-@router.post("/sessions/{session_id}/mark-read")
-async def mark_session_as_read(
-    session_id: str,
+@router.get("/sessions/search")
+async def search_chat_sessions(
+    q: str = Query(..., description="Search query"),
+    space_id: Optional[str] = Query(None, description="Space ID"),
+    limit: int = Query(20, ge=1, le=50, description="Max results"),
     current_user: dict = Depends(get_current_user),
 ):
-    """Mark a session's agent replies as read."""
+    """Search sessions by title and message content."""
     user_id = current_user.get("user_id")
     if not user_id:
         raise HTTPException(status_code=401, detail="User not authenticated")
-    await mark_session_read(session_id, user_id)
-    return {"ok": True}
+    return await search_sessions(user_id, q, space_id, limit)
+
+
+@router.get("/sessions/by-todo/{todo_id}")
+async def get_session_by_todo_route(
+    todo_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    """Find the session linked to a specific todo."""
+    session = await find_session_by_todo(current_user["user_id"], todo_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="No session found for this todo")
+    return session
 
 
 @router.get("/sessions/{session_id}")
@@ -857,143 +826,6 @@ async def delete_chat_session(
     # Also remove from cache
     _session_cache.pop(session_id, None)
     return {"ok": True}
-
-
-class CreateSessionRequest(BaseModel):
-    title: str
-    space_id: Optional[str] = None
-    message: Optional[str] = None
-    message_role: str = "user"
-    todo_id: Optional[str] = None
-
-
-class PostMessageRequest(BaseModel):
-    role: str  # "user" or "assistant"
-    content: str
-
-
-@router.post("/sessions")
-async def create_chat_session(
-    req: CreateSessionRequest,
-    current_user: dict = Depends(get_current_user),
-):
-    """Create a new chat session. Optionally include an initial message."""
-    user_id = current_user.get("user_id")
-    if not user_id:
-        raise HTTPException(status_code=401, detail="User not authenticated")
-
-    session_id = await create_session(user_id, req.space_id, req.title, req.todo_id)
-
-    if req.message:
-        role = req.message_role if req.message_role in ("user", "assistant") else "user"
-        await append_message(session_id, user_id, role, req.message)
-
-    return {"session_id": session_id, "title": req.title}
-
-
-class ClaimSessionRequest(BaseModel):
-    agent_id: str
-
-
-@router.post("/sessions/{session_id}/claim")
-async def claim_chat_session(
-    session_id: str,
-    req: ClaimSessionRequest,
-    current_user: dict = Depends(get_current_user),
-):
-    """Atomically claim a session for an agent. Returns ok=true if claimed."""
-    user_id = current_user.get("user_id")
-    if not user_id:
-        raise HTTPException(status_code=401, detail="User not authenticated")
-
-    claimed = await claim_session(session_id, user_id, req.agent_id)
-    return {"ok": claimed, "session_id": session_id, "agent_id": req.agent_id}
-
-
-@router.post("/sessions/{session_id}/release")
-async def release_chat_session(
-    session_id: str,
-    current_user: dict = Depends(get_current_user),
-):
-    """Release an agent's claim on a session."""
-    user_id = current_user.get("user_id")
-    if not user_id:
-        raise HTTPException(status_code=401, detail="User not authenticated")
-
-    await release_session(session_id, user_id)
-    return {"ok": True}
-
-
-@router.post("/sessions/{session_id}/messages")
-async def post_session_message(
-    session_id: str,
-    req: PostMessageRequest,
-    current_user: dict = Depends(get_current_user),
-):
-    """Append a message to a session. Used by external agents to post updates."""
-    user_id = current_user.get("user_id")
-    if not user_id:
-        raise HTTPException(status_code=401, detail="User not authenticated")
-
-    if req.role not in ("user", "assistant"):
-        raise HTTPException(status_code=400, detail="Role must be 'user' or 'assistant'")
-
-    success = await append_message(session_id, user_id, req.role, req.content)
-    if not success:
-        raise HTTPException(status_code=404, detail="Session not found")
-
-    return {"ok": True}
-
-
-@router.get("/sessions/{session_id}/watch")
-async def watch_session(
-    session_id: str,
-    since: Optional[str] = Query(None, description="ISO timestamp — return only messages after this time"),
-    current_user: dict = Depends(get_current_user),
-):
-    """Poll for new messages in a session since a given timestamp.
-
-    Designed for subagents to check for follow-up user messages while working.
-    Returns only new messages and the current agent claim status.
-    """
-    user_id = current_user.get("user_id")
-    if not user_id:
-        raise HTTPException(status_code=401, detail="User not authenticated")
-
-    result = await get_session_trajectory(session_id, user_id)
-    if not result:
-        raise HTTPException(status_code=404, detail="Session not found")
-
-    messages = result.get("display_messages", [])
-
-    # Filter to messages after `since` timestamp
-    if since:
-        from datetime import datetime as dt
-
-        try:
-            dt.fromisoformat(since.replace("Z", "+00:00"))
-        except ValueError:
-            raise HTTPException(status_code=400, detail="Invalid 'since' timestamp")
-        new_messages = []
-        for m in messages:
-            ts = m.get("timestamp", "")
-            if ts and ts > since:
-                new_messages.append(m)
-        messages = new_messages
-
-    # Get trajectory doc for agent_id info
-    traj_doc = await trajectories_collection.find_one(
-        {"session_id": session_id, "user_id": user_id},
-        {"agent_id": 1, "needs_agent_response": 1},
-    )
-
-    return {
-        "session_id": session_id,
-        "new_messages": messages,
-        "has_new_user_message": any(m.get("role") == "user" for m in messages),
-        "agent_id": traj_doc.get("agent_id") if traj_doc else None,
-        "needs_agent_response": traj_doc.get("needs_agent_response", False) if traj_doc else False,
-    }
 
 
 @router.get("/stream")

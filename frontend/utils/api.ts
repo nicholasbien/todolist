@@ -1,13 +1,5 @@
 import { Capacitor } from '@capacitor/core';
 
-// Configuration - keep in sync with service worker
-// NOTE: Backend URL is configured via Railway environment variables (BACKEND_URL)
-// and read by the proxy at build time. These are fallback values for reference only.
-const CONFIG = {
-  PRODUCTION_BACKEND: process.env.BACKEND_URL || 'http://localhost:8000',
-  PRODUCTION_DOMAIN: 'todolist.nyc'
-};
-
 /**
  * Get the correct API base URL for the current environment
  */
@@ -23,6 +15,13 @@ function getApiBaseUrl(forceBackend = false): string {
 }
 
 /**
+ * Get the direct backend URL for SSE streaming (bypasses SW proxy which buffers).
+ */
+export function getStreamingBackendUrl(): string {
+  return process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000';
+}
+
+/**
  * Enhanced fetch wrapper that handles environment-specific routing
  */
 export async function apiRequest(endpoint: string, options: RequestInit = {}): Promise<Response> {
@@ -34,21 +33,10 @@ export async function apiRequest(endpoint: string, options: RequestInit = {}): P
   const baseUrl = getApiBaseUrl(false);
 
   // Build URL
-  // Check if service worker is active — if not, use /api proxy prefix
-  // so requests reach the Next.js proxy instead of hitting Railway edge directly
-  const swActive = typeof navigator !== 'undefined'
-    && 'serviceWorker' in navigator
-    && navigator.serviceWorker.controller;
-
   let url;
   if (baseUrl === '') {
-    if (swActive) {
-      // SW will intercept and route to backend
-      url = `/${cleanEndpoint}`;
-    } else {
-      // No SW yet (first load / cleared cache) — use Next.js proxy
-      url = `/api/${cleanEndpoint}`;
-    }
+    // Use relative URLs - service worker will handle routing
+    url = `/${cleanEndpoint}`;
   } else {
     // Direct backend call
     url = `${baseUrl}/${cleanEndpoint}`;

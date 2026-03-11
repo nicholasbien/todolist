@@ -126,5 +126,13 @@ class Collections:
     def chat_trajectories(self):
         return db.chat_trajectories
 
+    @property
+    def agent_memories(self):
+        return db.agent_memories
+
+    @property
+    def agent_memory_logs(self):
+        return db.agent_memory_logs
+
 
 collections = Collections()

@@ -12,6 +12,7 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from typing import Dict, List, Optional, Tuple
 
+import jinja2
 import openai
 from bson import ObjectId
 from dotenv import load_dotenv
@@ -32,6 +33,14 @@ FROM_EMAIL = os.getenv("FROM_EMAIL")
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
 logger = logging.getLogger(__name__)
+
+# Jinja2 environment for loading prompt templates
+_prompts_dir = os.path.join(os.path.dirname(__file__), "prompts")
+_jinja_env = jinja2.Environment(
+    loader=jinja2.FileSystemLoader(_prompts_dir),
+    autoescape=True,
+    keep_trailing_newline=True,
+)
 
 
 def format_date_with_relative(date_str: str) -> str:
@@ -116,7 +125,7 @@ Write like a Buddhist monk. Include a life lesson and famous Buddhist quote or k
 """
 
 
-def create_summary_prompt(  # noqa: E501 (long lines OK for email templates)
+def create_summary_prompt(
     spaces_json: str,
     user_name: str = "there",
     custom_instructions: str = "",
@@ -125,110 +134,26 @@ def create_summary_prompt(  # noqa: E501 (long lines OK for email templates)
     journal_entries_json: str = "",
 ) -> str:
     """Create a prompt for generating a daily todo summary with space context."""
-    # Localize date to user's timezone
     import pytz  # type: ignore
 
     try:
         tz = pytz.timezone(user_timezone)
-        current_datetime = datetime.now(tz)
-        current_date = current_datetime.strftime("%A, %B %d, %Y")
+        current_date = datetime.now(tz).strftime("%A, %B %d, %Y")
     except Exception:
-        # Fallback to New York timezone if timezone is invalid
         try:
             tz = pytz.timezone("America/New_York")
             current_date = datetime.now(tz).strftime("%A, %B %d, %Y")
         except Exception:
-            # Final fallback to UTC
             current_date = datetime.now().strftime("%A, %B %d, %Y")
 
-    # Email template with intentionally longer lines for readability
-    return f"""You are a helpful personal assistant creating a daily todo summary email with clear structure
-and visual hierarchy.
-
-Today's date: {current_date}
-
-Given the following JSON data of todos organized by collaboration space and recent journal entries,
-create a well-structured, scannable daily summary email.
-
-Todo Data (grouped by space):
-{spaces_json}
-
-Recent Journal Entries:
-{journal_entries_json}
-
-**EMAIL STRUCTURE (blend structured format with flowing prose):**
-
-Good morning {user_name},
-
-**Today's Overview**
-• [X completed tasks today/yesterday] ✅ | [Y pending tasks] 📋 | [Z high priority] 🔥
-
-**Recent Wins**
-[Write 2-3 sentences celebrating recently completed tasks with personal context and encouragement.
-Connect completions to broader goals or themes. Be warm and specific about achievements.]
-
-**Priority Focus (Top 3-5 most important)**
-• 🚨 [Overdue task] - [due date with relative time]
-• ⚡ [High priority task] - [due date with relative time]
-• 📅 [Upcoming deadline] - [due date with relative time]
-
-[Write 1-2 sentences about these priority items - why they matter, how they connect to user's goals,
-gentle urgency without pressure. Personal and encouraging tone.]
-
-**Quick Wins (Tasks that take <15 minutes)**
-• [Quick task 1]
-• [Quick task 2]
-
-**Insights & Reflection**
-[Write a flowing paragraph (3-4 sentences) that weaves together:
-- Productivity patterns and most active category
-- Deeper meaning behind the tasks and progress
-- Connection to personal growth or life themes
-- Thoughtful observations about momentum and direction
-Keep the philosophical, reflective tone from the original emails.]
-
-[Buddhist koan - keep meaningful and relevant to the user's current situation]
-
----
-
-{haiku}
-
-**FORMATTING REQUIREMENTS:**
-1. Address user as "{user_name}"
-2. **Use PLAIN TEXT formatting** - no HTML, no markdown bold/italics, just emojis and text
-3. **Blend structure with narrative** - use the emoji headers for scanning, but write in flowing prose
-   within each section
-4. **Focus on recent completions (last 24-48 hours only)** from dateCompleted field
-5. **Analyze task priorities yourself** - look at the "priority" field (High/Medium/Low) and due dates
-6. **Maintain the original's thoughtful tone** - be personal, encouraging, and philosophical
-7. Use bullet points for task lists but paragraphs for reflections and insights
-8. Add time context using dueDateRelative fields when available
-9. Group overdue items with 🚨, high priority with ⚡, upcoming with 📅
-10. Include accurate task counts in overview section
-11. **For Quick Wins section**: Identify tasks that appear simple/quick based on their text:
-    - Single action items (call, email, buy, pick up, clean, trim, etc.)
-    - Administrative tasks (pay bill, submit form, schedule appointment)
-    - Short maintenance tasks
-    - Avoid complex projects or multi-step tasks
-12. **Write with depth and meaning** - connect tasks to broader life themes, personal growth, and mindful living
-{custom_instructions}
-
-11. **Haiku placement**: Use ONLY the provided haiku exactly as written:
-
-{haiku}
-
-12. Add exactly ONE emoji at the end of the haiku's third line from:
-   - Nature: 🌸🍃🌺🍂🌱🌼🌻🌷🌹🌿🌳🌲🌴🌾🌵
-   - Sky/Weather: 🌙⭐🌅🌊🌄🌈☀️🌤️⛅🌥️❄️💧🌟✨
-   - Zen/Spiritual: 🧘🕯️🪷🎍🎐🪶🪨🏔️🎋🍀
-
-13. The format should be:
-[haiku line 1]
-[haiku line 2]
-[haiku line 3] [emoji]
-
-Format as plain text email content (no HTML, no subject line).
-"""
+    return _jinja_env.get_template("email_summary.j2").render(
+        current_date=current_date,
+        user_name=user_name,
+        spaces_json=spaces_json,
+        journal_entries_json=journal_entries_json,
+        haiku=haiku,
+        custom_instructions=custom_instructions,
+    )
 
 
 async def generate_todo_summary(

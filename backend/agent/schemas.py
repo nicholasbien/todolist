@@ -4,34 +4,7 @@ Pydantic schemas for agent tool validation and OpenAI function calling.
 
 from typing import List, Literal, Optional
 
-from pydantic import BaseModel, Field, model_validator
-
-
-class WeatherCurrentRequest(BaseModel):
-    location: str = Field(
-        ...,
-        description=(
-            "Location in one of these formats: "
-            "City name (e.g., 'Tokyo'), "
-            "City,CountryCode (e.g., 'Paris,FR'), "
-            "City,StateCode,US (e.g., 'Portland,OR,US' for US cities)"
-        ),
-    )
-    units: Literal["metric", "imperial", "kelvin"] = Field(default="imperial", description="Temperature units")
-
-
-class WeatherForecastRequest(BaseModel):
-    location: str = Field(
-        ...,
-        description=(
-            "Location in one of these formats: "
-            "City name (e.g., 'Tokyo'), "
-            "City,CountryCode (e.g., 'Paris,FR'), "
-            "City,StateCode,US (e.g., 'Portland,OR,US' for US cities)"
-        ),
-    )
-    days: int = Field(default=3, ge=1, le=5, description="Number of forecast days (1-5)")
-    units: Literal["metric", "imperial", "kelvin"] = Field(default="imperial", description="Temperature units")
+from pydantic import BaseModel, Field
 
 
 class TaskAddRequest(BaseModel):
@@ -51,6 +24,10 @@ class TaskAddRequest(BaseModel):
         description=(
             "Additional task details or context. Keep the main task title concise and place extended details here."
         ),
+    )
+    parent_id: Optional[str] = Field(
+        default=None,
+        description="Parent task ID to create this as a sub-task. Sub-tasks execute in linear order.",
     )
 
 
@@ -85,31 +62,6 @@ class SearchRequest(BaseModel):
     limit: int = Field(default=8, ge=1, le=50, description="Maximum results")
 
 
-class BookRecommendationRequest(BaseModel):
-    query: Optional[str] = Field(
-        None,
-        description="Short search query for books - keep it brief (e.g., 'productivity', 'Python basics', 'sci-fi')",
-    )
-    queries: Optional[List[str]] = Field(None, description="Multiple short search queries to combine results from")
-    subject: Optional[str] = Field(
-        None,
-        description="Subject-specific search using single words/topics (e.g., 'python', 'programming', 'meditation')",
-    )
-    author: Optional[str] = Field(None, description="Search for books by a specific author name")
-    limit: int = Field(default=5, ge=1, le=20, description="Number of books to return")
-
-    @model_validator(mode="after")
-    def check_parameters(self):
-        if not self.query and not self.queries and not self.subject and not self.author:
-            raise ValueError("Either query, queries, subject, or author must be provided")
-        return self
-
-
-class InspirationalQuoteRequest(BaseModel):
-    goal: Literal["productivity", "self-care", "resilience"] = Field(..., description="User's current focus area")
-    limit: int = Field(default=1, ge=1, le=5, description="Number of quotes to return")
-
-
 class WebSearchRequest(BaseModel):
     query: str = Field(..., min_length=1, description="Search query")
     count: int = Field(default=5, ge=1, le=10, description="Number of results to return")
@@ -136,6 +88,38 @@ class SendEmailRequest(BaseModel):
     )
 
 
+class MemorySaveRequest(BaseModel):
+    key: str = Field(
+        ...,
+        min_length=1,
+        description=(
+            "Short identifier for this memory fact, e.g. 'preferred_name', "
+            "'work_schedule', 'communication_style', 'project_context'"
+        ),
+    )
+    value: str = Field(..., min_length=1, description="The value or description to remember")
+    category: Optional[str] = Field(
+        default=None,
+        description="Optional category: 'preference', 'context', 'workflow', or 'personal'",
+    )
+
+
+class MemoryListRequest(BaseModel):
+    category: Optional[str] = Field(
+        default=None,
+        description="Optional category filter: 'preference', 'context', 'workflow', or 'personal'",
+    )
+
+
+class MemoryDeleteRequest(BaseModel):
+    key: str = Field(..., min_length=1, description="Key of the memory fact to delete")
+
+
+class SearchSessionsRequest(BaseModel):
+    query: str = Field(..., min_length=1, description="Search query text")
+    limit: int = Field(default=20, ge=1, le=50, description="Maximum number of results to return")
+
+
 # OpenAI function schema generators
 def get_openai_tool_schema(model_class: BaseModel) -> dict:
     """Convert Pydantic model to OpenAI function schema format."""
@@ -155,42 +139,10 @@ def get_openai_tool_schema(model_class: BaseModel) -> dict:
 # Tool schema mapping for OpenAI Responses API
 # Format: {"type": "function", "name": "...", "description": "...", "parameters": {...}}
 OPENAI_TOOL_SCHEMAS = {
-    "get_current_weather": {
-        "type": "function",
-        "name": "get_current_weather",
-        "description": "Get current weather conditions for a specific location. Call when user asks about current weather, temperature, or 'what's the weather like' in any location.",  # noqa: E501
-        "parameters": get_openai_tool_schema(WeatherCurrentRequest),
-    },
-    "get_weather_forecast": {
-        "type": "function",
-        "name": "get_weather_forecast",
-        "description": "Get multi-day weather forecast for a location. Call when user asks for weather predictions, forecast, or 'weather this week'.",  # noqa: E501
-        "parameters": get_openai_tool_schema(WeatherForecastRequest),
-    },
-    "get_book_recommendations": {
-        "type": "function",
-        "name": "get_book_recommendations",
-        "description": (
-            "Search for book recommendations using SHORT queries, subjects, or authors. "
-            "KEEP QUERIES BRIEF: use 'query' for short terms like 'productivity', 'Python basics', 'sci-fi'. "
-            "Use 'queries' for multiple short searches like ['meditation', 'mindfulness', 'habits']. "
-            "Use 'subject' for topics like 'programming', 'fiction'. Use 'author' for names like 'Stephen King'."
-        ),
-        "parameters": get_openai_tool_schema(BookRecommendationRequest),
-    },
-    "get_inspirational_quotes": {
-        "type": "function",
-        "name": "get_inspirational_quotes",
-        "description": (
-            "Fetch motivational quotes or affirmations tailored to a goal. "
-            "Call when user asks for inspiration, motivation, or positive affirmations."
-        ),
-        "parameters": get_openai_tool_schema(InspirationalQuoteRequest),
-    },
     "add_task": {
         "type": "function",
         "name": "add_task",
-        "description": "Add a new task to user's todo list. Choose a category from the user's existing categories (provided in system context), or use 'General' if none fit well. Call when user wants to add, create, or save a new task, todo, or reminder.",  # noqa: E501
+        "description": "Add a new task to user's todo list. Choose a category from the user's existing categories (provided in system context), or use 'General' if none fit well. Call when user wants to add, create, or save a new task, todo, or reminder. To create a sub-task, pass the parent task's ID as parent_id. Sub-tasks execute in order; completing all sub-tasks auto-completes the parent.",  # noqa: E501
         "parameters": get_openai_tool_schema(TaskAddRequest),
     },
     "list_tasks": {
@@ -242,5 +194,45 @@ OPENAI_TOOL_SCHEMAS = {
             "Call when the user asks the assistant to email them information or a recap."
         ),
         "parameters": get_openai_tool_schema(SendEmailRequest),
+    },
+    "save_memory": {
+        "type": "function",
+        "name": "save_memory",
+        "description": (
+            "Save a fact or preference about the user to persistent memory. "
+            "Use this proactively when the user shares preferences, context about themselves, "
+            "their work style, project details, or anything worth remembering across sessions. "
+            "Examples: preferred name, communication style, recurring projects, timezone, "
+            "tools they use, team structure. The memory persists across all future conversations."
+        ),
+        "parameters": get_openai_tool_schema(MemorySaveRequest),
+    },
+    "list_memories": {
+        "type": "function",
+        "name": "list_memories",
+        "description": (
+            "List all saved memory facts about the user. "
+            "Call when the user asks what you know about them, or to review stored preferences."
+        ),
+        "parameters": get_openai_tool_schema(MemoryListRequest),
+    },
+    "delete_memory": {
+        "type": "function",
+        "name": "delete_memory",
+        "description": (
+            "Delete a specific memory fact by key. "
+            "Call when the user asks to forget something or correct outdated information."
+        ),
+        "parameters": get_openai_tool_schema(MemoryDeleteRequest),
+    },
+    "search_sessions": {
+        "type": "function",
+        "name": "search_sessions",
+        "description": (
+            "Search chat sessions by title and message content. "
+            "Call when the user wants to find a past conversation, look up what was discussed, "
+            "or locate a session related to a specific topic. Returns matching sessions with preview snippets."
+        ),
+        "parameters": get_openai_tool_schema(SearchSessionsRequest),
     },
 }
