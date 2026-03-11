@@ -74,6 +74,7 @@ class Todo(BaseModel):
     agent_id: Optional[str] = None
     parent_id: Optional[str] = None  # ID of parent todo for sub-tasks
     subtask_ids: list[str] = []  # Ordered array of child todo IDs (on the parent)
+    depends_on: list[str] = []  # IDs of sibling subtasks this task depends on
 
     class Config:
         arbitrary_types_allowed = True
@@ -340,6 +341,13 @@ async def migrate_legacy_todos() -> None:
         )
         if result.modified_count > 0:
             logger.info("Migrated %d legacy todos to have subtask_ids: []", result.modified_count)
+
+        result = await todos_collection.update_many(
+            {"depends_on": {"$exists": False}},
+            {"$set": {"depends_on": []}},
+        )
+        if result.modified_count > 0:
+            logger.info("Migrated %d legacy todos to have depends_on: []", result.modified_count)
     except Exception as e:
         logger.error(f"Error migrating legacy todos: {str(e)}")
 
@@ -365,8 +373,9 @@ async def get_subtasks(parent_id: str):
 async def handle_subtask_completion(todo_id: str, user_id: str):
     """Handle orchestration when a subtask is completed.
 
-    Activates the next subtask's session and posts progress to the
-    parent session. The managing agent is responsible for giving the
+    When a subtask completes, find all sibling subtasks whose dependencies
+    are now fully satisfied and activate their sessions. Posts progress to
+    the parent session. The managing agent is responsible for giving the
     final summary and completing the parent task.
     """
     todo = await todos_collection.find_one({"_id": ObjectId(todo_id)})
@@ -379,42 +388,56 @@ async def handle_subtask_completion(todo_id: str, user_id: str):
     from chat_sessions import append_message, find_session_by_todo
     from chat_sessions import sessions_collection as sess_coll
 
-    # Find next uncompleted subtask using parent's subtask_ids order
     parent = await todos_collection.find_one({"_id": ObjectId(parent_id)})
-    ordered_ids = parent.get("subtask_ids", []) if parent else []
+    parent.get("subtask_ids", []) if parent else []
 
-    # Find current subtask's position and look for the next uncompleted one
-    current_idx = ordered_ids.index(todo_id) if todo_id in ordered_ids else -1
-    next_subtask = None
-    if current_idx >= 0:
-        for next_id in ordered_ids[current_idx + 1 :]:
-            candidate = await todos_collection.find_one({"_id": ObjectId(next_id), "completed": False})
-            if candidate:
-                next_subtask = candidate
-                break
+    # Build set of all completed subtask IDs (including the one just completed)
+    all_subtasks = await get_subtasks(parent_id)
+    completed_ids = {s["_id"] for s in all_subtasks if s.get("completed")}
 
-    if next_subtask:
-        # Activate next subtask's session
-        next_todo_id = str(next_subtask["_id"])
-        next_session = await find_session_by_todo(user_id, next_todo_id)
-        if next_session:
-            session_id = str(next_session["_id"])
-            await sess_coll.update_one(
-                {"_id": ObjectId(session_id)},
-                {"$set": {"needs_agent_response": True}},
-            )
-            await append_message(
-                session_id,
-                user_id,
-                "user",
-                f"Previous subtask completed: \"{todo.get('text', '')}\". You may now begin this subtask.",
-            )
-            logger.info(f"Activated next subtask session {session_id} for todo {next_todo_id}")
+    # Find subtasks that are now unblocked:
+    # - Not yet completed
+    # - All depends_on entries are in completed_ids
+    newly_unblocked = []
+    for s in all_subtasks:
+        sid = s["_id"]
+        if s.get("completed"):
+            continue
+        deps = s.get("depends_on", [])
+        if not deps:
+            # No dependencies — should already be active (parallel by default)
+            continue
+        # Check if all dependencies are now satisfied
+        if all(dep_id in completed_ids for dep_id in deps):
+            # Check if session is currently dormant (needs_agent_response == False)
+            session = await find_session_by_todo(user_id, sid)
+            if session and not session.get("needs_agent_response"):
+                newly_unblocked.append((sid, s, session))
+
+    # Activate newly unblocked subtask sessions
+    for sub_todo_id, sub_todo, session in newly_unblocked:
+        session_id = str(session["_id"])
+        await sess_coll.update_one(
+            {"_id": ObjectId(session_id)},
+            {"$set": {"needs_agent_response": True}},
+        )
+        dep_names = []
+        for dep_id in sub_todo.get("depends_on", []):
+            dep_todo = next((s for s in all_subtasks if s["_id"] == dep_id), None)
+            if dep_todo:
+                dep_names.append(f'"{dep_todo.get("text", dep_id)}"')
+        deps_msg = ", ".join(dep_names) if dep_names else "previous subtasks"
+        await append_message(
+            session_id,
+            user_id,
+            "user",
+            f"Dependencies satisfied ({deps_msg} completed). You may now begin this subtask.",
+        )
+        logger.info(f"Activated unblocked subtask session {session_id} for todo {sub_todo_id}")
 
     # Post progress update to parent session
-    subtasks = await get_subtasks(parent_id)
-    done_count = sum(1 for s in subtasks if s.get("completed"))
-    total_count = len(subtasks)
+    done_count = len(completed_ids)
+    total_count = len(all_subtasks)
 
     parent_session = await find_session_by_todo(user_id, parent_id)
     if parent_session:

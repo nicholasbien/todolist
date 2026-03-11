@@ -124,9 +124,10 @@ task assigned to you.
 1. Read and understand the task and any follow-up messages
 2. If the task is complex, break it into sub-tasks:
    - Create sub-tasks via mcp__todolist__add_todo with parent_id={todo_id}
+   - Sub-tasks run in parallel by default — use depends_on to specify ordering
    - Post a plan to the parent session describing what each subtask will do
    - Use /todolist check (or mcp__todolist__get_pending_sessions) to poll
-     for subtask progress — the backend activates subtasks sequentially
+     for subtask progress — the backend activates subtasks as dependencies clear
    - Monitor progress and handle any issues as subtasks complete
    - When all subtasks are done, read their sessions, post a final summary,
      and complete the parent task via mcp__todolist__complete_todo
@@ -196,25 +197,43 @@ The TodoList backend supports multi-agent routing via `agent_id`:
 ## Sub-Task Management
 
 When a task is complex, the managing agent should break it into sub-tasks. Sub-tasks
-execute in **linear order** — only the first sub-task's session starts as pending.
-When a sub-task completes, the next one's session is automatically activated.
+execute in **parallel by default** — all sub-tasks without dependencies start immediately.
+Use `depends_on` to specify ordering constraints between sibling sub-tasks.
 
 ### Creating Sub-Tasks
 
-Use `mcp__todolist__add_todo` with `parent_id` set to the parent task's ID:
+Use `mcp__todolist__add_todo` with `parent_id` set to the parent task's ID.
+Sub-tasks without `depends_on` start immediately (parallel). Use `depends_on`
+to specify that a sub-task should wait for other sibling sub-tasks to complete first.
 
+**Parallel sub-tasks (all start immediately):**
 ```
 mcp__todolist__add_todo({
-  text: "Step 1: Research the problem",
+  text: "Research the problem",
   parent_id: "PARENT_TODO_ID"
 })
+// Returns ID: "TASK_A"
+
 mcp__todolist__add_todo({
-  text: "Step 2: Implement the solution",
+  text: "Set up test infrastructure",
   parent_id: "PARENT_TODO_ID"
 })
+// Returns ID: "TASK_B"
+```
+
+**Sub-tasks with dependencies (start when dependencies complete):**
+```
 mcp__todolist__add_todo({
-  text: "Step 3: Write tests",
-  parent_id: "PARENT_TODO_ID"
+  text: "Implement the solution",
+  parent_id: "PARENT_TODO_ID",
+  depends_on: ["TASK_A"]  // waits for research to finish
+})
+// Returns ID: "TASK_C"
+
+mcp__todolist__add_todo({
+  text: "Write tests",
+  parent_id: "PARENT_TODO_ID",
+  depends_on: ["TASK_B", "TASK_C"]  // waits for both infra + implementation
 })
 ```
 
@@ -222,16 +241,20 @@ Each sub-task:
 - Gets appended to the parent's `subtask_ids` array
 - Gets its own linked session automatically
 - Inherits `agent_id` from the parent's session
-- Only the first sub-task (order 0) starts with an active pending session
+- Starts with an active session UNLESS `depends_on` is specified
+- `depends_on` accepts an array of sibling sub-task IDs
 
 ### How Sub-Task Orchestration Works
 
-1. **Agent creates sub-tasks** with `parent_id` → sessions created, only first is pending
-2. **Agent/subagent picks up first sub-task** via `get_pending_sessions` → works on it
-3. **First sub-task completes** (via `complete_todo`) → backend automatically:
-   - Activates the next sub-task's session (sets `needs_agent_response = true`)
+1. **Agent creates sub-tasks** with `parent_id` → sessions created
+   - Sub-tasks without `depends_on` start as pending (parallel)
+   - Sub-tasks with `depends_on` start dormant (blocked)
+2. **Agents pick up all unblocked sub-tasks** via `get_pending_sessions` → work in parallel
+3. **When a sub-task completes** (via `complete_todo`) → backend automatically:
+   - Checks all blocked siblings to see if their dependencies are now satisfied
+   - Activates newly-unblocked sub-tasks (sets `needs_agent_response = true`)
    - Posts progress update to parent session: "Subtask completed: X (1/3 done)"
-4. **Next agent poll picks up the newly-activated sub-task** → works on it
+4. **Next agent poll picks up newly-unblocked sub-tasks** → works on them
 5. **Repeat** until all sub-tasks complete
 6. **All done** → backend posts to parent session: "All subtasks complete. Please review and provide summary."
    The **managing agent** (not the backend) is responsible for:
@@ -248,9 +271,12 @@ needs to be broken into sub-tasks:
 2. If the task is complex (multiple distinct steps, different concerns):
    - Create sub-tasks with clear, actionable descriptions
    - Include detailed notes for each sub-task explaining what to do
-   - **Post a plan to the parent session** describing what each subtask will do:
-     e.g. "Breaking this into 3 sub-tasks:\n1. Research the problem — investigate X\n2. Implement solution — build Y\n3. Write tests — cover Z"
-   - The first sub-task will automatically become pending for the next poll cycle
+   - **Identify dependencies**: which sub-tasks can run in parallel vs. which need
+     to wait for others. Use `depends_on` to express ordering constraints.
+   - **Post a plan to the parent session** describing what each subtask will do
+     and their dependency relationships:
+     e.g. "Breaking this into 3 sub-tasks:\n1. Research the problem (TASK_A)\n2. Set up infra (TASK_B)\n3. Implement solution (TASK_C, depends on A)\n\nTasks A and B will run in parallel. Task C starts when A finishes."
+   - All sub-tasks without `depends_on` start immediately (parallel by default)
 3. If the task is simple:
    - Do the work directly and post the result
 

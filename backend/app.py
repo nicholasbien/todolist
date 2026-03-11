@@ -471,16 +471,16 @@ async def api_create_todo(request: Request, current_user: dict = Depends(get_cur
                 )
                 await append_message(session_id, current_user["user_id"], role, initial_msg)
 
-                # For subtasks after the first, make session dormant
-                # (will be activated when previous subtask completes)
+                # For subtasks with dependencies, make session dormant
+                # (will be activated when all dependencies complete)
+                # Subtasks without dependencies start active (parallel by default)
                 if is_subtask:
                     from bson import ObjectId as _ObjId
                     from chat_sessions import sessions_collection as sess_coll
 
-                    # Check if this subtask is the first in the parent's subtask_ids
-                    parent_doc_fresh = await todos_collection.find_one({"_id": _ObjId(body["parent_id"])})
-                    parent_subtask_ids = parent_doc_fresh.get("subtask_ids", []) if parent_doc_fresh else []
-                    if parent_subtask_ids and parent_subtask_ids[0] != todo_id:
+                    depends_on = body.get("depends_on", [])
+                    if depends_on:
+                        # This subtask has dependencies — start dormant
                         await sess_coll.update_one(
                             {"_id": _ObjId(session_id)},
                             {"$set": {"needs_agent_response": False}},
