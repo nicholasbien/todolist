@@ -104,7 +104,6 @@ def schedule_briefing_job(user_id: str, hour: int, minute: int, timezone: str = 
 
 def remove_briefing_schedule(user_id: str) -> None:
     """Remove a user's briefing job."""
-    global scheduler
     if scheduler is None:
         return
 
@@ -187,7 +186,6 @@ def update_briefing_schedule(user_id: str, hour: int, minute: int, timezone: str
 
 def remove_user_schedule(user_id: str) -> None:
     """Remove a user's scheduled email job."""
-    global scheduler
     if scheduler is None:
         return
 
