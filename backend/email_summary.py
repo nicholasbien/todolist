@@ -38,7 +38,7 @@ logger = logging.getLogger(__name__)
 _prompts_dir = os.path.join(os.path.dirname(__file__), "prompts")
 _jinja_env = jinja2.Environment(
     loader=jinja2.FileSystemLoader(_prompts_dir),
-    autoescape=False,
+    autoescape=True,
     keep_trailing_newline=True,
 )
 

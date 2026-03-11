@@ -67,6 +67,7 @@ from spaces import (
     update_space,
     user_in_space,
 )
+from starlette.middleware.base import BaseHTTPMiddleware
 from todos import (
     Todo,
     complete_todo,
@@ -176,13 +177,32 @@ app.include_router(agent_router)
 MAX_HISTORY = 10
 
 
+# Security headers middleware
+
+
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request, call_next):
+        response = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        return response
+
+
+app.add_middleware(SecurityHeadersMiddleware)
+
+
 # Enable CORS - specifically for the Next.js frontend
+_allowed_origins = os.getenv(
+    "CORS_ORIGINS",
+    "http://localhost:3000,https://app.todolist.nyc,capacitor://localhost,ionic://localhost",
+).split(",")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins in development
+    allow_origins=_allowed_origins,
     allow_credentials=True,
-    allow_methods=["*"],  # Allow all methods including DELETE and PUT
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"],
 )
 
 
@@ -281,46 +301,74 @@ async def api_get_todos(space_id: str | None = None, current_user: dict = Depend
 @app.post("/todos", response_model=Todo)
 async def api_create_todo(request: Request, current_user: dict = Depends(get_current_user)):
     try:
-        # Log the raw request body for debugging
         body = await request.json()
-        logger.info(f"Received todo creation request: {json.dumps(body)}")
 
         body["user_id"] = current_user["user_id"]
         if "space_id" not in body:
             body["space_id"] = None
 
-        # Determine the text to classify
+        # Input length validation
         text = body.get("text", "").strip()
+        if not text:
+            raise HTTPException(status_code=400, detail="Task text is required")
+        if len(text) > 2000:
+            raise HTTPException(status_code=400, detail="Task text too long (max 2000 chars)")
+        notes = body.get("notes", "")
+        if notes and len(notes) > 10000:
+            raise HTTPException(status_code=400, detail="Notes too long (max 10000 chars)")
+
+        # Determine the text to classify
         classify_text = text
 
         # Detect if text is a URL and fetch page title
         if text.startswith("http://") or text.startswith("https://"):
             body["link"] = text
             try:
-                headers = {
-                    "User-Agent": (
-                        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-                        "(KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
-                    )
-                }
-                async with httpx.AsyncClient(timeout=5, headers=headers, follow_redirects=True) as client:
-                    resp = await client.get(text)
-                    print(f"URL fetch response: {resp.status_code} for {text}")
-                    if resp.status_code == 200:
-                        soup = BeautifulSoup(resp.text, "html.parser")
-                        title_tag = soup.find("title")
-                        if title_tag and title_tag.text:
-                            page_title = title_tag.text.strip()
-                            print(f"Extracted title: '{page_title}' from {text}")
-                            body["text"] = page_title
-                            classify_text = page_title
-                        else:
-                            print(f"No title found for {text}")
-                    else:
-                        print(f"HTTP error {resp.status_code} for {text}")
+                from urllib.parse import urlparse
+
+                parsed = urlparse(text)
+                hostname = parsed.hostname or ""
+
+                # Block requests to private/internal networks (SSRF protection)
+                import ipaddress
+
+                _blocked = False
+                try:
+                    ip = ipaddress.ip_address(hostname)
+                    if ip.is_private or ip.is_loopback or ip.is_reserved or ip.is_link_local:
+                        _blocked = True
+                except ValueError:
+                    # hostname is not an IP — block common internal names
+                    if hostname in ("localhost",) or hostname.endswith(".local") or hostname.endswith(".internal"):
+                        _blocked = True
+
+                if _blocked:
+                    logger.warning(f"Blocked URL fetch to private/internal host: {hostname}")
+                else:
+                    req_headers = {
+                        "User-Agent": (
+                            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                            "(KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+                        )
+                    }
+                    async with httpx.AsyncClient(
+                        timeout=5,
+                        headers=req_headers,
+                        follow_redirects=True,
+                        max_redirects=5,
+                    ) as client:
+                        resp = await client.get(text)
+                        if resp.status_code == 200:
+                            # Only parse a limited amount of response body
+                            body_text = resp.text[:100_000]
+                            soup = BeautifulSoup(body_text, "html.parser")
+                            title_tag = soup.find("title")
+                            if title_tag and title_tag.text:
+                                page_title = title_tag.text.strip()[:500]
+                                body["text"] = page_title
+                                classify_text = page_title
             except Exception as e:
-                print(f"Exception fetching {text}: {e}")
-                logger.error(f"Failed to fetch title for {text}: {e}")
+                logger.error(f"Failed to fetch title for URL: {e}")
 
         # Only classify if not created offline and no category provided
         if not body.get("created_offline", False) and not body.get("category"):
@@ -405,9 +453,11 @@ async def api_create_todo(request: Request, current_user: dict = Depends(get_cur
                 logger.error(f"Failed to auto-create session for todo: {e}")
 
         return result
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error creating todo: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error creating todo: {str(e)}")
+        raise HTTPException(status_code=500, detail="Error creating todo")
 
 
 @app.put("/todos/reorder")
@@ -417,7 +467,25 @@ async def api_reorder_todos(request: Request, current_user: dict = Depends(get_c
         todo_ids = body.get("todoIds", [])
         if not todo_ids:
             raise HTTPException(status_code=400, detail="todoIds required")
+        if len(todo_ids) > 500:
+            raise HTTPException(status_code=400, detail="Too many items to reorder")
         from bson import ObjectId
+
+        user_id = current_user["user_id"]
+        # Verify the user owns all the todos being reordered
+        oid_list = [ObjectId(tid) for tid in todo_ids]
+        owned_count = await todos_collection.count_documents({"_id": {"$in": oid_list}, "user_id": user_id})
+        if owned_count != len(oid_list):
+            # Fall back to checking space membership for collaborative todos
+            space_docs = await todos_collection.find({"_id": {"$in": oid_list}}, {"space_id": 1}).to_list(
+                length=len(oid_list)
+            )
+            if len(space_docs) != len(oid_list):
+                raise HTTPException(status_code=403, detail="Not authorized to reorder these todos")
+            for doc in space_docs:
+                sid = doc.get("space_id")
+                if not sid or not await user_in_space(user_id, sid):
+                    raise HTTPException(status_code=403, detail="Not authorized to reorder these todos")
 
         for i, todo_id in enumerate(todo_ids):
             await todos_collection.update_one({"_id": ObjectId(todo_id)}, {"$set": {"sortOrder": i}})
@@ -425,8 +493,8 @@ async def api_reorder_todos(request: Request, current_user: dict = Depends(get_c
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error reordering todos: {repr(e)}")
-        raise HTTPException(status_code=500, detail=f"Error reordering todos: {repr(e)}")
+        logger.error(f"Error reordering todos: {e}")
+        raise HTTPException(status_code=500, detail="Error reordering todos")
 
 
 @app.delete("/todos/{todo_id}")
@@ -445,6 +513,14 @@ async def api_complete_todo(todo_id: str, current_user: dict = Depends(get_curre
 async def api_update_todo(todo_id: str, request: Request, current_user: dict = Depends(get_current_user)):
     try:
         body = await request.json()
+
+        # Input length validation
+        if "text" in body and len(body["text"]) > 2000:
+            raise HTTPException(status_code=400, detail="Task text too long (max 2000 chars)")
+        if "notes" in body and body["notes"] and len(body["notes"]) > 10000:
+            raise HTTPException(status_code=400, detail="Notes too long (max 10000 chars)")
+        if "category" in body and len(body["category"]) > 100:
+            raise HTTPException(status_code=400, detail="Category name too long")
 
         # Build updates dict from request body
         updates = {}
@@ -472,8 +548,7 @@ async def api_update_todo(todo_id: str, request: Request, current_user: dict = D
         if not updates:
             raise HTTPException(status_code=400, detail="No valid fields to update")
 
-        logger.info(f"Updating todo {todo_id} with: {updates} for user: {current_user['email']}")
-        logger.info(f"CURRENT_USER DEBUG: {current_user}")
+        logger.info(f"Updating todo {todo_id} for user: {current_user['email']}")
         result = await update_todo_fields(todo_id, updates, current_user["user_id"])
 
         # If agent_id changed, update the linked session
@@ -498,8 +573,8 @@ async def api_update_todo(todo_id: str, request: Request, current_user: dict = D
         # Re-raise HTTP exceptions (like 403, 404) without converting to 500
         raise
     except Exception as e:
-        logger.error(f"Error updating todo - Exception type: {type(e)}, Exception args: {e.args}, Exception: {repr(e)}")
-        raise HTTPException(status_code=500, detail=f"Error updating todo: {repr(e)}")
+        logger.error(f"Error updating todo: {repr(e)}")
+        raise HTTPException(status_code=500, detail="Error updating todo")
 
 
 @app.get("/health")
@@ -723,6 +798,9 @@ async def api_contact(
 ):
     """Send contact message to admin email."""
     try:
+        if len(req.message) > 5000:
+            raise HTTPException(status_code=400, detail="Message too long (max 5000 chars)")
+
         logger.info("Contact message from %s", current_user["email"])
 
         # Import email sending function
@@ -820,6 +898,10 @@ async def api_get_journal_entries(
 async def api_create_journal_entry(request: JournalCreateRequest, current_user: dict = Depends(get_current_user)):
     """Create or update a journal entry."""
     try:
+        # Input length validation
+        if len(request.text) > 50000:
+            raise HTTPException(status_code=400, detail="Journal text too long (max 50000 chars)")
+
         # Check space access if space_id provided
         if request.space_id is not None and not await user_in_space(current_user["user_id"], request.space_id):
             raise HTTPException(status_code=403, detail="Access denied to this space")
@@ -1010,9 +1092,11 @@ async def api_get_single_todo(
         raise HTTPException(status_code=400, detail="Invalid todo ID")
     if not doc:
         raise HTTPException(status_code=404, detail="Todo not found")
-    # Check space access
-    if doc.get("space_id") and not await user_in_space(current_user["user_id"], doc["space_id"]):
-        raise HTTPException(status_code=403, detail="Not in space")
+    # Check ownership: user must own the todo or be in the same space
+    is_owner = doc.get("user_id") == current_user["user_id"]
+    is_space_member = doc.get("space_id") and await user_in_space(current_user["user_id"], doc["space_id"])
+    if not is_owner and not is_space_member:
+        raise HTTPException(status_code=403, detail="Not authorized")
     doc["_id"] = str(doc["_id"])
     # Add first_name
     try:

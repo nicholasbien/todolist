@@ -411,11 +411,11 @@ class TestAgentStreaming:
             async for message in stream:
                 messages.append(message)
 
-        # Should have ready event and error event
+        # Should have ready event and error event (generic, no internal details)
         assert len(messages) >= 2
         assert "ready" in messages[0]
         assert "error" in messages[-1]
-        assert "OpenAI API Error" in messages[-1]
+        assert "An error occurred" in messages[-1]
 
 
 class TestAgentIntegration:
