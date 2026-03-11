@@ -5,7 +5,6 @@ interface SubtaskItem {
   _id: string;
   text: string;
   completed: boolean;
-  subtask_order?: number;
   [key: string]: any;
 }
 

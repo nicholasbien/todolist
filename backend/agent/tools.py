@@ -122,7 +122,6 @@ async def add_task(request: TaskAddRequest, user_id: str, space_id: Optional[str
             from chat_sessions import find_session_by_todo
 
             is_subtask = bool(request.parent_id)
-            subtask_order = created_task_dict.get("subtask_order", 0)
 
             # Build initial message
             if is_subtask:
@@ -153,13 +152,16 @@ async def add_task(request: TaskAddRequest, user_id: str, space_id: Optional[str
             await append_message(session_id, user_id, "assistant", initial_msg)
 
             # Dormant session for non-first subtasks
-            if is_subtask and subtask_order > 0:
-                from chat_sessions import sessions_collection as sess_coll
+            if is_subtask:
+                parent_doc_fresh = await collections.todos.find_one({"_id": ObjectId(request.parent_id)})
+                parent_subtask_ids = parent_doc_fresh.get("subtask_ids", []) if parent_doc_fresh else []
+                if parent_subtask_ids and parent_subtask_ids[0] != todo_id:
+                    from chat_sessions import sessions_collection as sess_coll
 
-                await sess_coll.update_one(
-                    {"_id": ObjectId(session_id)},
-                    {"$set": {"needs_agent_response": False}},
-                )
+                    await sess_coll.update_one(
+                        {"_id": ObjectId(session_id)},
+                        {"$set": {"needs_agent_response": False}},
+                    )
         except Exception as e:
             import logging
 

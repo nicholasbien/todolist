@@ -370,8 +370,16 @@ class TodolistMCPServer {
                 childrenMap.set(t.parent_id, list);
             }
         }
-        // Sort children by subtask_order
-        childrenMap.forEach((children) => children.sort((a, b) => (a.subtask_order ?? 0) - (b.subtask_order ?? 0)));
+        // Sort children by their position in the parent's subtask_ids array
+        childrenMap.forEach((children, parentId) => {
+            const parent = todos.find((t) => t._id === parentId);
+            const subtaskIds = parent?.subtask_ids || [];
+            children.sort((a, b) => {
+                const aIdx = subtaskIds.indexOf(a._id);
+                const bIdx = subtaskIds.indexOf(b._id);
+                return (aIdx === -1 ? Infinity : aIdx) - (bIdx === -1 ? Infinity : bIdx);
+            });
+        });
         const lines = [];
         let i = 1;
         for (const t of parents) {

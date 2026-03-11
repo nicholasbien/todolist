@@ -371,7 +371,6 @@ async def api_create_todo(request: Request, current_user: dict = Depends(get_cur
                 todo_dict = result.dict(by_alias=True)
                 todo_id = str(todo_dict["_id"])
                 is_subtask = bool(body.get("parent_id"))
-                subtask_order = todo_dict.get("subtask_order", 0)
 
                 # Build initial message with task details
                 details = []
@@ -426,14 +425,18 @@ async def api_create_todo(request: Request, current_user: dict = Depends(get_cur
 
                 # For subtasks after the first, make session dormant
                 # (will be activated when previous subtask completes)
-                if is_subtask and subtask_order > 0:
+                if is_subtask:
                     from bson import ObjectId as _ObjId
                     from chat_sessions import sessions_collection as sess_coll
 
-                    await sess_coll.update_one(
-                        {"_id": _ObjId(session_id)},
-                        {"$set": {"needs_agent_response": False}},
-                    )
+                    # Check if this subtask is the first in the parent's subtask_ids
+                    parent_doc_fresh = await todos_collection.find_one({"_id": _ObjId(body["parent_id"])})
+                    parent_subtask_ids = parent_doc_fresh.get("subtask_ids", []) if parent_doc_fresh else []
+                    if parent_subtask_ids and parent_subtask_ids[0] != todo_id:
+                        await sess_coll.update_one(
+                            {"_id": _ObjId(session_id)},
+                            {"$set": {"needs_agent_response": False}},
+                        )
             except Exception as e:
                 logger.error(f"Failed to auto-create session for todo: {e}")
 
@@ -1040,7 +1043,7 @@ async def api_get_subtasks(
     todo_id: str,
     current_user: dict = Depends(get_current_user),
 ):
-    """Get subtasks of a parent todo, ordered by subtask_order."""
+    """Get subtasks of a parent todo, ordered by the parent's subtask_ids array."""
     from todos import get_subtasks
 
     return await get_subtasks(todo_id)

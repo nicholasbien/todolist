@@ -1287,9 +1287,16 @@ export default function AIToDoListApp({
       childrenByParent.set(todo.parent_id, siblings);
     }
   }
-  // Sort children by subtask_order
-  childrenByParent.forEach((children) => {
-    children.sort((a: any, b: any) => (a.subtask_order ?? 0) - (b.subtask_order ?? 0));
+  // Sort children by their position in the parent's subtask_ids array
+  childrenByParent.forEach((children, parentId) => {
+    const parent = allFilteredTodos.find((t: any) => t._id === parentId);
+    const subtaskIds: string[] = parent?.subtask_ids || [];
+    children.sort((a: any, b: any) => {
+      const aIdx = subtaskIds.indexOf(a._id);
+      const bIdx = subtaskIds.indexOf(b._id);
+      // Items not in subtask_ids go to the end
+      return (aIdx === -1 ? Infinity : aIdx) - (bIdx === -1 ? Infinity : bIdx);
+    });
   });
 
   // Separate completed and uncompleted todos (top-level only, sub-tasks rendered inline)

@@ -261,13 +261,13 @@ When a sub-task completes, the next one's session is automatically activated.
 Pass `parent_id` when adding a todo to create it as a sub-task:
 
 ```bash
-# Create sub-task 1 (auto-assigned subtask_order=0, session starts pending)
+# Create sub-task 1 (appended to parent's subtask_ids, session starts pending)
 curl -s -X POST -H "Authorization: Bearer $TODOLIST_AUTH_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"text": "Step 1: Research the problem", "space_id": "SPACE_ID", "parent_id": "PARENT_TODO_ID"}' \
   "${TODOLIST_API_URL:-https://app.todolist.nyc}/todos" | jq '.'
 
-# Create sub-task 2 (auto-assigned subtask_order=1, session starts dormant)
+# Create sub-task 2 (appended to parent's subtask_ids, session starts dormant)
 curl -s -X POST -H "Authorization: Bearer $TODOLIST_AUTH_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"text": "Step 2: Implement the solution", "space_id": "SPACE_ID", "parent_id": "PARENT_TODO_ID"}' \
@@ -275,7 +275,7 @@ curl -s -X POST -H "Authorization: Bearer $TODOLIST_AUTH_TOKEN" \
 ```
 
 Each sub-task:
-- Gets auto-assigned a `subtask_order` (0, 1, 2, ...)
+- Gets appended to the parent's `subtask_ids` array
 - Gets its own linked session automatically
 - Inherits `agent_id` from the parent's session
 - Only the first sub-task (order 0) starts with an active pending session

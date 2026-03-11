@@ -45,9 +45,8 @@ async def init_todo_indexes() -> None:
         # Queries by category within a space
         await todos_collection.create_index([("user_id", 1), ("space_id", 1), ("category", 1)])
 
-        # Sub-task lookups by parent, ordered
+        # Sub-task lookups by parent
         await todos_collection.create_index("parent_id")
-        await todos_collection.create_index([("parent_id", 1), ("subtask_order", 1)])
 
         logger.info("Todo indexes created successfully")
     except Exception as e:
@@ -74,7 +73,7 @@ class Todo(BaseModel):
     creator_type: str = "user"  # "user" or "agent"
     agent_id: Optional[str] = None
     parent_id: Optional[str] = None  # ID of parent todo for sub-tasks
-    subtask_order: Optional[int] = None  # 0-based execution order within parent
+    subtask_ids: list[str] = []  # Ordered array of child todo IDs (on the parent)
 
     class Config:
         arbitrary_types_allowed = True
@@ -112,17 +111,15 @@ async def create_todo(todo: Todo):
             # Single-level nesting only
             if parent.get("parent_id"):
                 raise HTTPException(status_code=400, detail="Cannot create sub-task of a sub-task")
-            # Auto-assign subtask_order if not provided
-            if todo_dict.get("subtask_order") is None:
-                max_order = await todos_collection.find_one(
-                    {"parent_id": todo.parent_id},
-                    sort=[("subtask_order", -1)],
-                )
-                todo_dict["subtask_order"] = (
-                    (max_order["subtask_order"] + 1) if max_order and max_order.get("subtask_order") is not None else 0
-                )
 
         result = await todos_collection.insert_one(todo_dict)
+
+        # Append new subtask ID to parent's subtask_ids array
+        if todo.parent_id:
+            await todos_collection.update_one(
+                {"_id": ObjectId(todo.parent_id)},
+                {"$push": {"subtask_ids": str(result.inserted_id)}},
+            )
 
         # Get the inserted document with the new _id
         created_todo = await todos_collection.find_one({"_id": result.inserted_id})
@@ -212,6 +209,12 @@ async def delete_todo(todo_id: str, user_id: str):
             raise HTTPException(status_code=403, detail="Not in space")
         result = await todos_collection.delete_one(query)
         if result.deleted_count == 1:
+            # If this was a subtask, remove its ID from the parent's subtask_ids
+            if todo.get("parent_id"):
+                await todos_collection.update_one(
+                    {"_id": ObjectId(todo["parent_id"])},
+                    {"$pull": {"subtask_ids": todo_id}},
+                )
             # Cascade delete: remove all sub-tasks if this was a parent
             await todos_collection.delete_many({"parent_id": todo_id})
             return {"message": "Todo deleted successfully"}
@@ -323,24 +326,40 @@ async def migrate_legacy_todos() -> None:
         if result.modified_count > 0:
             logger.info("Migrated %d legacy todos to have space_id: None", result.modified_count)
 
-        # Ensure parent_id and subtask_order fields exist on all todos
+        # Ensure parent_id and subtask_ids fields exist on all todos
         result = await todos_collection.update_many(
             {"parent_id": {"$exists": False}},
-            {"$set": {"parent_id": None, "subtask_order": None}},
+            {"$set": {"parent_id": None}},
         )
         if result.modified_count > 0:
-            logger.info("Migrated %d legacy todos to have parent_id/subtask_order: None", result.modified_count)
+            logger.info("Migrated %d legacy todos to have parent_id: None", result.modified_count)
+
+        result = await todos_collection.update_many(
+            {"subtask_ids": {"$exists": False}},
+            {"$set": {"subtask_ids": []}},
+        )
+        if result.modified_count > 0:
+            logger.info("Migrated %d legacy todos to have subtask_ids: []", result.modified_count)
     except Exception as e:
         logger.error(f"Error migrating legacy todos: {str(e)}")
 
 
 async def get_subtasks(parent_id: str):
-    """Get subtasks of a parent todo, ordered by subtask_order."""
-    cursor = todos_collection.find({"parent_id": parent_id}).sort("subtask_order", 1)
+    """Get subtasks of a parent todo, ordered by the parent's subtask_ids array."""
+    parent = await todos_collection.find_one({"_id": ObjectId(parent_id)})
+    ordered_ids = parent.get("subtask_ids", []) if parent else []
+
+    cursor = todos_collection.find({"parent_id": parent_id})
     subtasks = await cursor.to_list(length=100)
+    subtask_map = {}
     for s in subtasks:
         s["_id"] = str(s["_id"])
-    return subtasks
+        subtask_map[s["_id"]] = s
+
+    # Return in the order defined by parent's subtask_ids, then any extras
+    ordered = [subtask_map.pop(sid) for sid in ordered_ids if sid in subtask_map]
+    ordered.extend(subtask_map.values())
+    return ordered
 
 
 async def handle_subtask_completion(todo_id: str, user_id: str):
@@ -360,15 +379,19 @@ async def handle_subtask_completion(todo_id: str, user_id: str):
     from chat_sessions import append_message, find_session_by_todo
     from chat_sessions import sessions_collection as sess_coll
 
-    # Find next uncompleted subtask by order
-    next_subtask = await todos_collection.find_one(
-        {
-            "parent_id": parent_id,
-            "subtask_order": {"$gt": todo.get("subtask_order", 0)},
-            "completed": False,
-        },
-        sort=[("subtask_order", 1)],
-    )
+    # Find next uncompleted subtask using parent's subtask_ids order
+    parent = await todos_collection.find_one({"_id": ObjectId(parent_id)})
+    ordered_ids = parent.get("subtask_ids", []) if parent else []
+
+    # Find current subtask's position and look for the next uncompleted one
+    current_idx = ordered_ids.index(todo_id) if todo_id in ordered_ids else -1
+    next_subtask = None
+    if current_idx >= 0:
+        for next_id in ordered_ids[current_idx + 1 :]:
+            candidate = await todos_collection.find_one({"_id": ObjectId(next_id), "completed": False})
+            if candidate:
+                next_subtask = candidate
+                break
 
     if next_subtask:
         # Activate next subtask's session

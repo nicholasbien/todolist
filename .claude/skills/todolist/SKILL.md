@@ -219,7 +219,7 @@ mcp__todolist__add_todo({
 ```
 
 Each sub-task:
-- Gets auto-assigned a `subtask_order` (0, 1, 2, ...)
+- Gets appended to the parent's `subtask_ids` array
 - Gets its own linked session automatically
 - Inherits `agent_id` from the parent's session
 - Only the first sub-task (order 0) starts with an active pending session

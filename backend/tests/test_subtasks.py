@@ -13,6 +13,14 @@ async def _get_space_id(client, headers):
     return spaces[0]["_id"]
 
 
+async def _get_todo(client, headers, space_id, todo_id):
+    """Helper to fetch a single todo from the list endpoint (reliable in tests)."""
+    resp = await client.get(f"/todos?space_id={space_id}", headers=headers)
+    todos = resp.json()
+    matches = [t for t in todos if t["_id"] == todo_id]
+    return matches[0] if matches else None
+
+
 class TestSubtasks:
     """Integration tests for sub-task CRUD and orchestration."""
 
@@ -21,9 +29,10 @@ class TestSubtasks:
         """Creating a todo with parent_id creates a sub-task."""
         token = await get_token(client, test_email)
         headers = {"Authorization": f"Bearer {token}"}
+        space_id = await _get_space_id(client, headers)
 
         # Create parent task
-        resp = await client.post("/todos", json={"text": "Parent task"}, headers=headers)
+        resp = await client.post("/todos", json={"text": "Parent task", "space_id": space_id}, headers=headers)
         assert resp.status_code == 200
         parent = resp.json()
         parent_id = parent["_id"]
@@ -31,33 +40,42 @@ class TestSubtasks:
         # Create sub-task
         resp = await client.post(
             "/todos",
-            json={"text": "Sub-task 1", "parent_id": parent_id},
+            json={"text": "Sub-task 1", "parent_id": parent_id, "space_id": space_id},
             headers=headers,
         )
         assert resp.status_code == 200
         subtask = resp.json()
         assert subtask["parent_id"] == parent_id
-        assert subtask["subtask_order"] == 0
+
+        # Verify parent's subtask_ids contains the child
+        parent_fresh = await _get_todo(client, headers, space_id, parent_id)
+        assert subtask["_id"] in parent_fresh["subtask_ids"]
 
     @pytest.mark.asyncio
-    async def test_subtask_auto_order(self, client, test_email):
-        """Subtasks get auto-incrementing subtask_order."""
+    async def test_subtask_ordering_via_parent(self, client, test_email):
+        """Subtasks are ordered by the parent's subtask_ids array."""
         token = await get_token(client, test_email)
         headers = {"Authorization": f"Bearer {token}"}
+        space_id = await _get_space_id(client, headers)
 
         # Create parent
-        resp = await client.post("/todos", json={"text": "Parent"}, headers=headers)
+        resp = await client.post("/todos", json={"text": "Parent", "space_id": space_id}, headers=headers)
         parent_id = resp.json()["_id"]
 
         # Create 3 subtasks
+        child_ids = []
         for i in range(3):
             resp = await client.post(
                 "/todos",
-                json={"text": f"Step {i+1}", "parent_id": parent_id},
+                json={"text": f"Step {i+1}", "parent_id": parent_id, "space_id": space_id},
                 headers=headers,
             )
             assert resp.status_code == 200
-            assert resp.json()["subtask_order"] == i
+            child_ids.append(resp.json()["_id"])
+
+        # Check parent's subtask_ids has them in order
+        parent_fresh = await _get_todo(client, headers, space_id, parent_id)
+        assert parent_fresh["subtask_ids"] == child_ids
 
     @pytest.mark.asyncio
     async def test_no_nested_subtasks(self, client, test_email):
@@ -113,6 +131,34 @@ class TestSubtasks:
             assert sid not in remaining_ids
 
     @pytest.mark.asyncio
+    async def test_delete_subtask_removes_from_parent(self, client, test_email):
+        """Deleting a subtask removes its ID from the parent's subtask_ids."""
+        token = await get_token(client, test_email)
+        headers = {"Authorization": f"Bearer {token}"}
+        space_id = await _get_space_id(client, headers)
+
+        resp = await client.post("/todos", json={"text": "Parent", "space_id": space_id}, headers=headers)
+        parent_id = resp.json()["_id"]
+
+        # Create 2 subtasks
+        child_ids = []
+        for i in range(2):
+            resp = await client.post(
+                "/todos",
+                json={"text": f"Step {i+1}", "parent_id": parent_id, "space_id": space_id},
+                headers=headers,
+            )
+            child_ids.append(resp.json()["_id"])
+
+        # Delete first subtask
+        resp = await client.delete(f"/todos/{child_ids[0]}", headers=headers)
+        assert resp.status_code == 200
+
+        # Parent's subtask_ids should only have the second child
+        parent_fresh = await _get_todo(client, headers, space_id, parent_id)
+        assert parent_fresh["subtask_ids"] == [child_ids[1]]
+
+    @pytest.mark.asyncio
     async def test_completing_subtask_does_not_auto_complete_parent(self, client, test_email):
         """Completing all sub-tasks does NOT auto-complete the parent (agent handles that)."""
         token = await get_token(client, test_email)
@@ -137,9 +183,8 @@ class TestSubtasks:
             assert resp.status_code == 200
 
         # Parent should NOT be auto-completed — managing agent does that
-        resp = await client.get(f"/todos?space_id={space_id}", headers=headers)
-        parent = [t for t in resp.json() if t["_id"] == parent_id][0]
-        assert parent["completed"] is False
+        parent_fresh = await _get_todo(client, headers, space_id, parent_id)
+        assert parent_fresh["completed"] is False
 
     @pytest.mark.asyncio
     async def test_get_subtasks_endpoint(self, client, test_email):
@@ -164,9 +209,6 @@ class TestSubtasks:
         assert subtasks[0]["text"] == "Step 1"
         assert subtasks[1]["text"] == "Step 2"
         assert subtasks[2]["text"] == "Step 3"
-        assert subtasks[0]["subtask_order"] == 0
-        assert subtasks[1]["subtask_order"] == 1
-        assert subtasks[2]["subtask_order"] == 2
 
     @pytest.mark.asyncio
     async def test_subtasks_hidden_from_top_level(self, client, test_email):
