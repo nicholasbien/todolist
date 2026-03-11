@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { ChevronDown, ArrowLeft, CheckCircle2 } from 'lucide-react';
+import { ChevronDown, ArrowLeft, CheckCircle2, RotateCcw } from 'lucide-react';
 import { MessageRenderer, PlainTextRenderer } from './MessageRenderer';
 import { getStreamingBackendUrl } from '../utils/api';
 import AgentMemoryViewer from './AgentMemoryViewer';
@@ -65,6 +65,7 @@ export default function AgentChatbot({
   const [activeTodoId, setActiveTodoId] = useState<string | null>(null);
   const [taskCompleted, setTaskCompleted] = useState(false);
   const [completingTask, setCompletingTask] = useState(false);
+  const [reopeningTask, setReopeningTask] = useState(false);
   // External agent ownership: when session is claimed by an agent like openclaw
   const [sessionAgentId, setSessionAgentId] = useState<string | null>(null);
   // Whether the agent is waiting for a human response
@@ -185,8 +186,25 @@ export default function AgentChatbot({
         const displayMessages = data.display_messages || [];
         setCurrentSessionId(pendingSessionId);
         // Track the linked todo ID for complete action
-        if (data.todo_id) setActiveTodoId(data.todo_id);
-        setTaskCompleted(false);
+        if (data.todo_id) {
+          setActiveTodoId(data.todo_id);
+          // Fetch the todo's actual completion status
+          try {
+            const todoRes = await fetch(`/todos/${data.todo_id}`, {
+              headers: { Authorization: `Bearer ${token}` },
+            });
+            if (todoRes.ok) {
+              const todoData = await todoRes.json();
+              setTaskCompleted(!!todoData.completed);
+            } else {
+              setTaskCompleted(false);
+            }
+          } catch {
+            setTaskCompleted(false);
+          }
+        } else {
+          setTaskCompleted(false);
+        }
         // If waiting for agent (last message is user), auto-trigger streaming
         // BUT skip if session is claimed by an external agent (e.g. openclaw)
         const lastMsg = displayMessages[displayMessages.length - 1];
@@ -433,6 +451,26 @@ export default function AgentChatbot({
   };
 
   // -----------------------------------------------------------------------
+  // Reopen (uncomplete) the linked task from within the chat
+  // -----------------------------------------------------------------------
+  const handleReopenTask = async () => {
+    if (!activeTodoId || !token || reopeningTask || !taskCompleted) return;
+    setReopeningTask(true);
+    try {
+      const res = await fetch(`/todos/${activeTodoId}/complete`, {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error('Failed to reopen task');
+      setTaskCompleted(false);
+    } catch (err: any) {
+      setError(err.message || 'Failed to reopen task');
+    } finally {
+      setReopeningTask(false);
+    }
+  };
+
+  // -----------------------------------------------------------------------
   // Send a message
   // -----------------------------------------------------------------------
   const handleSend = async () => {
@@ -655,18 +693,27 @@ export default function AgentChatbot({
               Back to Task
             </button>
             {activeTodoId && (
-              <button
-                onClick={handleCompleteTask}
-                disabled={completingTask || taskCompleted}
-                className={`ml-auto px-3 py-1 rounded text-sm flex items-center gap-1.5 transition-colors ${
-                  taskCompleted
-                    ? 'bg-green-600/20 text-green-300 border border-green-500/30 cursor-default'
-                    : 'bg-green-600/20 text-green-300 border border-green-500/30 hover:bg-green-600/30 disabled:opacity-50 disabled:cursor-not-allowed'
-                }`}
-              >
-                <CheckCircle2 className="w-3.5 h-3.5" />
-                {completingTask ? 'Completing...' : taskCompleted ? 'Completed' : 'Complete Task'}
-              </button>
+              <div className="ml-auto flex items-center gap-2">
+                {taskCompleted ? (
+                  <button
+                    onClick={handleReopenTask}
+                    disabled={reopeningTask}
+                    className="px-3 py-1 rounded text-sm flex items-center gap-1.5 transition-colors bg-amber-600/20 text-amber-300 border border-amber-500/30 hover:bg-amber-600/30 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    {reopeningTask ? 'Reopening...' : 'Reopen'}
+                  </button>
+                ) : (
+                  <button
+                    onClick={handleCompleteTask}
+                    disabled={completingTask}
+                    className="px-3 py-1 rounded text-sm flex items-center gap-1.5 transition-colors bg-green-600/20 text-green-300 border border-green-500/30 hover:bg-green-600/30 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    {completingTask ? 'Completing...' : 'Complete Task'}
+                  </button>
+                )}
+              </div>
             )}
           </div>
         ) : sessionAgentId && currentSessionId ? (
