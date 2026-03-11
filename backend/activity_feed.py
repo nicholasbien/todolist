@@ -2,7 +2,7 @@
 into a single chronological timeline."""
 
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from db import db
@@ -192,8 +192,16 @@ async def get_activity_feed(
 
 
 def _parse_date(value: Any) -> Optional[datetime]:
-    """Parse a date string or datetime object into a datetime."""
+    """Parse a date string or datetime object into a UTC-aware datetime.
+
+    All returned datetimes are timezone-aware (UTC) so that .isoformat()
+    produces a suffix like ``+00:00`` and JavaScript ``new Date()`` parses
+    the timestamp correctly instead of treating it as local time.
+    """
     if isinstance(value, datetime):
+        # If the datetime is naive (no tzinfo), assume it's UTC
+        if value.tzinfo is None:
+            return value.replace(tzinfo=timezone.utc)
         return value
     if not isinstance(value, str) or not value:
         return None
@@ -205,7 +213,9 @@ def _parse_date(value: Any) -> Optional[datetime]:
         "%Y-%m-%d",
     ):
         try:
-            return datetime.strptime(value.split("+")[0].rstrip("Z"), fmt)
+            dt = datetime.strptime(value.split("+")[0].rstrip("Z"), fmt)
+            # Treat parsed naive datetimes as UTC
+            return dt.replace(tzinfo=timezone.utc)
         except ValueError:
             continue
     return None
