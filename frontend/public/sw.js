@@ -21,8 +21,30 @@ const ID_MAP = 'idmap';
 
 const DEFAULT_CATEGORIES = ['General'];
 
-// API route prefixes intercepted by the service worker.
-// Single source of truth — used by the fetch listener, tests, and route validation.
+// ============================================================================
+// API_ROUTES — CRITICAL: READ BEFORE MODIFYING BACKEND ENDPOINTS
+// ============================================================================
+//
+// This array is the SINGLE SOURCE OF TRUTH for which request paths the service
+// worker proxies to the backend API. The fetch listener uses isApiPath() to
+// decide whether to forward a request to the backend or let it fall through
+// to Next.js (which will return a 404 for unknown paths).
+//
+// >>> IF YOU ADD A NEW BACKEND ENDPOINT PREFIX AND FORGET TO ADD IT HERE,
+// >>> REQUESTS TO THAT ENDPOINT WILL 404 IN THE BROWSER. <<<
+//
+// This is the #1 recurring bug in this codebase. Checklist when adding a
+// new backend route:
+//
+//   1. Add the endpoint in backend/app.py
+//   2. Add its path prefix to API_ROUTES below
+//   3. Increment STATIC_CACHE version at the top of this file
+//   4. Update AGENTS.md "Service Worker API_ROUTES" section
+//   5. Run tests: __tests__/ServiceWorkerRouteValidation.test.ts
+//   6. Test in browser with service worker active (not just curl to backend)
+//
+// See also: frontend/docs/API_ROUTING_ARCHITECTURE.md
+// ============================================================================
 const API_ROUTES = [
   '/todos', '/categories', '/spaces', '/journals', '/insights',
   '/agent', '/auth', '/email', '/contact', '/export', '/health',
@@ -533,7 +555,7 @@ async function syncServerDataToLocal() {
 
     // Fetch and store todos
     try {
-      const todosResponse = await fetch(`${backendBase}/todos`, { headers });
+      const todosResponse = await fetch(`${backendBase}/todos?include_closed=true`, { headers });
       if (todosResponse.ok) {
         const serverTodos = await todosResponse.json();
         for (const todo of serverTodos) {
