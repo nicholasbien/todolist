@@ -322,6 +322,14 @@ async def migrate_legacy_todos() -> None:
         result = await todos_collection.update_many({"space_id": {"$exists": False}}, {"$set": {"space_id": None}})
         if result.modified_count > 0:
             logger.info("Migrated %d legacy todos to have space_id: None", result.modified_count)
+
+        # Ensure parent_id and subtask_order fields exist on all todos
+        result = await todos_collection.update_many(
+            {"parent_id": {"$exists": False}},
+            {"$set": {"parent_id": None, "subtask_order": None}},
+        )
+        if result.modified_count > 0:
+            logger.info("Migrated %d legacy todos to have parent_id/subtask_order: None", result.modified_count)
     except Exception as e:
         logger.error(f"Error migrating legacy todos: {str(e)}")
 
