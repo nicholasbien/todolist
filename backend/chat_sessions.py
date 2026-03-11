@@ -394,14 +394,28 @@ async def search_sessions(
     )
     content_hits = await cursor.to_list(length=limit)
 
+    # Filter to unseen session IDs and build a lookup of trajectory data
+    new_content_hits = []
     for traj in content_hits:
         sid = traj.get("session_id")
         if not sid or sid in seen_session_ids:
             continue
         seen_session_ids.add(sid)
+        new_content_hits.append(traj)
 
-        # Look up session metadata
-        session_doc = await sessions_collection.find_one({"_id": ObjectId(sid)})
+    # Batch-fetch all session docs in a single query instead of N individual lookups
+    if new_content_hits:
+        content_sids = [t["session_id"] for t in new_content_hits]
+        content_session_ids = [ObjectId(sid) for sid in content_sids]
+        session_cursor = sessions_collection.find({"_id": {"$in": content_session_ids}})
+        session_docs_list = await session_cursor.to_list(length=len(content_session_ids))
+        session_docs_map: Dict[str, Dict[str, Any]] = {str(doc["_id"]): doc for doc in session_docs_list}
+    else:
+        session_docs_map = {}
+
+    for traj in new_content_hits:
+        sid = traj["session_id"]
+        session_doc = session_docs_map.get(sid)
         if not session_doc:
             continue
 
