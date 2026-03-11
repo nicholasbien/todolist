@@ -125,14 +125,21 @@ task assigned to you.
 ## Instructions
 1. Read and understand the task and any follow-up messages
 2. If the task is complex, break it into sub-tasks:
-   - Create sub-tasks via mcp__todolist__add_todo with parent_id={todo_id}
-   - Sub-tasks run in parallel by default — use depends_on to specify ordering
-   - Post a plan to the parent session describing what each subtask will do
-   - Use /todolist check (or mcp__todolist__get_pending_sessions) to poll
-     for subtask progress — the backend activates subtasks as dependencies clear
-   - Monitor progress and handle any issues as subtasks complete
-   - When all subtasks are done, read their sessions, post a final summary,
-     and complete the parent task via mcp__todolist__complete_todo
+   a. First, PLAN your subtasks — decide what the actionable work items are.
+      Only create subtasks for concrete, actionable work. If the user's
+      description includes context, explanations, or motivational text,
+      put that in the parent session message — NOT as separate subtasks.
+   b. Post your plan to the parent session BEFORE creating any subtasks.
+      Describe what each subtask will do and their dependency relationships.
+   c. Then create sub-tasks via mcp__todolist__add_todo.
+      CRITICAL: Every subtask MUST include parent_id={todo_id}.
+      Without parent_id, you create orphaned top-level tasks instead of subtasks.
+   d. Sub-tasks run in parallel by default — use depends_on to specify ordering
+   e. Use /todolist check (or mcp__todolist__get_pending_sessions) to poll
+      for subtask progress — the backend activates subtasks as dependencies clear
+   f. Monitor progress and handle any issues as subtasks complete
+   g. When all subtasks are done, read their sessions, post a final summary,
+      and complete the parent task via mcp__todolist__complete_todo
 3. If the task is simple, do the work directly:
    - Writing or modifying code in this repository
    - Researching information
@@ -147,6 +154,8 @@ IMPORTANT: Always include agent_id="claude" when posting to claim/maintain
 routing. The user will see your reply in their TodoList app.
 IMPORTANT: If you create subtasks, use /todolist check to poll for updates
 from your subtasks rather than trying to do all the work yourself.
+IMPORTANT: NEVER create subtasks without parent_id. If you call add_todo
+without parent_id, it creates a standalone top-level task — NOT a subtask.
 ```
 
 **Run subagents in the background** when handling multiple tasks so they work
@@ -234,6 +243,20 @@ execute in **parallel by default** — all sub-tasks without dependencies start 
 Use `depends_on` to specify ordering constraints between sibling sub-tasks.
 
 ### Creating Sub-Tasks
+
+**CRITICAL: Every sub-task MUST be created with `parent_id`.** Without it, you
+create orphaned top-level tasks that clutter the task list and break the
+orchestration flow. There is NEVER a reason to create related work items as
+separate top-level tasks when they should be subtasks.
+
+**Only create subtasks for actionable work items.** If the user's task
+description includes context, explanations, or motivational text (e.g.
+"This makes the agent feel like it knows you"), include that as context in
+the parent session message or task notes — do NOT create a subtask for it.
+
+**Plan before creating.** Post your subtask plan to the parent session first,
+then create the subtasks. This ensures you've thought through the structure
+before committing to it.
 
 Use `mcp__todolist__add_todo` with `parent_id` set to the parent task's ID.
 Sub-tasks without `depends_on` start immediately (parallel). Use `depends_on`
@@ -353,6 +376,8 @@ The managing agent should:
 - **Log everything** — print clear status messages so the user knows what's being worked on
 - **Handle errors gracefully** — if a subagent fails, log the error and move on
 - **Respect the user** — if the user says stop, stop immediately
+- **Subtasks MUST have parent_id** — never call `add_todo` without `parent_id` when creating subtasks. Orphaned top-level tasks break the orchestration flow and clutter the task list.
+- **Filter description from action** — only create subtasks for actionable work. Context, explanations, and motivational text belong in session messages or task notes, not as subtasks.
 
 ## Example Session
 

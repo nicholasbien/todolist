@@ -50,6 +50,12 @@ export default function AgentChatbot({
   const [sessionToDelete, setSessionToDelete] = useState<SessionMeta | null>(null);
   const [deleteSessionLoading, setDeleteSessionLoading] = useState(false);
 
+  // Search state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // Task session mode: when viewing a task-linked session
   const [isTaskSession, setIsTaskSession] = useState(false);
   const [taskInitialMessage, setTaskInitialMessage] = useState<string | null>(null);
@@ -91,6 +97,44 @@ export default function AgentChatbot({
       setSessionsLoading(false);
     }
   }, [token, activeSpace?._id]);
+
+  // Debounced search handler
+  const handleSearch = useCallback((query: string) => {
+    setSearchQuery(query);
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+    if (!query.trim()) {
+      setSearchResults([]);
+      setIsSearching(false);
+      return;
+    }
+    setIsSearching(true);
+    searchTimeoutRef.current = setTimeout(async () => {
+      try {
+        const params = new URLSearchParams({ q: query });
+        if (activeSpace?._id) params.append('space_id', activeSpace._id);
+        const res = await fetch(`/agent/sessions/search?${params.toString()}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setSearchResults(data);
+        }
+      } catch {
+        // Silently ignore search errors
+      } finally {
+        setIsSearching(false);
+      }
+    }, 300);
+  }, [token, activeSpace?._id]);
+
+  // Cleanup search timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+    };
+  }, []);
 
   // Fetch sessions on mount and when space changes
   useEffect(() => {
@@ -161,6 +205,8 @@ export default function AgentChatbot({
     const handleClickOutside = (e: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
         setShowSessionDropdown(false);
+        setSearchQuery('');
+        setSearchResults([]);
       }
     };
     if (showSessionDropdown) {
@@ -192,10 +238,9 @@ export default function AgentChatbot({
     if (shouldAutoScrollRef.current && isActive && messages.length > 0) {
       setTimeout(() => {
         scrollToBottom();
-        shouldAutoScrollRef.current = true;
       }, 10);
     }
-  }, [messages, isActive]);
+  }, [messages, isActive, loading, needsHumanResponse]);
 
   // Whether we're waiting for an external agent (e.g. openclaw) to respond
   const isWaitingForExternalAgent = sessionAgentId && currentSessionId && messages.length > 0 && messages[messages.length - 1]?.role === 'user';
@@ -606,41 +651,102 @@ export default function AgentChatbot({
             </button>
 
             {showSessionDropdown && (
-              <div className="absolute left-0 top-full mt-1 w-72 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-20 max-h-80 overflow-y-auto custom-scrollbar">
-                {sessions.length === 0 && !sessionsLoading && (
-                  <div className="px-3 py-3 text-sm text-gray-500 text-center">
-                    No past chats
-                  </div>
-                )}
+              <div className="absolute left-0 top-full mt-1 w-72 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-20 max-h-96 flex flex-col">
+                {/* Search input */}
+                <div className="px-2 pt-2 pb-1 border-b border-gray-700 flex-shrink-0">
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => handleSearch(e.target.value)}
+                    placeholder="Search chats..."
+                    className="w-full bg-gray-900 text-gray-200 text-sm px-2.5 py-1.5 rounded border border-gray-600 focus:border-accent focus:outline-none placeholder-gray-500"
+                    autoFocus
+                  />
+                </div>
 
-                {sessions.map((session) => (
-                  <div
-                    key={session._id}
-                    onClick={() => loadSession(session._id)}
-                    className={`flex items-center justify-between px-3 py-2 text-sm cursor-pointer hover:bg-gray-700 transition-colors ${
-                      currentSessionId === session._id ? 'bg-gray-700/50 border-l-2 border-accent' : ''
-                    }`}
-                  >
-                    <div className="flex-1 min-w-0 mr-2">
-                      <div className="flex items-center gap-1.5">
-                        <p className="text-gray-200 truncate">{session.title}</p>
-                        {session.agent_id && !session.todo_id && (
-                          <span className="bg-purple-600/20 text-purple-300 border border-purple-500/30 px-1.5 py-0 rounded text-[10px] font-medium flex-shrink-0">
-                            {AGENTS.find(a => a.id === session.agent_id)?.label || session.agent_id}
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-gray-500 text-xs">{formatSessionDate(session.updated_at)}</p>
-                    </div>
-                    <button
-                      onClick={(e) => requestDeleteSession(session, e)}
-                      className="text-gray-500 hover:text-red-400 flex-shrink-0 text-xs px-1 transition-colors"
-                      aria-label="Delete session"
-                    >
-                      x
-                    </button>
-                  </div>
-                ))}
+                <div className="overflow-y-auto custom-scrollbar flex-1">
+                  {/* Search results mode */}
+                  {searchQuery.trim() ? (
+                    <>
+                      {isSearching && (
+                        <div className="px-3 py-3 text-sm text-gray-500 text-center">
+                          Searching...
+                        </div>
+                      )}
+                      {!isSearching && searchResults.length === 0 && (
+                        <div className="px-3 py-3 text-sm text-gray-500 text-center">
+                          No results found
+                        </div>
+                      )}
+                      {searchResults.map((result) => (
+                        <div
+                          key={result._id}
+                          onClick={() => {
+                            loadSession(result._id);
+                            setSearchQuery('');
+                            setSearchResults([]);
+                          }}
+                          className={`px-3 py-2 text-sm cursor-pointer hover:bg-gray-700 transition-colors ${
+                            currentSessionId === result._id ? 'bg-gray-700/50 border-l-2 border-accent' : ''
+                          }`}
+                        >
+                          <div className="flex items-center gap-1.5">
+                            <p className="text-gray-200 truncate">{result.title}</p>
+                            <span className={`px-1 py-0 rounded text-[10px] font-medium flex-shrink-0 ${
+                              result.match_source === 'title'
+                                ? 'bg-blue-600/20 text-blue-300 border border-blue-500/30'
+                                : 'bg-green-600/20 text-green-300 border border-green-500/30'
+                            }`}>
+                              {result.match_source === 'title' ? 'title' : 'message'}
+                            </span>
+                          </div>
+                          {result.preview && result.match_source === 'content' && (
+                            <p className="text-gray-400 text-xs mt-0.5 truncate">{result.preview}</p>
+                          )}
+                          <p className="text-gray-500 text-xs">{formatSessionDate(result.updated_at)}</p>
+                        </div>
+                      ))}
+                    </>
+                  ) : (
+                    <>
+                      {/* Normal session list mode */}
+                      {sessions.length === 0 && !sessionsLoading && (
+                        <div className="px-3 py-3 text-sm text-gray-500 text-center">
+                          No past chats
+                        </div>
+                      )}
+
+                      {sessions.map((session) => (
+                        <div
+                          key={session._id}
+                          onClick={() => loadSession(session._id)}
+                          className={`flex items-center justify-between px-3 py-2 text-sm cursor-pointer hover:bg-gray-700 transition-colors ${
+                            currentSessionId === session._id ? 'bg-gray-700/50 border-l-2 border-accent' : ''
+                          }`}
+                        >
+                          <div className="flex-1 min-w-0 mr-2">
+                            <div className="flex items-center gap-1.5">
+                              <p className="text-gray-200 truncate">{session.title}</p>
+                              {session.agent_id && !session.todo_id && (
+                                <span className="bg-purple-600/20 text-purple-300 border border-purple-500/30 px-1.5 py-0 rounded text-[10px] font-medium flex-shrink-0">
+                                  {AGENTS.find(a => a.id === session.agent_id)?.label || session.agent_id}
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-gray-500 text-xs">{formatSessionDate(session.updated_at)}</p>
+                          </div>
+                          <button
+                            onClick={(e) => requestDeleteSession(session, e)}
+                            className="text-gray-500 hover:text-red-400 flex-shrink-0 text-xs px-1 transition-colors"
+                            aria-label="Delete session"
+                          >
+                            x
+                          </button>
+                        </div>
+                      ))}
+                    </>
+                  )}
+                </div>
               </div>
             )}
           </div>
