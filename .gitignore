@@ -1,17 +1,29 @@
+# Environment files (may contain secrets)
 .env
-backend/venv/*
 backend/.env
+frontend/.env.local
+mcp-server/.env
+
+# Python
+backend/venv/*
 **/__pycache__/
+
+# Node / Next.js
 frontend/node_modules/
 frontend/.next/
-frontend/.env.local
 frontend/out/
 frontend/coverage/
-frontend/.DS_Store
-frontend/.claude/
-frontend/ios/App/.DS_Store
 frontend/tsconfig.tsbuildinfo
 mcp-server/node_modules/
+
+# OS files
+.DS_Store
+**/.DS_Store
+frontend/.claude/
+
+# Playwright / testing
 .pw-offline-profile/
 .playwright-mcp/
+
+# MCP config (may contain tokens)
 .mcp.json

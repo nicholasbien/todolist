@@ -30,7 +30,7 @@ chmod +x scripts/login.sh
 ./scripts/login.sh
 ```
 
-For testing: `test@example.com` / code `000000`
+For testing: use the test account (requires `ALLOW_TEST_ACCOUNT=true` in backend `.env`)
 
 ### 3. Set environment variables
 

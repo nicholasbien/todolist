@@ -217,8 +217,11 @@ async def signup_user(email: str) -> dict:
     """Create or update user with new verification code."""
     try:
         # Special handling for test account - no email needed
-        if email == "test@example.com":
-            return {"message": "Test account ready - use code 000000 to login"}
+        # Only allow when ALLOW_TEST_ACCOUNT=true (for development/testing)
+        test_email = os.getenv("TEST_EMAIL", "test@example.com")
+        test_code = os.getenv("TEST_CODE", "000000")
+        if os.getenv("ALLOW_TEST_ACCOUNT", "").lower() == "true" and email == test_email:
+            return {"message": f"Test account ready - use code {test_code} to login"}
 
         # Generate verification code
         code = generate_verification_code()
@@ -277,11 +280,10 @@ async def login_user(email: str, code: str) -> dict:
     """Verify code and create session for user."""
     try:
         # Check if this is a test environment bypass
-        test_email = os.getenv("TEST_EMAIL")
-        test_code = os.getenv("TEST_CODE")
-        if (test_email and test_code and email == test_email and code == test_code) or (
-            email == "test@example.com" and code == "000000"
-        ):
+        # Only allow when ALLOW_TEST_ACCOUNT=true (for development/testing)
+        test_email = os.getenv("TEST_EMAIL", "test@example.com")
+        test_code = os.getenv("TEST_CODE", "000000")
+        if os.getenv("ALLOW_TEST_ACCOUNT", "").lower() == "true" and email == test_email and code == test_code:
             # Find or create test user
             user = await users_collection.find_one({"email": email})
             if not user:
