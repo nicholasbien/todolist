@@ -16,7 +16,7 @@ An AI-powered collaborative task manager with multi-agent support, offline-first
 
 **Multi-Agent Architecture**
 - Built-in MCP server for connecting AI agents (Claude Code, OpenClaw, custom agents)
-- Multi-agent routing -- tag tasks with `#claude` or `#openclaw` to assign to specific agents
+- Multi-agent routing via agent dropdown -- assign tasks to Claude, OpenClaw, or custom agents
 - Post-and-poll messaging sessions for async agent communication
 - Agents can create tasks, write journal entries, and collaborate autonomously
 

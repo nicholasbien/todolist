@@ -58,12 +58,12 @@ You can tell OpenClaw to automatically watch for tasks you assign in the app:
 
 ### How it works
 
-1. You create a task in the TodoList app with **#openclaw** in the text (e.g., "Research the best React testing libraries #openclaw")
+1. You create a task in the TodoList app and select "OpenClaw" from the agent dropdown (e.g., "Research the best React testing libraries")
 2. You tap on it to open a chat session and write what you want done
-3. OpenClaw's cron job picks up the pending session, sees the `#openclaw` tag, does the work, and replies
+3. OpenClaw's cron job picks up the pending session (routed via `agent_id=openclaw`), does the work, and replies
 4. You see the reply in the app with a notification
 
-Tasks **without** `#openclaw` are left for the app's built-in AI agent — no double replies.
+Tasks assigned to other agents are left for those agents — no double replies.
 
 Each cron cycle runs in an isolated session so it doesn't clutter your main chat.
 

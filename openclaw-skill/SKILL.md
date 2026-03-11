@@ -238,7 +238,7 @@ Use this workflow to act as an autonomous agent responding to user messages:
 3. **If `is_followup` is true** — the user sent a new message to a session you previously handled. Check `recent_messages` for what they said and handle accordingly
 4. **If `agent_id` is `openclaw` and no `todo_id`** — this is a direct chat session. The user started a conversation with you directly from the Assistant tab (not linked to a task). Respond conversationally. Do not create or update todos unless the user explicitly asks
 5. **If not a followup** and the session has `agent_id: openclaw` and `todo_id` — this is a new task pre-routed to you via the agent dropdown. Claim it by posting an interim ack, then do the work
-6. **If unclaimed** (no `agent_id`) and `todo_id` is present — check the todo text for `#openclaw`. If present, claim it. If not, **skip** (the built-in agent will handle it)
+6. **If unclaimed** (no `agent_id`) and `todo_id` is present — **skip** (the built-in agent will handle it). Only handle sessions that are explicitly routed to you via `agent_id`
 7. **Post an interim ack** — immediately reply with `interim=true` so the user sees the task was picked up while you work on it
 8. **Do the work** — update the todo, add new tasks, write a journal entry, etc.
 9. **Reply** to the session with `agent_id=openclaw` (without `interim`) to post the final response
@@ -349,7 +349,7 @@ openclaw cron add \
   --name "todolist-watcher" \
   --every "5m" \
   --session isolated \
-  --message "Check for pending TodoList sessions and respond to them. Use the todolist skill. Follow the 'Responding to Pending Sessions' workflow: routing source of truth is GET /agent/sessions/pending?agent_id=openclaw. This returns sessions claimed by openclaw plus unclaimed sessions. Do not require extra #openclaw filtering. Use is_followup/recent_messages for followups, post an interim ack before work, and always reply with agent_id=openclaw to claim routing. If there are no pending sessions, do nothing."
+  --message "Check for pending TodoList sessions and respond to them. Use the todolist skill. Follow the 'Responding to Pending Sessions' workflow: routing source of truth is GET /agent/sessions/pending?agent_id=openclaw. This returns sessions claimed by openclaw plus unclaimed sessions. Skip unclaimed sessions (no agent_id) — the built-in agent handles those. Use is_followup/recent_messages for followups, post an interim ack before work, and always reply with agent_id=openclaw to claim routing. If there are no pending sessions, do nothing."
 ```
 
 This creates an isolated session every 5 minutes that checks for work. Adjust the interval based on user preference.
@@ -367,8 +367,7 @@ openclaw cron remove todolist-watcher
 3. For sessions where `is_followup` is true, it checks `recent_messages` and handles the followup
 4. For direct-chat sessions (`agent_id=openclaw`, no `todo_id`), it responds conversationally
 5. For new task sessions with `agent_id=openclaw` and `todo_id` (pre-routed via dropdown), it posts an interim ack and does the work
-6. For unclaimed sessions, it checks the linked todo for `#openclaw` — if present, claims and handles it
-7. **If not tagged or routed**, it skips the session — the built-in agent will handle it
+6. For unclaimed sessions (no `agent_id`), it skips them — the built-in agent will handle those
 8. The isolated session closes — no context pollution in the main chat
 
 ### Important
