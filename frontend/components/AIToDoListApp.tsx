@@ -217,7 +217,7 @@ export default function AIToDoListApp({
 
   // Tab state
   const [activeTab, setActiveTab] = useState<'tasks' | 'agent' | 'journal'>('tasks');
-  const [tabIndex, setTabIndex] = useState(0); // 0=tasks, 1=agent, 2=journal
+  const [tabIndex, setTabIndex] = useState(0); // 0=tasks, 1=agent
   const tasksTabRef = useRef<HTMLDivElement>(null);
   const agentTabRef = useRef<HTMLDivElement>(null);
   const journalTabRef = useRef<HTMLDivElement>(null);
@@ -459,7 +459,7 @@ export default function AIToDoListApp({
 
   // Handle tab change (from button click only - swiping is disabled)
   const handleTabChange = useCallback((index: number) => {
-    const tabs: ('tasks' | 'agent' | 'journal')[] = ['tasks', 'agent', 'journal'];
+    const tabs: ('tasks' | 'agent' | 'journal')[] = ['tasks', 'agent'];
     setTabIndex(index);
     setActiveTab(tabs[index]);
   }, []);
@@ -1447,6 +1447,7 @@ export default function AIToDoListApp({
         >
           Assistant
         </button>
+        {/* Journal tab hidden - kept for future re-enabling
         <button
           onClick={() => handleTabChange(2)}
           className={`flex-1 py-3 px-2 sm:px-6 font-medium text-sm transition-colors ${
@@ -1457,6 +1458,7 @@ export default function AIToDoListApp({
         >
           Journal
         </button>
+        */}
       </div>
 
       {/* Tab Content */}
@@ -2038,19 +2040,16 @@ export default function AIToDoListApp({
           </div>
         </div>
 
-        {/* Journal Tab */}
+        {/* Journal Tab - hidden, kept for future re-enabling
         <div
           ref={journalTabRef}
           style={{ padding: '16px 16px 0 16px', height: '100%', display: 'flex', flexDirection: 'column', touchAction: 'pan-y' }}
         >
-          {/* Header Row with Page Title */}
-          {/* <div className="mb-6" style={{ flexShrink: 0 }}>
-            <h2 className="text-xl font-semibold text-gray-100">Journal</h2>
-          </div> */}
           <div style={{ flex: 1, minHeight: 0 }}>
             <JournalComponent token={token} activeSpace={activeSpace} />
           </div>
         </div>
+        */}
       </SwipeableViews>
       </div>
 
