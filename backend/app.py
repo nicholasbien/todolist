@@ -9,13 +9,14 @@ from typing import List, Optional, Union
 
 import httpx
 from bs4 import BeautifulSoup
-from fastapi import Depends, FastAPI, Header, HTTPException, Request
+from fastapi import Depends, FastAPI, File, Header, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from pydantic import BaseModel
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from activity_feed import get_activity_feed
+from images import delete_image, get_image, upload_image
 from agent import agent_router
 from agent_memory import get_recent_memory_logs
 from auth import (
@@ -1524,6 +1525,63 @@ async def api_mark_session_read(
     """Mark a session's agent replies as read."""
     ok = await mark_session_read(session_id, current_user["user_id"])
     return {"ok": ok}
+
+
+# ---------------------------------------------------------------------------
+# Image upload/serve endpoints
+# ---------------------------------------------------------------------------
+
+
+@app.post("/images/upload")
+async def api_upload_image(
+    file: UploadFile = File(...),
+    space_id: Optional[str] = None,
+    current_user: dict = Depends(get_current_user),
+):
+    """Upload an image file. Returns the image ID and URL."""
+    user_id = current_user["user_id"]
+    data = await file.read()
+
+    try:
+        image_id = await upload_image(
+            file_data=data,
+            filename=file.filename or "image",
+            content_type=file.content_type or "application/octet-stream",
+            user_id=user_id,
+            space_id=space_id,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    return {"image_id": image_id, "url": f"/images/{image_id}"}
+
+
+@app.get("/images/{image_id}")
+async def api_get_image(image_id: str):
+    """Serve an image by ID."""
+    result = await get_image(image_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="Image not found")
+
+    return Response(
+        content=result["data"],
+        media_type=result["content_type"],
+        headers={
+            "Cache-Control": "public, max-age=86400",
+        },
+    )
+
+
+@app.delete("/images/{image_id}")
+async def api_delete_image(
+    image_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    """Delete an uploaded image."""
+    ok = await delete_image(image_id)
+    if not ok:
+        raise HTTPException(status_code=404, detail="Image not found")
+    return {"ok": True}
 
 
 @app.get("/todos/{todo_id}/subtasks")
