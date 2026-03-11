@@ -433,7 +433,7 @@ async def api_create_todo(request: Request, current_user: dict = Depends(get_cur
                     details.append(f"Notes: {todo_dict['notes']}")
 
                 if is_subtask:
-                    # For subtasks, include parent context
+                    # For subtasks, include parent context and completed sibling context
                     from bson import ObjectId as _ObjId
 
                     parent_doc = await todos_collection.find_one({"_id": _ObjId(body["parent_id"])})
@@ -441,6 +441,35 @@ async def api_create_todo(request: Request, current_user: dict = Depends(get_cur
                     initial_msg = f"Subtask of: \"{parent_text}\"\n\nTask: {todo_dict['text']}"
                     if details:
                         initial_msg += "\n" + "\n".join(details)
+                    # Add parent context details
+                    if parent_doc:
+                        parent_details = []
+                        if parent_doc.get("notes"):
+                            parent_details.append(f"Parent Notes: {parent_doc['notes']}")
+                        if parent_doc.get("category") and parent_doc["category"] != "General":
+                            parent_details.append(f"Parent Category: {parent_doc['category']}")
+                        if parent_doc.get("priority"):
+                            parent_details.append(f"Parent Priority: {parent_doc['priority']}")
+                        if parent_doc.get("dueDate"):
+                            parent_details.append(f"Parent Due: {parent_doc['dueDate']}")
+                        if parent_details:
+                            initial_msg += "\n\n" + "\n".join(parent_details)
+
+                    # Include context from already-completed sibling subtasks
+                    from todos import get_subtasks
+
+                    existing_siblings = await get_subtasks(body["parent_id"])
+                    completed_siblings = [
+                        s for s in existing_siblings
+                        if s.get("completed") and s["_id"] != todo_id
+                    ]
+                    if completed_siblings:
+                        initial_msg += "\n\nCompleted sibling subtasks:"
+                        for sib in completed_siblings:
+                            line = f"- [DONE] {sib.get('text', '')}"
+                            if sib.get("notes"):
+                                line += f" | Notes: {sib['notes']}"
+                            initial_msg += "\n" + line
                 else:
                     initial_msg = f"Please help me with this task: {todo_dict['text']}"
                     if details:

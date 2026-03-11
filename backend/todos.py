@@ -555,16 +555,39 @@ async def handle_subtask_completion(todo_id: str, user_id: str):
         if not activated:
             continue  # Another concurrent completion already activated this
         dep_names = []
+        dep_context_lines = []
         for dep_id in sub_todo.get("depends_on", []):
             dep_todo = next((s for s in all_subtasks if s["_id"] == dep_id), None)
             if dep_todo:
-                dep_names.append(f'"{dep_todo.get("text", dep_id)}"')
+                dep_text = dep_todo.get("text", dep_id)
+                dep_names.append(f'"{dep_text}"')
+                detail = f"- [DONE] {dep_text}"
+                if dep_todo.get("notes"):
+                    detail += f" | Notes: {dep_todo['notes']}"
+                dep_context_lines.append(detail)
         deps_msg = ", ".join(dep_names) if dep_names else "previous subtasks"
+        activation_msg = f"Dependencies satisfied ({deps_msg} completed). You may now begin this subtask."
+        if dep_context_lines:
+            activation_msg += "\n\nContext from completed dependencies:\n" + "\n".join(dep_context_lines)
+        # Also include context from other completed siblings (not just direct dependencies)
+        other_completed = [
+            s for s in all_subtasks
+            if s.get("completed")
+            and s["_id"] != sub_todo_id
+            and s["_id"] not in sub_todo.get("depends_on", [])
+        ]
+        if other_completed:
+            activation_msg += "\n\nOther completed subtasks:"
+            for oc in other_completed:
+                line = f"- [DONE] {oc.get('text', '')}"
+                if oc.get("notes"):
+                    line += f" | Notes: {oc['notes']}"
+                activation_msg += "\n" + line
         await append_message(
             session_id,
             user_id,
             "user",
-            f"Dependencies satisfied ({deps_msg} completed). You may now begin this subtask.",
+            activation_msg,
         )
         logger.info(f"Activated unblocked subtask session {session_id} for todo {sub_todo_id}")
 

@@ -362,6 +362,44 @@ async def stream_agent_response(
                             todo_context += f"\n- Priority: {task_priority}"
                         if task_due:
                             todo_context += f"\n- Due: {task_due}"
+
+                        # If this is a subtask, inherit context from parent and completed siblings
+                        parent_id = todo_doc.get("parent_id")
+                        if parent_id:
+                            parent_doc = await collections.todos.find_one({"_id": _ObjId(parent_id)})
+                            if parent_doc:
+                                todo_context += "\n\n--- Parent Task Context ---"
+                                todo_context += f"\n- Parent Task: {parent_doc.get('text', '')}"
+                                if parent_doc.get("notes"):
+                                    todo_context += f"\n- Parent Notes: {parent_doc['notes']}"
+                                if parent_doc.get("category"):
+                                    todo_context += f"\n- Parent Category: {parent_doc['category']}"
+                                if parent_doc.get("priority"):
+                                    todo_context += f"\n- Parent Priority: {parent_doc['priority']}"
+                                if parent_doc.get("dueDate"):
+                                    todo_context += f"\n- Parent Due: {parent_doc['dueDate']}"
+
+                            # Fetch completed sibling subtasks for context
+                            from todos import get_subtasks
+
+                            siblings = await get_subtasks(parent_id)
+                            completed_siblings = [
+                                s for s in siblings
+                                if s.get("completed") and s["_id"] != todo_id
+                            ]
+                            if completed_siblings:
+                                todo_context += "\n\n--- Completed Sibling Subtasks ---"
+                                todo_context += (
+                                    "\nThe following subtasks have already been completed."
+                                    " Use their context to inform your work and avoid"
+                                    " duplicating effort:"
+                                )
+                                for sib in completed_siblings:
+                                    todo_context += f"\n- [DONE] {sib.get('text', '')}"
+                                    if sib.get("notes"):
+                                        todo_context += f" | Notes: {sib['notes']}"
+                                todo_context += "\n--- End Sibling Context ---"
+
                         todo_context += (
                             f"\n\nThis task ALREADY EXISTS (ID: {todo_id}) — do NOT"
                             " create a duplicate."
