@@ -702,6 +702,15 @@ async def api_update_todo(
 
         if "closed" in body:
             updates["closed"] = bool(body["closed"])
+        if "image_ids" in body:
+            image_ids = body["image_ids"]
+            if not isinstance(image_ids, list) or not all(
+                isinstance(i, str) for i in image_ids
+            ):
+                raise HTTPException(
+                    status_code=400, detail="image_ids must be a list of strings"
+                )
+            updates["image_ids"] = image_ids
 
         if not updates:
             raise HTTPException(status_code=400, detail="No valid fields to update")
