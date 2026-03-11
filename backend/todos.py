@@ -45,6 +45,10 @@ async def init_todo_indexes() -> None:
         # Queries by category within a space
         await todos_collection.create_index([("user_id", 1), ("space_id", 1), ("category", 1)])
 
+        # Sub-task lookups by parent, ordered
+        await todos_collection.create_index("parent_id")
+        await todos_collection.create_index([("parent_id", 1), ("subtask_order", 1)])
+
         logger.info("Todo indexes created successfully")
     except Exception as e:
         logger.error(f"Error creating todo indexes: {e}")
@@ -69,6 +73,8 @@ class Todo(BaseModel):
     created_offline: bool = False
     creator_type: str = "user"  # "user" or "agent"
     agent_id: Optional[str] = None
+    parent_id: Optional[str] = None  # ID of parent todo for sub-tasks
+    subtask_order: Optional[int] = None  # 0-based execution order within parent
 
     class Config:
         arbitrary_types_allowed = True
@@ -93,6 +99,28 @@ async def create_todo(todo: Todo):
         final_space_id = todo_dict.get("space_id")
         if final_space_id and not await user_in_space(todo.user_id, final_space_id):
             raise HTTPException(status_code=403, detail="Not in space")
+
+        # Validate parent_id for sub-tasks
+        if todo.parent_id:
+            parent = await todos_collection.find_one({"_id": ObjectId(todo.parent_id)})
+            if not parent:
+                raise HTTPException(status_code=404, detail="Parent todo not found")
+            if parent.get("space_id") != final_space_id:
+                raise HTTPException(status_code=403, detail="Parent todo not in same space")
+            if not parent.get("space_id") and parent.get("user_id") != todo.user_id:
+                raise HTTPException(status_code=403, detail="Parent todo not owned by user")
+            # Single-level nesting only
+            if parent.get("parent_id"):
+                raise HTTPException(status_code=400, detail="Cannot create sub-task of a sub-task")
+            # Auto-assign subtask_order if not provided
+            if todo_dict.get("subtask_order") is None:
+                max_order = await todos_collection.find_one(
+                    {"parent_id": todo.parent_id},
+                    sort=[("subtask_order", -1)],
+                )
+                todo_dict["subtask_order"] = (
+                    (max_order["subtask_order"] + 1) if max_order and max_order.get("subtask_order") is not None else 0
+                )
 
         result = await todos_collection.insert_one(todo_dict)
 
@@ -184,6 +212,8 @@ async def delete_todo(todo_id: str, user_id: str):
             raise HTTPException(status_code=403, detail="Not in space")
         result = await todos_collection.delete_one(query)
         if result.deleted_count == 1:
+            # Cascade delete: remove all sub-tasks if this was a parent
+            await todos_collection.delete_many({"parent_id": todo_id})
             return {"message": "Todo deleted successfully"}
         raise HTTPException(status_code=404, detail="Todo not found")
     except HTTPException as he:
@@ -229,7 +259,7 @@ async def complete_todo(todo_id: str, user_id: str):
             )
         if result.modified_count == 1:
             status = "complete" if new_completed_status else "incomplete"
-            return {"message": f"Todo marked as {status}"}
+            return {"message": f"Todo marked as {status}", "parent_id": todo.get("parent_id")}
         raise HTTPException(status_code=404, detail="Todo not found")
     except HTTPException as he:
         raise he
@@ -294,6 +324,88 @@ async def migrate_legacy_todos() -> None:
             logger.info("Migrated %d legacy todos to have space_id: None", result.modified_count)
     except Exception as e:
         logger.error(f"Error migrating legacy todos: {str(e)}")
+
+
+async def get_subtasks(parent_id: str):
+    """Get subtasks of a parent todo, ordered by subtask_order."""
+    cursor = todos_collection.find({"parent_id": parent_id}).sort("subtask_order", 1)
+    subtasks = await cursor.to_list(length=100)
+    for s in subtasks:
+        s["_id"] = str(s["_id"])
+    return subtasks
+
+
+async def handle_subtask_completion(todo_id: str, user_id: str):
+    """Handle orchestration when a subtask is completed.
+
+    Activates the next subtask's session and posts progress to the
+    parent session. The managing agent is responsible for giving the
+    final summary and completing the parent task.
+    """
+    todo = await todos_collection.find_one({"_id": ObjectId(todo_id)})
+    if not todo or not todo.get("parent_id"):
+        return  # Not a subtask
+
+    parent_id = todo["parent_id"]
+
+    # Import here to avoid circular imports
+    from chat_sessions import append_message, find_session_by_todo
+    from chat_sessions import sessions_collection as sess_coll
+
+    # Find next uncompleted subtask by order
+    next_subtask = await todos_collection.find_one(
+        {
+            "parent_id": parent_id,
+            "subtask_order": {"$gt": todo.get("subtask_order", 0)},
+            "completed": False,
+        },
+        sort=[("subtask_order", 1)],
+    )
+
+    if next_subtask:
+        # Activate next subtask's session
+        next_todo_id = str(next_subtask["_id"])
+        next_session = await find_session_by_todo(user_id, next_todo_id)
+        if next_session:
+            session_id = str(next_session["_id"])
+            await sess_coll.update_one(
+                {"_id": ObjectId(session_id)},
+                {"$set": {"needs_agent_response": True}},
+            )
+            await append_message(
+                session_id,
+                user_id,
+                "user",
+                f"Previous subtask completed: \"{todo.get('text', '')}\". You may now begin this subtask.",
+            )
+            logger.info(f"Activated next subtask session {session_id} for todo {next_todo_id}")
+
+    # Post progress update to parent session
+    subtasks = await get_subtasks(parent_id)
+    done_count = sum(1 for s in subtasks if s.get("completed"))
+    total_count = len(subtasks)
+
+    parent_session = await find_session_by_todo(user_id, parent_id)
+    if parent_session:
+        parent_session_id = str(parent_session["_id"])
+        if done_count == total_count:
+            # All subtasks done — notify managing agent to give final summary
+            await append_message(
+                parent_session_id,
+                user_id,
+                "user",
+                f"All {total_count} subtasks are now complete. Please review the results and provide a final summary.",
+            )
+            logger.info(f"All subtasks done — notified parent session {parent_session_id}")
+        else:
+            # Progress update
+            await append_message(
+                parent_session_id,
+                user_id,
+                "user",
+                f"Subtask completed: \"{todo.get('text', '')}\" ({done_count}/{total_count} done)",
+            )
+            logger.info(f"Posted progress to parent session: {done_count}/{total_count}")
 
 
 async def health_check():

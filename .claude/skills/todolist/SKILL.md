@@ -66,7 +66,8 @@ protocol (they will be available as `mcp__todolist__<tool_name>`):
 | `list_todos` | List all todos |
 | `update_todo` | Update a todo's text, category, priority, or notes |
 | `complete_todo` | Mark a todo as done |
-| `add_todo` | Create new todos (for subtasks) |
+| `add_todo` | Create new todos or sub-tasks (pass `parent_id` for sub-tasks) |
+| `complete_todo` | Mark a todo as done (triggers subtask orchestration) |
 | `create_session` | Create a session linked to a new todo |
 | `write_journal` | Log progress in the journal |
 
@@ -182,6 +183,85 @@ The TodoList backend supports multi-agent routing via `agent_id`:
   follow-ups and new tasks.
 - **Isolation**: Other agents (like openclaw) only see their own claimed
   sessions + unclaimed ones. They won't steal your sessions.
+
+## Sub-Task Management
+
+When a task is complex, the managing agent should break it into sub-tasks. Sub-tasks
+execute in **linear order** — only the first sub-task's session starts as pending.
+When a sub-task completes, the next one's session is automatically activated.
+
+### Creating Sub-Tasks
+
+Use `mcp__todolist__add_todo` with `parent_id` set to the parent task's ID:
+
+```
+mcp__todolist__add_todo({
+  text: "Step 1: Research the problem",
+  parent_id: "PARENT_TODO_ID"
+})
+mcp__todolist__add_todo({
+  text: "Step 2: Implement the solution",
+  parent_id: "PARENT_TODO_ID"
+})
+mcp__todolist__add_todo({
+  text: "Step 3: Write tests",
+  parent_id: "PARENT_TODO_ID"
+})
+```
+
+Each sub-task:
+- Gets auto-assigned a `subtask_order` (0, 1, 2, ...)
+- Gets its own linked session automatically
+- Inherits `agent_id` from the parent's session
+- Only the first sub-task (order 0) starts with an active pending session
+
+### How Sub-Task Orchestration Works
+
+1. **Agent creates sub-tasks** with `parent_id` → sessions created, only first is pending
+2. **Agent/subagent picks up first sub-task** via `get_pending_sessions` → works on it
+3. **First sub-task completes** (via `complete_todo`) → backend automatically:
+   - Activates the next sub-task's session (sets `needs_agent_response = true`)
+   - Posts progress update to parent session: "Subtask completed: X (1/3 done)"
+4. **Next agent poll picks up the newly-activated sub-task** → works on it
+5. **Repeat** until all sub-tasks complete
+6. **All done** → backend posts to parent session: "All subtasks complete. Please review and provide summary."
+   The **managing agent** (not the backend) is responsible for:
+   - Reading the subtask results from their sessions
+   - Posting the final summary to the parent session
+   - Completing the parent task via `complete_todo`
+
+### Sub-Task Workflow for the Task Manager
+
+When dispatching a subagent for a task, the subagent should decide if the task
+needs to be broken into sub-tasks:
+
+1. Read the task description and notes
+2. If the task is complex (multiple distinct steps, different concerns):
+   - Create sub-tasks with clear, actionable descriptions
+   - Include detailed notes for each sub-task explaining what to do
+   - The first sub-task will automatically become pending for the next poll cycle
+   - Post an interim message to the parent session: "Breaking this into N sub-tasks..."
+3. If the task is simple:
+   - Do the work directly and post the result
+
+### Managing Agent Responsibilities
+
+The managing agent monitors the parent task's session for progress updates.
+As subtasks complete, the backend posts progress messages to the parent session
+(e.g. "Subtask completed: Step 1 (1/3 done)"). The parent session's
+`needs_agent_response` is set to true, so the managing agent picks it up
+on the next poll.
+
+When the managing agent sees "All subtasks complete":
+1. Read each subtask's session to gather results (use `get_session`)
+2. Post a final summary to the parent session
+3. Complete the parent task via `complete_todo`
+
+### Sub-Task Display
+
+- `list_todos` shows sub-tasks indented under their parent: `└─ [done] Step 1...`
+- Parent tasks show progress: `[0/3 sub-tasks]`
+- In the web UI, sub-tasks appear nested under their parent task
 
 ## Rules
 

@@ -250,6 +250,80 @@ When you add a todo and want to track discussion:
 
 The user will see the session linked to their task in the app and can reply to continue the conversation.
 
+### Sub-Task Management
+
+When a task is complex, break it into sub-tasks for sequential execution. Sub-tasks
+execute in **linear order** — only the first sub-task's session starts as pending.
+When a sub-task completes, the next one's session is automatically activated.
+
+#### Creating Sub-Tasks
+
+Pass `parent_id` when adding a todo to create it as a sub-task:
+
+```bash
+# Create sub-task 1 (auto-assigned subtask_order=0, session starts pending)
+curl -s -X POST -H "Authorization: Bearer $TODOLIST_AUTH_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"text": "Step 1: Research the problem", "space_id": "SPACE_ID", "parent_id": "PARENT_TODO_ID"}' \
+  "${TODOLIST_API_URL:-https://app.todolist.nyc}/todos" | jq '.'
+
+# Create sub-task 2 (auto-assigned subtask_order=1, session starts dormant)
+curl -s -X POST -H "Authorization: Bearer $TODOLIST_AUTH_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"text": "Step 2: Implement the solution", "space_id": "SPACE_ID", "parent_id": "PARENT_TODO_ID"}' \
+  "${TODOLIST_API_URL:-https://app.todolist.nyc}/todos" | jq '.'
+```
+
+Each sub-task:
+- Gets auto-assigned a `subtask_order` (0, 1, 2, ...)
+- Gets its own linked session automatically
+- Inherits `agent_id` from the parent's session
+- Only the first sub-task (order 0) starts with an active pending session
+
+#### How Sub-Task Orchestration Works
+
+1. **Agent creates sub-tasks** with `parent_id` → sessions created, only first is pending
+2. **Agent picks up first sub-task** via polling `GET /agent/sessions/pending` → works on it
+3. **First sub-task completes** (via `PUT /todos/TODO_ID/complete`) → backend automatically:
+   - Activates the next sub-task's session (`needs_agent_response = true`)
+   - Posts progress update to parent session: "Subtask completed: X (1/3 done)"
+4. **Next poll picks up the newly-activated sub-task** → works on it
+5. **Repeat** until all sub-tasks complete
+6. **All done** → backend notifies parent session: "All subtasks complete."
+   The **managing agent** is responsible for:
+   - Reading subtask session results
+   - Posting a final summary to the parent session
+   - Completing the parent task via `PUT /todos/TODO_ID/complete`
+
+#### Get Sub-Tasks
+
+```bash
+curl -s -H "Authorization: Bearer $TODOLIST_AUTH_TOKEN" \
+  "${TODOLIST_API_URL:-https://app.todolist.nyc}/todos/PARENT_TODO_ID/subtasks" | jq '.'
+```
+
+#### Sub-Task Workflow
+
+When handling a complex task:
+1. Read the task description and notes
+2. Create sub-tasks with clear, actionable descriptions and detailed notes
+3. Post an interim message to the parent session: "Breaking this into N sub-tasks..."
+4. The first sub-task will automatically become pending for the next poll cycle
+5. Each poll cycle, pick up the next activated sub-task and work on it
+6. Monitor the parent session for progress updates from the backend
+7. When all subtasks complete, the parent session receives a notification
+8. Read each subtask's session results, post a final summary, and complete the parent task
+
+#### Sub-Task Display in list_todos
+
+Sub-tasks appear indented under their parent:
+```
+1. [  ] Build login page [Development] (ID: abc123) [0/3 sub-tasks]
+   └─ [done] Design wireframe (ID: def456)
+   └─ [  ] Implement frontend (ID: ghi789)
+   └─ [  ] Add tests (ID: jkl012)
+```
+
 ## Error Handling
 
 - **401 Unauthorized** — Token expired. Re-run `{baseDir}/scripts/login.sh` to get a new token.
