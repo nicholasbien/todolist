@@ -62,7 +62,6 @@ export default function AgentChatbot({
 
   // Task session mode: when viewing a task-linked session
   const [isTaskSession, setIsTaskSession] = useState(false);
-  const [taskInitialMessage, setTaskInitialMessage] = useState<string | null>(null);
   const [activeTodoId, setActiveTodoId] = useState<string | null>(null);
   const [taskCompleted, setTaskCompleted] = useState(false);
   const [completingTask, setCompletingTask] = useState(false);
@@ -188,10 +187,6 @@ export default function AgentChatbot({
         // Track the linked todo ID for complete action
         if (data.todo_id) setActiveTodoId(data.todo_id);
         setTaskCompleted(false);
-        // Save the first user message for reset functionality
-        const firstUserMsg = displayMessages.find((m: any) => m.role === 'user');
-        if (firstUserMsg) setTaskInitialMessage(firstUserMsg.content);
-
         // If waiting for agent (last message is user), auto-trigger streaming
         // BUT skip if session is claimed by an external agent (e.g. openclaw)
         const lastMsg = displayMessages[displayMessages.length - 1];
@@ -414,30 +409,7 @@ export default function AgentChatbot({
     setSessionAgentId(null);
     setNeedsHumanResponse(false);
     setSelectedAgentId(null);
-    setTaskInitialMessage(null);
     messageQueueRef.current = [];
-  };
-
-  // -----------------------------------------------------------------------
-  // Reset task chat — delete session and restart with original message
-  // -----------------------------------------------------------------------
-  const handleResetTaskChat = async () => {
-    if (!currentSessionId || !taskInitialMessage || !token) return;
-    try {
-      // Delete the current session
-      await fetch(`/agent/sessions/${currentSessionId}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      // Clear UI and start fresh
-      setMessages([]);
-      setCurrentSessionId(null);
-      messageQueueRef.current = [];
-      // Re-send the initial message (will create a new session)
-      handleStreamingAsk(taskInitialMessage);
-    } catch (err) {
-      console.error('Failed to reset task chat:', err);
-    }
   };
 
   // -----------------------------------------------------------------------
@@ -681,13 +653,6 @@ export default function AgentChatbot({
             >
               <ArrowLeft className="w-3 h-3" />
               Back to Task
-            </button>
-            <button
-              onClick={handleResetTaskChat}
-              disabled={loading || !taskInitialMessage}
-              className="border border-gray-600 text-gray-400 px-3 py-1 rounded text-sm hover:bg-gray-800 hover:text-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              Reset Chat
             </button>
             {activeTodoId && (
               <button
