@@ -363,13 +363,20 @@ async def stream_agent_response(
                         if task_due:
                             todo_context += f"\n- Due: {task_due}"
                         todo_context += (
-                            "\n\nThis task ALREADY EXISTS — do NOT"
+                            f"\n\nThis task ALREADY EXISTS (ID: {todo_id}) — do NOT"
                             " create a duplicate."
                             " The user is chatting about this specific"
                             " task and wants help working on it."
                             " You can: answer questions, give advice,"
-                            " break it into subtasks, or update this"
-                            f" task (use update_task with ID {todo_id})."
+                            f" update this task (use update_task with ID {todo_id}),"
+                            " or break it into sub-tasks (use add_task with"
+                            f' parent_id="{todo_id}").'
+                            " When creating sub-tasks, each one should be a"
+                            " concrete, actionable step with clear notes."
+                            " Sub-tasks execute in linear order — completing"
+                            " all sub-tasks auto-completes the parent."
+                            " Each sub-task gets its own session for an agent"
+                            " to work on."
                         )
                 except Exception as e:
                     logger.error(f"Failed to fetch todo context: {e}")

@@ -66,7 +66,8 @@ protocol (they will be available as `mcp__todolist__<tool_name>`):
 | `list_todos` | List all todos |
 | `update_todo` | Update a todo's text, category, priority, or notes |
 | `complete_todo` | Mark a todo as done |
-| `add_todo` | Create new todos (for subtasks) |
+| `add_todo` | Create new todos or sub-tasks (pass `parent_id` for sub-tasks) |
+| `complete_todo` | Mark a todo as done (triggers subtask orchestration) |
 | `create_session` | Create a session linked to a new todo |
 | `write_journal` | Log progress in the journal |
 
@@ -121,12 +122,19 @@ task assigned to you.
 
 ## Instructions
 1. Read and understand the task and any follow-up messages
-2. Do the work requested — this may involve:
+2. If the task is complex, break it into sub-tasks:
+   - Create sub-tasks via mcp__todolist__add_todo with parent_id={todo_id}
+   - Post a plan to the parent session describing what each subtask will do
+   - Use /todolist check (or mcp__todolist__get_pending_sessions) to poll
+     for subtask progress — the backend activates subtasks sequentially
+   - Monitor progress and handle any issues as subtasks complete
+   - When all subtasks are done, read their sessions, post a final summary,
+     and complete the parent task via mcp__todolist__complete_todo
+3. If the task is simple, do the work directly:
    - Writing or modifying code in this repository
    - Researching information
-   - Creating subtasks via mcp__todolist__add_todo
    - Updating the task via mcp__todolist__update_todo
-3. When done, post your response using mcp__todolist__post_to_session:
+4. When done, post your response using mcp__todolist__post_to_session:
    - session_id: "{session_id}"
    - content: Your detailed response describing what you did
    - role: "assistant"
@@ -134,6 +142,8 @@ task assigned to you.
 
 IMPORTANT: Always include agent_id="claude" when posting to claim/maintain
 routing. The user will see your reply in their TodoList app.
+IMPORTANT: If you create subtasks, use /todolist check to poll for updates
+from your subtasks rather than trying to do all the work yourself.
 ```
 
 **Run subagents in the background** when handling multiple tasks so they work
@@ -182,6 +192,95 @@ The TodoList backend supports multi-agent routing via `agent_id`:
   follow-ups and new tasks.
 - **Isolation**: Other agents (like openclaw) only see their own claimed
   sessions + unclaimed ones. They won't steal your sessions.
+
+## Sub-Task Management
+
+When a task is complex, the managing agent should break it into sub-tasks. Sub-tasks
+execute in **linear order** — only the first sub-task's session starts as pending.
+When a sub-task completes, the next one's session is automatically activated.
+
+### Creating Sub-Tasks
+
+Use `mcp__todolist__add_todo` with `parent_id` set to the parent task's ID:
+
+```
+mcp__todolist__add_todo({
+  text: "Step 1: Research the problem",
+  parent_id: "PARENT_TODO_ID"
+})
+mcp__todolist__add_todo({
+  text: "Step 2: Implement the solution",
+  parent_id: "PARENT_TODO_ID"
+})
+mcp__todolist__add_todo({
+  text: "Step 3: Write tests",
+  parent_id: "PARENT_TODO_ID"
+})
+```
+
+Each sub-task:
+- Gets appended to the parent's `subtask_ids` array
+- Gets its own linked session automatically
+- Inherits `agent_id` from the parent's session
+- Only the first sub-task (order 0) starts with an active pending session
+
+### How Sub-Task Orchestration Works
+
+1. **Agent creates sub-tasks** with `parent_id` → sessions created, only first is pending
+2. **Agent/subagent picks up first sub-task** via `get_pending_sessions` → works on it
+3. **First sub-task completes** (via `complete_todo`) → backend automatically:
+   - Activates the next sub-task's session (sets `needs_agent_response = true`)
+   - Posts progress update to parent session: "Subtask completed: X (1/3 done)"
+4. **Next agent poll picks up the newly-activated sub-task** → works on it
+5. **Repeat** until all sub-tasks complete
+6. **All done** → backend posts to parent session: "All subtasks complete. Please review and provide summary."
+   The **managing agent** (not the backend) is responsible for:
+   - Reading the subtask results from their sessions
+   - Posting the final summary to the parent session
+   - Completing the parent task via `complete_todo`
+
+### Sub-Task Workflow for the Task Manager
+
+When dispatching a subagent for a task, the subagent should decide if the task
+needs to be broken into sub-tasks:
+
+1. Read the task description and notes
+2. If the task is complex (multiple distinct steps, different concerns):
+   - Create sub-tasks with clear, actionable descriptions
+   - Include detailed notes for each sub-task explaining what to do
+   - **Post a plan to the parent session** describing what each subtask will do:
+     e.g. "Breaking this into 3 sub-tasks:\n1. Research the problem — investigate X\n2. Implement solution — build Y\n3. Write tests — cover Z"
+   - The first sub-task will automatically become pending for the next poll cycle
+3. If the task is simple:
+   - Do the work directly and post the result
+
+### Managing Agent Responsibilities
+
+The managing agent (subagent assigned to the parent task) is responsible for
+monitoring subtask progress, handling issues, and providing the final summary.
+
+**The managing agent should use `/todolist check` (or `mcp__todolist__get_pending_sessions`)
+to poll for updates.** When a subtask completes, the backend posts a progress
+message to the parent session (e.g. "Subtask completed: Step 1 (1/3 done)").
+The parent session's `needs_agent_response` is set to true, so the managing
+agent picks it up on the next poll.
+
+The managing agent should:
+1. **Poll regularly** using `/todolist check` or `get_pending_sessions` to
+   monitor subtask progress
+2. **Post progress updates** to the parent session as subtasks complete
+3. **Handle issues** — if a subtask fails or needs intervention, read its
+   session and take corrective action
+4. When all subtasks are complete:
+   - Read each subtask's session to gather results (use `get_session`)
+   - Post a final summary to the parent session
+   - Complete the parent task via `complete_todo`
+
+### Sub-Task Display
+
+- `list_todos` shows sub-tasks indented under their parent: `└─ [done] Step 1...`
+- Parent tasks show progress: `[0/3 sub-tasks]`
+- In the web UI, sub-tasks appear nested under their parent task
 
 ## Rules
 

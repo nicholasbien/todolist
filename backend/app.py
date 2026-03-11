@@ -74,6 +74,7 @@ from todos import (
     create_todo,
     delete_todo,
     get_todos,
+    handle_subtask_completion,
     health_check,
     todos_collection,
     update_todo_fields,
@@ -417,6 +418,8 @@ async def api_create_todo(request: Request, current_user: dict = Depends(get_cur
             try:
                 todo_dict = result.dict(by_alias=True)
                 todo_id = str(todo_dict["_id"])
+                is_subtask = bool(body.get("parent_id"))
+
                 # Build initial message with task details
                 details = []
                 if todo_dict.get("category") and todo_dict["category"] != "General":
@@ -427,9 +430,20 @@ async def api_create_todo(request: Request, current_user: dict = Depends(get_cur
                     details.append(f"Due: {todo_dict['dueDate']}")
                 if todo_dict.get("notes"):
                     details.append(f"Notes: {todo_dict['notes']}")
-                initial_msg = f"Please help me with this task: {todo_dict['text']}"
-                if details:
-                    initial_msg += "\n" + "\n".join(details)
+
+                if is_subtask:
+                    # For subtasks, include parent context
+                    from bson import ObjectId as _ObjId
+
+                    parent_doc = await todos_collection.find_one({"_id": _ObjId(body["parent_id"])})
+                    parent_text = parent_doc.get("text", "") if parent_doc else ""
+                    initial_msg = f"Subtask of: \"{parent_text}\"\n\nTask: {todo_dict['text']}"
+                    if details:
+                        initial_msg += "\n" + "\n".join(details)
+                else:
+                    initial_msg = f"Please help me with this task: {todo_dict['text']}"
+                    if details:
+                        initial_msg += "\n" + "\n".join(details)
 
                 # Post as assistant if agent-created, user if user-created
                 role = "assistant" if body.get("creator_type") == "agent" else "user"
@@ -441,6 +455,13 @@ async def api_create_todo(request: Request, current_user: dict = Depends(get_cur
                         auto_agent_id = "openclaw"
                     elif "#claude" in text_lower:
                         auto_agent_id = "claude"
+
+                # For subtasks, inherit agent_id from parent session if not set
+                if is_subtask and not auto_agent_id and parent_doc:
+                    parent_session = await find_session_by_todo(current_user["user_id"], body["parent_id"])
+                    if parent_session and parent_session.get("agent_id"):
+                        auto_agent_id = parent_session["agent_id"]
+
                 session_id = await create_chat_session(
                     current_user["user_id"],
                     body.get("space_id"),
@@ -449,6 +470,21 @@ async def api_create_todo(request: Request, current_user: dict = Depends(get_cur
                     agent_id=auto_agent_id,
                 )
                 await append_message(session_id, current_user["user_id"], role, initial_msg)
+
+                # For subtasks after the first, make session dormant
+                # (will be activated when previous subtask completes)
+                if is_subtask:
+                    from bson import ObjectId as _ObjId
+                    from chat_sessions import sessions_collection as sess_coll
+
+                    # Check if this subtask is the first in the parent's subtask_ids
+                    parent_doc_fresh = await todos_collection.find_one({"_id": _ObjId(body["parent_id"])})
+                    parent_subtask_ids = parent_doc_fresh.get("subtask_ids", []) if parent_doc_fresh else []
+                    if parent_subtask_ids and parent_subtask_ids[0] != todo_id:
+                        await sess_coll.update_one(
+                            {"_id": _ObjId(session_id)},
+                            {"$set": {"needs_agent_response": False}},
+                        )
             except Exception as e:
                 logger.error(f"Failed to auto-create session for todo: {e}")
 
@@ -506,7 +542,13 @@ async def api_delete_todo(todo_id: str, current_user: dict = Depends(get_current
 @app.put("/todos/{todo_id}/complete")
 async def api_complete_todo(todo_id: str, current_user: dict = Depends(get_current_user)):
     logger.info(f"Marking todo as complete with ID: {todo_id} for user: {current_user['email']}")
-    return await complete_todo(todo_id, current_user["user_id"])
+    result = await complete_todo(todo_id, current_user["user_id"])
+    # Trigger subtask orchestration (activate next subtask, post final results)
+    try:
+        await handle_subtask_completion(todo_id, current_user["user_id"])
+    except Exception as e:
+        logger.error(f"Subtask orchestration error: {e}")
+    return result
 
 
 @app.put("/todos/{todo_id}", response_model=Todo)
@@ -1076,6 +1118,17 @@ async def api_mark_session_read(
     """Mark a session's agent replies as read."""
     ok = await mark_session_read(session_id, current_user["user_id"])
     return {"ok": ok}
+
+
+@app.get("/todos/{todo_id}/subtasks")
+async def api_get_subtasks(
+    todo_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    """Get subtasks of a parent todo, ordered by the parent's subtask_ids array."""
+    from todos import get_subtasks
+
+    return await get_subtasks(todo_id)
 
 
 @app.get("/todos/{todo_id}")

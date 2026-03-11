@@ -1278,15 +1278,36 @@ export default function AIToDoListApp({
     }
   };
 
-  // Separate completed and uncompleted todos
+  // Build parent→children map for sub-tasks
+  const childrenByParent = new Map<string, any[]>();
+  for (const todo of allFilteredTodos) {
+    if (todo.parent_id) {
+      const siblings = childrenByParent.get(todo.parent_id) || [];
+      siblings.push(todo);
+      childrenByParent.set(todo.parent_id, siblings);
+    }
+  }
+  // Sort children by their position in the parent's subtask_ids array
+  childrenByParent.forEach((children, parentId) => {
+    const parent = allFilteredTodos.find((t: any) => t._id === parentId);
+    const subtaskIds: string[] = parent?.subtask_ids || [];
+    children.sort((a: any, b: any) => {
+      const aIdx = subtaskIds.indexOf(a._id);
+      const bIdx = subtaskIds.indexOf(b._id);
+      // Items not in subtask_ids go to the end
+      return (aIdx === -1 ? Infinity : aIdx) - (bIdx === -1 ? Infinity : bIdx);
+    });
+  });
+
+  // Separate completed and uncompleted todos (top-level only, sub-tasks rendered inline)
   const uncompletedTodos = allFilteredTodos
-    .filter(todo => !todo.completed)
+    .filter(todo => !todo.completed && !todo.parent_id)
     .sort(sortTodos);
 
   const uncompletedTodoIds = uncompletedTodos.map(t => t._id);
 
   const completedTodos = allFilteredTodos
-    .filter((todo) => todo.completed)
+    .filter((todo) => todo.completed && !todo.parent_id)
     .sort((a, b) => {
       // Sort completed todos by completion date (most recent first)
       const dateA = a.dateCompleted || a.dateAdded;
@@ -1829,23 +1850,28 @@ export default function AIToDoListApp({
         <SortableContext items={uncompletedTodoIds} strategy={verticalListSortingStrategy}>
           <div className="space-y-3">
             {uncompletedTodos.map((todo) => (
-              <SortableItem key={todo._id} id={todo._id} disabled={!isSortModeActive}>
-                <TodoItem
-                  todo={todo}
-                  categories={categories}
-                  editingCategory={editingCategory}
-                  setEditingCategory={setEditingCategory}
-                  handleUpdateCategory={handleUpdateCategory}
-                  handleUpdatePriority={handleUpdatePriority}
-
-                  handleCompleteTodo={handleCompleteTodo}
-                  handleDeleteTodo={handleDeleteTodo}
-                  isCollaborative={(activeSpace?.member_ids?.length ?? 0) > 1}
-                  onEdit={handleEditTodo}
-                  onChat={handleChatAboutTodo}
-                  sessionStatus={todoSessionStatuses[todo._id] as any}
-                />
-              </SortableItem>
+              <React.Fragment key={todo._id}>
+                <SortableItem id={todo._id} disabled={!isSortModeActive}>
+                  <TodoItem
+                    todo={todo}
+                    categories={categories}
+                    editingCategory={editingCategory}
+                    setEditingCategory={setEditingCategory}
+                    handleUpdateCategory={handleUpdateCategory}
+                    handleUpdatePriority={handleUpdatePriority}
+                    handleCompleteTodo={handleCompleteTodo}
+                    handleDeleteTodo={handleDeleteTodo}
+                    isCollaborative={(activeSpace?.member_ids?.length ?? 0) > 1}
+                    onEdit={handleEditTodo}
+                    onChat={handleChatAboutTodo}
+                    sessionStatus={todoSessionStatuses[todo._id] as any}
+                    subtaskCount={childrenByParent.get(todo._id)?.length}
+                    subtaskDoneCount={childrenByParent.get(todo._id)?.filter(c => c.completed).length}
+                    subtasks={childrenByParent.get(todo._id)}
+                    subtaskSessionStatuses={todoSessionStatuses as any}
+                  />
+                </SortableItem>
+              </React.Fragment>
             ))}
           </div>
         </SortableContext>
@@ -1866,21 +1892,26 @@ export default function AIToDoListApp({
       {showCompleted && completedTodos.length > 0 && (
         <div className="mt-6 mb-4 space-y-3">
           {completedTodos.map((todo) => (
-            <TodoItem
-              key={todo._id}
-              todo={todo}
-              categories={categories}
-              editingCategory={editingCategory}
-              setEditingCategory={setEditingCategory}
-              handleUpdateCategory={handleUpdateCategory}
-              handleUpdatePriority={handleUpdatePriority}
-              handleCompleteTodo={handleCompleteTodo}
-              handleDeleteTodo={handleDeleteTodo}
-              isCollaborative={(activeSpace?.member_ids?.length ?? 0) > 1}
-              onEdit={handleEditTodo}
-              onChat={handleChatAboutTodo}
-              sessionStatus={todoSessionStatuses[todo._id] as any}
-            />
+            <React.Fragment key={todo._id}>
+              <TodoItem
+                todo={todo}
+                categories={categories}
+                editingCategory={editingCategory}
+                setEditingCategory={setEditingCategory}
+                handleUpdateCategory={handleUpdateCategory}
+                handleUpdatePriority={handleUpdatePriority}
+                handleCompleteTodo={handleCompleteTodo}
+                handleDeleteTodo={handleDeleteTodo}
+                isCollaborative={(activeSpace?.member_ids?.length ?? 0) > 1}
+                onEdit={handleEditTodo}
+                onChat={handleChatAboutTodo}
+                sessionStatus={todoSessionStatuses[todo._id] as any}
+                subtaskCount={childrenByParent.get(todo._id)?.length}
+                subtaskDoneCount={childrenByParent.get(todo._id)?.filter(c => c.completed).length}
+                subtasks={childrenByParent.get(todo._id)}
+                subtaskSessionStatuses={todoSessionStatuses as any}
+              />
+            </React.Fragment>
           ))}
         </div>
       )}

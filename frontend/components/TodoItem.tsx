@@ -1,6 +1,13 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Check, RotateCcw, X, MessageCircle, Clock, User, Bot } from "lucide-react";
 
+interface SubtaskItem {
+  _id: string;
+  text: string;
+  completed: boolean;
+  [key: string]: any;
+}
+
 interface TodoItemProps {
   todo: any;
   categories: string[];
@@ -14,6 +21,11 @@ interface TodoItemProps {
   onEdit: (todo: any) => void;
   onChat?: (todo: any) => void;
   sessionStatus?: 'waiting' | 'unread_reply';
+  isSubtask?: boolean;
+  subtaskCount?: number;
+  subtaskDoneCount?: number;
+  subtasks?: SubtaskItem[];
+  subtaskSessionStatuses?: Record<string, 'waiting' | 'unread_reply'>;
 }
 
 export default function TodoItem({
@@ -29,6 +41,11 @@ export default function TodoItem({
   onEdit,
   onChat,
   sessionStatus,
+  isSubtask,
+  subtaskCount,
+  subtaskDoneCount,
+  subtasks,
+  subtaskSessionStatuses,
 }: TodoItemProps) {
   const [isCompleting, setIsCompleting] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -146,6 +163,11 @@ export default function TodoItem({
               todo.text
             )}
           </p>
+          {subtaskCount != null && subtaskCount > 0 && (
+            <p className="text-xs text-gray-400 mt-1">
+              {subtaskDoneCount || 0}/{subtaskCount} sub-tasks done
+            </p>
+          )}
         </div>
 
         <div className="flex items-center space-x-1 ml-3" onTouchStart={(e) => e.stopPropagation()}>
@@ -344,6 +366,73 @@ export default function TodoItem({
           </span>
         )}
       </div>
+
+      {/* Subtasks rendered inside parent card */}
+      {subtasks && subtasks.length > 0 && (
+        <div className="mt-3 pt-3 border-t border-gray-800 space-y-1.5">
+          {subtasks.map((st, idx) => (
+            <div
+              key={st._id}
+              className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${
+                st.completed
+                  ? 'bg-black/40 text-gray-500'
+                  : 'bg-gray-800/50 text-gray-200'
+              }`}
+            >
+              {/* Subtask complete/uncomplete button */}
+              <button
+                onClick={(e) => { e.stopPropagation(); handleCompleteTodo(st._id); }}
+                className={`flex-shrink-0 w-5 h-5 rounded border transition-colors flex items-center justify-center ${
+                  st.completed
+                    ? 'bg-green-900/40 border-green-700 text-green-400'
+                    : 'border-gray-600 hover:border-green-500 text-transparent hover:text-green-400'
+                }`}
+                aria-label={st.completed ? "Mark subtask incomplete" : "Mark subtask complete"}
+              >
+                <Check className="w-3 h-3" />
+              </button>
+
+              {/* Subtask text */}
+              <span
+                className={`flex-1 text-sm cursor-pointer ${st.completed ? 'line-through' : ''}`}
+                onClick={(e) => { e.stopPropagation(); onEdit(st); }}
+              >
+                {st.text}
+              </span>
+
+              {/* Subtask chat button */}
+              {onChat && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); onChat(st); }}
+                  className={`flex-shrink-0 w-7 h-7 flex items-center justify-center rounded transition-colors ${
+                    subtaskSessionStatuses?.[st._id] === 'unread_reply'
+                      ? 'text-accent'
+                      : subtaskSessionStatuses?.[st._id] === 'waiting'
+                      ? 'text-gray-400'
+                      : 'text-gray-600 hover:text-gray-400'
+                  }`}
+                  aria-label="Chat about subtask"
+                >
+                  {subtaskSessionStatuses?.[st._id] === 'waiting' ? (
+                    <Clock className="w-3.5 h-3.5" />
+                  ) : (
+                    <MessageCircle className="w-3.5 h-3.5" />
+                  )}
+                </button>
+              )}
+
+              {/* Subtask delete */}
+              <button
+                onClick={(e) => { e.stopPropagation(); handleDeleteTodo(st._id); }}
+                className="flex-shrink-0 w-7 h-7 flex items-center justify-center rounded text-gray-600 hover:text-red-400 transition-colors"
+                aria-label="Delete subtask"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
