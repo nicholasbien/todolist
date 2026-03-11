@@ -16,7 +16,7 @@ Heartbeat runbook (every heartbeat)
 2) Pull actionable TodoList work
 - Query TodoList pending sessions using the agent route with explicit agent filter:
   - `GET /agent/sessions/pending?agent_id=openclaw`
-- Backend returns sessions claimed by openclaw plus unclaimed sessions.
+- Backend returns sessions claimed by openclaw.
 
 3) Triage each item into exactly one state
 - `PENDING`: no work started yet.
