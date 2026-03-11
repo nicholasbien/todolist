@@ -1,13 +1,14 @@
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Dict, Optional
 
-import auth
 from bson import ObjectId
-from db import db
 from dotenv import load_dotenv
 from fastapi import HTTPException
 from pydantic import BaseModel, Field
+
+import auth
+from db import db
 from spaces import user_in_space
 
 # Configure logging
@@ -37,13 +38,19 @@ async def init_todo_indexes() -> None:
         await todos_collection.create_index([("space_id", 1), ("user_id", 1)])
 
         # Queries for completed/uncompleted todos within a space
-        await todos_collection.create_index([("user_id", 1), ("space_id", 1), ("completed", 1)])
+        await todos_collection.create_index(
+            [("user_id", 1), ("space_id", 1), ("completed", 1)]
+        )
 
         # Queries sorted by date (most recent first)
-        await todos_collection.create_index([("user_id", 1), ("space_id", 1), ("dateAdded", -1)])
+        await todos_collection.create_index(
+            [("user_id", 1), ("space_id", 1), ("dateAdded", -1)]
+        )
 
         # Queries by category within a space
-        await todos_collection.create_index([("user_id", 1), ("space_id", 1), ("category", 1)])
+        await todos_collection.create_index(
+            [("user_id", 1), ("space_id", 1), ("category", 1)]
+        )
 
         # Sub-task lookups by parent
         await todos_collection.create_index("parent_id")
@@ -75,6 +82,10 @@ class Todo(BaseModel):
     parent_id: Optional[str] = None  # ID of parent todo for sub-tasks
     subtask_ids: list[str] = []  # Ordered array of child todo IDs (on the parent)
     depends_on: list[str] = []  # IDs of sibling subtasks this task depends on
+    closed: bool = False  # Soft-deleted: hidden from active view, visible in completed
+    dateClosed: Optional[str] = None  # ISO timestamp when the todo was closed
+    recurrence_rule: Optional[str] = None  # "daily", "weekly", "monthly", or None
+    recurrence_next: Optional[str] = None  # ISO datetime string for next occurrence
 
     class Config:
         arbitrary_types_allowed = True
@@ -148,7 +159,9 @@ async def create_todo(todo: Todo):
         if not todo.space_id:
             from spaces import spaces_collection
 
-            default_space = await spaces_collection.find_one({"owner_id": todo.user_id, "is_default": True})
+            default_space = await spaces_collection.find_one(
+                {"owner_id": todo.user_id, "is_default": True}
+            )
             if default_space:
                 todo_dict["space_id"] = str(default_space["_id"])
 
@@ -163,12 +176,18 @@ async def create_todo(todo: Todo):
             if not parent:
                 raise HTTPException(status_code=404, detail="Parent todo not found")
             if parent.get("space_id") != final_space_id:
-                raise HTTPException(status_code=403, detail="Parent todo not in same space")
+                raise HTTPException(
+                    status_code=403, detail="Parent todo not in same space"
+                )
             if not parent.get("space_id") and parent.get("user_id") != todo.user_id:
-                raise HTTPException(status_code=403, detail="Parent todo not owned by user")
+                raise HTTPException(
+                    status_code=403, detail="Parent todo not owned by user"
+                )
             # Single-level nesting only
             if parent.get("parent_id"):
-                raise HTTPException(status_code=400, detail="Cannot create sub-task of a sub-task")
+                raise HTTPException(
+                    status_code=400, detail="Cannot create sub-task of a sub-task"
+                )
 
         # Validate depends_on
         if todo.depends_on:
@@ -223,7 +242,9 @@ async def create_todo(todo: Todo):
 
         # Add user's first name for collaborative spaces
         try:
-            user = await auth.users_collection.find_one({"_id": ObjectId(created_todo["user_id"])})
+            user = await auth.users_collection.find_one(
+                {"_id": ObjectId(created_todo["user_id"])}
+            )
             if user:
                 created_todo["first_name"] = user.get("first_name", "")
         except Exception:
@@ -283,6 +304,7 @@ async def get_todos(user_id: str, space_id: Optional[str] | None = None):
 
 
 async def delete_todo(todo_id: str, user_id: str):
+    """Soft-delete: mark the todo as closed instead of removing from the database."""
     try:
         # Check if todo_id is valid
         if not todo_id or todo_id == "None" or todo_id == "undefined":
@@ -291,7 +313,65 @@ async def delete_todo(todo_id: str, user_id: str):
         try:
             object_id = ObjectId(todo_id)
         except Exception:
-            raise HTTPException(status_code=400, detail=f"Invalid todo ID format: {todo_id}")
+            raise HTTPException(
+                status_code=400, detail=f"Invalid todo ID format: {todo_id}"
+            )
+
+        query = {"_id": object_id}
+        todo = await todos_collection.find_one(query)
+        if not todo:
+            raise HTTPException(status_code=404, detail="Todo not found")
+        if todo.get("space_id") and not await user_in_space(user_id, todo["space_id"]):
+            raise HTTPException(status_code=403, detail="Not in space")
+
+        now = datetime.now().isoformat()
+        result = await todos_collection.update_one(
+            query,
+            {
+                "$set": {
+                    "closed": True,
+                    "dateClosed": now,
+                    "completed": True,
+                    "dateCompleted": now,
+                }
+            },
+        )
+        if result.modified_count == 1:
+            # Also close all sub-tasks if this was a parent
+            if todo.get("subtask_ids"):
+                await todos_collection.update_many(
+                    {"parent_id": todo_id},
+                    {
+                        "$set": {
+                            "closed": True,
+                            "dateClosed": now,
+                            "completed": True,
+                            "dateCompleted": now,
+                        }
+                    },
+                )
+            return {"message": "Todo closed successfully"}
+        raise HTTPException(status_code=404, detail="Todo not found")
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        logger.error(f"Error closing todo: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error closing todo: {str(e)}")
+
+
+async def permanent_delete_todo(todo_id: str, user_id: str):
+    """Permanently remove the todo from the database."""
+    try:
+        # Check if todo_id is valid
+        if not todo_id or todo_id == "None" or todo_id == "undefined":
+            raise HTTPException(status_code=400, detail="Invalid todo ID")
+
+        try:
+            object_id = ObjectId(todo_id)
+        except Exception:
+            raise HTTPException(
+                status_code=400, detail=f"Invalid todo ID format: {todo_id}"
+            )
 
         query = {"_id": object_id}
         todo = await todos_collection.find_one(query)
@@ -315,13 +395,15 @@ async def delete_todo(todo_id: str, user_id: str):
                 )
             # Cascade delete: remove all sub-tasks if this was a parent
             await todos_collection.delete_many({"parent_id": todo_id})
-            return {"message": "Todo deleted successfully"}
+            return {"message": "Todo permanently deleted"}
         raise HTTPException(status_code=404, detail="Todo not found")
     except HTTPException as he:
         raise he
     except Exception as e:
-        logger.error(f"Error deleting todo: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error deleting todo: {str(e)}")
+        logger.error(f"Error permanently deleting todo: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Error permanently deleting todo: {str(e)}"
+        )
 
 
 async def complete_todo(todo_id: str, user_id: str):
@@ -333,7 +415,9 @@ async def complete_todo(todo_id: str, user_id: str):
         try:
             object_id = ObjectId(todo_id)
         except Exception:
-            raise HTTPException(status_code=400, detail=f"Invalid todo ID format: {todo_id}")
+            raise HTTPException(
+                status_code=400, detail=f"Invalid todo ID format: {todo_id}"
+            )
 
         query = {"_id": object_id}
         todo = await todos_collection.find_one(query)
@@ -351,7 +435,13 @@ async def complete_todo(todo_id: str, user_id: str):
         if new_completed_status:
             # Setting as complete - set both fields
             result = await todos_collection.update_one(
-                query, {"$set": {"completed": True, "dateCompleted": datetime.now().isoformat()}}
+                query,
+                {
+                    "$set": {
+                        "completed": True,
+                        "dateCompleted": datetime.now().isoformat(),
+                    }
+                },
             )
         else:
             # Setting as incomplete - set completed to false and remove dateCompleted
@@ -360,7 +450,25 @@ async def complete_todo(todo_id: str, user_id: str):
             )
         if result.modified_count == 1:
             status = "complete" if new_completed_status else "incomplete"
-            return {"message": f"Todo marked as {status}", "parent_id": todo.get("parent_id")}
+            response = {
+                "message": f"Todo marked as {status}",
+                "parent_id": todo.get("parent_id"),
+            }
+
+            # If completing a recurring task, auto-create the next occurrence
+            if new_completed_status and todo.get("recurrence_rule"):
+                try:
+                    # Re-read the todo to get the latest state
+                    updated_todo = await todos_collection.find_one({"_id": object_id})
+                    if updated_todo:
+                        next_todo = await create_recurring_next(updated_todo)
+                        if next_todo:
+                            response["recurring_next_id"] = next_todo["_id"]
+                            response["recurring_next_text"] = next_todo["text"]
+                except Exception as e:
+                    logger.error(f"Error creating next recurring todo: {e}")
+
+            return response
         raise HTTPException(status_code=404, detail="Todo not found")
     except HTTPException as he:
         raise he
@@ -371,7 +479,9 @@ async def complete_todo(todo_id: str, user_id: str):
 
 async def update_todo_fields(todo_id: str, updates: dict, user_id: str):
     try:
-        logger.info(f"UPDATE DEBUG - todo_id: {todo_id}, updates: {updates}, user_id: {user_id}")
+        logger.info(
+            f"UPDATE DEBUG - todo_id: {todo_id}, updates: {updates}, user_id: {user_id}"
+        )
 
         # Check if todo_id is valid
         if not todo_id or todo_id == "None" or todo_id == "undefined":
@@ -380,7 +490,9 @@ async def update_todo_fields(todo_id: str, updates: dict, user_id: str):
         try:
             object_id = ObjectId(todo_id)
         except Exception:
-            raise HTTPException(status_code=400, detail=f"Invalid todo ID format: {todo_id}")
+            raise HTTPException(
+                status_code=400, detail=f"Invalid todo ID format: {todo_id}"
+            )
 
         query = {"_id": object_id}
         todo = await todos_collection.find_one(query)
@@ -402,10 +514,17 @@ async def update_todo_fields(todo_id: str, updates: dict, user_id: str):
                 # Validate each dep is a sibling
                 for dep_id in new_deps:
                     if dep_id == todo_id:
-                        raise HTTPException(status_code=400, detail="A subtask cannot depend on itself")
-                    dep_todo = await todos_collection.find_one({"_id": ObjectId(dep_id)})
+                        raise HTTPException(
+                            status_code=400, detail="A subtask cannot depend on itself"
+                        )
+                    dep_todo = await todos_collection.find_one(
+                        {"_id": ObjectId(dep_id)}
+                    )
                     if not dep_todo:
-                        raise HTTPException(status_code=400, detail=f"depends_on ID {dep_id} does not exist")
+                        raise HTTPException(
+                            status_code=400,
+                            detail=f"depends_on ID {dep_id} does not exist",
+                        )
                     if dep_todo.get("parent_id") != parent_id:
                         raise HTTPException(
                             status_code=400,
@@ -429,7 +548,9 @@ async def update_todo_fields(todo_id: str, updates: dict, user_id: str):
 
                 # Add user's first name for collaborative spaces
                 try:
-                    user = await auth.users_collection.find_one({"_id": ObjectId(updated_todo["user_id"])})
+                    user = await auth.users_collection.find_one(
+                        {"_id": ObjectId(updated_todo["user_id"])}
+                    )
                     if user:
                         updated_todo["first_name"] = user.get("first_name", "")
                 except Exception:
@@ -442,7 +563,9 @@ async def update_todo_fields(todo_id: str, updates: dict, user_id: str):
     except HTTPException as he:
         raise he
     except Exception as e:
-        logger.error(f"Error updating todo - Exception type: {type(e)}, Exception args: {e.args}, Exception: {repr(e)}")
+        logger.error(
+            f"Error updating todo - Exception type: {type(e)}, Exception args: {e.args}, Exception: {repr(e)}"
+        )
         raise HTTPException(status_code=500, detail=f"Error updating todo: {repr(e)}")
 
 
@@ -450,9 +573,13 @@ async def update_todo_fields(todo_id: str, updates: dict, user_id: str):
 async def migrate_legacy_todos() -> None:
     try:
         # Update all todos that don't have space_id field to have space_id: None
-        result = await todos_collection.update_many({"space_id": {"$exists": False}}, {"$set": {"space_id": None}})
+        result = await todos_collection.update_many(
+            {"space_id": {"$exists": False}}, {"$set": {"space_id": None}}
+        )
         if result.modified_count > 0:
-            logger.info("Migrated %d legacy todos to have space_id: None", result.modified_count)
+            logger.info(
+                "Migrated %d legacy todos to have space_id: None", result.modified_count
+            )
 
         # Ensure parent_id and subtask_ids fields exist on all todos
         result = await todos_collection.update_many(
@@ -460,21 +587,49 @@ async def migrate_legacy_todos() -> None:
             {"$set": {"parent_id": None}},
         )
         if result.modified_count > 0:
-            logger.info("Migrated %d legacy todos to have parent_id: None", result.modified_count)
+            logger.info(
+                "Migrated %d legacy todos to have parent_id: None",
+                result.modified_count,
+            )
 
         result = await todos_collection.update_many(
             {"subtask_ids": {"$exists": False}},
             {"$set": {"subtask_ids": []}},
         )
         if result.modified_count > 0:
-            logger.info("Migrated %d legacy todos to have subtask_ids: []", result.modified_count)
+            logger.info(
+                "Migrated %d legacy todos to have subtask_ids: []",
+                result.modified_count,
+            )
 
         result = await todos_collection.update_many(
             {"depends_on": {"$exists": False}},
             {"$set": {"depends_on": []}},
         )
         if result.modified_count > 0:
-            logger.info("Migrated %d legacy todos to have depends_on: []", result.modified_count)
+            logger.info(
+                "Migrated %d legacy todos to have depends_on: []", result.modified_count
+            )
+
+        # Ensure closed field exists on all todos (default: false)
+        result = await todos_collection.update_many(
+            {"closed": {"$exists": False}},
+            {"$set": {"closed": False}},
+        )
+        if result.modified_count > 0:
+            logger.info(
+                "Migrated %d legacy todos to have closed: false", result.modified_count
+            )
+
+        result = await todos_collection.update_many(
+            {"recurrence_rule": {"$exists": False}},
+            {"$set": {"recurrence_rule": None, "recurrence_next": None}},
+        )
+        if result.modified_count > 0:
+            logger.info(
+                "Migrated %d legacy todos to have recurrence fields",
+                result.modified_count,
+            )
     except Exception as e:
         logger.error(f"Error migrating legacy todos: {str(e)}")
 
@@ -566,7 +721,9 @@ async def handle_subtask_completion(todo_id: str, user_id: str):
             "user",
             f"Dependencies satisfied ({deps_msg} completed). You may now begin this subtask.",
         )
-        logger.info(f"Activated unblocked subtask session {session_id} for todo {sub_todo_id}")
+        logger.info(
+            f"Activated unblocked subtask session {session_id} for todo {sub_todo_id}"
+        )
 
     # Post progress update to parent session
     done_count = len(completed_ids)
@@ -583,7 +740,9 @@ async def handle_subtask_completion(todo_id: str, user_id: str):
                 "user",
                 f"All {total_count} subtasks are now complete. Please review the results and provide a final summary.",
             )
-            logger.info(f"All subtasks done — notified parent session {parent_session_id}")
+            logger.info(
+                f"All subtasks done — notified parent session {parent_session_id}"
+            )
         else:
             # Progress update
             await append_message(
@@ -592,7 +751,87 @@ async def handle_subtask_completion(todo_id: str, user_id: str):
                 "user",
                 f"Subtask completed: \"{todo.get('text', '')}\" ({done_count}/{total_count} done)",
             )
-            logger.info(f"Posted progress to parent session: {done_count}/{total_count}")
+            logger.info(
+                f"Posted progress to parent session: {done_count}/{total_count}"
+            )
+
+
+def _compute_next_occurrence(rule: str, from_date: datetime | None = None) -> str:
+    """Compute the next occurrence date based on recurrence rule.
+
+    Returns an ISO datetime string for the next occurrence.
+    """
+    base = from_date or datetime.now()
+    if rule == "daily":
+        next_dt = base + timedelta(days=1)
+    elif rule == "weekly":
+        next_dt = base + timedelta(weeks=1)
+    elif rule == "monthly":
+        # Advance by one month, handling month-end edge cases
+        month = base.month % 12 + 1
+        year = base.year + (1 if base.month == 12 else 0)
+        day = min(base.day, 28)  # Safe day to avoid month-end issues
+        next_dt = base.replace(year=year, month=month, day=day)
+    else:
+        next_dt = base + timedelta(days=1)
+    return next_dt.isoformat()
+
+
+async def create_recurring_next(todo: dict) -> dict | None:
+    """Create the next occurrence of a recurring task.
+
+    Clones the completed todo with a new dateAdded and due date shifted forward.
+    Returns the created todo dict or None if not recurring.
+    """
+    rule = todo.get("recurrence_rule")
+    if not rule:
+        return None
+
+    now = datetime.now()
+    next_date = _compute_next_occurrence(rule, now)
+
+    # Build the new todo document, preserving key fields
+    new_todo = {
+        "text": todo["text"],
+        "category": todo.get("category", "General"),
+        "priority": todo.get("priority", "Medium"),
+        "dateAdded": now.isoformat(),
+        "completed": False,
+        "user_id": todo["user_id"],
+        "space_id": todo.get("space_id"),
+        "creator_type": todo.get("creator_type", "user"),
+        "agent_id": todo.get("agent_id"),
+        "notes": todo.get("notes"),
+        "link": todo.get("link"),
+        "recurrence_rule": rule,
+        "recurrence_next": next_date,
+        "parent_id": None,
+        "subtask_ids": [],
+        "depends_on": [],
+        "sortOrder": todo.get("sortOrder"),
+    }
+
+    # Shift due date forward by the recurrence interval if the original had one
+    if todo.get("dueDate"):
+        try:
+            datetime.fromisoformat(todo["dueDate"])
+            new_due_dt = datetime.fromisoformat(next_date)
+            new_todo["dueDate"] = new_due_dt.strftime("%Y-%m-%d")
+        except (ValueError, TypeError):
+            new_todo["dueDate"] = None
+    else:
+        new_todo["dueDate"] = None
+
+    result = await todos_collection.insert_one(new_todo)
+    new_todo["_id"] = str(result.inserted_id)
+
+    logger.info(
+        "Created next recurring task '%s' (rule=%s, next=%s)",
+        new_todo["text"],
+        rule,
+        next_date,
+    )
+    return new_todo
 
 
 async def health_check():
@@ -605,4 +844,6 @@ async def health_check():
             await db.list_collection_names()
         return {"status": "healthy", "database": "connected"}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Database connection error: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Database connection error: {str(e)}"
+        )

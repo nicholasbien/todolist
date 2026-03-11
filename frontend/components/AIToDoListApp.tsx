@@ -6,6 +6,8 @@ import { useAuth } from "../context/AuthContext";
 import Link from "next/link";
 import InsightsComponent from "./InsightsComponent";
 import JournalComponent from "./JournalComponent";
+import BriefingSettings from "./BriefingSettings";
+import ActivityFeed from "./ActivityFeed";
 import SpaceDropdown from "./SpaceDropdown";
 import { sortSpaces } from "../utils/spaceUtils";
 import { loadSortModePreference, saveSortModePreference, type SortMode } from "../utils/sortPreferences";
@@ -101,6 +103,7 @@ export default function AIToDoListApp({
   const { logout, clearAuthExpired, authenticatedFetch } = useAuth();
   const [todos, setTodos] = useState<any[]>([]);
   const [newTodo, setNewTodo] = useState("");
+  const [newTodoNotes, setNewTodoNotes] = useState("");
   const [isNewTodoFocused, setIsNewTodoFocused] = useState(false);
   const [categories, setCategories] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -141,6 +144,7 @@ export default function AIToDoListApp({
   const [spaceToEdit, setSpaceToEdit] = useState<any>(null);
   const [spaceMembers, setSpaceMembers] = useState<any[]>([]);
   const [showOfflineTooltip, setShowOfflineTooltip] = useState(false);
+  const [showBriefingSettings, setShowBriefingSettings] = useState(false);
 
   useEffect(() => {
     activeSpaceRef.current = activeSpace;
@@ -204,12 +208,15 @@ export default function AIToDoListApp({
   const [editDueDate, setEditDueDate] = useState<string>('');
   const [editSpaceId, setEditSpaceId] = useState<string>('');
   const [editSpaceCategories, setEditSpaceCategories] = useState<string[]>([]);
+  const [showPermanentDeleteConfirm, setShowPermanentDeleteConfirm] = useState(false);
+  const [editRecurrenceRule, setEditRecurrenceRule] = useState<string>('');
   const [newTodoAgent, setNewTodoAgent] = useState<string>(() => {
     if (typeof window !== 'undefined') {
       return localStorage.getItem('lastSelectedAgent') || '';
     }
     return '';
   });
+  const [newTodoRecurrence, setNewTodoRecurrence] = useState<string>('');
 
   // Long-press to edit category
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -221,10 +228,11 @@ export default function AIToDoListApp({
   const membersFetchIdRef = useRef(0);
 
   // Tab state
-  const [activeTab, setActiveTab] = useState<'tasks' | 'agent' | 'journal'>('tasks');
-  const [tabIndex, setTabIndex] = useState(0); // 0=tasks, 1=agent
+  const [activeTab, setActiveTab] = useState<'tasks' | 'agent' | 'activity' | 'journal'>('tasks');
+  const [tabIndex, setTabIndex] = useState(0); // 0=tasks, 1=agent, 2=activity
   const tasksTabRef = useRef<HTMLDivElement>(null);
   const agentTabRef = useRef<HTMLDivElement>(null);
+  const activityTabRef = useRef<HTMLDivElement>(null);
   const journalTabRef = useRef<HTMLDivElement>(null);
 
   // Session state for task-linked chats
@@ -464,7 +472,7 @@ export default function AIToDoListApp({
 
   // Handle tab change (from button click only - swiping is disabled)
   const handleTabChange = useCallback((index: number) => {
-    const tabs: ('tasks' | 'agent' | 'journal')[] = ['tasks', 'agent'];
+    const tabs: ('tasks' | 'agent' | 'activity' | 'journal')[] = ['tasks', 'agent', 'activity'];
     setTabIndex(index);
     setActiveTab(tabs[index]);
   }, []);
@@ -474,6 +482,7 @@ export default function AIToDoListApp({
     const refMap = {
       tasks: tasksTabRef,
       agent: agentTabRef,
+      activity: activityTabRef,
       journal: journalTabRef
     };
     const ref = refMap[activeTab];
@@ -810,11 +819,8 @@ export default function AIToDoListApp({
 
   // Add new todo(s)
   const handleAddTodo = async () => {
-    const lines = newTodo
-      .split('\n')
-      .map((line) => line.trim())
-      .filter(Boolean);
-    if (lines.length === 0) return;
+    const title = newTodo.trim();
+    if (!title) return;
 
     setLoading(true);
     setError('');
@@ -826,48 +832,55 @@ export default function AIToDoListApp({
       const localTimeString = now.toLocaleTimeString('en-GB', { hour12: false }); // HH:MM:SS format
       const localISOString = `${localDateString}T${localTimeString}`;
 
-      for (const line of lines) {
-        const todo: any = {
-          text: line,
-          dateAdded: localISOString,
-          completed: false,
-          space_id: activeSpace ? activeSpace._id : null,
-          agent_id: newTodoAgent || null,
-        };
+      const todo: any = {
+        text: title,
+        dateAdded: localISOString,
+        completed: false,
+        space_id: activeSpace ? activeSpace._id : null,
+        agent_id: newTodoAgent || null,
+        recurrence_rule: newTodoRecurrence || null,
+      };
 
-        // If a category is selected (not "All"), skip AI classification on backend
-        if (activeCat !== 'All') {
-          todo.category = activeCat;
-          todo.priority = 'Medium';
-        }
+      // Include notes if provided
+      const notes = newTodoNotes.trim();
+      if (notes) {
+        todo.notes = notes;
+      }
 
-        // Store link if it's a URL so backend can fetch title
-        if (isUrl(line)) {
-          todo.link = line;
-        }
+      // If a category is selected (not "All"), skip AI classification on backend
+      if (activeCat !== 'All') {
+        todo.category = activeCat;
+        todo.priority = 'Medium';
+      }
 
-        // Save to MongoDB with timeout
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+      // Store link if it's a URL so backend can fetch title
+      if (isUrl(title)) {
+        todo.link = title;
+      }
 
-        const response = await authenticatedFetch('/todos', {
-          method: 'POST',
-          body: JSON.stringify(todo),
-          signal: controller.signal
-        });
+      // Save to MongoDB with timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
 
-        clearTimeout(timeoutId);
+      const response = await authenticatedFetch('/todos', {
+        method: 'POST',
+        body: JSON.stringify(todo),
+        signal: controller.signal
+      });
 
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.detail || 'Failed to save todo');
-        }
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to save todo');
       }
 
       // Refresh todos list
       await fetchTodos(false);
       setNewTodo('');
+      setNewTodoNotes('');
       setNewTodoAgent('');
+      setNewTodoRecurrence('');
     } catch (err) {
       if (err.name === 'AbortError') {
         setError('Request timed out. Please try again.');
@@ -879,7 +892,7 @@ export default function AIToDoListApp({
     }
   };
 
-  // Delete todo
+  // Delete todo (soft-delete: marks as closed)
   const handleDeleteTodo = async (id) => {
     try {
       // Validate ID
@@ -894,14 +907,43 @@ export default function AIToDoListApp({
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.detail || 'Failed to delete todo');
+        throw new Error(errorData.detail || 'Failed to close todo');
       }
 
       // Refresh todos list
       await fetchTodos(false);
       setError(''); // Clear any existing errors on success
     } catch (err) {
-      handleError(err, 'Error deleting todo');
+      handleError(err, 'Error closing todo');
+    }
+  };
+
+  // Permanently delete todo (removes from database)
+  const handlePermanentDeleteTodo = async (id) => {
+    try {
+      // Validate ID
+      if (!id || id === "None" || id === "undefined") {
+        setError('Invalid todo ID');
+        return;
+      }
+
+      const response = await authenticatedFetch(`/todos/${id}/permanent`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to permanently delete todo');
+      }
+
+      // Close modal and refresh
+      setShowEditTodoModal(false);
+      setShowPermanentDeleteConfirm(false);
+      setTodoToEdit(null);
+      await fetchTodos(false);
+      setError(''); // Clear any existing errors on success
+    } catch (err) {
+      handleError(err, 'Error permanently deleting todo');
     }
   };
 
@@ -980,6 +1022,7 @@ export default function AIToDoListApp({
 
   const handleEditTodo = async (todo) => {
     setTodoToEdit(todo);
+    setShowPermanentDeleteConfirm(false);
     setEditText(todo.text);
     setEditNotes(todo.notes || '');
     setEditCategoryVal(todo.category);
@@ -1021,6 +1064,7 @@ export default function AIToDoListApp({
       }
     }
     setEditDueDate(formattedDate);
+    setEditRecurrenceRule(todo.recurrence_rule || '');
 
     setShowEditTodoModal(true);
   };
@@ -1059,6 +1103,7 @@ export default function AIToDoListApp({
         priority: editPriorityVal,
         dueDate: editDueDate || null,
         space_id: editSpaceId, // Always include space_id since todos must have a space
+        recurrence_rule: editRecurrenceRule || null,
       };
       // Optimistic update
       setTodos(prev => prev.map(t => t._id === todoToEdit._id ? { ...t, ...updates } : t));
@@ -1385,6 +1430,7 @@ export default function AIToDoListApp({
                 e.target.value = '';
                 if (action === 'account') onShowAccountSettings?.();
                 else if (action === 'email') onShowEmailSettings?.();
+                else if (action === 'briefings') setShowBriefingSettings(true);
                 else if (action === 'insights') onShowInsights?.();
                 else if (action === 'export') onShowExportModal?.();
                 else if (action === 'contact') onShowContactModal?.();
@@ -1396,6 +1442,7 @@ export default function AIToDoListApp({
               <option value="" disabled>Settings</option>
               <option value="account">Account</option>
               <option value="email">Email Settings</option>
+              <option value="briefings">Briefings</option>
               <option value="insights">Insights</option>
               <option value="export">Export Data</option>
               <option value="contact">Contact</option>
@@ -1452,18 +1499,16 @@ export default function AIToDoListApp({
         >
           Assistant
         </button>
-        {/* Journal tab hidden - kept for future re-enabling
         <button
           onClick={() => handleTabChange(2)}
           className={`flex-1 py-3 px-2 sm:px-6 font-medium text-sm transition-colors ${
-            activeTab === 'journal'
+            activeTab === 'activity'
               ? 'text-accent border-b-2 border-accent'
               : 'text-gray-400 hover:text-gray-300'
           }`}
         >
-          Journal
+          Activity
         </button>
-        */}
       </div>
 
       {/* Tab Content */}
@@ -1641,29 +1686,22 @@ export default function AIToDoListApp({
       {/* Add new todo */}
       <div className="mb-5">
         <div className="flex gap-2 items-end">
-          <textarea
+          <input
+            type="text"
             value={newTodo}
-            onChange={(e) => {
-              setNewTodo(e.target.value);
-              e.target.style.height = 'auto';
-              e.target.style.height = Math.min(e.target.scrollHeight, 140) + 'px';
-            }}
+            onChange={(e) => setNewTodo(e.target.value)}
             onFocus={() => setIsNewTodoFocused(true)}
             onBlur={() => setIsNewTodoFocused(false)}
             onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
+              if (e.key === 'Enter') {
                 e.preventDefault();
                 handleAddTodo();
-                // Reset height after submit
-                const target = e.target as HTMLTextAreaElement;
-                setTimeout(() => { target.style.height = 'auto'; }, 0);
               }
             }}
-            placeholder="Add task(s)… (Shift+Enter for newline)"
+            placeholder="Task title…"
             disabled={loading}
-            aria-label="Add new task"
-            rows={1}
-            className="flex-1 p-3 border border-gray-800 rounded-xl bg-black text-gray-100 placeholder-gray-500 focus:border-accent focus:outline-none transition-colors resize-none min-h-[48px] max-h-[140px] overflow-y-auto"
+            aria-label="Task title"
+            className="flex-1 p-3 border border-gray-800 rounded-xl bg-black text-gray-100 placeholder-gray-500 focus:border-accent focus:outline-none transition-colors h-12"
           />
           <select
             value={newTodoAgent}
@@ -1677,6 +1715,18 @@ export default function AIToDoListApp({
             <option value="openclaw">OpenClaw</option>
             <option value="claude">Claude</option>
           </select>
+          <select
+            value={newTodoRecurrence}
+            onChange={(e) => setNewTodoRecurrence(e.target.value)}
+            className={`h-12 px-2 rounded-xl bg-gray-900 border text-sm focus:border-accent focus:outline-none transition-colors appearance-none cursor-pointer ${
+              newTodoRecurrence ? 'border-accent text-accent' : 'border-gray-700 text-gray-200'
+            }`}
+          >
+            <option value="">Once</option>
+            <option value="daily">Daily</option>
+            <option value="weekly">Weekly</option>
+            <option value="monthly">Monthly</option>
+          </select>
           <button
             onClick={handleAddTodo}
             disabled={loading}
@@ -1689,6 +1739,19 @@ export default function AIToDoListApp({
             {loading ? '...' : '+'}
           </button>
         </div>
+        <textarea
+          value={newTodoNotes}
+          onChange={(e) => {
+            setNewTodoNotes(e.target.value);
+            e.target.style.height = 'auto';
+            e.target.style.height = Math.min(e.target.scrollHeight, 140) + 'px';
+          }}
+          placeholder="Notes (optional)"
+          disabled={loading}
+          aria-label="Task notes"
+          rows={1}
+          className="w-full mt-2 p-3 border border-gray-800 rounded-xl bg-black text-gray-100 placeholder-gray-500 focus:border-accent focus:outline-none transition-colors resize-none min-h-[40px] max-h-[140px] overflow-y-auto text-sm"
+        />
       </div>
 
       {showAddSpaceModal && (
@@ -2017,9 +2080,51 @@ export default function AIToDoListApp({
                 </button>
               )}
             </div>
+            <div>
+              <label className="block text-sm text-gray-300 mb-2">Repeat</label>
+              <select
+                value={editRecurrenceRule}
+                onChange={(e) => setEditRecurrenceRule(e.target.value)}
+                className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 text-base focus:outline-none focus:border-accent"
+              >
+                <option value="">No repeat</option>
+                <option value="daily">Daily</option>
+                <option value="weekly">Weekly</option>
+                <option value="monthly">Monthly</option>
+              </select>
+            </div>
             <div className="flex justify-center space-x-3">
               <button onClick={handleSaveTodoEdit} className="border border-accent text-accent hover:bg-accent/10 px-6 py-2 rounded-lg transition-colors">Save</button>
               <button onClick={() => setShowEditTodoModal(false)} className="border border-gray-600 text-gray-300 hover:bg-gray-800 px-6 py-2 rounded-lg transition-colors">Cancel</button>
+            </div>
+            {/* Permanently Delete */}
+            <div className="pt-3 border-t border-gray-800 mt-2">
+              {!showPermanentDeleteConfirm ? (
+                <button
+                  onClick={() => setShowPermanentDeleteConfirm(true)}
+                  className="w-full text-center text-red-400 hover:text-red-300 text-sm py-2 transition-colors"
+                >
+                  Permanently Delete
+                </button>
+              ) : (
+                <div className="space-y-2">
+                  <p className="text-center text-red-400 text-sm">Are you sure? This cannot be undone.</p>
+                  <div className="flex justify-center space-x-3">
+                    <button
+                      onClick={() => todoToEdit && handlePermanentDeleteTodo(todoToEdit._id)}
+                      className="border border-red-500 text-red-400 hover:bg-red-900/20 px-6 py-2 rounded-lg transition-colors text-sm"
+                    >
+                      Yes, Delete Forever
+                    </button>
+                    <button
+                      onClick={() => setShowPermanentDeleteConfirm(false)}
+                      className="border border-gray-600 text-gray-300 hover:bg-gray-800 px-4 py-2 rounded-lg transition-colors text-sm"
+                    >
+                      No
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -2044,20 +2149,34 @@ export default function AIToDoListApp({
               isActive={activeTab === 'agent'}
               pendingSessionId={pendingSessionId}
               onSessionLoaded={() => setPendingSessionId(null)}
+              onNavigateToTasks={() => {
+                setTabIndex(0);
+                setActiveTab('tasks');
+              }}
             />
           </div>
         </div>
 
-        {/* Journal Tab - hidden, kept for future re-enabling
+        {/* Activity Tab */}
         <div
-          ref={journalTabRef}
+          ref={activityTabRef}
           style={{ padding: '16px 16px 0 16px', height: '100%', display: 'flex', flexDirection: 'column', touchAction: 'pan-y' }}
         >
           <div style={{ flex: 1, minHeight: 0 }}>
-            <JournalComponent token={token} activeSpace={activeSpace} />
+            <ActivityFeed
+              activeSpace={activeSpace}
+              token={token}
+              isActive={activeTab === 'activity'}
+              onOpenTaskChat={(todoId: string) => {
+                // Find the todo and open its chat
+                const todo = todos.find((t: any) => t._id === todoId);
+                if (todo) {
+                  handleChatAboutTodo(todo);
+                }
+              }}
+            />
           </div>
         </div>
-        */}
       </SwipeableViews>
       </div>
 
@@ -2085,6 +2204,15 @@ export default function AIToDoListApp({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Briefing Settings Modal */}
+      {showBriefingSettings && (
+        <BriefingSettings
+          token={token}
+          authenticatedFetch={authenticatedFetch}
+          onClose={() => setShowBriefingSettings(false)}
+        />
       )}
 
       {/* Email Settings Modal */}

@@ -1,3 +1,6 @@
+// Force test environment for React act() support
+process.env.NODE_ENV = 'test';
+
 const nextJest = require('next/jest');
 const createJestConfig = nextJest({ dir: './' });
 

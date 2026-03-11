@@ -41,30 +41,41 @@ class TaskUpdateRequest(BaseModel):
 
 
 class TaskListRequest(BaseModel):
-    completed: Optional[bool] = Field(None, description="Filter by completion status (optional)")
+    completed: Optional[bool] = Field(
+        None, description="Filter by completion status (optional)"
+    )
 
 
 class JournalAddRequest(BaseModel):
     content: str = Field(..., min_length=1, description="Journal entry content")
-    date: Optional[str] = Field(None, description="Date in YYYY-MM-DD format (optional, defaults to today)")
+    date: Optional[str] = Field(
+        None, description="Date in YYYY-MM-DD format (optional, defaults to today)"
+    )
 
 
 class JournalReadRequest(BaseModel):
     date: Optional[str] = Field(
-        None, description="Date in YYYY-MM-DD format (optional, gets recent entries if not provided)"
+        None,
+        description="Date in YYYY-MM-DD format (optional, gets recent entries if not provided)",
     )
-    limit: int = Field(default=5, description="Number of recent entries to return if no date specified")
+    limit: int = Field(
+        default=5, description="Number of recent entries to return if no date specified"
+    )
 
 
 class SearchRequest(BaseModel):
     query: str = Field(..., min_length=1, description="Search query")
-    types: Optional[List[Literal["task", "journal"]]] = Field(None, description="Types to search (optional)")
+    types: Optional[List[Literal["task", "journal"]]] = Field(
+        None, description="Types to search (optional)"
+    )
     limit: int = Field(default=8, ge=1, le=50, description="Maximum results")
 
 
 class WebSearchRequest(BaseModel):
     query: str = Field(..., min_length=1, description="Search query")
-    count: int = Field(default=5, ge=1, le=10, description="Number of results to return")
+    count: int = Field(
+        default=5, ge=1, le=10, description="Number of results to return"
+    )
     freshness: Optional[str] = Field(
         default="pm",
         description="Freshness filter: 'pd' (past day), 'pw' (past week), 'pm' (past month), 'py' (past year)",
@@ -74,17 +85,59 @@ class WebSearchRequest(BaseModel):
 
 class WebScrapingRequest(BaseModel):
     url: str = Field(..., description="URL to scrape")
-    selector: Optional[str] = Field(None, description="CSS selector to extract specific content (optional)")
+    selector: Optional[str] = Field(
+        None, description="CSS selector to extract specific content (optional)"
+    )
     extract_text: bool = Field(default=True, description="Extract text content")
     extract_html: bool = Field(default=False, description="Extract HTML content")
 
 
 class SendEmailRequest(BaseModel):
-    text: str = Field(..., min_length=1, description="Plain text content of the email to send to the user")
+    text: str = Field(
+        ...,
+        min_length=1,
+        description="Plain text content of the email to send to the user",
+    )
     title: Optional[str] = Field(
         None,
         min_length=1,
         description="Optional subject line for the email. If omitted, a default subject is used.",
+    )
+
+
+class MemorySaveRequest(BaseModel):
+    key: str = Field(
+        ...,
+        min_length=1,
+        description=(
+            "Short identifier for this memory fact, e.g. 'preferred_name', "
+            "'work_schedule', 'communication_style', 'project_context'"
+        ),
+    )
+    value: str = Field(
+        ..., min_length=1, description="The value or description to remember"
+    )
+    category: Optional[str] = Field(
+        default=None,
+        description="Optional category: 'preference', 'context', 'workflow', or 'personal'",
+    )
+
+
+class MemoryListRequest(BaseModel):
+    category: Optional[str] = Field(
+        default=None,
+        description="Optional category filter: 'preference', 'context', 'workflow', or 'personal'",
+    )
+
+
+class MemoryDeleteRequest(BaseModel):
+    key: str = Field(..., min_length=1, description="Key of the memory fact to delete")
+
+
+class SearchSessionsRequest(BaseModel):
+    query: str = Field(..., min_length=1, description="Search query text")
+    limit: int = Field(
+        default=20, ge=1, le=50, description="Maximum number of results to return"
     )
 
 
@@ -101,7 +154,12 @@ def get_openai_tool_schema(model_class: BaseModel) -> dict:
     required = schema.get("required", [])
     properties = schema.get("properties", {})
 
-    return {"type": "object", "properties": properties, "required": required, "additionalProperties": False}
+    return {
+        "type": "object",
+        "properties": properties,
+        "required": required,
+        "additionalProperties": False,
+    }
 
 
 # Tool schema mapping for OpenAI Responses API
@@ -162,5 +220,45 @@ OPENAI_TOOL_SCHEMAS = {
             "Call when the user asks the assistant to email them information or a recap."
         ),
         "parameters": get_openai_tool_schema(SendEmailRequest),
+    },
+    "save_memory": {
+        "type": "function",
+        "name": "save_memory",
+        "description": (
+            "Save a fact or preference about the user to persistent memory. "
+            "Use this proactively when the user shares preferences, context about themselves, "
+            "their work style, project details, or anything worth remembering across sessions. "
+            "Examples: preferred name, communication style, recurring projects, timezone, "
+            "tools they use, team structure. The memory persists across all future conversations."
+        ),
+        "parameters": get_openai_tool_schema(MemorySaveRequest),
+    },
+    "list_memories": {
+        "type": "function",
+        "name": "list_memories",
+        "description": (
+            "List all saved memory facts about the user. "
+            "Call when the user asks what you know about them, or to review stored preferences."
+        ),
+        "parameters": get_openai_tool_schema(MemoryListRequest),
+    },
+    "delete_memory": {
+        "type": "function",
+        "name": "delete_memory",
+        "description": (
+            "Delete a specific memory fact by key. "
+            "Call when the user asks to forget something or correct outdated information."
+        ),
+        "parameters": get_openai_tool_schema(MemoryDeleteRequest),
+    },
+    "search_sessions": {
+        "type": "function",
+        "name": "search_sessions",
+        "description": (
+            "Search chat sessions by title and message content. "
+            "Call when the user wants to find a past conversation, look up what was discussed, "
+            "or locate a session related to a specific topic. Returns matching sessions with preview snippets."
+        ),
+        "parameters": get_openai_tool_schema(SearchSessionsRequest),
     },
 }

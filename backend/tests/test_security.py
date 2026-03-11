@@ -7,6 +7,7 @@ security headers, and generic error messages.
 from datetime import datetime
 
 import pytest
+
 from tests.test_auth import get_verification_code_from_db
 
 
@@ -147,7 +148,9 @@ class TestInputValidation:
 
 class TestAuthorization:
     @pytest.mark.asyncio
-    async def test_cannot_access_other_users_todo(self, client, test_email, test_email2):
+    async def test_cannot_access_other_users_todo(
+        self, client, test_email, test_email2
+    ):
         """User 2 should not be able to GET a todo belonging to User 1."""
         token1 = await get_token(client, test_email)
         token2 = await get_token(client, test_email2)
@@ -169,7 +172,9 @@ class TestAuthorization:
         assert resp2.status_code in (403, 404)
 
     @pytest.mark.asyncio
-    async def test_cannot_update_other_users_todo(self, client, test_email, test_email2):
+    async def test_cannot_update_other_users_todo(
+        self, client, test_email, test_email2
+    ):
         """User 2 should not be able to update a todo belonging to User 1."""
         token1 = await get_token(client, test_email)
         token2 = await get_token(client, test_email2)
@@ -190,7 +195,9 @@ class TestAuthorization:
         assert resp2.status_code in (403, 404)
 
     @pytest.mark.asyncio
-    async def test_cannot_delete_other_users_todo(self, client, test_email, test_email2):
+    async def test_cannot_delete_other_users_todo(
+        self, client, test_email, test_email2
+    ):
         """User 2 should not be able to delete a todo belonging to User 1."""
         token1 = await get_token(client, test_email)
         token2 = await get_token(client, test_email2)
@@ -210,7 +217,9 @@ class TestAuthorization:
         assert resp2.status_code in (403, 404)
 
     @pytest.mark.asyncio
-    async def test_cannot_reorder_other_users_todos(self, client, test_email, test_email2):
+    async def test_cannot_reorder_other_users_todos(
+        self, client, test_email, test_email2
+    ):
         """User 2 should not be able to reorder User 1's todos."""
         token1 = await get_token(client, test_email)
         token2 = await get_token(client, test_email2)

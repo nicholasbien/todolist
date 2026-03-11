@@ -89,14 +89,16 @@ class TodolistMCPServer {
           // --- Todo tools ---
           {
             name: 'add_todo',
-            description: 'Add a new todo item. Pass parent_id to create a sub-task of an existing todo. Sub-tasks run in parallel by default. Use depends_on to specify ordering constraints between sibling sub-tasks.',
+            description: 'Add a new todo item. Keep the title (text) short — one line, a few words. Put details, context, and descriptions in the notes field. Pass parent_id to create a sub-task of an existing todo. Sub-tasks run in parallel by default. Use depends_on to specify ordering constraints between sibling sub-tasks.',
             inputSchema: {
               type: 'object',
               properties: {
-                text: { type: 'string', description: 'The todo item text' },
+                text: { type: 'string', description: 'Short task title (keep it to one concise line)' },
+                notes: { type: 'string', description: 'Detailed notes, context, or description for the task (optional). Put any details here instead of in the title.' },
                 space_id: { type: 'string', description: 'Space ID (auto-detected if not provided)' },
                 parent_id: { type: 'string', description: 'Parent todo ID to create as a sub-task (optional).' },
                 depends_on: { type: 'array', items: { type: 'string' }, description: 'Array of sibling sub-task IDs this task depends on (optional). Task starts only after all dependencies complete. Omit for parallel execution.' },
+                recurrence_rule: { type: 'string', enum: ['daily', 'weekly', 'monthly'], description: 'Set task to repeat on a schedule (optional). When completed, a new occurrence is auto-created.' },
               },
               required: ['text'],
             },
@@ -123,6 +125,7 @@ class TodolistMCPServer {
                 text: { type: 'string', description: 'New todo text (optional)' },
                 completed: { type: 'boolean', description: 'Completion status (optional)' },
                 category: { type: 'string', description: 'Todo category (optional)' },
+                recurrence_rule: { type: ['string', 'null'], enum: ['daily', 'weekly', 'monthly', null], description: 'Set or clear recurrence schedule (optional)' },
               },
               required: ['id'],
             },
@@ -140,11 +143,12 @@ class TodolistMCPServer {
           },
           {
             name: 'delete_todo',
-            description: 'Delete a todo item',
+            description: 'Close (soft-delete) a todo item. The item is marked as closed and appears in the completed list. Use permanent=true to permanently remove it from the database.',
             inputSchema: {
               type: 'object',
               properties: {
                 id: { type: 'string', description: 'Todo ID' },
+                permanent: { type: 'boolean', description: 'If true, permanently delete from database instead of soft-deleting. Default: false.' },
               },
               required: ['id'],
             },
@@ -240,6 +244,7 @@ class TodolistMCPServer {
                 role: { type: 'string', enum: ['user', 'assistant'], description: 'Message role (default: assistant)' },
                 agent_id: { type: 'string', description: 'Agent ID to claim this session (optional). Followups will route back to this agent.' },
                 interim: { type: 'boolean', description: 'If true, post as a progress update without clearing the pending flag. Default: false.' },
+                needs_human_response: { type: 'boolean', description: 'If true, pause agent polling until the human responds. Use when asking the user a question. Default: false.' },
               },
               required: ['session_id', 'content'],
             },
@@ -375,16 +380,19 @@ class TodolistMCPServer {
 
   // --- Todo tools ---
 
-  private async addTodo(args: { text: string; space_id?: string; parent_id?: string; depends_on?: string[] }) {
+  private async addTodo(args: { text: string; notes?: string; space_id?: string; parent_id?: string; depends_on?: string[]; recurrence_rule?: string }) {
     const spaceId = await this.resolveSpaceId(args.space_id);
     const body: any = { text: args.text, space_id: spaceId };
+    if (args.notes) body.notes = args.notes;
     if (args.parent_id) body.parent_id = args.parent_id;
     if (args.depends_on && args.depends_on.length > 0) body.depends_on = args.depends_on;
+    if (args.recurrence_rule) body.recurrence_rule = args.recurrence_rule;
     const response = await api.post('/todos', body);
     const todo = response.data;
     const prefix = args.parent_id ? 'Added sub-task' : 'Added todo';
     const depsInfo = args.depends_on && args.depends_on.length > 0 ? ` (depends on: ${args.depends_on.join(', ')})` : '';
-    return this.textResult(`${prefix}: "${todo.text}" (ID: ${todo._id}, Category: ${todo.category})${depsInfo}`);
+    const recInfo = args.recurrence_rule ? ` (repeats ${args.recurrence_rule})` : '';
+    return this.textResult(`${prefix}: "${todo.text}" (ID: ${todo._id}, Category: ${todo.category})${depsInfo}${recInfo}`);
   }
 
   private async listTodos(args: { space_id?: string; completed?: boolean }) {
@@ -422,7 +430,8 @@ class TodolistMCPServer {
     for (const t of parents) {
       const subtasks = childrenMap.get(t._id) || [];
       const subtaskInfo = subtasks.length > 0 ? ` [${subtasks.filter(s => s.completed).length}/${subtasks.length} sub-tasks]` : '';
-      lines.push(`${i++}. ${t.completed ? '[done]' : '[  ]'} ${t.text} [${t.category || 'General'}] (ID: ${t._id})${subtaskInfo}`);
+      const recurrenceInfo = t.recurrence_rule ? ` [repeats ${t.recurrence_rule}]` : '';
+      lines.push(`${i++}. ${t.completed ? '[done]' : '[  ]'} ${t.text} [${t.category || 'General'}] (ID: ${t._id})${subtaskInfo}${recurrenceInfo}`);
       for (const c of subtasks) {
         const deps = c.depends_on && c.depends_on.length > 0 ? ` [depends on: ${c.depends_on.join(', ')}]` : '';
         lines.push(`   └─ ${c.completed ? '[done]' : '[  ]'} ${c.text} (ID: ${c._id})${deps}`);
@@ -431,11 +440,12 @@ class TodolistMCPServer {
     return this.textResult(lines.join('\n'));
   }
 
-  private async updateTodo(args: { id: string; text?: string; completed?: boolean; category?: string }) {
+  private async updateTodo(args: { id: string; text?: string; completed?: boolean; category?: string; recurrence_rule?: string | null }) {
     const updateData: any = {};
     if (args.text !== undefined) updateData.text = args.text;
     if (args.completed !== undefined) updateData.completed = args.completed;
     if (args.category !== undefined) updateData.category = args.category;
+    if (args.recurrence_rule !== undefined) updateData.recurrence_rule = args.recurrence_rule;
     await api.put(`/todos/${args.id}`, updateData);
     const changes = [];
     if (args.text) changes.push(`text to "${args.text}"`);
@@ -449,9 +459,13 @@ class TodolistMCPServer {
     return this.textResult(response.data.message || 'Todo completion toggled');
   }
 
-  private async deleteTodo(args: { id: string }) {
+  private async deleteTodo(args: { id: string; permanent?: boolean }) {
+    if (args.permanent) {
+      await api.delete(`/todos/${args.id}/permanent`);
+      return this.textResult(`Permanently deleted todo ${args.id}`);
+    }
     await api.delete(`/todos/${args.id}`);
-    return this.textResult(`Deleted todo ${args.id}`);
+    return this.textResult(`Closed (soft-deleted) todo ${args.id}`);
   }
 
   // --- Space tools ---
@@ -538,12 +552,13 @@ class TodolistMCPServer {
     return this.textResult(`Pending sessions:\n${lines.join('\n')}`);
   }
 
-  private async postToSession(args: { session_id: string; content: string; role?: string; agent_id?: string; interim?: boolean }) {
+  private async postToSession(args: { session_id: string; content: string; role?: string; agent_id?: string; interim?: boolean; needs_human_response?: boolean }) {
     await api.post(`/agent/sessions/${args.session_id}/messages`, {
       role: args.role || 'assistant',
       content: args.content,
       ...(args.agent_id && { agent_id: args.agent_id }),
       ...(args.interim !== undefined && { interim: args.interim }),
+      ...(args.needs_human_response !== undefined && { needs_human_response: args.needs_human_response }),
     });
     return this.textResult(`Posted ${args.role || 'assistant'} message to session ${args.session_id}`);
   }

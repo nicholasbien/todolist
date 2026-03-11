@@ -11,6 +11,7 @@ from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
 from bson import ObjectId
+
 from db import db
 
 logging.basicConfig(level=logging.INFO)
@@ -68,22 +69,32 @@ async def create_session(
     return session_id
 
 
-async def list_sessions(user_id: str, space_id: Optional[str] = None, limit: int = 50) -> List[Dict[str, Any]]:
+async def list_sessions(
+    user_id: str, space_id: Optional[str] = None, limit: int = 50
+) -> List[Dict[str, Any]]:
     """List sessions for dropdown. Returns lightweight metadata only."""
     query: Dict[str, Any] = {"user_id": user_id}
     if space_id is not None:
         query["space_id"] = space_id
 
-    cursor = sessions_collection.find(query, {"user_id": 0}).sort("updated_at", -1).limit(limit)
+    cursor = (
+        sessions_collection.find(query, {"user_id": 0})
+        .sort("updated_at", -1)
+        .limit(limit)
+    )
     items = await cursor.to_list(length=limit)
     for item in items:
         item["_id"] = str(item["_id"])
     return items
 
 
-async def get_session_trajectory(session_id: str, user_id: str) -> Optional[Dict[str, Any]]:
+async def get_session_trajectory(
+    session_id: str, user_id: str
+) -> Optional[Dict[str, Any]]:
     """Load a session's trajectory and display messages. Validates ownership."""
-    doc = await trajectories_collection.find_one({"session_id": session_id, "user_id": user_id})
+    doc = await trajectories_collection.find_one(
+        {"session_id": session_id, "user_id": user_id}
+    )
     if not doc:
         return None
 
@@ -96,6 +107,9 @@ async def get_session_trajectory(session_id: str, user_id: str) -> Optional[Dict
         "title": title,
         "todo_id": session_doc.get("todo_id") if session_doc else None,
         "agent_id": session_doc.get("agent_id") if session_doc else None,
+        "needs_human_response": (
+            session_doc.get("needs_human_response", False) if session_doc else False
+        ),
         "display_messages": doc.get("display_messages", []),
         "trajectory": doc.get("trajectory", []),
         "created_at": doc.get("created_at"),
@@ -129,8 +143,12 @@ async def save_trajectory(
 
 async def delete_session(session_id: str, user_id: str) -> bool:
     """Delete a session and its trajectory. Returns True if found."""
-    result = await sessions_collection.delete_one({"_id": ObjectId(session_id), "user_id": user_id})
-    await trajectories_collection.delete_one({"session_id": session_id, "user_id": user_id})
+    result = await sessions_collection.delete_one(
+        {"_id": ObjectId(session_id), "user_id": user_id}
+    )
+    await trajectories_collection.delete_one(
+        {"session_id": session_id, "user_id": user_id}
+    )
     return result.deleted_count > 0
 
 
@@ -149,10 +167,11 @@ async def append_message(
     content: str,
     agent_id: Optional[str] = None,
     interim: bool = False,
+    needs_human_response: bool = False,
 ) -> Dict[str, Any]:
     """Append a message to a session's display_messages and update flags.
 
-    When a user posts: sets needs_agent_response=True.
+    When a user posts: sets needs_agent_response=True, clears needs_human_response.
     When an assistant posts: sets needs_agent_response=False, has_unread_reply=True.
     If agent_id is provided on an assistant message, stamps the session so
     future followups route back to that agent.
@@ -161,11 +180,22 @@ async def append_message(
     needs_agent_response is NOT cleared.  This allows progress updates
     (e.g. "Working on this...") without removing the session from the
     pending queue, so the final response can be posted later.
+
+    If needs_human_response=True and role is 'assistant', the session is marked
+    as needing a human reply before the agent should continue. This sets
+    needs_human_response=True and needs_agent_response=False, effectively
+    pausing agent polling until the human responds.
     """
     now = datetime.utcnow()
-    message: Dict[str, Any] = {"role": role, "content": content, "timestamp": now.isoformat()}
+    message: Dict[str, Any] = {
+        "role": role,
+        "content": content,
+        "timestamp": now.isoformat(),
+    }
     if agent_id and role == "assistant":
         message["agent_id"] = agent_id
+    if needs_human_response:
+        message["needs_human_response"] = True
 
     # Update trajectory doc
     await trajectories_collection.update_one(
@@ -180,12 +210,16 @@ async def append_message(
     update: Dict[str, Any] = {"updated_at": now}
     if role == "user":
         update["needs_agent_response"] = True
+        update["needs_human_response"] = False
     elif role == "assistant":
         if not interim:
             update["needs_agent_response"] = False
         update["has_unread_reply"] = True
         if agent_id:
             update["agent_id"] = agent_id
+        if needs_human_response:
+            update["needs_human_response"] = True
+            update["needs_agent_response"] = False
 
     await sessions_collection.update_one(
         {"_id": ObjectId(session_id)},
@@ -212,6 +246,7 @@ async def get_pending_sessions(
         "user_id": user_id,
         "needs_agent_response": True,
         "updated_at": {"$gte": cutoff},
+        "needs_human_response": {"$ne": True},
     }
     if space_id is not None:
         query["space_id"] = space_id
@@ -226,7 +261,11 @@ async def get_pending_sessions(
         # Default: only unclaimed sessions
         query["agent_id"] = {"$exists": False}
 
-    cursor = sessions_collection.find(query).sort("updated_at", -1).limit(MAX_ACTIVE_SESSIONS)
+    cursor = (
+        sessions_collection.find(query)
+        .sort("updated_at", -1)
+        .limit(MAX_ACTIVE_SESSIONS)
+    )
     items = await cursor.to_list(length=MAX_ACTIVE_SESSIONS)
 
     # Enrich each session with message count and recent user messages
@@ -268,7 +307,9 @@ async def get_pending_sessions(
     return items
 
 
-async def get_unread_todo_ids(user_id: str, space_id: Optional[str] = None) -> List[str]:
+async def get_unread_todo_ids(
+    user_id: str, space_id: Optional[str] = None
+) -> List[str]:
     """Return todo IDs that have sessions with unread agent replies."""
     query: Dict[str, Any] = {
         "user_id": user_id,
@@ -283,7 +324,9 @@ async def get_unread_todo_ids(user_id: str, space_id: Optional[str] = None) -> L
     return [item["todo_id"] for item in items if item.get("todo_id")]
 
 
-async def get_todo_session_statuses(user_id: str, space_id: Optional[str] = None) -> Dict[str, str]:
+async def get_todo_session_statuses(
+    user_id: str, space_id: Optional[str] = None
+) -> Dict[str, str]:
     """Return a map of todo_id -> status for todos with linked sessions.
 
     Status values: 'waiting', 'unread_reply'
@@ -297,7 +340,12 @@ async def get_todo_session_statuses(user_id: str, space_id: Optional[str] = None
 
     cursor = sessions_collection.find(
         query,
-        {"todo_id": 1, "needs_agent_response": 1, "has_unread_reply": 1},
+        {
+            "todo_id": 1,
+            "needs_agent_response": 1,
+            "has_unread_reply": 1,
+            "needs_human_response": 1,
+        },
     )
     items = await cursor.to_list(length=200)
 
@@ -306,7 +354,9 @@ async def get_todo_session_statuses(user_id: str, space_id: Optional[str] = None
         todo_id = item.get("todo_id")
         if not todo_id:
             continue
-        if item.get("has_unread_reply"):
+        if item.get("needs_human_response"):
+            statuses[todo_id] = "needs_human_response"
+        elif item.get("has_unread_reply"):
             statuses[todo_id] = "unread_reply"
         elif item.get("needs_agent_response"):
             statuses[todo_id] = "waiting"
@@ -394,14 +444,32 @@ async def search_sessions(
     )
     content_hits = await cursor.to_list(length=limit)
 
+    # Filter to unseen session IDs and build a lookup of trajectory data
+    new_content_hits = []
     for traj in content_hits:
         sid = traj.get("session_id")
         if not sid or sid in seen_session_ids:
             continue
         seen_session_ids.add(sid)
+        new_content_hits.append(traj)
 
-        # Look up session metadata
-        session_doc = await sessions_collection.find_one({"_id": ObjectId(sid)})
+    # Batch-fetch all session docs in a single query instead of N individual lookups
+    if new_content_hits:
+        content_sids = [t["session_id"] for t in new_content_hits]
+        content_session_ids = [ObjectId(sid) for sid in content_sids]
+        session_cursor = sessions_collection.find({"_id": {"$in": content_session_ids}})
+        session_docs_list = await session_cursor.to_list(
+            length=len(content_session_ids)
+        )
+        session_docs_map: Dict[str, Dict[str, Any]] = {
+            str(doc["_id"]): doc for doc in session_docs_list
+        }
+    else:
+        session_docs_map = {}
+
+    for traj in new_content_hits:
+        sid = traj["session_id"]
+        session_doc = session_docs_map.get(sid)
         if not session_doc:
             continue
 
@@ -451,12 +519,18 @@ async def search_sessions(
 async def init_chat_session_indexes() -> None:
     """Create indexes for chat sessions and trajectories."""
     try:
-        await sessions_collection.create_index([("user_id", 1), ("space_id", 1), ("updated_at", -1)])
+        await sessions_collection.create_index(
+            [("user_id", 1), ("space_id", 1), ("updated_at", -1)]
+        )
         await sessions_collection.create_index("user_id")
         # Index for pending session queries
-        await sessions_collection.create_index([("user_id", 1), ("needs_agent_response", 1)])
+        await sessions_collection.create_index(
+            [("user_id", 1), ("needs_agent_response", 1)]
+        )
         # Index for unread reply queries
-        await sessions_collection.create_index([("user_id", 1), ("has_unread_reply", 1)])
+        await sessions_collection.create_index(
+            [("user_id", 1), ("has_unread_reply", 1)]
+        )
         # Unique partial index: one session per user+todo
         await sessions_collection.create_index(
             [("user_id", 1), ("todo_id", 1)],

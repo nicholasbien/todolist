@@ -3,9 +3,10 @@ from datetime import datetime
 from typing import List, Optional
 
 from bson import ObjectId
-from db import db
 from fastapi import HTTPException
 from pydantic import BaseModel, Field
+
+from db import db
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -40,7 +41,9 @@ async def save_chat_message(message: ChatMessage) -> ChatMessage:
         raise HTTPException(status_code=500, detail="Failed to save chat message")
 
 
-async def get_chat_history(user_id: str, space_id: Optional[str] = None, limit: int = 10) -> List[ChatMessage]:
+async def get_chat_history(
+    user_id: str, space_id: Optional[str] = None, limit: int = 10
+) -> List[ChatMessage]:
     """Retrieve recent chat history for a user and optional space."""
     try:
         query = {"user_id": user_id}
@@ -77,7 +80,9 @@ async def init_chat_indexes() -> None:
         await chats_collection.create_index("user_id")
         await chats_collection.create_index("space_id")
         await chats_collection.create_index("created_at")
-        await chats_collection.create_index([("user_id", 1), ("space_id", 1), ("created_at", -1)])
+        await chats_collection.create_index(
+            [("user_id", 1), ("space_id", 1), ("created_at", -1)]
+        )
         logger.info("Chat indexes created successfully")
     except Exception as e:
         logger.error(f"Error creating chat indexes: {e}")

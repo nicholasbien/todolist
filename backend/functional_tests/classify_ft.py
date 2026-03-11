@@ -59,7 +59,10 @@ async def test_classify_party_on_friday():
 
     # Check that category is reasonable (likely Personal or Social)
     assert result["category"] in categories
-    assert result["category"] in ["Personal", "Social"]  # Party should be Personal or Social
+    assert result["category"] in [
+        "Personal",
+        "Social",
+    ]  # Party should be Personal or Social
 
     # Check priority is set
     assert result["priority"] in ["High", "Medium", "Low"]
@@ -109,7 +112,10 @@ async def test_classify_grocery_shopping_tomorrow():
 
     # Check that category is reasonable (likely Personal or Shopping)
     assert result["category"] in categories
-    assert result["category"] in ["Personal", "Shopping"]  # Grocery shopping should be Personal or Shopping
+    assert result["category"] in [
+        "Personal",
+        "Shopping",
+    ]  # Grocery shopping should be Personal or Shopping
 
     # Check priority is set
     assert result["priority"] in ["High", "Medium", "Low"]

@@ -19,6 +19,10 @@ logger = logging.getLogger(__name__)
 # Add parent directory to path for imports  # noqa: E402
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
+from fastapi import APIRouter, Depends, Header, HTTPException, Query  # noqa: E402
+from fastapi.responses import StreamingResponse  # noqa: E402
+from openai import AsyncOpenAI  # noqa: E402
+
 from auth import verify_session  # noqa: E402
 from chat_sessions import (  # noqa: E402
     create_session,
@@ -33,9 +37,6 @@ from chat_sessions import (  # noqa: E402
     search_sessions,
 )
 from chats import ChatMessage, save_chat_message  # noqa: E402
-from fastapi import APIRouter, Depends, Header, HTTPException, Query  # noqa: E402
-from fastapi.responses import StreamingResponse  # noqa: E402
-from openai import AsyncOpenAI  # noqa: E402
 
 from .schemas import OPENAI_TOOL_SCHEMAS  # noqa: E402
 from .tools import AVAILABLE_TOOLS  # noqa: E402
@@ -82,7 +83,9 @@ async def connect_to_mcp_server() -> Optional[ClientSession]:
             logger.error(f"MCP server not found at: {mcp_server_path}")
             return None
 
-        server = StdioServerParameters(command=sys.executable, args=[mcp_server_path], env=dict(os.environ))
+        server = StdioServerParameters(
+            command=sys.executable, args=[mcp_server_path], env=dict(os.environ)
+        )
 
         logger.info(f"Starting MCP server from: {mcp_server_path}")
         context = stdio_client(server)
@@ -151,7 +154,10 @@ conversation_state: Dict[str, List[Dict[str, Any]]] = {}
 MAX_HISTORY = 10
 
 
-async def get_current_user(authorization: str = Header(None), token_param: Optional[str] = Query(None, alias="token")):
+async def get_current_user(
+    authorization: str = Header(None),
+    token_param: Optional[str] = Query(None, alias="token"),
+):
     """Extract user from Authorization header or token query parameter.
 
     EventSource doesn't support custom headers, so we need to accept token via query param
@@ -164,9 +170,13 @@ async def get_current_user(authorization: str = Header(None), token_param: Optio
         try:
             scheme, token = authorization.split()
             if scheme.lower() != "bearer":
-                raise HTTPException(status_code=401, detail="Invalid authentication scheme")
+                raise HTTPException(
+                    status_code=401, detail="Invalid authentication scheme"
+                )
         except ValueError:
-            raise HTTPException(status_code=401, detail="Invalid authorization header format")
+            raise HTTPException(
+                status_code=401, detail="Invalid authorization header format"
+            )
 
     # Fallback to query parameter (for EventSource compatibility)
     elif token_param:
@@ -185,7 +195,9 @@ async def get_current_user(authorization: str = Header(None), token_param: Optio
     return user_info
 
 
-def estimate_token_count(messages: List[Dict[str, Any]], tools: Optional[List[Dict[str, Any]]] = None) -> int:
+def estimate_token_count(
+    messages: List[Dict[str, Any]], tools: Optional[List[Dict[str, Any]]] = None
+) -> int:
     """Rough estimate of token count for messages and tools."""
     # Very rough approximation: ~4 characters per token on average
     total_chars = 0
@@ -230,7 +242,18 @@ def _format_tool_display(tool_name: str, args: dict, result: dict) -> str:
             return f"📖 Found {len(d['entries'])} journal entries"
         if "entry" in d:
             entry = d["entry"]
-            return f"📖 Journal entry from {entry['date']}" if entry else "📖 No journal entry found"
+            return (
+                f"📖 Journal entry from {entry['date']}"
+                if entry
+                else "📖 No journal entry found"
+            )
+        if "memory" in d:
+            mem = d["memory"]
+            return f"🧠 Saved: {mem.get('key', '')} = {mem.get('value', '')}"
+        if "memories" in d:
+            return f"🧠 Found {d.get('count', len(d['memories']))} memories"
+        if "deleted_key" in d:
+            return f"🧠 Forgot: {d['deleted_key']}"
         return "✅ Success"
 
     return f"🔧 {tool_name}{fmt_args(args)}: {fmt_result(result)}"
@@ -255,8 +278,12 @@ async def _persist_turn(
     _cache_put(session_id, input_messages, display_messages)
 
     # Also save to legacy chats collection for backward compatibility
-    user_entry = ChatMessage(user_id=user_id, space_id=space_id, role="user", content=user_message)
-    assistant_entry = ChatMessage(user_id=user_id, space_id=space_id, role="assistant", content=assistant_text)
+    user_entry = ChatMessage(
+        user_id=user_id, space_id=space_id, role="user", content=user_message
+    )
+    assistant_entry = ChatMessage(
+        user_id=user_id, space_id=space_id, role="assistant", content=assistant_text
+    )
     await save_chat_message(user_entry)
     await save_chat_message(assistant_entry)
 
@@ -300,9 +327,11 @@ async def stream_agent_response(
                     "type": "function",
                     "name": tool.name,
                     "description": tool.description or f"MCP tool: {tool.name}",
-                    "parameters": tool.inputSchema
-                    if hasattr(tool, "inputSchema")
-                    else {"type": "object", "properties": {}, "required": []},
+                    "parameters": (
+                        tool.inputSchema
+                        if hasattr(tool, "inputSchema")
+                        else {"type": "object", "properties": {}, "required": []}
+                    ),
                 }
             logger.info(f"Discovered {len(mcp_tools)} MCP tools")
         except Exception as e:
@@ -330,7 +359,9 @@ async def stream_agent_response(
         if cached:
             input_messages = list(cached["trajectory"])
             display_messages = list(cached["display_messages"])
-            logger.info(f"Loaded session {session_id} from cache ({len(input_messages)} trajectory items)")
+            logger.info(
+                f"Loaded session {session_id} from cache ({len(input_messages)} trajectory items)"
+            )
         else:
             traj_doc = await get_session_trajectory(session_id, user_id)
             if not traj_doc:
@@ -338,16 +369,21 @@ async def stream_agent_response(
                 return
             input_messages = list(traj_doc.get("trajectory", []))
             display_messages = list(traj_doc.get("display_messages", []))
-            logger.info(f"Loaded session {session_id} from DB ({len(input_messages)} trajectory items)")
+            logger.info(
+                f"Loaded session {session_id} from DB ({len(input_messages)} trajectory items)"
+            )
 
             # If session is linked to a todo, fetch task context
             todo_id = traj_doc.get("todo_id")
             if todo_id:
                 try:
                     from bson import ObjectId as _ObjId
+
                     from db import collections
 
-                    todo_doc = await collections.todos.find_one({"_id": _ObjId(todo_id)})
+                    todo_doc = await collections.todos.find_one(
+                        {"_id": _ObjId(todo_id)}
+                    )
                     if todo_doc:
                         task_text = todo_doc.get("text", "")
                         task_notes = todo_doc.get("notes", "")
@@ -385,7 +421,12 @@ async def stream_agent_response(
     assert session_id is not None  # guaranteed after create or resume
 
     tool_names = list(OPENAI_TOOL_SCHEMAS.keys()) + list(mcp_tools.keys())
-    ready_data = {"ok": True, "tools": tool_names, "space_id": space_id, "session_id": session_id}
+    ready_data = {
+        "ok": True,
+        "tools": tool_names,
+        "space_id": space_id,
+        "session_id": session_id,
+    }
     yield format_sse_message("ready", ready_data)
 
     # -----------------------------------------------------------------------
@@ -394,6 +435,7 @@ async def stream_agent_response(
     from datetime import datetime
 
     from bson import ObjectId
+
     from categories import get_categories
     from db import collections
 
@@ -416,12 +458,24 @@ async def stream_agent_response(
     # Build context with user name if available
     user_context = f"You are helping {user_name}.\n" if user_name else ""
 
-    developer_instructions = _jinja_env.get_template("agent_developer_instructions.j2").render(
+    # Build memory context
+    memory_context = ""
+    try:
+        from agent_memory import build_memory_context
+
+        memory_context = await build_memory_context(user_id, space_id)
+    except Exception as e:
+        logger.error(f"Failed to build memory context: {e}")
+
+    developer_instructions = _jinja_env.get_template(
+        "agent_developer_instructions.j2"
+    ).render(
         current_date=current_date,
         user_context=user_context,
         space_name=space_name,
         categories_str=categories_str,
         todo_context=todo_context,
+        memory_context=memory_context,
     )
 
     # -----------------------------------------------------------------------
@@ -456,9 +510,14 @@ async def stream_agent_response(
                     stream=True,
                 )
             except Exception as api_error:
-                logger.error(f"OpenAI API Error: {type(api_error).__name__}: {api_error}")
+                logger.error(
+                    f"OpenAI API Error: {type(api_error).__name__}: {api_error}"
+                )
                 yield format_sse_message(
-                    "error", {"message": "An error occurred while processing your request. Please try again."}
+                    "error",
+                    {
+                        "message": "An error occurred while processing your request. Please try again."
+                    },
                 )
                 return
 
@@ -502,7 +561,9 @@ async def stream_agent_response(
                                 "arguments": "",
                             }
                     if hasattr(event, "delta") and current_tool_call_id:
-                        partial_tool_calls[current_tool_call_id]["arguments"] += event.delta
+                        partial_tool_calls[current_tool_call_id][
+                            "arguments"
+                        ] += event.delta
 
                 # Handle function call completion - get the name from output_item.done
                 elif event_type == "response.output_item.done":
@@ -512,12 +573,20 @@ async def stream_agent_response(
                             call_id = event.item.id
                             if call_id in partial_tool_calls:
                                 partial_tool_calls[call_id]["name"] = event.item.name
-                                partial_tool_calls[call_id]["arguments"] = event.item.arguments
-                                partial_tool_calls[call_id]["call_id"] = event.item.call_id
+                                partial_tool_calls[call_id][
+                                    "arguments"
+                                ] = event.item.arguments
+                                partial_tool_calls[call_id][
+                                    "call_id"
+                                ] = event.item.call_id
 
             if partial_tool_calls:
-                tool_names_executing = [p["name"] for p in partial_tool_calls.values() if p.get("name")]
-                logger.info(f"Executing {len(partial_tool_calls)} tools: {', '.join(tool_names_executing)}")
+                tool_names_executing = [
+                    p["name"] for p in partial_tool_calls.values() if p.get("name")
+                ]
+                logger.info(
+                    f"Executing {len(partial_tool_calls)} tools: {', '.join(tool_names_executing)}"
+                )
 
                 # Append assistant's message with function calls to input (like response.output)
                 assistant_output_items = []
@@ -528,7 +597,9 @@ async def stream_agent_response(
                         {
                             "type": "message",
                             "role": "assistant",
-                            "content": [{"type": "output_text", "text": "".join(content_parts)}],
+                            "content": [
+                                {"type": "output_text", "text": "".join(content_parts)}
+                            ],
                         }
                     )
 
@@ -556,9 +627,14 @@ async def stream_agent_response(
                         # Check if it's an MCP tool or native tool
                         if tool_name in mcp_tools and mcp_session:
                             # Call MCP tool
-                            mcp_result = await mcp_session.call_tool(tool_name, arguments=args)
+                            mcp_result = await mcp_session.call_tool(
+                                tool_name, arguments=args
+                            )
                             if hasattr(mcp_result, "content"):
-                                if isinstance(mcp_result.content, list) and len(mcp_result.content) > 0:
+                                if (
+                                    isinstance(mcp_result.content, list)
+                                    and len(mcp_result.content) > 0
+                                ):
                                     content = (
                                         mcp_result.content[0].text
                                         if hasattr(mcp_result.content[0], "text")
@@ -568,7 +644,11 @@ async def stream_agent_response(
                                     content = str(mcp_result.content)
 
                                 try:
-                                    result = json.loads(content) if isinstance(content, str) else content
+                                    result = (
+                                        json.loads(content)
+                                        if isinstance(content, str)
+                                        else content
+                                    )
                                 except (json.JSONDecodeError, ValueError):
                                     result = {"result": content}
                             else:
@@ -576,14 +656,23 @@ async def stream_agent_response(
                         elif tool_name in AVAILABLE_TOOLS:
                             info = AVAILABLE_TOOLS[tool_name]
                             request = info["schema"](**args)
-                            result = await info["func"](request=request, user_id=user_id, space_id=space_id)
+                            result = await info["func"](
+                                request=request, user_id=user_id, space_id=space_id
+                            )
                         else:
-                            result = {"ok": False, "error": f"Unknown tool: {tool_name}"}
+                            result = {
+                                "ok": False,
+                                "error": f"Unknown tool: {tool_name}",
+                            }
                     except Exception as e:
-                        logger.error(f"Error executing tool {tool_name}: {e}", exc_info=True)
+                        logger.error(
+                            f"Error executing tool {tool_name}: {e}", exc_info=True
+                        )
                         result = {"ok": False, "error": str(e)}
 
-                    yield format_sse_message("tool_result", {"tool": tool_name, "args": args, "data": result})
+                    yield format_sse_message(
+                        "tool_result", {"tool": tool_name, "args": args, "data": result}
+                    )
 
                     # Build display message for this tool call
                     tool_display = _format_tool_display(tool_name, args, result)
@@ -591,13 +680,19 @@ async def stream_agent_response(
                         {
                             "role": "system",
                             "content": tool_display,
-                            "toolData": {"tool": tool_name, "args": args, "data": result},
+                            "toolData": {
+                                "tool": tool_name,
+                                "args": args,
+                                "data": result,
+                            },
                         }
                     )
 
                     # Use call_id from the event, not the item id
                     actual_call_id = partial.get("call_id", call_id)
-                    logger.info(f"Adding function_call_output with call_id: {actual_call_id}")
+                    logger.info(
+                        f"Adding function_call_output with call_id: {actual_call_id}"
+                    )
                     # Append function call output to input (like official example)
                     input_messages.append(
                         {
@@ -616,7 +711,9 @@ async def stream_agent_response(
                     {
                         "type": "message",
                         "role": "assistant",
-                        "content": [{"type": "output_text", "text": "".join(content_parts)}],
+                        "content": [
+                            {"type": "output_text", "text": "".join(content_parts)}
+                        ],
                     }
                 )
 
@@ -645,7 +742,9 @@ async def stream_agent_response(
 
         # If we exit the loop due to max steps, force a final response
         if api_call_count >= MAX_AGENT_STEPS:
-            logger.warning(f"Reached maximum agent steps ({MAX_AGENT_STEPS}), generating final response")
+            logger.warning(
+                f"Reached maximum agent steps ({MAX_AGENT_STEPS}), generating final response"
+            )
 
             # Add final instruction to wrap up
             final_instruction = (
@@ -662,9 +761,14 @@ async def stream_agent_response(
                     stream=True,
                 )
             except Exception as api_error:
-                logger.error(f"OpenAI API Error (final response): {type(api_error).__name__}: {api_error}")
+                logger.error(
+                    f"OpenAI API Error (final response): {type(api_error).__name__}: {api_error}"
+                )
                 yield format_sse_message(
-                    "error", {"message": "An error occurred while processing your request. Please try again."}
+                    "error",
+                    {
+                        "message": "An error occurred while processing your request. Please try again."
+                    },
                 )
                 return
 
@@ -683,7 +787,10 @@ async def stream_agent_response(
                         total_input_tokens += event.response.usage.input_tokens
                         total_output_tokens += event.response.usage.output_tokens
                     except Exception as e:
-                        logger.error(f"Error accessing usage data in final response: {e}", exc_info=True)
+                        logger.error(
+                            f"Error accessing usage data in final response: {e}",
+                            exc_info=True,
+                        )
 
             # Persist before yielding done
             await _persist_turn(
@@ -696,7 +803,13 @@ async def stream_agent_response(
                 display_messages,
             )
 
-            yield format_sse_message("done", {"ok": True, "info": f"Reached maximum of {MAX_AGENT_STEPS} agent steps"})
+            yield format_sse_message(
+                "done",
+                {
+                    "ok": True,
+                    "info": f"Reached maximum of {MAX_AGENT_STEPS} agent steps",
+                },
+            )
 
     except Exception as e:
         error_msg = str(e)
@@ -724,7 +837,9 @@ async def list_chat_sessions(
 @router.get("/sessions/pending")
 async def get_pending_sessions_route(
     space_id: Optional[str] = Query(None),
-    agent_id: Optional[str] = Query(None, description="Filter by agent_id; omit for unclaimed only"),
+    agent_id: Optional[str] = Query(
+        None, description="Filter by agent_id; omit for unclaimed only"
+    ),
     current_user: dict = Depends(get_current_user),
 ):
     """Get sessions awaiting agent response."""
@@ -815,7 +930,9 @@ async def delete_chat_session(
 async def agent_stream(
     q: str = Query(..., description="User query"),
     space_id: Optional[str] = Query(None, description="Space ID"),
-    session_id: Optional[str] = Query(None, description="Session ID to resume; omit for new session"),
+    session_id: Optional[str] = Query(
+        None, description="Session ID to resume; omit for new session"
+    ),
     user_data: dict = Depends(get_current_user),
 ):
     """Stream agent responses with tool calls via Server-Sent Events."""
@@ -828,9 +945,17 @@ async def agent_stream(
 
     # Create async generator
     async def generate():
-        async for chunk in stream_agent_response(q, user_id, space_id, user_name, session_id):
+        async for chunk in stream_agent_response(
+            q, user_id, space_id, user_name, session_id
+        ):
             yield chunk
 
     # Return streaming response
-    headers = {"Cache-Control": "no-cache", "Connection": "keep-alive", "X-Accel-Buffering": "no"}  # For nginx
-    return StreamingResponse(generate(), media_type="text/event-stream", headers=headers)
+    headers = {
+        "Cache-Control": "no-cache",
+        "Connection": "keep-alive",
+        "X-Accel-Buffering": "no",
+    }  # For nginx
+    return StreamingResponse(
+        generate(), media_type="text/event-stream", headers=headers
+    )

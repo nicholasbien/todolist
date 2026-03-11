@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { ChevronDown, ArrowLeft } from 'lucide-react';
+import { ChevronDown, ArrowLeft, CheckCircle2 } from 'lucide-react';
 import { MessageRenderer, PlainTextRenderer } from './MessageRenderer';
 import { getStreamingBackendUrl } from '../utils/api';
+import AgentMemoryViewer from './AgentMemoryViewer';
 
 interface ChatbotProps {
   activeSpace: any;
@@ -10,6 +11,7 @@ interface ChatbotProps {
   isActive?: boolean;
   pendingSessionId?: string | null;
   onSessionLoaded?: () => void;
+  onNavigateToTasks?: () => void;
 }
 
 interface SessionMeta {
@@ -32,6 +34,7 @@ export default function AgentChatbot({
   isActive = true,
   pendingSessionId,
   onSessionLoaded,
+  onNavigateToTasks,
 }: ChatbotProps) {
   const [question, setQuestion] = useState('');
   const [messages, setMessages] = useState<{ role: string; content: string; toolData?: any; agent_id?: string }[]>([]);
@@ -55,16 +58,22 @@ export default function AgentChatbot({
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const searchAbortRef = useRef<AbortController | null>(null);
 
   // Task session mode: when viewing a task-linked session
   const [isTaskSession, setIsTaskSession] = useState(false);
   const [taskInitialMessage, setTaskInitialMessage] = useState<string | null>(null);
+  const [activeTodoId, setActiveTodoId] = useState<string | null>(null);
+  const [taskCompleted, setTaskCompleted] = useState(false);
+  const [completingTask, setCompletingTask] = useState(false);
   // External agent ownership: when session is claimed by an agent like openclaw
   const [sessionAgentId, setSessionAgentId] = useState<string | null>(null);
   // Whether the agent is waiting for a human response
   const [needsHumanResponse, setNeedsHumanResponse] = useState(false);
   // Direct agent chat: selected agent before a session is created
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
+  // Memory viewer
+  const [showMemoryViewer, setShowMemoryViewer] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
@@ -104,6 +113,11 @@ export default function AgentChatbot({
     if (searchTimeoutRef.current) {
       clearTimeout(searchTimeoutRef.current);
     }
+    // Abort any in-flight search request
+    if (searchAbortRef.current) {
+      searchAbortRef.current.abort();
+      searchAbortRef.current = null;
+    }
     if (!query.trim()) {
       setSearchResults([]);
       setIsSearching(false);
@@ -111,28 +125,36 @@ export default function AgentChatbot({
     }
     setIsSearching(true);
     searchTimeoutRef.current = setTimeout(async () => {
+      const abortController = new AbortController();
+      searchAbortRef.current = abortController;
       try {
         const params = new URLSearchParams({ q: query });
         if (activeSpace?._id) params.append('space_id', activeSpace._id);
         const res = await fetch(`/agent/sessions/search?${params.toString()}`, {
           headers: { Authorization: `Bearer ${token}` },
+          signal: abortController.signal,
         });
         if (res.ok) {
           const data = await res.json();
           setSearchResults(data);
         }
-      } catch {
-        // Silently ignore search errors
+      } catch (err: any) {
+        // Ignore abort errors; silently ignore other search errors
+        if (err?.name === 'AbortError') return;
       } finally {
-        setIsSearching(false);
+        // Only clear searching state if this controller wasn't aborted
+        if (!abortController.signal.aborted) {
+          setIsSearching(false);
+        }
       }
     }, 300);
   }, [token, activeSpace?._id]);
 
-  // Cleanup search timeout on unmount
+  // Cleanup search timeout and abort controller on unmount
   useEffect(() => {
     return () => {
       if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+      if (searchAbortRef.current) searchAbortRef.current.abort();
     };
   }, []);
 
@@ -163,6 +185,9 @@ export default function AgentChatbot({
         const data = await res.json();
         const displayMessages = data.display_messages || [];
         setCurrentSessionId(pendingSessionId);
+        // Track the linked todo ID for complete action
+        if (data.todo_id) setActiveTodoId(data.todo_id);
+        setTaskCompleted(false);
         // Save the first user message for reset functionality
         const firstUserMsg = displayMessages.find((m: any) => m.role === 'user');
         if (firstUserMsg) setTaskInitialMessage(firstUserMsg.content);
@@ -332,6 +357,8 @@ export default function AgentChatbot({
       setMessages(displayMessages);
       setCurrentSessionId(sessionId);
       setIsTaskSession(isTodoSession);
+      setActiveTodoId(data.todo_id || null);
+      setTaskCompleted(false);
       setSessionAgentId(data.agent_id || null);
       setNeedsHumanResponse(!!data.needs_human_response);
     } catch (err: any) {
@@ -381,6 +408,9 @@ export default function AgentChatbot({
     setMessages([]);
     setShowSessionDropdown(false);
     setIsTaskSession(false);
+    setActiveTodoId(null);
+    setTaskCompleted(false);
+    setCompletingTask(false);
     setSessionAgentId(null);
     setNeedsHumanResponse(false);
     setSelectedAgentId(null);
@@ -407,6 +437,26 @@ export default function AgentChatbot({
       handleStreamingAsk(taskInitialMessage);
     } catch (err) {
       console.error('Failed to reset task chat:', err);
+    }
+  };
+
+  // -----------------------------------------------------------------------
+  // Complete the linked task from within the chat
+  // -----------------------------------------------------------------------
+  const handleCompleteTask = async () => {
+    if (!activeTodoId || !token || completingTask || taskCompleted) return;
+    setCompletingTask(true);
+    try {
+      const res = await fetch(`/todos/${activeTodoId}/complete`, {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error('Failed to complete task');
+      setTaskCompleted(true);
+    } catch (err: any) {
+      setError(err.message || 'Failed to complete task');
+    } finally {
+      setCompletingTask(false);
     }
   };
 
@@ -602,19 +652,35 @@ export default function AgentChatbot({
 
   const isWaiting = loading;
 
+  // Show memory viewer when toggled
+  if (showMemoryViewer) {
+    return (
+      <div className="flex flex-col h-full">
+        <AgentMemoryViewer
+          token={token || ''}
+          activeSpace={activeSpace}
+          onClose={() => setShowMemoryViewer(false)}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col h-full">
       {/* Top bar */}
       <div className="mb-2 flex items-center gap-2 flex-shrink-0">
         {isTaskSession ? (
-          // Back + Reset buttons when viewing a task session
-          <div className="flex items-center gap-2">
+          // Back + Reset + Complete buttons when viewing a task session
+          <div className="flex items-center gap-2 flex-1">
             <button
-              onClick={handleNewChat}
+              onClick={() => {
+                handleNewChat();
+                onNavigateToTasks?.();
+              }}
               className="bg-gray-700 text-gray-200 px-3 py-1 rounded text-sm hover:bg-gray-600 transition-colors flex items-center gap-1"
             >
               <ArrowLeft className="w-3 h-3" />
-              Back to Assistant
+              Back to Task
             </button>
             <button
               onClick={handleResetTaskChat}
@@ -623,8 +689,22 @@ export default function AgentChatbot({
             >
               Reset Chat
             </button>
+            {activeTodoId && (
+              <button
+                onClick={handleCompleteTask}
+                disabled={completingTask || taskCompleted}
+                className={`ml-auto px-3 py-1 rounded text-sm flex items-center gap-1.5 transition-colors ${
+                  taskCompleted
+                    ? 'bg-green-600/20 text-green-300 border border-green-500/30 cursor-default'
+                    : 'bg-green-600/20 text-green-300 border border-green-500/30 hover:bg-green-600/30 disabled:opacity-50 disabled:cursor-not-allowed'
+                }`}
+              >
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                {completingTask ? 'Completing...' : taskCompleted ? 'Completed' : 'Complete Task'}
+              </button>
+            )}
           </div>
-        ) : sessionAgentId && !isTaskSession && currentSessionId ? (
+        ) : sessionAgentId && currentSessionId ? (
           // Back button + agent badge for direct agent chat sessions
           <div className="flex items-center gap-2">
             <button
@@ -639,7 +719,7 @@ export default function AgentChatbot({
             </span>
           </div>
         ) : (
-          // Past Chats dropdown (main assistant mode)
+          // Past Chats dropdown (main assistant mode — always visible)
           <div className="relative" ref={dropdownRef}>
             <button
               onClick={() => setShowSessionDropdown(!showSessionDropdown)}
@@ -752,15 +832,23 @@ export default function AgentChatbot({
           </div>
         )}
 
-        {/* New Chat button */}
+        {/* New Chat + Memory buttons */}
         {!isTaskSession && !(sessionAgentId && currentSessionId) && (messages.length > 0 || currentSessionId) && (
-          <button
-            onClick={handleNewChat}
-            disabled={loading}
-            className="ml-auto border border-gray-600 text-gray-300 px-3 py-1 rounded text-sm hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
-            New Chat
-          </button>
+          <div className="ml-auto flex items-center gap-2">
+            <button
+              onClick={() => setShowMemoryViewer(true)}
+              className="border border-gray-600 text-gray-400 px-3 py-1 rounded text-sm hover:bg-gray-800 hover:text-gray-200 transition-colors"
+            >
+              Memory
+            </button>
+            <button
+              onClick={handleNewChat}
+              disabled={loading}
+              className="border border-gray-600 text-gray-300 px-3 py-1 rounded text-sm hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              New Chat
+            </button>
+          </div>
         )}
       </div>
 
@@ -838,6 +926,15 @@ export default function AgentChatbot({
                 <p className="text-sm text-gray-500 italic">
                   Try: &quot;What should I get done today?&quot; or &quot;Summarize my latest journals&quot;
                 </p>
+              </div>
+
+              <div className="mt-2">
+                <button
+                  onClick={() => setShowMemoryViewer(true)}
+                  className="text-xs text-gray-500 hover:text-gray-300 transition-colors underline underline-offset-2"
+                >
+                  View agent memory
+                </button>
               </div>
 
               <div className="mt-4 pt-4 border-t border-gray-800">

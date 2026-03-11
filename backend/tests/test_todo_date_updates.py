@@ -6,6 +6,7 @@ Tests for todo due date updates via the edit todo endpoint.
 from datetime import datetime
 
 import pytest
+
 from tests.conftest import get_token
 
 
@@ -33,7 +34,9 @@ async def test_update_todo_due_date(client, test_email):
     # Update the todo with a due date
     update_data = {"dueDate": "2024-12-25"}
 
-    update_response = await client.put(f"/todos/{todo_id}", json=update_data, headers=headers)
+    update_response = await client.put(
+        f"/todos/{todo_id}", json=update_data, headers=headers
+    )
     assert update_response.status_code == 200
     updated_todo = update_response.json()
 
@@ -70,7 +73,9 @@ async def test_update_todo_clear_due_date(client, test_email):
     # Clear the due date
     update_data = {"dueDate": None}
 
-    update_response = await client.put(f"/todos/{todo_id}", json=update_data, headers=headers)
+    update_response = await client.put(
+        f"/todos/{todo_id}", json=update_data, headers=headers
+    )
     assert update_response.status_code == 200
     updated_todo = update_response.json()
 
@@ -110,7 +115,9 @@ async def test_update_todo_multiple_fields_including_date(client, test_email):
         "dueDate": "2024-12-31",
     }
 
-    update_response = await client.put(f"/todos/{todo_id}", json=update_data, headers=headers)
+    update_response = await client.put(
+        f"/todos/{todo_id}", json=update_data, headers=headers
+    )
     assert update_response.status_code == 200
     updated_todo = update_response.json()
 
@@ -153,7 +160,9 @@ async def test_update_todo_date_formats(client, test_email):
     for test_date in test_dates:
         update_data = {"dueDate": test_date}
 
-        update_response = await client.put(f"/todos/{todo_id}", json=update_data, headers=headers)
+        update_response = await client.put(
+            f"/todos/{todo_id}", json=update_data, headers=headers
+        )
         assert update_response.status_code == 200
         updated_todo = update_response.json()
 
@@ -187,7 +196,9 @@ async def test_update_todo_empty_string_date(client, test_email):
     # Update with empty string
     update_data = {"dueDate": ""}
 
-    update_response = await client.put(f"/todos/{todo_id}", json=update_data, headers=headers)
+    update_response = await client.put(
+        f"/todos/{todo_id}", json=update_data, headers=headers
+    )
     assert update_response.status_code == 200
     updated_todo = update_response.json()
 
@@ -220,7 +231,9 @@ async def test_update_todo_partial_update_preserves_date(client, test_email):
     # Update only the text (not the date)
     update_data = {"text": "Updated text"}
 
-    update_response = await client.put(f"/todos/{todo_id}", json=update_data, headers=headers)
+    update_response = await client.put(
+        f"/todos/{todo_id}", json=update_data, headers=headers
+    )
     assert update_response.status_code == 200
     updated_todo = update_response.json()
 

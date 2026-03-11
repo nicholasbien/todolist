@@ -35,7 +35,9 @@ if USE_MOCK_DB:
     logger.info("Using mock database for testing")
 else:
     client = AsyncIOMotorClient(MONGODB_URL, **MONGO_CLIENT_SETTINGS)
-    logger.info(f"MongoDB client created with connection pooling - Pool size: {MONGO_CLIENT_SETTINGS['maxPoolSize']}")
+    logger.info(
+        f"MongoDB client created with connection pooling - Pool size: {MONGO_CLIENT_SETTINGS['maxPoolSize']}"
+    )
 
 # Database instance
 db = client.todo_db
@@ -125,6 +127,14 @@ class Collections:
     @property
     def chat_trajectories(self):
         return db.chat_trajectories
+
+    @property
+    def agent_memories(self):
+        return db.agent_memories
+
+    @property
+    def agent_memory_logs(self):
+        return db.agent_memory_logs
 
 
 collections = Collections()

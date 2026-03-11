@@ -1,7 +1,9 @@
 """Tests for moving todos between spaces via space_id updates."""
+
 from datetime import datetime
 
 import pytest
+
 from tests.test_auth import get_verification_code_from_db
 
 
@@ -30,7 +32,9 @@ async def test_move_todo_between_spaces(client, test_email):
     assert default_space is not None
 
     # Create a second space
-    create_space_resp = await client.post("/spaces", json={"name": "Work Projects"}, headers=headers)
+    create_space_resp = await client.post(
+        "/spaces", json={"name": "Work Projects"}, headers=headers
+    )
     assert create_space_resp.status_code == 200
     work_space = create_space_resp.json()
     work_space_id = work_space["_id"]
@@ -49,19 +53,25 @@ async def test_move_todo_between_spaces(client, test_email):
     assert todo["space_id"] == default_space["_id"]
 
     # Move the todo to the work space
-    update_resp = await client.put(f"/todos/{todo_id}", json={"space_id": work_space_id}, headers=headers)
+    update_resp = await client.put(
+        f"/todos/{todo_id}", json={"space_id": work_space_id}, headers=headers
+    )
     assert update_resp.status_code == 200
     updated_todo = update_resp.json()
     assert updated_todo["space_id"] == work_space_id
 
     # Verify todo appears in work space todos
-    work_todos_resp = await client.get(f"/todos?space_id={work_space_id}", headers=headers)
+    work_todos_resp = await client.get(
+        f"/todos?space_id={work_space_id}", headers=headers
+    )
     assert work_todos_resp.status_code == 200
     work_todos = work_todos_resp.json()
     assert any(t["_id"] == todo_id for t in work_todos)
 
     # Verify todo does not appear in default space todos
-    default_todos_resp = await client.get(f"/todos?space_id={default_space['_id']}", headers=headers)
+    default_todos_resp = await client.get(
+        f"/todos?space_id={default_space['_id']}", headers=headers
+    )
     assert default_todos_resp.status_code == 200
     default_todos = default_todos_resp.json()
     assert not any(t["_id"] == todo_id for t in default_todos)
@@ -77,7 +87,9 @@ async def test_cannot_move_todo_to_unauthorized_space(client, test_email):
     headers2 = {"Authorization": f"Bearer {token2}"}
 
     # User 1 creates a space
-    create_space_resp = await client.post("/spaces", json={"name": "User 1 Private Space"}, headers=headers1)
+    create_space_resp = await client.post(
+        "/spaces", json={"name": "User 1 Private Space"}, headers=headers1
+    )
     assert create_space_resp.status_code == 200
     user1_space = create_space_resp.json()
 
@@ -85,7 +97,9 @@ async def test_cannot_move_todo_to_unauthorized_space(client, test_email):
     spaces_resp = await client.get("/spaces", headers=headers2)
     assert spaces_resp.status_code == 200
     user2_spaces = spaces_resp.json()
-    user2_default_space = next((s for s in user2_spaces if s.get("is_default", False)), None)
+    user2_default_space = next(
+        (s for s in user2_spaces if s.get("is_default", False)), None
+    )
     assert user2_default_space is not None
 
     # User 2 creates a todo in their default space
@@ -101,7 +115,9 @@ async def test_cannot_move_todo_to_unauthorized_space(client, test_email):
     todo_id = todo["_id"]
 
     # User 2 attempts to move todo to User 1's private space (should fail with 403)
-    update_resp = await client.put(f"/todos/{todo_id}", json={"space_id": user1_space["_id"]}, headers=headers2)
+    update_resp = await client.put(
+        f"/todos/{todo_id}", json={"space_id": user1_space["_id"]}, headers=headers2
+    )
     assert update_resp.status_code == 403
     assert "Not authorized" in update_resp.json()["detail"]
 
@@ -120,7 +136,9 @@ async def test_update_space_and_other_fields_together(client, test_email):
     assert default_space is not None
 
     # Create a second space
-    create_space_resp = await client.post("/spaces", json={"name": "Personal Projects"}, headers=headers)
+    create_space_resp = await client.post(
+        "/spaces", json={"name": "Personal Projects"}, headers=headers
+    )
     assert create_space_resp.status_code == 200
     personal_space = create_space_resp.json()
 
