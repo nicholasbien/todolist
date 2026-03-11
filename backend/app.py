@@ -512,10 +512,14 @@ async def api_reorder_todos(request: Request, current_user: dict = Depends(get_c
         if len(todo_ids) > 500:
             raise HTTPException(status_code=400, detail="Too many items to reorder")
         from bson import ObjectId
+        from bson.errors import InvalidId
 
         user_id = current_user["user_id"]
         # Verify the user owns all the todos being reordered
-        oid_list = [ObjectId(tid) for tid in todo_ids]
+        try:
+            oid_list = [ObjectId(tid) for tid in todo_ids]
+        except (InvalidId, TypeError):
+            raise HTTPException(status_code=400, detail="Invalid todo ID format")
         owned_count = await todos_collection.count_documents({"_id": {"$in": oid_list}, "user_id": user_id})
         if owned_count != len(oid_list):
             # Fall back to checking space membership for collaborative todos
@@ -1362,7 +1366,7 @@ async def api_get_single_todo(
     try:
         doc = await todos_collection.find_one({"_id": _ObjId(todo_id)})
     except Exception:
-        raise HTTPException(status_code=400, detail="Invalid todo ID")
+        raise HTTPException(status_code=404, detail="Todo not found")
     if not doc:
         raise HTTPException(status_code=404, detail="Todo not found")
     # Check ownership: user must own the todo or be in the same space

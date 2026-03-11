@@ -646,6 +646,7 @@ class TestAgentSystemPrompt:
             "save_memory",
             "list_memories",
             "delete_memory",
+            "search_sessions",
         }
 
         assert set(AVAILABLE_TOOLS.keys()) == expected_tools

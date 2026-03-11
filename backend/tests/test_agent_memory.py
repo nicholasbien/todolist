@@ -225,8 +225,8 @@ async def test_memory_module_direct():
     empty_ctx = await agent_memory.build_memory_context("unknown_user", space_id)
     assert empty_ctx == ""
 
-    # Test delete_memory
-    deleted = await agent_memory.delete_memory(user_id, "name", space_id)
+    # Test delete_memory_by_key
+    deleted = await agent_memory.delete_memory_by_key(user_id, "name", space_id)
     assert deleted is True
     facts_after = await agent_memory.list_memories(user_id, space_id)
     assert len(facts_after) == 1

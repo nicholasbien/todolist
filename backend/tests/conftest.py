@@ -65,6 +65,10 @@ async def client():
     activity_feed.trajectories_collection = db.db.chat_trajectories
     activity_feed.journals_collection = db.db.journals
 
+    # app.py imports todos_collection at module level; patch it too
+    import app as app_module
+    app_module.todos_collection = db.db.todos
+
     # Clear global MCP session state to prevent stale connections across tests
     from agent.agent import mcp_contexts, mcp_sessions
 

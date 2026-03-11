@@ -143,12 +143,11 @@ class TodolistMCPServer {
           },
           {
             name: 'delete_todo',
-            description: 'Close (soft-delete) a todo item. The item is marked as closed and appears in the completed list. Use permanent=true to permanently remove it from the database.',
+            description: 'Delete a todo item',
             inputSchema: {
               type: 'object',
               properties: {
                 id: { type: 'string', description: 'Todo ID' },
-                permanent: { type: 'boolean', description: 'If true, permanently delete from database instead of soft-deleting. Default: false.' },
               },
               required: ['id'],
             },
@@ -459,13 +458,9 @@ class TodolistMCPServer {
     return this.textResult(response.data.message || 'Todo completion toggled');
   }
 
-  private async deleteTodo(args: { id: string; permanent?: boolean }) {
-    if (args.permanent) {
-      await api.delete(`/todos/${args.id}/permanent`);
-      return this.textResult(`Permanently deleted todo ${args.id}`);
-    }
+  private async deleteTodo(args: { id: string }) {
     await api.delete(`/todos/${args.id}`);
-    return this.textResult(`Closed (soft-deleted) todo ${args.id}`);
+    return this.textResult(`Deleted todo ${args.id}`);
   }
 
   // --- Space tools ---
