@@ -2149,6 +2149,10 @@ export default function AIToDoListApp({
               isActive={activeTab === 'agent'}
               pendingSessionId={pendingSessionId}
               onSessionLoaded={() => setPendingSessionId(null)}
+              onNavigateToTasks={() => {
+                setTabIndex(0);
+                setActiveTab('tasks');
+              }}
             />
           </div>
         </div>
