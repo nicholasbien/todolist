@@ -1341,6 +1341,90 @@ async def api_get_single_todo(
     return doc
 
 
+# ---------------------------------------------------------------------------
+# Briefing preferences
+# ---------------------------------------------------------------------------
+
+
+class BriefingPreferencesRequest(BaseModel):
+    enabled: bool = False
+    hour: int = 8
+    minute: int = 0
+    timezone: str = "America/New_York"
+    stale_threshold_days: int = 3
+
+
+@app.get("/briefings/preferences")
+async def api_get_briefing_preferences(
+    current_user: dict = Depends(get_current_user),
+):
+    """Return the current user's briefing preferences."""
+    from auth import users_collection
+    from bson import ObjectId as _ObjId
+
+    user = await users_collection.find_one({"_id": _ObjId(current_user["user_id"])})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return {
+        "enabled": user.get("briefing_enabled", False),
+        "hour": user.get("briefing_hour", 8),
+        "minute": user.get("briefing_minute", 0),
+        "timezone": user.get("briefing_timezone", "America/New_York"),
+        "stale_threshold_days": user.get("briefing_stale_threshold_days", 3),
+    }
+
+
+@app.post("/briefings/preferences")
+async def api_update_briefing_preferences(
+    req: BriefingPreferencesRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    """Update the current user's briefing preferences and reschedule the job."""
+    from auth import users_collection
+    from bson import ObjectId as _ObjId
+
+    logger.info(
+        "Briefing preferences update by %s: enabled=%s, %02d:%02d %s, stale=%d days",
+        current_user["email"],
+        req.enabled,
+        req.hour,
+        req.minute,
+        req.timezone,
+        req.stale_threshold_days,
+    )
+
+    await users_collection.update_one(
+        {"_id": _ObjId(current_user["user_id"])},
+        {
+            "$set": {
+                "briefing_enabled": req.enabled,
+                "briefing_hour": req.hour,
+                "briefing_minute": req.minute,
+                "briefing_timezone": req.timezone,
+                "briefing_stale_threshold_days": req.stale_threshold_days,
+            }
+        },
+    )
+
+    # Schedule or remove the briefing job
+    try:
+        from briefings import remove_briefing_schedule, schedule_briefing_job
+
+        if req.enabled:
+            schedule_briefing_job(
+                user_id=current_user["user_id"],
+                hour=req.hour,
+                minute=req.minute,
+                timezone=req.timezone,
+            )
+        else:
+            remove_briefing_schedule(current_user["user_id"])
+    except Exception as e:
+        logger.warning("Could not update briefing schedule: %s", e)
+
+    return {"message": "Briefing preferences updated"}
+
+
 if __name__ == "__main__":
     import uvicorn
 
