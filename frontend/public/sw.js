@@ -48,7 +48,7 @@ const DEFAULT_CATEGORIES = ['General'];
 const API_ROUTES = [
   '/todos', '/categories', '/spaces', '/journals', '/insights',
   '/agent', '/auth', '/email', '/contact', '/export', '/health',
-  '/briefings', '/activity-feed', '/memories', '/memory-logs'
+  '/briefings', '/activity-feed', '/memories', '/memory-logs', '/images'
 ];
 
 function isApiPath(pathname) {
