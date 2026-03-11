@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import { ArrowUpDown, GripVertical, Search, X } from "lucide-react";
 import TodoItem from "./TodoItem";
 import AgentChatbot from "./AgentChatbot";
+import PushNotificationBanner from "./PushNotificationBanner";
 import { useAuth } from "../context/AuthContext";
 import Link from "next/link";
 import InsightsComponent from "./InsightsComponent";
@@ -12,6 +13,7 @@ import SpaceDropdown from "./SpaceDropdown";
 import { sortSpaces } from "../utils/spaceUtils";
 import { loadSortModePreference, saveSortModePreference, type SortMode } from "../utils/sortPreferences";
 import SwipeableViews from "react-swipeable-views-react-18-fix";
+import { isPushSupported, hasOptedIn, subscribeToPush } from "../utils/pushNotifications";
 import {
   DndContext,
   closestCenter,
@@ -504,6 +506,11 @@ export default function AIToDoListApp({
           userId: user.id || user._id || user.email
         });
       }
+
+      // Re-register push subscription if user previously opted in
+      if (isPushSupported() && hasOptedIn()) {
+        subscribeToPush().catch(() => {});
+      }
     }
   }, [token, user, fetchSpaces]);
 
@@ -594,17 +601,23 @@ export default function AIToDoListApp({
   }, [token, user, fetchTodos]);
 
   // Refresh todos after service worker sync completes (IDs may have changed)
+  // Also handle notification clicks to navigate to the relevant session
   useEffect(() => {
-    const handleSyncMessage = (event: MessageEvent) => {
+    const handleSWMessage = (event: MessageEvent) => {
       if (event.data?.type === 'SYNC_COMPLETE') {
         console.log('Sync complete — refreshing todos');
         fetchTodos(false);
       }
+      if (event.data?.type === 'NOTIFICATION_CLICK' && event.data?.session_id) {
+        console.log('Notification click — navigating to session', event.data.session_id);
+        setPendingSessionId(event.data.session_id);
+        setActiveTab('agent');
+      }
     };
 
-    navigator.serviceWorker?.addEventListener('message', handleSyncMessage);
+    navigator.serviceWorker?.addEventListener('message', handleSWMessage);
     return () => {
-      navigator.serviceWorker?.removeEventListener('message', handleSyncMessage);
+      navigator.serviceWorker?.removeEventListener('message', handleSWMessage);
     };
   }, [fetchTodos]);
 
@@ -2138,10 +2151,7 @@ export default function AIToDoListApp({
           ref={agentTabRef}
           style={{ padding: '16px 16px 0 16px', height: '100%', display: 'flex', flexDirection: 'column', touchAction: 'pan-y' }}
         >
-          {/* Header Row with Page Title */}
-          {/* <div className="mb-6" style={{ flexShrink: 0 }}>
-            <h2 className="text-xl font-semibold text-gray-100">Assistant</h2>
-          </div> */}
+          <PushNotificationBanner />
           <div style={{ flex: 1, minHeight: 0 }}>
             <AgentChatbot
               activeSpace={activeSpace}
