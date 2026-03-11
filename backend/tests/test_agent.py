@@ -705,6 +705,7 @@ class TestAgentSystemPrompt:
             "add_journal_entry",
             "read_journal_entry",
             "search_content",
+            "search_sessions",
             "web_search",
             "send_email_to_user",
             "web_scraping",
