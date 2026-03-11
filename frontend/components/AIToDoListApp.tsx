@@ -7,6 +7,7 @@ import Link from "next/link";
 import InsightsComponent from "./InsightsComponent";
 import JournalComponent from "./JournalComponent";
 import BriefingSettings from "./BriefingSettings";
+import ActivityFeed from "./ActivityFeed";
 import SpaceDropdown from "./SpaceDropdown";
 import { sortSpaces } from "../utils/spaceUtils";
 import { loadSortModePreference, saveSortModePreference, type SortMode } from "../utils/sortPreferences";
@@ -227,10 +228,11 @@ export default function AIToDoListApp({
   const membersFetchIdRef = useRef(0);
 
   // Tab state
-  const [activeTab, setActiveTab] = useState<'tasks' | 'agent' | 'journal'>('tasks');
-  const [tabIndex, setTabIndex] = useState(0); // 0=tasks, 1=agent
+  const [activeTab, setActiveTab] = useState<'tasks' | 'agent' | 'activity' | 'journal'>('tasks');
+  const [tabIndex, setTabIndex] = useState(0); // 0=tasks, 1=agent, 2=activity
   const tasksTabRef = useRef<HTMLDivElement>(null);
   const agentTabRef = useRef<HTMLDivElement>(null);
+  const activityTabRef = useRef<HTMLDivElement>(null);
   const journalTabRef = useRef<HTMLDivElement>(null);
 
   // Session state for task-linked chats
@@ -470,7 +472,7 @@ export default function AIToDoListApp({
 
   // Handle tab change (from button click only - swiping is disabled)
   const handleTabChange = useCallback((index: number) => {
-    const tabs: ('tasks' | 'agent' | 'journal')[] = ['tasks', 'agent'];
+    const tabs: ('tasks' | 'agent' | 'activity' | 'journal')[] = ['tasks', 'agent', 'activity'];
     setTabIndex(index);
     setActiveTab(tabs[index]);
   }, []);
@@ -480,6 +482,7 @@ export default function AIToDoListApp({
     const refMap = {
       tasks: tasksTabRef,
       agent: agentTabRef,
+      activity: activityTabRef,
       journal: journalTabRef
     };
     const ref = refMap[activeTab];
@@ -1496,18 +1499,16 @@ export default function AIToDoListApp({
         >
           Assistant
         </button>
-        {/* Journal tab hidden - kept for future re-enabling
         <button
           onClick={() => handleTabChange(2)}
           className={`flex-1 py-3 px-2 sm:px-6 font-medium text-sm transition-colors ${
-            activeTab === 'journal'
+            activeTab === 'activity'
               ? 'text-accent border-b-2 border-accent'
               : 'text-gray-400 hover:text-gray-300'
           }`}
         >
-          Journal
+          Activity
         </button>
-        */}
       </div>
 
       {/* Tab Content */}
@@ -2152,16 +2153,26 @@ export default function AIToDoListApp({
           </div>
         </div>
 
-        {/* Journal Tab - hidden, kept for future re-enabling
+        {/* Activity Tab */}
         <div
-          ref={journalTabRef}
+          ref={activityTabRef}
           style={{ padding: '16px 16px 0 16px', height: '100%', display: 'flex', flexDirection: 'column', touchAction: 'pan-y' }}
         >
           <div style={{ flex: 1, minHeight: 0 }}>
-            <JournalComponent token={token} activeSpace={activeSpace} />
+            <ActivityFeed
+              activeSpace={activeSpace}
+              token={token}
+              isActive={activeTab === 'activity'}
+              onOpenTaskChat={(todoId: string) => {
+                // Find the todo and open its chat
+                const todo = todos.find((t: any) => t._id === todoId);
+                if (todo) {
+                  handleChatAboutTodo(todo);
+                }
+              }}
+            />
           </div>
         </div>
-        */}
       </SwipeableViews>
       </div>
 

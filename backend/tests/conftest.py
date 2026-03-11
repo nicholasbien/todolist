@@ -22,6 +22,7 @@ async def client():
     os.environ.setdefault("USE_MOCK_DB", "true")
 
     # Reset database connections to avoid event loop issues between tests
+    import activity_feed
     import auth
     import categories
     import chat_sessions
@@ -58,6 +59,11 @@ async def client():
 
     agent_memory.memories_collection = db.db.agent_memories
     agent_memory.memory_logs_collection = db.db.agent_memory_logs
+
+    activity_feed.todos_collection = db.db.todos
+    activity_feed.sessions_collection = db.db.chat_sessions
+    activity_feed.trajectories_collection = db.db.chat_trajectories
+    activity_feed.journals_collection = db.db.journals
 
     # Clear global MCP session state to prevent stale connections across tests
     from agent.agent import mcp_contexts, mcp_sessions
