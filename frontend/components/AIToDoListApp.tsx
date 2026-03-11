@@ -204,7 +204,12 @@ export default function AIToDoListApp({
   const [editDueDate, setEditDueDate] = useState<string>('');
   const [editSpaceId, setEditSpaceId] = useState<string>('');
   const [editSpaceCategories, setEditSpaceCategories] = useState<string[]>([]);
-  const [newTodoAgent, setNewTodoAgent] = useState<string>('');
+  const [newTodoAgent, setNewTodoAgent] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('lastSelectedAgent') || '';
+    }
+    return '';
+  });
 
   // Long-press to edit category
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1662,7 +1667,10 @@ export default function AIToDoListApp({
           />
           <select
             value={newTodoAgent}
-            onChange={(e) => setNewTodoAgent(e.target.value)}
+            onChange={(e) => {
+              setNewTodoAgent(e.target.value);
+              localStorage.setItem('lastSelectedAgent', e.target.value);
+            }}
             className="h-12 px-2 rounded-xl bg-gray-900 border border-gray-700 text-gray-200 text-sm focus:border-accent focus:outline-none transition-colors appearance-none cursor-pointer"
           >
             <option value="">Built-in</option>
