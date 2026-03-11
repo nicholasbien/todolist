@@ -8,6 +8,7 @@ import InsightsComponent from "./InsightsComponent";
 import JournalComponent from "./JournalComponent";
 import BriefingSettings from "./BriefingSettings";
 import ActivityFeed from "./ActivityFeed";
+import ImageUploader, { type UploadedImage } from "./ImageUploader";
 import SpaceDropdown from "./SpaceDropdown";
 import { sortSpaces } from "../utils/spaceUtils";
 import { loadSortModePreference, saveSortModePreference, type SortMode } from "../utils/sortPreferences";
@@ -145,6 +146,7 @@ export default function AIToDoListApp({
   const [spaceMembers, setSpaceMembers] = useState<any[]>([]);
   const [showOfflineTooltip, setShowOfflineTooltip] = useState(false);
   const [showBriefingSettings, setShowBriefingSettings] = useState(false);
+  const [newTodoImages, setNewTodoImages] = useState<UploadedImage[]>([]);
 
   useEffect(() => {
     activeSpaceRef.current = activeSpace;
@@ -837,6 +839,7 @@ export default function AIToDoListApp({
         completed: false,
         space_id: activeSpace ? activeSpace._id : null,
         agent_id: newTodoAgent || null,
+        image_ids: newTodoImages.length > 0 ? newTodoImages.map(img => img.id) : undefined,
       };
 
       // Include notes if provided
@@ -878,6 +881,7 @@ export default function AIToDoListApp({
       setNewTodo('');
       setNewTodoNotes('');
       setNewTodoAgent('');
+      setNewTodoImages([]);
     } catch (err) {
       if (err.name === 'AbortError') {
         setError('Request timed out. Please try again.');
@@ -1737,6 +1741,16 @@ export default function AIToDoListApp({
           rows={1}
           className="w-full mt-2 p-3 border border-gray-800 rounded-xl bg-black text-gray-100 placeholder-gray-500 focus:border-accent focus:outline-none transition-colors resize-none min-h-[40px] max-h-[140px] overflow-y-auto text-sm"
         />
+        <div className="mt-2">
+          <ImageUploader
+            token={token}
+            spaceId={activeSpace?._id}
+            images={newTodoImages}
+            onImagesChange={setNewTodoImages}
+            maxImages={4}
+            compact
+          />
+        </div>
       </div>
 
       {showAddSpaceModal && (
