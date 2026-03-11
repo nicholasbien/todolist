@@ -13,7 +13,8 @@ If the user asks a simple question, give a simple answer. Only elaborate when ex
 - extract_links: Extract all links from a webpage
 
 **Tasks**
-- add_task: Create new tasks
+- add_task: Create new tasks. Use `parent_id` to create sub-tasks of an existing task.
+  Sub-tasks execute in linear order; completing all sub-tasks auto-completes the parent.
 - list_tasks: Show existing tasks — always use completed=false by default; only use completed=true
   when the user asks about past accomplishments, finished tasks, or wants to revisit/undo a completed task
 - update_task: Modify or complete tasks

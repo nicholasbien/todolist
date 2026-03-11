@@ -106,18 +106,70 @@ async def add_task(request: TaskAddRequest, user_id: str, space_id: Optional[str
             dateAdded=datetime.utcnow().isoformat(),
             notes=notes,
             creator_type="agent",
+            parent_id=request.parent_id,
         )
 
         created_todo = await db_create_todo(todo)
 
         # db_create_todo returns a Todo object, convert to dict
         created_task_dict = created_todo.dict(by_alias=True)
+        todo_id = str(created_task_dict["_id"])
+
+        # Auto-create linked session for agent-created tasks (mirrors app.py behavior)
+        try:
+            from chat_sessions import append_message
+            from chat_sessions import create_session as create_chat_session
+            from chat_sessions import find_session_by_todo
+
+            is_subtask = bool(request.parent_id)
+            subtask_order = created_task_dict.get("subtask_order", 0)
+
+            # Build initial message
+            if is_subtask:
+                parent_doc = await collections.todos.find_one({"_id": ObjectId(request.parent_id)})
+                parent_text = parent_doc.get("text", "") if parent_doc else ""
+                initial_msg = f'Subtask of: "{parent_text}"\n\nTask: {title}'
+                if notes:
+                    initial_msg += f"\nNotes: {notes}"
+            else:
+                initial_msg = f"Agent created task: {title}"
+                if notes:
+                    initial_msg += f"\nNotes: {notes}"
+
+            # Inherit agent_id from parent session for subtasks
+            auto_agent_id = None
+            if is_subtask and request.parent_id:
+                parent_session = await find_session_by_todo(user_id, request.parent_id)
+                if parent_session and parent_session.get("agent_id"):
+                    auto_agent_id = parent_session["agent_id"]
+
+            session_id = await create_chat_session(
+                user_id,
+                space_id,
+                title,
+                todo_id=todo_id,
+                agent_id=auto_agent_id,
+            )
+            await append_message(session_id, user_id, "assistant", initial_msg)
+
+            # Dormant session for non-first subtasks
+            if is_subtask and subtask_order > 0:
+                from chat_sessions import sessions_collection as sess_coll
+
+                await sess_coll.update_one(
+                    {"_id": ObjectId(session_id)},
+                    {"$set": {"needs_agent_response": False}},
+                )
+        except Exception as e:
+            import logging
+
+            logging.getLogger(__name__).error(f"Failed to create session for agent task: {e}")
 
         return {
             "ok": True,
-            "id": str(created_task_dict["_id"]),
+            "id": todo_id,
             "task": {
-                "_id": str(created_task_dict["_id"]),
+                "_id": todo_id,
                 "text": created_task_dict["text"],
                 "category": created_task_dict.get("category"),
                 "priority": created_task_dict.get("priority"),
@@ -126,6 +178,7 @@ async def add_task(request: TaskAddRequest, user_id: str, space_id: Optional[str
                 "space_id": created_task_dict.get("space_id"),
                 "user_id": created_task_dict.get("user_id"),
                 "notes": created_task_dict.get("notes"),
+                "parent_id": created_task_dict.get("parent_id"),
             },
         }
     except Exception as e:
@@ -183,6 +236,17 @@ async def update_task(request: TaskUpdateRequest, user_id: str, space_id: Option
 
         # Update using existing backend function
         await update_todo_fields(todo_id=request.id, updates=update_data, user_id=user_id)
+
+        # Trigger subtask orchestration if completing
+        if request.completed:
+            try:
+                from todos import handle_subtask_completion
+
+                await handle_subtask_completion(request.id, user_id)
+            except Exception as e:
+                import logging
+
+                logging.getLogger(__name__).error(f"Subtask orchestration error in agent: {e}")
 
         # Get updated task
         updated_task = await collections.todos.find_one({"_id": ObjectId(request.id)})

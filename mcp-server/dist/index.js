@@ -71,12 +71,13 @@ class TodolistMCPServer {
                     // --- Todo tools ---
                     {
                         name: 'add_todo',
-                        description: 'Add a new todo item',
+                        description: 'Add a new todo item. Pass parent_id to create a sub-task of an existing todo.',
                         inputSchema: {
                             type: 'object',
                             properties: {
                                 text: { type: 'string', description: 'The todo item text' },
                                 space_id: { type: 'string', description: 'Space ID (auto-detected if not provided)' },
+                                parent_id: { type: 'string', description: 'Parent todo ID to create as a sub-task (optional). Sub-tasks execute in linear order.' },
                             },
                             required: ['text'],
                         },
@@ -211,7 +212,7 @@ class TodolistMCPServer {
                     },
                     {
                         name: 'post_to_session',
-                        description: 'Post a message to a session. Use agent_id to claim the session for future routing.',
+                        description: 'Post a message to a session. Use agent_id to claim the session for future routing. Set interim=true for progress updates that should not clear the pending flag (e.g. "Working on this..."). The session stays in the pending queue so the final response can be posted later.',
                         inputSchema: {
                             type: 'object',
                             properties: {
@@ -219,6 +220,7 @@ class TodolistMCPServer {
                                 content: { type: 'string', description: 'Message content' },
                                 role: { type: 'string', enum: ['user', 'assistant'], description: 'Message role (default: assistant)' },
                                 agent_id: { type: 'string', description: 'Agent ID to claim this session (optional). Followups will route back to this agent.' },
+                                interim: { type: 'boolean', description: 'If true, post as a progress update without clearing the pending flag. Default: false.' },
                             },
                             required: ['session_id', 'content'],
                         },
@@ -338,9 +340,13 @@ class TodolistMCPServer {
     // --- Todo tools ---
     async addTodo(args) {
         const spaceId = await this.resolveSpaceId(args.space_id);
-        const response = await api.post('/todos', { text: args.text, space_id: spaceId });
+        const body = { text: args.text, space_id: spaceId };
+        if (args.parent_id)
+            body.parent_id = args.parent_id;
+        const response = await api.post('/todos', body);
         const todo = response.data;
-        return this.textResult(`Added todo: "${todo.text}" (ID: ${todo._id}, Category: ${todo.category})`);
+        const prefix = args.parent_id ? 'Added sub-task' : 'Added todo';
+        return this.textResult(`${prefix}: "${todo.text}" (ID: ${todo._id}, Category: ${todo.category})`);
     }
     async listTodos(args) {
         const spaceId = await this.resolveSpaceId(args.space_id);
@@ -354,7 +360,28 @@ class TodolistMCPServer {
         }
         if (todos.length === 0)
             return this.textResult('No todos found');
-        const lines = todos.map((t, i) => `${i + 1}. ${t.completed ? '[done]' : '[  ]'} ${t.text} [${t.category || 'General'}] (ID: ${t._id})`);
+        // Group: top-level first, then sub-tasks indented under parents
+        const parents = todos.filter((t) => !t.parent_id);
+        const childrenMap = new Map();
+        for (const t of todos) {
+            if (t.parent_id) {
+                const list = childrenMap.get(t.parent_id) || [];
+                list.push(t);
+                childrenMap.set(t.parent_id, list);
+            }
+        }
+        // Sort children by subtask_order
+        childrenMap.forEach((children) => children.sort((a, b) => (a.subtask_order ?? 0) - (b.subtask_order ?? 0)));
+        const lines = [];
+        let i = 1;
+        for (const t of parents) {
+            const subtasks = childrenMap.get(t._id) || [];
+            const subtaskInfo = subtasks.length > 0 ? ` [${subtasks.filter(s => s.completed).length}/${subtasks.length} sub-tasks]` : '';
+            lines.push(`${i++}. ${t.completed ? '[done]' : '[  ]'} ${t.text} [${t.category || 'General'}] (ID: ${t._id})${subtaskInfo}`);
+            for (const c of subtasks) {
+                lines.push(`   └─ ${c.completed ? '[done]' : '[  ]'} ${c.text} (ID: ${c._id})`);
+            }
+        }
         return this.textResult(lines.join('\n'));
     }
     async updateTodo(args) {
@@ -452,7 +479,12 @@ class TodolistMCPServer {
         const lines = sessions.map((s) => {
             const todoInfo = s.todo_id ? ` (todo: ${s.todo_id})` : '';
             const agentInfo = s.agent_id ? ` [agent: ${s.agent_id}]` : '';
-            return `- "${s.title}" (ID: ${s._id})${todoInfo}${agentInfo}`;
+            const followup = s.is_followup ? ' **FOLLOW-UP**' : '';
+            const msgCount = s.message_count !== undefined ? ` [${s.message_count} msgs]` : '';
+            const recentMsgs = s.recent_messages && s.recent_messages.length > 0
+                ? '\n  Recent messages:\n' + s.recent_messages.map((m) => `    - "${m}"`).join('\n')
+                : '';
+            return `- "${s.title}" (ID: ${s._id})${todoInfo}${agentInfo}${followup}${msgCount}${recentMsgs}`;
         });
         return this.textResult(`Pending sessions:\n${lines.join('\n')}`);
     }
@@ -461,6 +493,7 @@ class TodolistMCPServer {
             role: args.role || 'assistant',
             content: args.content,
             ...(args.agent_id && { agent_id: args.agent_id }),
+            ...(args.interim !== undefined && { interim: args.interim }),
         });
         return this.textResult(`Posted ${args.role || 'assistant'} message to session ${args.session_id}`);
     }
