@@ -660,7 +660,8 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // SSE streaming: don't intercept — let the browser connect directly
+  // SSE streaming: don't intercept — Next.js rewrite proxies /agent/stream
+  // to the backend at the server level (no buffering).
   if (isApi && url.pathname === '/agent/stream') {
     return;
   }

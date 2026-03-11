@@ -1,4 +1,7 @@
 /** @type {import('next').NextConfig} */
+
+const BACKEND_URL = (process.env.BACKEND_URL || 'http://localhost:8000').replace(/\/$/, '');
+
 const nextConfig = {
   reactStrictMode: true,
   swcMinify: true,
@@ -25,6 +28,19 @@ const nextConfig = {
       },
     ];
   },
+  // Rewrite /agent/stream to the backend so SSE streaming works same-origin
+  // (avoids CORS issues that occur when EventSource hits the backend directly).
+  // Next.js rewrites stream the response — they don't buffer like API routes.
+  ...(!process.env.CAPACITOR_BUILD && {
+    async rewrites() {
+      return [
+        {
+          source: '/agent/stream',
+          destination: `${BACKEND_URL}/agent/stream`,
+        },
+      ];
+    },
+  }),
 };
 
 module.exports = nextConfig;
