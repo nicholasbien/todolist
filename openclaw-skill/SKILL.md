@@ -307,12 +307,15 @@ curl -s -H "Authorization: Bearer $TODOLIST_AUTH_TOKEN" \
 When handling a complex task:
 1. Read the task description and notes
 2. Create sub-tasks with clear, actionable descriptions and detailed notes
-3. Post an interim message to the parent session: "Breaking this into N sub-tasks..."
+3. **Post a plan to the parent session** describing what each subtask will do:
+   e.g. "Breaking this into 3 sub-tasks:\n1. Research the problem — investigate X\n2. Implement solution — build Y\n3. Write tests — cover Z"
 4. The first sub-task will automatically become pending for the next poll cycle
-5. Each poll cycle, pick up the next activated sub-task and work on it
-6. Monitor the parent session for progress updates from the backend
-7. When all subtasks complete, the parent session receives a notification
-8. Read each subtask's session results, post a final summary, and complete the parent task
+5. **Poll for updates** using `GET /agent/sessions/pending?agent_id=openclaw` to
+   monitor subtask progress — the backend activates subtasks sequentially
+6. As subtasks complete, post progress updates to the parent session
+7. Handle any issues — if a subtask fails, read its session and take corrective action
+8. When all subtasks complete, the parent session receives a notification
+9. Read each subtask's session results, post a final summary, and complete the parent task
 
 #### Sub-Task Display in list_todos
 

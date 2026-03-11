@@ -122,12 +122,19 @@ task assigned to you.
 
 ## Instructions
 1. Read and understand the task and any follow-up messages
-2. Do the work requested — this may involve:
+2. If the task is complex, break it into sub-tasks:
+   - Create sub-tasks via mcp__todolist__add_todo with parent_id={todo_id}
+   - Post a plan to the parent session describing what each subtask will do
+   - Use /todolist check (or mcp__todolist__get_pending_sessions) to poll
+     for subtask progress — the backend activates subtasks sequentially
+   - Monitor progress and handle any issues as subtasks complete
+   - When all subtasks are done, read their sessions, post a final summary,
+     and complete the parent task via mcp__todolist__complete_todo
+3. If the task is simple, do the work directly:
    - Writing or modifying code in this repository
    - Researching information
-   - Creating subtasks via mcp__todolist__add_todo
    - Updating the task via mcp__todolist__update_todo
-3. When done, post your response using mcp__todolist__post_to_session:
+4. When done, post your response using mcp__todolist__post_to_session:
    - session_id: "{session_id}"
    - content: Your detailed response describing what you did
    - role: "assistant"
@@ -135,6 +142,8 @@ task assigned to you.
 
 IMPORTANT: Always include agent_id="claude" when posting to claim/maintain
 routing. The user will see your reply in their TodoList app.
+IMPORTANT: If you create subtasks, use /todolist check to poll for updates
+from your subtasks rather than trying to do all the work yourself.
 ```
 
 **Run subagents in the background** when handling multiple tasks so they work
@@ -239,23 +248,33 @@ needs to be broken into sub-tasks:
 2. If the task is complex (multiple distinct steps, different concerns):
    - Create sub-tasks with clear, actionable descriptions
    - Include detailed notes for each sub-task explaining what to do
+   - **Post a plan to the parent session** describing what each subtask will do:
+     e.g. "Breaking this into 3 sub-tasks:\n1. Research the problem — investigate X\n2. Implement solution — build Y\n3. Write tests — cover Z"
    - The first sub-task will automatically become pending for the next poll cycle
-   - Post an interim message to the parent session: "Breaking this into N sub-tasks..."
 3. If the task is simple:
    - Do the work directly and post the result
 
 ### Managing Agent Responsibilities
 
-The managing agent monitors the parent task's session for progress updates.
-As subtasks complete, the backend posts progress messages to the parent session
-(e.g. "Subtask completed: Step 1 (1/3 done)"). The parent session's
-`needs_agent_response` is set to true, so the managing agent picks it up
-on the next poll.
+The managing agent (subagent assigned to the parent task) is responsible for
+monitoring subtask progress, handling issues, and providing the final summary.
 
-When the managing agent sees "All subtasks complete":
-1. Read each subtask's session to gather results (use `get_session`)
-2. Post a final summary to the parent session
-3. Complete the parent task via `complete_todo`
+**The managing agent should use `/todolist check` (or `mcp__todolist__get_pending_sessions`)
+to poll for updates.** When a subtask completes, the backend posts a progress
+message to the parent session (e.g. "Subtask completed: Step 1 (1/3 done)").
+The parent session's `needs_agent_response` is set to true, so the managing
+agent picks it up on the next poll.
+
+The managing agent should:
+1. **Poll regularly** using `/todolist check` or `get_pending_sessions` to
+   monitor subtask progress
+2. **Post progress updates** to the parent session as subtasks complete
+3. **Handle issues** — if a subtask fails or needs intervention, read its
+   session and take corrective action
+4. When all subtasks are complete:
+   - Read each subtask's session to gather results (use `get_session`)
+   - Post a final summary to the parent session
+   - Complete the parent task via `complete_todo`
 
 ### Sub-Task Display
 

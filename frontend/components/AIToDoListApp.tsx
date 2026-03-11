@@ -1932,6 +1932,8 @@ export default function AIToDoListApp({
                     handleDeleteTodo={handleDeleteTodo}
                     isCollaborative={(activeSpace?.member_ids?.length ?? 0) > 1}
                     onEdit={handleEditTodo}
+                    onChat={handleChatAboutTodo}
+                    sessionStatus={todoSessionStatuses[child._id] as any}
                     isSubtask
                   />
                 </div>
