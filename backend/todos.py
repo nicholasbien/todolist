@@ -74,11 +74,69 @@ class Todo(BaseModel):
     agent_id: Optional[str] = None
     parent_id: Optional[str] = None  # ID of parent todo for sub-tasks
     subtask_ids: list[str] = []  # Ordered array of child todo IDs (on the parent)
+    depends_on: list[str] = []  # IDs of sibling subtasks this task depends on
 
     class Config:
         arbitrary_types_allowed = True
         json_encoders = {ObjectId: str}
         populate_by_name = True
+
+
+async def _check_for_cycles(
+    parent_id: str,
+    new_task_id: str,
+    new_task_deps: list[str],
+    extra_edges: dict[str, list[str]] | None = None,
+):
+    """DFS cycle detection on the subtask dependency graph.
+
+    Builds a directed graph of depends_on edges among siblings, adds the
+    proposed new edges, and checks for cycles.  Raises HTTPException(400)
+    if a cycle is found.
+
+    ``extra_edges`` allows callers to inject additional edge overrides
+    (used by update_todo_fields when depends_on is changed).
+    """
+    subtasks = await todos_collection.find({"parent_id": parent_id}).to_list(length=200)
+    # Build adjacency list: task_id -> list of IDs it depends on
+    graph: dict[str, list[str]] = {}
+    for s in subtasks:
+        sid = str(s["_id"])
+        graph[sid] = list(s.get("depends_on", []))
+
+    # Add the new task edges
+    graph[new_task_id] = list(new_task_deps)
+
+    # Apply extra edge overrides
+    if extra_edges:
+        graph.update(extra_edges)
+
+    # DFS for cycle detection
+    WHITE, GRAY, BLACK = 0, 1, 2
+    color: dict[str, int] = {node: WHITE for node in graph}
+    # Ensure all referenced nodes exist in the color map
+    for deps in graph.values():
+        for d in deps:
+            if d not in color:
+                color[d] = WHITE
+
+    def dfs(node: str) -> bool:
+        color[node] = GRAY
+        for dep in graph.get(node, []):
+            if color.get(dep) == GRAY:
+                return True  # cycle found
+            if color.get(dep) == WHITE and dfs(dep):
+                return True
+        color[node] = BLACK
+        return False
+
+    for node in list(graph.keys()):
+        if color[node] == WHITE:
+            if dfs(node):
+                raise HTTPException(
+                    status_code=400,
+                    detail="Circular dependency detected among subtasks",
+                )
 
 
 async def create_todo(todo: Todo):
@@ -111,6 +169,40 @@ async def create_todo(todo: Todo):
             # Single-level nesting only
             if parent.get("parent_id"):
                 raise HTTPException(status_code=400, detail="Cannot create sub-task of a sub-task")
+
+        # Validate depends_on
+        if todo.depends_on:
+            if not todo.parent_id:
+                raise HTTPException(
+                    status_code=400,
+                    detail="depends_on requires parent_id (only subtasks can have dependencies)",
+                )
+            # Get sibling subtask IDs from parent's subtask_ids
+            sibling_ids = set(parent.get("subtask_ids", []))
+            for dep_id in todo.depends_on:
+                # No self-references (use a placeholder since we don't have our ID yet,
+                # but self-ref is impossible at creation time — the task doesn't exist yet)
+                if dep_id not in sibling_ids:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"depends_on ID {dep_id} is not an existing sibling subtask",
+                    )
+                # Verify the dep actually exists in the DB
+                dep_todo = await todos_collection.find_one({"_id": ObjectId(dep_id)})
+                if not dep_todo:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"depends_on ID {dep_id} does not exist",
+                    )
+                if dep_todo.get("parent_id") != todo.parent_id:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"depends_on ID {dep_id} is not a sibling (different parent)",
+                    )
+
+            # Cycle detection: build the dependency graph including this new task,
+            # then check for cycles via DFS.
+            await _check_for_cycles(todo.parent_id, "NEW", todo.depends_on)
 
         result = await todos_collection.insert_one(todo_dict)
 
@@ -210,10 +302,16 @@ async def delete_todo(todo_id: str, user_id: str):
         result = await todos_collection.delete_one(query)
         if result.deleted_count == 1:
             # If this was a subtask, remove its ID from the parent's subtask_ids
+            # and clean it from siblings' depends_on arrays
             if todo.get("parent_id"):
                 await todos_collection.update_one(
                     {"_id": ObjectId(todo["parent_id"])},
                     {"$pull": {"subtask_ids": todo_id}},
+                )
+                # Remove this ID from any sibling's depends_on
+                await todos_collection.update_many(
+                    {"parent_id": todo["parent_id"]},
+                    {"$pull": {"depends_on": todo_id}},
                 )
             # Cascade delete: remove all sub-tasks if this was a parent
             await todos_collection.delete_many({"parent_id": todo_id})
@@ -291,6 +389,36 @@ async def update_todo_fields(todo_id: str, updates: dict, user_id: str):
         if todo.get("space_id") and not await user_in_space(user_id, todo["space_id"]):
             raise HTTPException(status_code=403, detail="Not in space")
 
+        # Validate depends_on if being updated
+        if "depends_on" in updates:
+            new_deps = updates["depends_on"]
+            parent_id = todo.get("parent_id")
+            if new_deps and not parent_id:
+                raise HTTPException(
+                    status_code=400,
+                    detail="depends_on requires parent_id (only subtasks can have dependencies)",
+                )
+            if new_deps and parent_id:
+                # Validate each dep is a sibling
+                for dep_id in new_deps:
+                    if dep_id == todo_id:
+                        raise HTTPException(status_code=400, detail="A subtask cannot depend on itself")
+                    dep_todo = await todos_collection.find_one({"_id": ObjectId(dep_id)})
+                    if not dep_todo:
+                        raise HTTPException(status_code=400, detail=f"depends_on ID {dep_id} does not exist")
+                    if dep_todo.get("parent_id") != parent_id:
+                        raise HTTPException(
+                            status_code=400,
+                            detail=f"depends_on ID {dep_id} is not a sibling",
+                        )
+                # Cycle detection
+                await _check_for_cycles(
+                    parent_id,
+                    todo_id,
+                    new_deps,
+                    extra_edges={todo_id: new_deps},
+                )
+
         result = await todos_collection.update_one(query, {"$set": updates})
         if result.matched_count == 1:
             # Get the updated todo document
@@ -340,6 +468,13 @@ async def migrate_legacy_todos() -> None:
         )
         if result.modified_count > 0:
             logger.info("Migrated %d legacy todos to have subtask_ids: []", result.modified_count)
+
+        result = await todos_collection.update_many(
+            {"depends_on": {"$exists": False}},
+            {"$set": {"depends_on": []}},
+        )
+        if result.modified_count > 0:
+            logger.info("Migrated %d legacy todos to have depends_on: []", result.modified_count)
     except Exception as e:
         logger.error(f"Error migrating legacy todos: {str(e)}")
 
@@ -365,8 +500,9 @@ async def get_subtasks(parent_id: str):
 async def handle_subtask_completion(todo_id: str, user_id: str):
     """Handle orchestration when a subtask is completed.
 
-    Activates the next subtask's session and posts progress to the
-    parent session. The managing agent is responsible for giving the
+    When a subtask completes, find all sibling subtasks whose dependencies
+    are now fully satisfied and activate their sessions. Posts progress to
+    the parent session. The managing agent is responsible for giving the
     final summary and completing the parent task.
     """
     todo = await todos_collection.find_one({"_id": ObjectId(todo_id)})
@@ -379,42 +515,62 @@ async def handle_subtask_completion(todo_id: str, user_id: str):
     from chat_sessions import append_message, find_session_by_todo
     from chat_sessions import sessions_collection as sess_coll
 
-    # Find next uncompleted subtask using parent's subtask_ids order
     parent = await todos_collection.find_one({"_id": ObjectId(parent_id)})
-    ordered_ids = parent.get("subtask_ids", []) if parent else []
+    if not parent:
+        return  # Parent no longer exists
 
-    # Find current subtask's position and look for the next uncompleted one
-    current_idx = ordered_ids.index(todo_id) if todo_id in ordered_ids else -1
-    next_subtask = None
-    if current_idx >= 0:
-        for next_id in ordered_ids[current_idx + 1 :]:
-            candidate = await todos_collection.find_one({"_id": ObjectId(next_id), "completed": False})
-            if candidate:
-                next_subtask = candidate
-                break
+    # Build set of all completed subtask IDs (including the one just completed)
+    all_subtasks = await get_subtasks(parent_id)
+    completed_ids = {s["_id"] for s in all_subtasks if s.get("completed")}
 
-    if next_subtask:
-        # Activate next subtask's session
-        next_todo_id = str(next_subtask["_id"])
-        next_session = await find_session_by_todo(user_id, next_todo_id)
-        if next_session:
-            session_id = str(next_session["_id"])
-            await sess_coll.update_one(
-                {"_id": ObjectId(session_id)},
-                {"$set": {"needs_agent_response": True}},
-            )
-            await append_message(
-                session_id,
-                user_id,
-                "user",
-                f"Previous subtask completed: \"{todo.get('text', '')}\". You may now begin this subtask.",
-            )
-            logger.info(f"Activated next subtask session {session_id} for todo {next_todo_id}")
+    # Find subtasks that are now unblocked:
+    # - Not yet completed
+    # - All depends_on entries are in completed_ids
+    newly_unblocked = []
+    for s in all_subtasks:
+        sid = s["_id"]
+        if s.get("completed"):
+            continue
+        deps = s.get("depends_on", [])
+        if not deps:
+            # No dependencies — should already be active (parallel by default)
+            continue
+        # Check if all dependencies are now satisfied
+        if all(dep_id in completed_ids for dep_id in deps):
+            # Check if session is currently dormant (needs_agent_response == False)
+            session = await find_session_by_todo(user_id, sid)
+            if session and not session.get("needs_agent_response"):
+                newly_unblocked.append((sid, s, session))
+
+    # Activate newly unblocked subtask sessions.
+    # Use find_one_and_update with a filter on needs_agent_response=False
+    # to atomically claim the activation — prevents race conditions where
+    # two concurrent completions both try to activate the same session.
+    for sub_todo_id, sub_todo, session in newly_unblocked:
+        session_id = str(session["_id"])
+        activated = await sess_coll.find_one_and_update(
+            {"_id": ObjectId(session_id), "needs_agent_response": False},
+            {"$set": {"needs_agent_response": True}},
+        )
+        if not activated:
+            continue  # Another concurrent completion already activated this
+        dep_names = []
+        for dep_id in sub_todo.get("depends_on", []):
+            dep_todo = next((s for s in all_subtasks if s["_id"] == dep_id), None)
+            if dep_todo:
+                dep_names.append(f'"{dep_todo.get("text", dep_id)}"')
+        deps_msg = ", ".join(dep_names) if dep_names else "previous subtasks"
+        await append_message(
+            session_id,
+            user_id,
+            "user",
+            f"Dependencies satisfied ({deps_msg} completed). You may now begin this subtask.",
+        )
+        logger.info(f"Activated unblocked subtask session {session_id} for todo {sub_todo_id}")
 
     # Post progress update to parent session
-    subtasks = await get_subtasks(parent_id)
-    done_count = sum(1 for s in subtasks if s.get("completed"))
-    total_count = len(subtasks)
+    done_count = len(completed_ids)
+    total_count = len(all_subtasks)
 
     parent_session = await find_session_by_todo(user_id, parent_id)
     if parent_session:
