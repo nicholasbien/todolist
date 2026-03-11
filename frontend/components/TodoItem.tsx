@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Check, RotateCcw, X, MessageCircle, Clock, User, Bot, UserCircle } from "lucide-react";
+import { Check, RotateCcw, X, MessageCircle, Clock, User, Bot, UserCircle, Repeat } from "lucide-react";
 
 interface SubtaskItem {
   _id: string;
@@ -357,6 +357,14 @@ export default function TodoItem({
                 return dueDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
               }
             })()}
+          </span>
+        )}
+        {todo.recurrence_rule && (
+          <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full ${
+            todo.completed ? 'bg-indigo-900/20 text-gray-500' : 'bg-indigo-900/30 text-indigo-300'
+          }`}>
+            <Repeat className="w-3 h-3" />
+            {todo.recurrence_rule === 'daily' ? 'Daily' : todo.recurrence_rule === 'weekly' ? 'Weekly' : 'Monthly'}
           </span>
         )}
         {todo.creator_type === 'agent' && (

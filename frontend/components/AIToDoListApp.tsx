@@ -208,12 +208,14 @@ export default function AIToDoListApp({
   const [editSpaceId, setEditSpaceId] = useState<string>('');
   const [editSpaceCategories, setEditSpaceCategories] = useState<string[]>([]);
   const [showPermanentDeleteConfirm, setShowPermanentDeleteConfirm] = useState(false);
+  const [editRecurrenceRule, setEditRecurrenceRule] = useState<string>('');
   const [newTodoAgent, setNewTodoAgent] = useState<string>(() => {
     if (typeof window !== 'undefined') {
       return localStorage.getItem('lastSelectedAgent') || '';
     }
     return '';
   });
+  const [newTodoRecurrence, setNewTodoRecurrence] = useState<string>('');
 
   // Long-press to edit category
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -833,6 +835,7 @@ export default function AIToDoListApp({
         completed: false,
         space_id: activeSpace ? activeSpace._id : null,
         agent_id: newTodoAgent || null,
+        recurrence_rule: newTodoRecurrence || null,
       };
 
       // Include notes if provided
@@ -874,6 +877,7 @@ export default function AIToDoListApp({
       setNewTodo('');
       setNewTodoNotes('');
       setNewTodoAgent('');
+      setNewTodoRecurrence('');
     } catch (err) {
       if (err.name === 'AbortError') {
         setError('Request timed out. Please try again.');
@@ -1057,6 +1061,7 @@ export default function AIToDoListApp({
       }
     }
     setEditDueDate(formattedDate);
+    setEditRecurrenceRule(todo.recurrence_rule || '');
 
     setShowEditTodoModal(true);
   };
@@ -1095,6 +1100,7 @@ export default function AIToDoListApp({
         priority: editPriorityVal,
         dueDate: editDueDate || null,
         space_id: editSpaceId, // Always include space_id since todos must have a space
+        recurrence_rule: editRecurrenceRule || null,
       };
       // Optimistic update
       setTodos(prev => prev.map(t => t._id === todoToEdit._id ? { ...t, ...updates } : t));
@@ -1708,6 +1714,18 @@ export default function AIToDoListApp({
             <option value="openclaw">OpenClaw</option>
             <option value="claude">Claude</option>
           </select>
+          <select
+            value={newTodoRecurrence}
+            onChange={(e) => setNewTodoRecurrence(e.target.value)}
+            className={`h-12 px-2 rounded-xl bg-gray-900 border text-sm focus:border-accent focus:outline-none transition-colors appearance-none cursor-pointer ${
+              newTodoRecurrence ? 'border-accent text-accent' : 'border-gray-700 text-gray-200'
+            }`}
+          >
+            <option value="">Once</option>
+            <option value="daily">Daily</option>
+            <option value="weekly">Weekly</option>
+            <option value="monthly">Monthly</option>
+          </select>
           <button
             onClick={handleAddTodo}
             disabled={loading}
@@ -2060,6 +2078,19 @@ export default function AIToDoListApp({
                   ✕
                 </button>
               )}
+            </div>
+            <div>
+              <label className="block text-sm text-gray-300 mb-2">Repeat</label>
+              <select
+                value={editRecurrenceRule}
+                onChange={(e) => setEditRecurrenceRule(e.target.value)}
+                className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 text-base focus:outline-none focus:border-accent"
+              >
+                <option value="">No repeat</option>
+                <option value="daily">Daily</option>
+                <option value="weekly">Weekly</option>
+                <option value="monthly">Monthly</option>
+              </select>
             </div>
             <div className="flex justify-center space-x-3">
               <button onClick={handleSaveTodoEdit} className="border border-accent text-accent hover:bg-accent/10 px-6 py-2 rounded-lg transition-colors">Save</button>

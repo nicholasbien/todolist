@@ -597,6 +597,20 @@ async def api_update_todo(todo_id: str, request: Request, current_user: dict = D
             updates["space_id"] = new_space_id
         if "agent_id" in body:
             updates["agent_id"] = body["agent_id"]
+        if "recurrence_rule" in body:
+            rule = body["recurrence_rule"]
+            if rule not in (None, "daily", "weekly", "monthly"):
+                raise HTTPException(
+                    status_code=400, detail="Invalid recurrence_rule. Must be daily, weekly, monthly, or null"
+                )
+            updates["recurrence_rule"] = rule
+            # Compute next occurrence when setting a rule
+            if rule:
+                from todos import _compute_next_occurrence
+
+                updates["recurrence_next"] = _compute_next_occurrence(rule)
+            else:
+                updates["recurrence_next"] = None
 
         if not updates:
             raise HTTPException(status_code=400, detail="No valid fields to update")

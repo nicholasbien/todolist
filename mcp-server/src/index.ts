@@ -98,6 +98,7 @@ class TodolistMCPServer {
                 space_id: { type: 'string', description: 'Space ID (auto-detected if not provided)' },
                 parent_id: { type: 'string', description: 'Parent todo ID to create as a sub-task (optional).' },
                 depends_on: { type: 'array', items: { type: 'string' }, description: 'Array of sibling sub-task IDs this task depends on (optional). Task starts only after all dependencies complete. Omit for parallel execution.' },
+                recurrence_rule: { type: 'string', enum: ['daily', 'weekly', 'monthly'], description: 'Set task to repeat on a schedule (optional). When completed, a new occurrence is auto-created.' },
               },
               required: ['text'],
             },
@@ -124,6 +125,7 @@ class TodolistMCPServer {
                 text: { type: 'string', description: 'New todo text (optional)' },
                 completed: { type: 'boolean', description: 'Completion status (optional)' },
                 category: { type: 'string', description: 'Todo category (optional)' },
+                recurrence_rule: { type: ['string', 'null'], enum: ['daily', 'weekly', 'monthly', null], description: 'Set or clear recurrence schedule (optional)' },
               },
               required: ['id'],
             },
@@ -378,17 +380,19 @@ class TodolistMCPServer {
 
   // --- Todo tools ---
 
-  private async addTodo(args: { text: string; notes?: string; space_id?: string; parent_id?: string; depends_on?: string[] }) {
+  private async addTodo(args: { text: string; notes?: string; space_id?: string; parent_id?: string; depends_on?: string[]; recurrence_rule?: string }) {
     const spaceId = await this.resolveSpaceId(args.space_id);
     const body: any = { text: args.text, space_id: spaceId };
     if (args.notes) body.notes = args.notes;
     if (args.parent_id) body.parent_id = args.parent_id;
     if (args.depends_on && args.depends_on.length > 0) body.depends_on = args.depends_on;
+    if (args.recurrence_rule) body.recurrence_rule = args.recurrence_rule;
     const response = await api.post('/todos', body);
     const todo = response.data;
     const prefix = args.parent_id ? 'Added sub-task' : 'Added todo';
     const depsInfo = args.depends_on && args.depends_on.length > 0 ? ` (depends on: ${args.depends_on.join(', ')})` : '';
-    return this.textResult(`${prefix}: "${todo.text}" (ID: ${todo._id}, Category: ${todo.category})${depsInfo}`);
+    const recInfo = args.recurrence_rule ? ` (repeats ${args.recurrence_rule})` : '';
+    return this.textResult(`${prefix}: "${todo.text}" (ID: ${todo._id}, Category: ${todo.category})${depsInfo}${recInfo}`);
   }
 
   private async listTodos(args: { space_id?: string; completed?: boolean }) {
@@ -426,7 +430,8 @@ class TodolistMCPServer {
     for (const t of parents) {
       const subtasks = childrenMap.get(t._id) || [];
       const subtaskInfo = subtasks.length > 0 ? ` [${subtasks.filter(s => s.completed).length}/${subtasks.length} sub-tasks]` : '';
-      lines.push(`${i++}. ${t.completed ? '[done]' : '[  ]'} ${t.text} [${t.category || 'General'}] (ID: ${t._id})${subtaskInfo}`);
+      const recurrenceInfo = t.recurrence_rule ? ` [repeats ${t.recurrence_rule}]` : '';
+      lines.push(`${i++}. ${t.completed ? '[done]' : '[  ]'} ${t.text} [${t.category || 'General'}] (ID: ${t._id})${subtaskInfo}${recurrenceInfo}`);
       for (const c of subtasks) {
         const deps = c.depends_on && c.depends_on.length > 0 ? ` [depends on: ${c.depends_on.join(', ')}]` : '';
         lines.push(`   └─ ${c.completed ? '[done]' : '[  ]'} ${c.text} (ID: ${c._id})${deps}`);
@@ -435,11 +440,12 @@ class TodolistMCPServer {
     return this.textResult(lines.join('\n'));
   }
 
-  private async updateTodo(args: { id: string; text?: string; completed?: boolean; category?: string }) {
+  private async updateTodo(args: { id: string; text?: string; completed?: boolean; category?: string; recurrence_rule?: string | null }) {
     const updateData: any = {};
     if (args.text !== undefined) updateData.text = args.text;
     if (args.completed !== undefined) updateData.completed = args.completed;
     if (args.category !== undefined) updateData.category = args.category;
+    if (args.recurrence_rule !== undefined) updateData.recurrence_rule = args.recurrence_rule;
     await api.put(`/todos/${args.id}`, updateData);
     const changes = [];
     if (args.text) changes.push(`text to "${args.text}"`);
