@@ -13,6 +13,7 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from bson import ObjectId
+from bson.errors import InvalidId
 from db import db
 from pydantic import BaseModel, Field
 
@@ -28,13 +29,16 @@ memory_logs_collection = db.agent_memory_logs
 async def init_memory_indexes() -> None:
     """Create indexes for optimal memory query performance."""
     try:
-        # Unique constraint: one fact per key per user per space
+        # Unique constraint: one fact per key per user per space per agent
         await memories_collection.create_index(
-            [("user_id", 1), ("space_id", 1), ("key", 1)],
+            [("user_id", 1), ("space_id", 1), ("agent_id", 1), ("key", 1)],
             unique=True,
         )
         await memories_collection.create_index("user_id")
         await memories_collection.create_index([("user_id", 1), ("space_id", 1)])
+        await memories_collection.create_index(
+            [("user_id", 1), ("space_id", 1), ("agent_id", 1)],
+        )
 
         # Daily log indexes
         await memory_logs_collection.create_index("user_id")
@@ -49,6 +53,10 @@ async def init_memory_indexes() -> None:
         logger.error(f"Error creating agent memory indexes: {e}")
 
 
+# Alias used by the viewer UI branch
+ensure_indexes = init_memory_indexes
+
+
 # ---------------------------------------------------------------------------
 # Pydantic models
 # ---------------------------------------------------------------------------
@@ -60,6 +68,7 @@ class MemoryFact(BaseModel):
     id: Optional[str] = Field(alias="_id", default=None)
     user_id: str
     space_id: Optional[str] = None
+    agent_id: Optional[str] = None
     key: str  # e.g. "preferred_name", "work_schedule", "communication_style"
     value: str  # freeform text
     category: Optional[str] = None  # e.g. "preference", "context", "workflow"
@@ -90,6 +99,28 @@ class MemoryLog(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Serialization helper (for REST API responses)
+# ---------------------------------------------------------------------------
+
+
+def _serialize(doc: Dict[str, Any]) -> Dict[str, Any]:
+    """Convert MongoDB document to JSON-safe dict."""
+    if not doc:
+        return {}
+    return {
+        "_id": str(doc["_id"]),
+        "user_id": doc.get("user_id", ""),
+        "space_id": doc.get("space_id", ""),
+        "agent_id": doc.get("agent_id", ""),
+        "key": doc.get("key", ""),
+        "value": doc.get("value", ""),
+        "category": doc.get("category", ""),
+        "created_at": doc.get("created_at", "").isoformat() if doc.get("created_at") else None,
+        "updated_at": doc.get("updated_at", "").isoformat() if doc.get("updated_at") else None,
+    }
+
+
+# ---------------------------------------------------------------------------
 # Memory facts CRUD
 # ---------------------------------------------------------------------------
 
@@ -100,11 +131,12 @@ async def save_memory(
     value: str,
     space_id: Optional[str] = None,
     category: Optional[str] = None,
+    agent_id: Optional[str] = None,
 ) -> MemoryFact:
-    """Save or update a memory fact (upsert by user+space+key)."""
+    """Save or update a memory fact (upsert by user+space+agent+key)."""
     now = datetime.utcnow()
     result = await memories_collection.find_one_and_update(
-        {"user_id": user_id, "space_id": space_id, "key": key},
+        {"user_id": user_id, "space_id": space_id, "agent_id": agent_id, "key": key},
         {
             "$set": {
                 "value": value,
@@ -114,6 +146,7 @@ async def save_memory(
             "$setOnInsert": {
                 "user_id": user_id,
                 "space_id": space_id,
+                "agent_id": agent_id,
                 "key": key,
                 "created_at": now,
             },
@@ -155,8 +188,38 @@ async def list_memories(
     return results
 
 
-async def delete_memory(user_id: str, key: str, space_id: Optional[str] = None) -> bool:
-    """Delete a specific memory fact."""
+async def get_memories(
+    user_id: str,
+    space_id: str,
+    agent_id: str,
+) -> List[Dict[str, Any]]:
+    """Retrieve all memories for a given (user, space, agent) triple.
+
+    Returns serialized dicts suitable for REST API responses.
+    """
+    cursor = memories_collection.find(
+        {
+            "user_id": user_id,
+            "space_id": space_id,
+            "agent_id": agent_id,
+        }
+    ).sort("updated_at", -1)
+    docs = await cursor.to_list(length=500)
+    return [_serialize(d) for d in docs]
+
+
+async def delete_memory(memory_id: str, user_id: str) -> bool:
+    """Delete a single memory by its MongoDB _id (must belong to user)."""
+    try:
+        oid = ObjectId(memory_id)
+    except (InvalidId, TypeError):
+        return False
+    result = await memories_collection.delete_one({"_id": oid, "user_id": user_id})
+    return result.deleted_count > 0
+
+
+async def delete_memory_by_key(user_id: str, key: str, space_id: Optional[str] = None) -> bool:
+    """Delete a specific memory fact by key."""
     result = await memories_collection.delete_one({"user_id": user_id, "space_id": space_id, "key": key})
     if result.deleted_count > 0:
         logger.info(f"Deleted memory '{key}' for user {user_id}, space {space_id}")
@@ -239,6 +302,33 @@ async def get_recent_memory_logs(
 # ---------------------------------------------------------------------------
 # Context building (for injection into agent prompts)
 # ---------------------------------------------------------------------------
+
+
+async def get_memories_for_context(
+    user_id: str,
+    space_id: str,
+    agent_id: Optional[str] = None,
+) -> str:
+    """Build a context string from stored memories for injection into prompts.
+
+    If agent_id is provided, returns memories specific to that agent.
+    Otherwise returns all memories for the user+space.
+    """
+    query: Dict[str, Any] = {"user_id": user_id, "space_id": space_id}
+    if agent_id:
+        query["agent_id"] = agent_id
+
+    cursor = memories_collection.find(query).sort("updated_at", -1).limit(50)
+    docs = await cursor.to_list(length=50)
+
+    if not docs:
+        return ""
+
+    lines = []
+    for doc in docs:
+        lines.append(f"- {doc['key']}: {doc['value']}")
+
+    return "## Agent Memory\nThings you've previously learned about this user:\n" + "\n".join(lines)
 
 
 async def build_memory_context(user_id: str, space_id: Optional[str] = None) -> str:

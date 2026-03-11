@@ -9,6 +9,7 @@ from typing import List, Optional, Union
 
 import httpx
 from agent import agent_router
+from agent_memory import get_recent_memory_logs
 from auth import (
     LoginRequest,
     SignupRequest,
@@ -1096,9 +1097,12 @@ async def api_list_memories(
     facts = await list_memories(current_user["user_id"], space_id, category)
     return [
         {
+            "_id": f.id,
             "key": f.key,
             "value": f.value,
             "category": f.category,
+            "agent_id": f.agent_id,
+            "created_at": f.created_at.isoformat() if f.created_at else None,
             "updated_at": f.updated_at.isoformat() if f.updated_at else None,
         }
         for f in facts
@@ -1126,19 +1130,21 @@ async def api_save_memory(
     return {"key": fact.key, "value": fact.value, "category": fact.category}
 
 
-@app.delete("/memories/{key}")
+@app.delete("/memories/{memory_id}")
 async def api_delete_memory(
-    key: str,
-    space_id: Optional[str] = None,
+    memory_id: str,
     current_user: dict = Depends(get_current_user),
 ):
-    """Delete a specific memory fact."""
-    from agent_memory import delete_memory
+    """Delete a specific memory fact by its _id."""
+    from agent_memory import delete_memory, delete_memory_by_key
 
-    deleted = await delete_memory(current_user["user_id"], key, space_id)
+    # Try deleting by ObjectId first, then fall back to key-based delete
+    deleted = await delete_memory(memory_id, current_user["user_id"])
+    if not deleted:
+        deleted = await delete_memory_by_key(current_user["user_id"], memory_id)
     if deleted:
-        return {"message": f"Memory '{key}' deleted"}
-    raise HTTPException(status_code=404, detail=f"Memory '{key}' not found")
+        return {"ok": True}
+    raise HTTPException(status_code=404, detail="Memory not found")
 
 
 @app.delete("/memories")
@@ -1341,88 +1347,27 @@ async def api_get_single_todo(
     return doc
 
 
-# ---------------------------------------------------------------------------
-# Briefing preferences
-# ---------------------------------------------------------------------------
-
-
-class BriefingPreferencesRequest(BaseModel):
-    enabled: bool = False
-    hour: int = 8
-    minute: int = 0
-    timezone: str = "America/New_York"
-    stale_threshold_days: int = 3
-
-
-@app.get("/briefings/preferences")
-async def api_get_briefing_preferences(
+@app.get("/memory-logs")
+async def api_get_memory_logs(
+    space_id: Optional[str] = None,
+    limit: int = 14,
     current_user: dict = Depends(get_current_user),
 ):
-    """Return the current user's briefing preferences."""
-    from auth import users_collection
-    from bson import ObjectId as _ObjId
-
-    user = await users_collection.find_one({"_id": _ObjId(current_user["user_id"])})
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    return {
-        "enabled": user.get("briefing_enabled", False),
-        "hour": user.get("briefing_hour", 8),
-        "minute": user.get("briefing_minute", 0),
-        "timezone": user.get("briefing_timezone", "America/New_York"),
-        "stale_threshold_days": user.get("briefing_stale_threshold_days", 3),
-    }
-
-
-@app.post("/briefings/preferences")
-async def api_update_briefing_preferences(
-    req: BriefingPreferencesRequest,
-    current_user: dict = Depends(get_current_user),
-):
-    """Update the current user's briefing preferences and reschedule the job."""
-    from auth import users_collection
-    from bson import ObjectId as _ObjId
-
-    logger.info(
-        "Briefing preferences update by %s: enabled=%s, %02d:%02d %s, stale=%d days",
-        current_user["email"],
-        req.enabled,
-        req.hour,
-        req.minute,
-        req.timezone,
-        req.stale_threshold_days,
-    )
-
-    await users_collection.update_one(
-        {"_id": _ObjId(current_user["user_id"])},
-        {
-            "$set": {
-                "briefing_enabled": req.enabled,
-                "briefing_hour": req.hour,
-                "briefing_minute": req.minute,
-                "briefing_timezone": req.timezone,
-                "briefing_stale_threshold_days": req.stale_threshold_days,
+    """Return recent daily memory logs for the current user."""
+    sid = space_id or current_user.get("active_space_id", "")
+    logs = await get_recent_memory_logs(current_user["user_id"], sid, limit=min(limit, 30))
+    result = []
+    for log in logs:
+        result.append(
+            {
+                "_id": log.id,
+                "date": log.date,
+                "entries": log.entries,
+                "created_at": log.created_at.isoformat() if log.created_at else None,
+                "updated_at": log.updated_at.isoformat() if log.updated_at else None,
             }
-        },
-    )
-
-    # Schedule or remove the briefing job
-    try:
-        from briefings import remove_briefing_schedule, schedule_briefing_job
-
-        if req.enabled:
-            schedule_briefing_job(
-                user_id=current_user["user_id"],
-                hour=req.hour,
-                minute=req.minute,
-                timezone=req.timezone,
-            )
-        else:
-            remove_briefing_schedule(current_user["user_id"])
-    except Exception as e:
-        logger.warning("Could not update briefing schedule: %s", e)
-
-    return {"message": "Briefing preferences updated"}
+        )
+    return result
 
 
 if __name__ == "__main__":

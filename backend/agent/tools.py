@@ -614,9 +614,9 @@ async def delete_memory_tool(
 ) -> Dict[str, Any]:
     """Delete a specific memory fact."""
     try:
-        from agent_memory import delete_memory
+        from agent_memory import delete_memory_by_key
 
-        deleted = await delete_memory(
+        deleted = await delete_memory_by_key(
             user_id=user_id,
             key=request.key,
             space_id=space_id,
