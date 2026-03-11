@@ -1,5 +1,7 @@
 """Tests for the /activity-feed endpoint."""
 
+import re
+
 import pytest
 
 from tests.conftest import get_token
@@ -94,3 +96,30 @@ async def test_activity_feed_respects_limit(client, test_email):
     assert resp.status_code == 200
     data = resp.json()
     assert len(data) <= 3
+
+
+@pytest.mark.asyncio
+async def test_activity_feed_timestamps_have_timezone(client, test_email):
+    """Timestamps must include timezone info so JS Date() parses them as UTC."""
+    token = await get_token(client, test_email)
+    headers = {"Authorization": f"Bearer {token}"}
+
+    # Create a todo to ensure there's at least one event
+    await client.post(
+        "/todos",
+        json={"text": "Timezone test task", "dateAdded": "2026-03-11T10:00:00"},
+        headers=headers,
+    )
+
+    resp = await client.get("/activity-feed", headers=headers)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert len(data) > 0
+
+    tz_pattern = re.compile(r"(Z|[+-]\d{2}:\d{2})$")
+    for event in data:
+        ts = event["timestamp"]
+        assert tz_pattern.search(ts), (
+            f"Timestamp {ts!r} is missing timezone info — "
+            f"JavaScript will parse it as local time, breaking relative display"
+        )

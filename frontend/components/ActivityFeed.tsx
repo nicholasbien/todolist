@@ -32,8 +32,22 @@ interface ActivityFeedProps {
   onOpenTaskChat?: (todoId: string) => void;
 }
 
+/**
+ * Ensure an ISO timestamp has a timezone indicator.
+ * Backend timestamps from datetime.utcnow().isoformat() omit the 'Z' suffix,
+ * causing JavaScript's Date constructor to parse them as local time. For users
+ * in timezones west of UTC this shifts timestamps into the future, making
+ * every item display as "Just now".
+ */
+function ensureTimezone(isoString: string): string {
+  if (!/[Zz]|[+-]\d{2}:?\d{2}$/.test(isoString)) {
+    return isoString + 'Z';
+  }
+  return isoString;
+}
+
 function formatRelativeTime(isoString: string): string {
-  const normalizedTimestamp = isoString.replace(/\.(\d{3})\d*/, '.$1');
+  const normalizedTimestamp = ensureTimezone(isoString).replace(/\.(\d{3})\d*/, '.$1');
   const date = new Date(normalizedTimestamp);
   const now = new Date();
   const diffMs = now.getTime() - date.getTime();
@@ -49,7 +63,7 @@ function formatRelativeTime(isoString: string): string {
 }
 
 function formatFullTime(isoString: string): string {
-  const normalizedTimestamp = isoString.replace(/\.(\d{3})\d*/, '.$1');
+  const normalizedTimestamp = ensureTimezone(isoString).replace(/\.(\d{3})\d*/, '.$1');
   const date = new Date(normalizedTimestamp);
   return date.toLocaleString('en-US', {
     month: 'short',
@@ -63,7 +77,7 @@ function formatFullTime(isoString: string): string {
 function groupByDate(events: ActivityEvent[]): Map<string, ActivityEvent[]> {
   const groups = new Map<string, ActivityEvent[]>();
   for (const event of events) {
-    const normalizedTimestamp = event.timestamp.replace(/\.(\d{3})\d*/, '.$1');
+    const normalizedTimestamp = ensureTimezone(event.timestamp).replace(/\.(\d{3})\d*/, '.$1');
     const date = new Date(normalizedTimestamp);
     const key = date.toLocaleDateString('en-US', {
       weekday: 'long',
