@@ -6,6 +6,7 @@ import { useAuth } from "../context/AuthContext";
 import Link from "next/link";
 import InsightsComponent from "./InsightsComponent";
 import JournalComponent from "./JournalComponent";
+import BriefingSettings from "./BriefingSettings";
 import SpaceDropdown from "./SpaceDropdown";
 import { sortSpaces } from "../utils/spaceUtils";
 import { loadSortModePreference, saveSortModePreference, type SortMode } from "../utils/sortPreferences";
@@ -141,6 +142,7 @@ export default function AIToDoListApp({
   const [spaceToEdit, setSpaceToEdit] = useState<any>(null);
   const [spaceMembers, setSpaceMembers] = useState<any[]>([]);
   const [showOfflineTooltip, setShowOfflineTooltip] = useState(false);
+  const [showBriefingSettings, setShowBriefingSettings] = useState(false);
 
   useEffect(() => {
     activeSpaceRef.current = activeSpace;
@@ -1385,6 +1387,7 @@ export default function AIToDoListApp({
                 e.target.value = '';
                 if (action === 'account') onShowAccountSettings?.();
                 else if (action === 'email') onShowEmailSettings?.();
+                else if (action === 'briefings') setShowBriefingSettings(true);
                 else if (action === 'insights') onShowInsights?.();
                 else if (action === 'export') onShowExportModal?.();
                 else if (action === 'contact') onShowContactModal?.();
@@ -1396,6 +1399,7 @@ export default function AIToDoListApp({
               <option value="" disabled>Settings</option>
               <option value="account">Account</option>
               <option value="email">Email Settings</option>
+              <option value="briefings">Briefings</option>
               <option value="insights">Insights</option>
               <option value="export">Export Data</option>
               <option value="contact">Contact</option>
@@ -2085,6 +2089,15 @@ export default function AIToDoListApp({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Briefing Settings Modal */}
+      {showBriefingSettings && (
+        <BriefingSettings
+          token={token}
+          authenticatedFetch={authenticatedFetch}
+          onClose={() => setShowBriefingSettings(false)}
+        />
       )}
 
       {/* Email Settings Modal */}
