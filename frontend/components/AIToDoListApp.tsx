@@ -1860,27 +1860,10 @@ export default function AIToDoListApp({
                     sessionStatus={todoSessionStatuses[todo._id] as any}
                     subtaskCount={childrenByParent.get(todo._id)?.length}
                     subtaskDoneCount={childrenByParent.get(todo._id)?.filter(c => c.completed).length}
+                    subtasks={childrenByParent.get(todo._id)}
+                    subtaskSessionStatuses={todoSessionStatuses as any}
                   />
                 </SortableItem>
-                {childrenByParent.get(todo._id)?.filter(c => !c.completed).map((child) => (
-                  <div key={child._id} className="ml-8">
-                    <TodoItem
-                      todo={child}
-                      categories={categories}
-                      editingCategory={editingCategory}
-                      setEditingCategory={setEditingCategory}
-                      handleUpdateCategory={handleUpdateCategory}
-                      handleUpdatePriority={handleUpdatePriority}
-                      handleCompleteTodo={handleCompleteTodo}
-                      handleDeleteTodo={handleDeleteTodo}
-                      isCollaborative={(activeSpace?.member_ids?.length ?? 0) > 1}
-                      onEdit={handleEditTodo}
-                      onChat={handleChatAboutTodo}
-                      sessionStatus={todoSessionStatuses[child._id] as any}
-                      isSubtask
-                    />
-                  </div>
-                ))}
               </React.Fragment>
             ))}
           </div>
@@ -1918,26 +1901,9 @@ export default function AIToDoListApp({
                 sessionStatus={todoSessionStatuses[todo._id] as any}
                 subtaskCount={childrenByParent.get(todo._id)?.length}
                 subtaskDoneCount={childrenByParent.get(todo._id)?.filter(c => c.completed).length}
+                subtasks={childrenByParent.get(todo._id)}
+                subtaskSessionStatuses={todoSessionStatuses as any}
               />
-              {childrenByParent.get(todo._id)?.map((child) => (
-                <div key={child._id} className="ml-8">
-                  <TodoItem
-                    todo={child}
-                    categories={categories}
-                    editingCategory={editingCategory}
-                    setEditingCategory={setEditingCategory}
-                    handleUpdateCategory={handleUpdateCategory}
-                    handleUpdatePriority={handleUpdatePriority}
-                    handleCompleteTodo={handleCompleteTodo}
-                    handleDeleteTodo={handleDeleteTodo}
-                    isCollaborative={(activeSpace?.member_ids?.length ?? 0) > 1}
-                    onEdit={handleEditTodo}
-                    onChat={handleChatAboutTodo}
-                    sessionStatus={todoSessionStatuses[child._id] as any}
-                    isSubtask
-                  />
-                </div>
-              ))}
             </React.Fragment>
           ))}
         </div>
