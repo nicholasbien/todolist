@@ -10,6 +10,7 @@ interface ChatbotProps {
   isActive?: boolean;
   pendingSessionId?: string | null;
   onSessionLoaded?: () => void;
+  onNavigateToTasks?: () => void;
 }
 
 interface SessionMeta {
@@ -32,6 +33,7 @@ export default function AgentChatbot({
   isActive = true,
   pendingSessionId,
   onSessionLoaded,
+  onNavigateToTasks,
 }: ChatbotProps) {
   const [question, setQuestion] = useState('');
   const [messages, setMessages] = useState<{ role: string; content: string; toolData?: any; agent_id?: string }[]>([]);
@@ -641,11 +643,14 @@ export default function AgentChatbot({
           // Back + Reset + Complete buttons when viewing a task session
           <div className="flex items-center gap-2 flex-1">
             <button
-              onClick={handleNewChat}
+              onClick={() => {
+                handleNewChat();
+                onNavigateToTasks?.();
+              }}
               className="bg-gray-700 text-gray-200 px-3 py-1 rounded text-sm hover:bg-gray-600 transition-colors flex items-center gap-1"
             >
               <ArrowLeft className="w-3 h-3" />
-              Back to Assistant
+              Back to Task
             </button>
             <button
               onClick={handleResetTaskChat}
@@ -669,7 +674,7 @@ export default function AgentChatbot({
               </button>
             )}
           </div>
-        ) : sessionAgentId && !isTaskSession && currentSessionId ? (
+        ) : sessionAgentId && currentSessionId ? (
           // Back button + agent badge for direct agent chat sessions
           <div className="flex items-center gap-2">
             <button
@@ -684,7 +689,7 @@ export default function AgentChatbot({
             </span>
           </div>
         ) : (
-          // Past Chats dropdown (main assistant mode)
+          // Past Chats dropdown (main assistant mode — always visible)
           <div className="relative" ref={dropdownRef}>
             <button
               onClick={() => setShowSessionDropdown(!showSessionDropdown)}
