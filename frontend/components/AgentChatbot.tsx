@@ -18,7 +18,13 @@ interface SessionMeta {
   created_at: string;
   updated_at: string;
   todo_id?: string;
+  agent_id?: string;
 }
+
+const AGENTS = [
+  { id: 'claude', label: 'Claude' },
+  { id: 'openclaw', label: 'OpenClaw' },
+];
 
 export default function AgentChatbot({
   activeSpace,
@@ -49,6 +55,10 @@ export default function AgentChatbot({
   const [taskInitialMessage, setTaskInitialMessage] = useState<string | null>(null);
   // External agent ownership: when session is claimed by an agent like openclaw
   const [sessionAgentId, setSessionAgentId] = useState<string | null>(null);
+  // Whether the agent is waiting for a human response
+  const [needsHumanResponse, setNeedsHumanResponse] = useState(false);
+  // Direct agent chat: selected agent before a session is created
+  const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
@@ -118,6 +128,7 @@ export default function AgentChatbot({
         const lastMsg = displayMessages[displayMessages.length - 1];
         const agentId = data.agent_id || null;
         setSessionAgentId(agentId);
+        setNeedsHumanResponse(!!data.needs_human_response);
         if (lastMsg?.role === 'user' && !agentId) {
           // Don't pre-populate messages — let handleStreamingAsk add the user message itself
           // Show any earlier messages (if multi-turn), but skip the last user message
@@ -218,7 +229,9 @@ export default function AgentChatbot({
     };
   }, []);
   useEffect(() => {
-    if (!isWaitingForExternalAgent || !token) return;
+    if ((!isWaitingForExternalAgent && !needsHumanResponse) || !token) return;
+    // Don't poll when agent is waiting for human response
+    if (needsHumanResponse) return;
     const poll = setInterval(async () => {
       try {
         const res = await fetch(`/agent/sessions/${currentSessionId}`, {
@@ -231,12 +244,13 @@ export default function AgentChatbot({
         if (lastMsg?.role === 'assistant') {
           setMessages(displayMessages);
         }
+        setNeedsHumanResponse(!!data.needs_human_response);
       } catch {
         // ignore polling errors
       }
     }, 5000);
     return () => clearInterval(poll);
-  }, [isWaitingForExternalAgent, currentSessionId, token]);
+  }, [isWaitingForExternalAgent, needsHumanResponse, currentSessionId, token]);
 
   // Lock body scroll when delete modal is open
   useEffect(() => {
@@ -274,6 +288,7 @@ export default function AgentChatbot({
       setCurrentSessionId(sessionId);
       setIsTaskSession(isTodoSession);
       setSessionAgentId(data.agent_id || null);
+      setNeedsHumanResponse(!!data.needs_human_response);
     } catch (err: any) {
       setError(err.message || 'Failed to load chat');
     } finally {
@@ -322,6 +337,8 @@ export default function AgentChatbot({
     setShowSessionDropdown(false);
     setIsTaskSession(false);
     setSessionAgentId(null);
+    setNeedsHumanResponse(false);
+    setSelectedAgentId(null);
     setTaskInitialMessage(null);
     messageQueueRef.current = [];
   };
@@ -357,10 +374,36 @@ export default function AgentChatbot({
     setQuestion('');
     shouldAutoScrollRef.current = true;
 
+    // Direct agent chat: create a new session for the selected agent
+    if (selectedAgentId && !currentSessionId) {
+      setMessages((prev) => [...prev, { role: 'user', content: userMessage }]);
+      try {
+        const res = await fetch('/agent/sessions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({
+            space_id: activeSpace?._id,
+            initial_message: userMessage,
+            agent_id: selectedAgentId,
+          }),
+        });
+        if (!res.ok) throw new Error('Failed to create session');
+        const data = await res.json();
+        setCurrentSessionId(data.session_id);
+        setSessionAgentId(selectedAgentId);
+        setSelectedAgentId(null);
+        fetchSessions();
+      } catch (err: any) {
+        setError(err.message || 'Failed to create agent session');
+      }
+      return;
+    }
+
     // If session is owned by an external agent, post via messaging API
     // so the external agent picks it up (don't stream to built-in agent)
     if (sessionAgentId && currentSessionId) {
       setMessages((prev) => [...prev, { role: 'user', content: userMessage }]);
+      setNeedsHumanResponse(false);
       try {
         await fetch(`/agent/sessions/${currentSessionId}/messages`, {
           method: 'POST',
@@ -536,6 +579,20 @@ export default function AgentChatbot({
               Reset Chat
             </button>
           </div>
+        ) : sessionAgentId && !isTaskSession && currentSessionId ? (
+          // Back button + agent badge for direct agent chat sessions
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleNewChat}
+              className="bg-gray-700 text-gray-200 px-3 py-1 rounded text-sm hover:bg-gray-600 transition-colors flex items-center gap-1"
+            >
+              <ArrowLeft className="w-3 h-3" />
+              Back to Assistant
+            </button>
+            <span className="bg-purple-600/20 text-purple-300 border border-purple-500/30 px-2 py-0.5 rounded text-xs font-medium">
+              {AGENTS.find(a => a.id === sessionAgentId)?.label || sessionAgentId}
+            </span>
+          </div>
         ) : (
           // Past Chats dropdown (main assistant mode)
           <div className="relative" ref={dropdownRef}>
@@ -565,7 +622,14 @@ export default function AgentChatbot({
                     }`}
                   >
                     <div className="flex-1 min-w-0 mr-2">
-                      <p className="text-gray-200 truncate">{session.title}</p>
+                      <div className="flex items-center gap-1.5">
+                        <p className="text-gray-200 truncate">{session.title}</p>
+                        {session.agent_id && !session.todo_id && (
+                          <span className="bg-purple-600/20 text-purple-300 border border-purple-500/30 px-1.5 py-0 rounded text-[10px] font-medium flex-shrink-0">
+                            {AGENTS.find(a => a.id === session.agent_id)?.label || session.agent_id}
+                          </span>
+                        )}
+                      </div>
                       <p className="text-gray-500 text-xs">{formatSessionDate(session.updated_at)}</p>
                     </div>
                     <button
@@ -583,7 +647,7 @@ export default function AgentChatbot({
         )}
 
         {/* New Chat button */}
-        {!isTaskSession && (messages.length > 0 || currentSessionId) && (
+        {!isTaskSession && !(sessionAgentId && currentSessionId) && (messages.length > 0 || currentSessionId) && (
           <button
             onClick={handleNewChat}
             disabled={loading}
@@ -669,6 +733,35 @@ export default function AgentChatbot({
                   Try: &quot;What should I get done today?&quot; or &quot;Summarize my latest journals&quot;
                 </p>
               </div>
+
+              <div className="mt-4 pt-4 border-t border-gray-800">
+                <p className="text-xs text-gray-500 mb-2">Or chat directly with an agent:</p>
+                <div className="flex flex-wrap gap-2 justify-center">
+                  <button
+                    onClick={() => setSelectedAgentId(null)}
+                    className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                      selectedAgentId === null
+                        ? 'bg-accent/20 text-accent border border-accent/40'
+                        : 'bg-gray-800 text-gray-400 border border-gray-700 hover:bg-gray-700'
+                    }`}
+                  >
+                    Built-in Assistant
+                  </button>
+                  {AGENTS.map((agent) => (
+                    <button
+                      key={agent.id}
+                      onClick={() => setSelectedAgentId(agent.id)}
+                      className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                        selectedAgentId === agent.id
+                          ? 'bg-purple-600/20 text-purple-300 border border-purple-500/40'
+                          : 'bg-gray-800 text-gray-400 border border-gray-700 hover:bg-gray-700'
+                      }`}
+                    >
+                      {agent.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
         )}
@@ -707,7 +800,14 @@ export default function AgentChatbot({
             </div>
           </div>
         )}
-        {isWaitingForExternalAgent && !isWaiting && (
+        {needsHumanResponse && !isWaiting && (
+          <div className="flex justify-start">
+            <div className="w-full px-3 py-2 bg-amber-900/20 border border-amber-700/50 rounded-lg">
+              <p className="text-sm text-amber-300">Agent is waiting for your response</p>
+            </div>
+          </div>
+        )}
+        {isWaitingForExternalAgent && !isWaiting && !needsHumanResponse && (
           <div className="flex justify-start">
             <div className="text-purple-400 w-full px-0 py-2">
               <div className="text-xs mb-1 font-medium">{sessionAgentId}</div>
@@ -760,6 +860,10 @@ export default function AgentChatbot({
                 ? "Assistant requires internet connection"
                 : isTaskSession
                 ? "Send a message about this task..."
+                : sessionAgentId
+                ? `Chat with ${AGENTS.find(a => a.id === sessionAgentId)?.label || sessionAgentId}...`
+                : selectedAgentId
+                ? `Chat with ${AGENTS.find(a => a.id === selectedAgentId)?.label || selectedAgentId}...`
                 : "Ask a question..."
             }
             disabled={!isOnline}
