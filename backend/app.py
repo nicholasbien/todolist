@@ -8,6 +8,7 @@ from io import StringIO
 from typing import List, Optional, Union
 
 import httpx
+from activity_feed import get_activity_feed
 from agent import agent_router
 from auth import (
     LoginRequest,
@@ -1000,6 +1001,27 @@ async def get_insights(
     except Exception as e:
         logger.error(f"Error getting insights: {e}")
         raise HTTPException(status_code=500, detail="Failed to get insights")
+
+
+@app.get("/activity-feed")
+async def api_get_activity_feed(
+    space_id: Optional[str] = None,
+    limit: int = 50,
+    before: Optional[str] = None,
+    current_user: dict = Depends(get_current_user),
+):
+    """Get a chronological activity feed of all events (tasks, messages, journals)."""
+    try:
+        events = await get_activity_feed(
+            user_id=current_user["user_id"],
+            space_id=space_id,
+            limit=min(limit, 100),
+            before=before,
+        )
+        return events
+    except Exception as e:
+        logger.error(f"Error getting activity feed: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get activity feed")
 
 
 class JournalCreateRequest(BaseModel):
