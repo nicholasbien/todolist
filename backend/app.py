@@ -102,6 +102,7 @@ async def lifespan(app: FastAPI):
         logger.info("Starting initialization tasks...")
 
         # Import initialization functions
+        from agent_memory import init_memory_indexes
         from auth import cleanup_expired_sessions, init_auth_indexes
         from categories import init_category_indexes
         from chat_sessions import init_chat_session_indexes
@@ -129,6 +130,7 @@ async def lifespan(app: FastAPI):
             ("init_journal_indexes", init_journal_indexes),
             ("init_chat_indexes", init_chat_indexes),
             ("init_chat_session_indexes", init_chat_session_indexes),
+            ("init_memory_indexes", init_memory_indexes),
             ("init_default_categories", init_default_categories),
             ("cleanup_expired_sessions", cleanup_expired_sessions),
         ]
@@ -988,6 +990,78 @@ async def api_delete_journal_entry(entry_id: str, current_user: dict = Depends(g
     except Exception as e:
         logger.error(f"Error deleting journal entry: {e}")
         raise HTTPException(status_code=500, detail="Failed to delete journal entry")
+
+
+# ── Agent Memory Endpoints ────────────────────────────────────────────
+
+
+@app.get("/memories")
+async def api_list_memories(
+    space_id: Optional[str] = None,
+    category: Optional[str] = None,
+    current_user: dict = Depends(get_current_user),
+):
+    """List all agent memory facts for the current user/space."""
+    from agent_memory import list_memories
+
+    facts = await list_memories(current_user["user_id"], space_id, category)
+    return [
+        {
+            "key": f.key,
+            "value": f.value,
+            "category": f.category,
+            "updated_at": f.updated_at.isoformat() if f.updated_at else None,
+        }
+        for f in facts
+    ]
+
+
+@app.put("/memories")
+async def api_save_memory(
+    request: Request,
+    space_id: Optional[str] = None,
+    current_user: dict = Depends(get_current_user),
+):
+    """Save or update a memory fact."""
+    from agent_memory import save_memory
+
+    body = await request.json()
+    key = body.get("key", "").strip()
+    value = body.get("value", "").strip()
+    category = body.get("category")
+
+    if not key or not value:
+        raise HTTPException(status_code=400, detail="key and value are required")
+
+    fact = await save_memory(current_user["user_id"], key, value, space_id, category)
+    return {"key": fact.key, "value": fact.value, "category": fact.category}
+
+
+@app.delete("/memories/{key}")
+async def api_delete_memory(
+    key: str,
+    space_id: Optional[str] = None,
+    current_user: dict = Depends(get_current_user),
+):
+    """Delete a specific memory fact."""
+    from agent_memory import delete_memory
+
+    deleted = await delete_memory(current_user["user_id"], key, space_id)
+    if deleted:
+        return {"message": f"Memory '{key}' deleted"}
+    raise HTTPException(status_code=404, detail=f"Memory '{key}' not found")
+
+
+@app.delete("/memories")
+async def api_delete_all_memories(
+    space_id: Optional[str] = None,
+    current_user: dict = Depends(get_current_user),
+):
+    """Delete all memory facts for the current user/space."""
+    from agent_memory import delete_all_memories
+
+    count = await delete_all_memories(current_user["user_id"], space_id)
+    return {"deleted_count": count}
 
 
 @app.get("/export")
