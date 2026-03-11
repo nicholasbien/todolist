@@ -371,8 +371,25 @@ export default function AgentChatbot({
       setCurrentSessionId(sessionId);
       setIsTaskSession(isTodoSession);
       setActiveTodoId(data.todo_id || null);
-      setTaskCompleted(false);
       setSessionAgentId(data.agent_id || null);
+      // Fetch the linked todo's actual completion status (like the pendingSessionId flow)
+      if (data.todo_id) {
+        try {
+          const todoRes = await fetch(`/todos/${data.todo_id}`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (todoRes.ok) {
+            const todoData = await todoRes.json();
+            setTaskCompleted(!!todoData.completed);
+          } else {
+            setTaskCompleted(false);
+          }
+        } catch {
+          setTaskCompleted(false);
+        }
+      } else {
+        setTaskCompleted(false);
+      }
       setNeedsHumanResponse(!!data.needs_human_response);
     } catch (err: any) {
       setError(err.message || 'Failed to load chat');
