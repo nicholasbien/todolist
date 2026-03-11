@@ -1,6 +1,6 @@
 // IMPORTANT: Always increment these versions when modifying this service worker file
 // This forces browsers to download and use the updated service worker
-const STATIC_CACHE = 'todo-static-v129';
+const STATIC_CACHE = 'todo-static-v130';
 
 const GLOBAL_DB_NAME = 'TodoGlobalDB';
 const USER_DB_PREFIX = 'TodoUserDB_';
@@ -26,7 +26,7 @@ const DEFAULT_CATEGORIES = ['General'];
 const API_ROUTES = [
   '/todos', '/categories', '/spaces', '/journals', '/insights',
   '/agent', '/auth', '/email', '/contact', '/export', '/health',
-  '/briefings', '/activity-feed', '/memories', '/memory-logs'
+  '/briefings', '/activity-feed', '/memories', '/memory-logs', '/push'
 ];
 
 function isApiPath(pathname) {
@@ -1857,6 +1857,57 @@ self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'SKIP_WAITING') {
     self.skipWaiting();
   }
+});
+
+// --- Push Notification Handlers ---
+
+self.addEventListener('push', (event) => {
+  if (!event.data) return;
+
+  let payload;
+  try {
+    payload = event.data.json();
+  } catch (e) {
+    payload = { title: 'New Notification', body: event.data.text() };
+  }
+
+  const title = payload.title || 'TodoList';
+  const options = {
+    body: payload.body || '',
+    icon: '/icon-192x192.png',
+    badge: '/icon-192x192.png',
+    data: payload.data || {},
+    tag: payload.data?.session_id || 'default',
+    renotify: true,
+  };
+
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+
+  const data = event.notification.data || {};
+  const urlPath = data.url || '/';
+
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+      // Try to focus an existing window
+      for (const client of clientList) {
+        if (client.url.includes(self.location.origin) && 'focus' in client) {
+          // Post a message to navigate to the session
+          client.postMessage({
+            type: 'NOTIFICATION_CLICK',
+            session_id: data.session_id,
+            url: urlPath,
+          });
+          return client.focus();
+        }
+      }
+      // No existing window — open a new one
+      return self.clients.openWindow(urlPath);
+    })
+  );
 });
 
 // Export functions for unit testing in Node environment

@@ -61,6 +61,10 @@ async def client():
     agent_memory.memories_collection = db.db.agent_memories
     agent_memory.memory_logs_collection = db.db.agent_memory_logs
 
+    import push_notifications
+
+    push_notifications.push_subscriptions_collection = db.db.push_subscriptions
+
     activity_feed.todos_collection = db.db.todos
     activity_feed.sessions_collection = db.db.chat_sessions
     activity_feed.trajectories_collection = db.db.chat_trajectories
