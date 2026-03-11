@@ -10,6 +10,7 @@ interface ChatbotProps {
   token?: string;
   isActive?: boolean;
   pendingSessionId?: string | null;
+  directAssistantKey?: number;
   onSessionLoaded?: () => void;
   onNavigateToTasks?: () => void;
 }
@@ -33,6 +34,7 @@ export default function AgentChatbot({
   token,
   isActive = true,
   pendingSessionId,
+  directAssistantKey,
   onSessionLoaded,
   onNavigateToTasks,
 }: ChatbotProps) {
@@ -446,6 +448,18 @@ export default function AgentChatbot({
     setSelectedAgentId(null);
     messageQueueRef.current = [];
   };
+
+  // -----------------------------------------------------------------------
+  // Reset to direct assistant when the user clicks the Assistant tab directly
+  // -----------------------------------------------------------------------
+  const directAssistantKeyRef = useRef(directAssistantKey);
+  useEffect(() => {
+    // Skip the initial render — only react to subsequent changes
+    if (directAssistantKeyRef.current === directAssistantKey) return;
+    directAssistantKeyRef.current = directAssistantKey;
+    handleNewChat();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [directAssistantKey]);
 
   // -----------------------------------------------------------------------
   // Complete the linked task from within the chat

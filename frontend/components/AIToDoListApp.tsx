@@ -237,6 +237,9 @@ export default function AIToDoListApp({
   // Session state for task-linked chats
   const [pendingSessionId, setPendingSessionId] = useState<string | null>(null);
   const [todoSessionStatuses, setTodoSessionStatuses] = useState<Record<string, string>>({});
+  // Counter that increments when user clicks the Assistant tab directly,
+  // signaling AgentChatbot to reset to the direct assistant chat.
+  const [directAssistantKey, setDirectAssistantKey] = useState(0);
 
   // Lock body scroll when any modal is open so background doesn't scroll (including when keyboard opens on mobile)
   useEffect(() => {
@@ -474,6 +477,12 @@ export default function AIToDoListApp({
     const tabs: ('tasks' | 'agent' | 'activity' | 'journal')[] = ['tasks', 'agent', 'activity'];
     setTabIndex(index);
     setActiveTab(tabs[index]);
+    // When user clicks the Assistant tab directly (not via a task chat button),
+    // reset to the direct assistant chat so they don't see a stale task session.
+    if (index === 1) {
+      setPendingSessionId(null);
+      setDirectAssistantKey(k => k + 1);
+    }
   }, []);
 
   // Scroll to top when clicking header
@@ -2133,6 +2142,7 @@ export default function AIToDoListApp({
               token={token}
               isActive={activeTab === 'agent'}
               pendingSessionId={pendingSessionId}
+              directAssistantKey={directAssistantKey}
               onSessionLoaded={() => setPendingSessionId(null)}
               onNavigateToTasks={() => {
                 setTabIndex(0);
