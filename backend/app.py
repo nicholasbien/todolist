@@ -702,6 +702,15 @@ async def api_update_todo(
 
         if "closed" in body:
             updates["closed"] = bool(body["closed"])
+        if "image_ids" in body:
+            image_ids = body["image_ids"]
+            if not isinstance(image_ids, list) or not all(
+                isinstance(i, str) for i in image_ids
+            ):
+                raise HTTPException(
+                    status_code=400, detail="image_ids must be a list of strings"
+                )
+            updates["image_ids"] = image_ids
 
         if not updates:
             raise HTTPException(status_code=400, detail="No valid fields to update")
@@ -1458,6 +1467,7 @@ class PostMessageRequest(BaseModel):
     agent_id: Optional[str] = None
     interim: bool = False
     needs_human_response: bool = False
+    image_ids: Optional[List[str]] = None
 
 
 @app.post("/agent/sessions")
@@ -1512,6 +1522,7 @@ async def api_post_session_message(
         req.agent_id,
         interim=req.interim,
         needs_human_response=req.needs_human_response,
+        image_ids=req.image_ids,
     )
     return {"ok": True, "message": message}
 
