@@ -13,6 +13,7 @@ import pytest_asyncio
 # Add the backend directory to Python path so we can import modules
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+import app as app_module  # noqa: E402
 from app import app  # noqa: E402
 
 
@@ -65,6 +66,11 @@ async def client():
     activity_feed.sessions_collection = db.db.chat_sessions
     activity_feed.trajectories_collection = db.db.chat_trajectories
     activity_feed.journals_collection = db.db.journals
+
+    # Also update collection references that app.py imported directly
+    # (from X import Y creates a local binding that isn't updated by X.Y = ...)
+    app_module.todos_collection = db.db.todos
+    app_module.journals_collection = db.db.journals
 
     # Clear global MCP session state to prevent stale connections across tests
     from agent.agent import mcp_contexts, mcp_sessions
