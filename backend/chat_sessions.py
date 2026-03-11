@@ -322,6 +322,132 @@ async def mark_session_read(session_id: str, user_id: str) -> bool:
     return result.modified_count > 0
 
 
+async def search_sessions(
+    user_id: str,
+    query: str,
+    space_id: Optional[str] = None,
+    limit: int = 20,
+) -> List[Dict[str, Any]]:
+    """Search sessions by title and message content using MongoDB text indexes.
+
+    Returns sessions where the title or message content matches the query,
+    sorted by text relevance score. Each result includes a preview snippet
+    from the best-matching message.
+    """
+    if not query or not query.strip():
+        return []
+
+    results: List[Dict[str, Any]] = []
+    seen_session_ids: set = set()
+
+    # 1) Search session titles via text index
+    title_filter: Dict[str, Any] = {
+        "user_id": user_id,
+        "$text": {"$search": query},
+    }
+    if space_id is not None:
+        title_filter["space_id"] = space_id
+
+    cursor = (
+        sessions_collection.find(
+            title_filter,
+            {"score": {"$meta": "textScore"}},
+        )
+        .sort([("score", {"$meta": "textScore"})])
+        .limit(limit)
+    )
+    title_hits = await cursor.to_list(length=limit)
+
+    for doc in title_hits:
+        sid = str(doc["_id"])
+        seen_session_ids.add(sid)
+        results.append(
+            {
+                "_id": sid,
+                "title": doc.get("title", ""),
+                "space_id": doc.get("space_id"),
+                "todo_id": doc.get("todo_id"),
+                "agent_id": doc.get("agent_id"),
+                "updated_at": doc.get("updated_at"),
+                "created_at": doc.get("created_at"),
+                "match_source": "title",
+                "preview": doc.get("title", ""),
+                "score": doc.get("score", 0),
+            }
+        )
+
+    # 2) Search message content via text index on trajectories
+    content_filter: Dict[str, Any] = {
+        "user_id": user_id,
+        "$text": {"$search": query},
+    }
+    if space_id is not None:
+        content_filter["space_id"] = space_id
+
+    cursor = (
+        trajectories_collection.find(
+            content_filter,
+            {"score": {"$meta": "textScore"}, "session_id": 1, "display_messages": 1},
+        )
+        .sort([("score", {"$meta": "textScore"})])
+        .limit(limit)
+    )
+    content_hits = await cursor.to_list(length=limit)
+
+    for traj in content_hits:
+        sid = traj.get("session_id")
+        if not sid or sid in seen_session_ids:
+            continue
+        seen_session_ids.add(sid)
+
+        # Look up session metadata
+        session_doc = await sessions_collection.find_one({"_id": ObjectId(sid)})
+        if not session_doc:
+            continue
+
+        # Find the best matching message snippet
+        preview = ""
+        query_lower = query.lower()
+        for msg in reversed(traj.get("display_messages", [])):
+            content = msg.get("content", "")
+            if query_lower in content.lower():
+                # Extract a snippet around the match
+                idx = content.lower().index(query_lower)
+                start = max(0, idx - 40)
+                end = min(len(content), idx + len(query) + 80)
+                snippet = content[start:end]
+                if start > 0:
+                    snippet = "..." + snippet
+                if end < len(content):
+                    snippet = snippet + "..."
+                preview = snippet
+                break
+
+        if not preview and traj.get("display_messages"):
+            # Fallback: use last message as preview
+            last_msg = traj["display_messages"][-1]
+            preview = last_msg.get("content", "")[:120]
+
+        results.append(
+            {
+                "_id": sid,
+                "title": session_doc.get("title", ""),
+                "space_id": session_doc.get("space_id"),
+                "todo_id": session_doc.get("todo_id"),
+                "agent_id": session_doc.get("agent_id"),
+                "updated_at": session_doc.get("updated_at"),
+                "created_at": session_doc.get("created_at"),
+                "match_source": "content",
+                "preview": preview,
+                "score": traj.get("score", 0),
+            }
+        )
+
+    # Sort all results by score descending, cap at limit
+    results.sort(key=lambda r: r.get("score", 0), reverse=True)
+    return results[:limit]
+
+
 async def init_chat_session_indexes() -> None:
     """Create indexes for chat sessions and trajectories."""
     try:
@@ -338,8 +464,19 @@ async def init_chat_session_indexes() -> None:
             partialFilterExpression={"todo_id": {"$exists": True}},
         )
 
+        # Text index on session titles for search
+        await sessions_collection.create_index(
+            [("title", "text")],
+            name="title_text_search",
+        )
+
         await trajectories_collection.create_index("session_id", unique=True)
         await trajectories_collection.create_index("user_id")
+        # Text index on message content for search
+        await trajectories_collection.create_index(
+            [("display_messages.content", "text")],
+            name="message_content_text_search",
+        )
         logger.info("Chat session indexes created successfully")
     except Exception as e:
         logger.error(f"Error creating chat session indexes: {e}")

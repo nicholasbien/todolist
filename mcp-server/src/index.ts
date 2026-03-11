@@ -245,6 +245,19 @@ class TodolistMCPServer {
             },
           },
           {
+            name: 'search_sessions',
+            description: 'Search chat sessions by title and message content. Returns matching sessions with preview snippets.',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                q: { type: 'string', description: 'Search query text' },
+                space_id: { type: 'string', description: 'Space ID (auto-detected if not provided)' },
+                limit: { type: 'number', description: 'Max results (default: 20, max: 50)' },
+              },
+              required: ['q'],
+            },
+          },
+          {
             name: 'delete_session',
             description: 'Delete a chat session',
             inputSchema: {
@@ -328,6 +341,7 @@ class TodolistMCPServer {
           case 'get_session': return await this.getSession(args as any);
           case 'get_pending_sessions': return await this.getPendingSessions(args as any);
           case 'post_to_session': return await this.postToSession(args as any);
+          case 'search_sessions': return await this.searchSessions(args as any);
           case 'delete_session': return await this.deleteSession(args as any);
           case 'get_journal': return await this.getJournal(args as any);
           case 'write_journal': return await this.writeJournal(args as any);
@@ -532,6 +546,22 @@ class TodolistMCPServer {
       ...(args.interim !== undefined && { interim: args.interim }),
     });
     return this.textResult(`Posted ${args.role || 'assistant'} message to session ${args.session_id}`);
+  }
+
+  private async searchSessions(args: { q: string; space_id?: string; limit?: number }) {
+    const spaceId = await this.resolveSpaceId(args.space_id);
+    const params: any = { q: args.q };
+    if (spaceId) params.space_id = spaceId;
+    if (args.limit) params.limit = args.limit;
+    const response = await api.get('/agent/sessions/search', { params });
+    const sessions = response.data;
+    if (sessions.length === 0) return this.textResult('No sessions found matching your search');
+    const lines = sessions.map((s: any) => {
+      const source = s.match_source === 'title' ? '[title match]' : '[content match]';
+      const todoInfo = s.todo_id ? ` (todo: ${s.todo_id})` : '';
+      return `- "${s.title}" ${source} (ID: ${s._id})${todoInfo}\n  Preview: ${s.preview}`;
+    });
+    return this.textResult(`Found ${sessions.length} session(s):\n${lines.join('\n')}`);
   }
 
   private async deleteSession(args: { session_id: string }) {

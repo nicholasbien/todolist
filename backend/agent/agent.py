@@ -30,6 +30,7 @@ from chat_sessions import (  # noqa: E402
     get_unread_todo_ids,
     list_sessions,
     save_trajectory,
+    search_sessions,
 )
 from chats import ChatMessage, save_chat_message  # noqa: E402
 from fastapi import APIRouter, Depends, Header, HTTPException, Query  # noqa: E402
@@ -747,6 +748,20 @@ async def get_todo_statuses_route(
 ):
     """Get session status per todo (waiting/processing/unread_reply)."""
     return await get_todo_session_statuses(current_user["user_id"], space_id)
+
+
+@router.get("/sessions/search")
+async def search_chat_sessions(
+    q: str = Query(..., description="Search query"),
+    space_id: Optional[str] = Query(None, description="Space ID"),
+    limit: int = Query(20, ge=1, le=50, description="Max results"),
+    current_user: dict = Depends(get_current_user),
+):
+    """Search sessions by title and message content."""
+    user_id = current_user.get("user_id")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="User not authenticated")
+    return await search_sessions(user_id, q, space_id, limit)
 
 
 @router.get("/sessions/by-todo/{todo_id}")
