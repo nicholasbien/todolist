@@ -55,6 +55,7 @@ export default function AgentChatbot({
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const searchAbortRef = useRef<AbortController | null>(null);
 
   // Task session mode: when viewing a task-linked session
   const [isTaskSession, setIsTaskSession] = useState(false);
@@ -107,6 +108,11 @@ export default function AgentChatbot({
     if (searchTimeoutRef.current) {
       clearTimeout(searchTimeoutRef.current);
     }
+    // Abort any in-flight search request
+    if (searchAbortRef.current) {
+      searchAbortRef.current.abort();
+      searchAbortRef.current = null;
+    }
     if (!query.trim()) {
       setSearchResults([]);
       setIsSearching(false);
@@ -114,28 +120,36 @@ export default function AgentChatbot({
     }
     setIsSearching(true);
     searchTimeoutRef.current = setTimeout(async () => {
+      const abortController = new AbortController();
+      searchAbortRef.current = abortController;
       try {
         const params = new URLSearchParams({ q: query });
         if (activeSpace?._id) params.append('space_id', activeSpace._id);
         const res = await fetch(`/agent/sessions/search?${params.toString()}`, {
           headers: { Authorization: `Bearer ${token}` },
+          signal: abortController.signal,
         });
         if (res.ok) {
           const data = await res.json();
           setSearchResults(data);
         }
-      } catch {
-        // Silently ignore search errors
+      } catch (err: any) {
+        // Ignore abort errors; silently ignore other search errors
+        if (err?.name === 'AbortError') return;
       } finally {
-        setIsSearching(false);
+        // Only clear searching state if this controller wasn't aborted
+        if (!abortController.signal.aborted) {
+          setIsSearching(false);
+        }
       }
     }, 300);
   }, [token, activeSpace?._id]);
 
-  // Cleanup search timeout on unmount
+  // Cleanup search timeout and abort controller on unmount
   useEffect(() => {
     return () => {
       if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+      if (searchAbortRef.current) searchAbortRef.current.abort();
     };
   }, []);
 
