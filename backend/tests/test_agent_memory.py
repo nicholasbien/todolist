@@ -5,6 +5,7 @@ Run with: pytest tests/test_agent_memory.py -v
 """
 
 import pytest
+
 from tests.conftest import get_token
 
 
@@ -168,8 +169,9 @@ async def test_memory_module_direct():
 
     os.environ.setdefault("USE_MOCK_DB", "true")
 
-    import db
     from mongomock_motor import AsyncMongoMockClient
+
+    import db
 
     db.client = AsyncMongoMockClient()
     db.db = db.client.todo_db
@@ -183,7 +185,9 @@ async def test_memory_module_direct():
     space_id = "test_space_456"
 
     # Test save_memory
-    fact = await agent_memory.save_memory(user_id, "name", "Alice", space_id, "preference")
+    fact = await agent_memory.save_memory(
+        user_id, "name", "Alice", space_id, "preference"
+    )
     assert fact.key == "name"
     assert fact.value == "Alice"
 
@@ -198,10 +202,14 @@ async def test_memory_module_direct():
     assert len(facts) == 2
 
     # Test append_memory_log
-    log = await agent_memory.append_memory_log(user_id, "User prefers morning standups", space_id, "2026-03-11")
+    log = await agent_memory.append_memory_log(
+        user_id, "User prefers morning standups", space_id, "2026-03-11"
+    )
     assert len(log.entries) == 1
 
-    log = await agent_memory.append_memory_log(user_id, "User works in Python primarily", space_id, "2026-03-11")
+    log = await agent_memory.append_memory_log(
+        user_id, "User works in Python primarily", space_id, "2026-03-11"
+    )
     assert len(log.entries) == 2
 
     # Test get_memory_log
@@ -210,7 +218,9 @@ async def test_memory_module_direct():
     assert len(retrieved_log.entries) == 2
 
     # Test get_recent_memory_logs
-    await agent_memory.append_memory_log(user_id, "Another observation", space_id, "2026-03-10")
+    await agent_memory.append_memory_log(
+        user_id, "Another observation", space_id, "2026-03-10"
+    )
     logs = await agent_memory.get_recent_memory_logs(user_id, space_id, limit=5)
     assert len(logs) == 2
 

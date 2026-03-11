@@ -49,7 +49,10 @@ def manual_parse_due_date(text: str, date_added: str) -> tuple[Optional[str], st
         return (reference.date() + timedelta(days=1)).isoformat(), cleaned_text
 
     # Handle "in <number> days/weeks"
-    m = re.search(r"\bin\s+(\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+(day|days|week|weeks)\b", lowered)
+    m = re.search(
+        r"\bin\s+(\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+(day|days|week|weeks)\b",
+        lowered,
+    )
     if m:
         try:
             num_str, unit = m.group(1), m.group(2)
@@ -87,7 +90,9 @@ def manual_parse_due_date(text: str, date_added: str) -> tuple[Optional[str], st
             days_ahead = (weekday - reference.weekday() + 7) % 7
             days_ahead = days_ahead or 7
             cleaned_text = remove_phrase(cleaned_text, m)
-            return (reference.date() + timedelta(days=days_ahead)).isoformat(), cleaned_text
+            return (
+                reference.date() + timedelta(days=days_ahead)
+            ).isoformat(), cleaned_text
         except Exception:
             pass
 
@@ -102,7 +107,9 @@ def manual_parse_due_date(text: str, date_added: str) -> tuple[Optional[str], st
             today_weekday = reference.weekday()
             days_ahead = (weekday - today_weekday + 7) % 7
             cleaned_text = remove_phrase(cleaned_text, m)
-            return (reference.date() + timedelta(days=days_ahead)).isoformat(), cleaned_text
+            return (
+                reference.date() + timedelta(days=days_ahead)
+            ).isoformat(), cleaned_text
         except Exception:
             pass
 
@@ -117,7 +124,9 @@ def manual_parse_due_date(text: str, date_added: str) -> tuple[Optional[str], st
             today_weekday = reference.weekday()
             days_ahead = (weekday - today_weekday + 7) % 7
             cleaned_text = remove_phrase(cleaned_text, m)
-            return (reference.date() + timedelta(days=days_ahead)).isoformat(), cleaned_text
+            return (
+                reference.date() + timedelta(days=days_ahead)
+            ).isoformat(), cleaned_text
         except Exception:
             pass
 
@@ -131,7 +140,9 @@ def manual_parse_due_date(text: str, date_added: str) -> tuple[Optional[str], st
             pass
 
     # Handle date formats: MM/DD/YYYY, DD/MM/YYYY or MM-DD-YYYY, DD-MM-YYYY
-    m = re.search(rf"\b({keyword_re})?\s*(\d{{1,2}})[/-](\d{{1,2}})[/-](\d{{4}})\b", lowered)
+    m = re.search(
+        rf"\b({keyword_re})?\s*(\d{{1,2}})[/-](\d{{1,2}})[/-](\d{{4}})\b", lowered
+    )
     if m:
         try:
             first_str, second_str, year_str = m.group(2), m.group(3), m.group(4)
@@ -184,7 +195,11 @@ def manual_parse_due_date(text: str, date_added: str) -> tuple[Optional[str], st
                     return str(groups[1]), cleaned_text
                 # US/EU: (keyword, month, day, year)
                 elif len(groups) == 4 and all(groups[1:]):
-                    month_str, day_str, year_str = str(groups[1]), str(groups[2]), str(groups[3])
+                    month_str, day_str, year_str = (
+                        str(groups[1]),
+                        str(groups[2]),
+                        str(groups[3]),
+                    )
                     try:
                         dt = datetime(int(year_str), int(month_str), int(day_str))
                         cleaned_text = remove_phrase(cleaned_text, m)
@@ -248,7 +263,11 @@ def manual_parse_due_date(text: str, date_added: str) -> tuple[Optional[str], st
                 else:
                     continue
                 try:
-                    day_num = int(day_str) if isinstance(day_str, str) and day_str.isdigit() else None
+                    day_num = (
+                        int(day_str)
+                        if isinstance(day_str, str) and day_str.isdigit()
+                        else None
+                    )
                     year_num = (
                         int(year_str)
                         if year_str and isinstance(year_str, str) and year_str.isdigit()
@@ -259,7 +278,9 @@ def manual_parse_due_date(text: str, date_added: str) -> tuple[Optional[str], st
                 if day_num is None or month_num is None or year_num is None:
                     continue
                 dt = datetime(year_num, month_num, day_num)
-                if (not year_str or not year_str.strip()) and dt.date() < reference.date():
+                if (
+                    not year_str or not year_str.strip()
+                ) and dt.date() < reference.date():
                     dt = datetime(year_num + 1, month_num, day_num)
                 cleaned_text = remove_phrase(cleaned_text, m)
                 return dt.date().isoformat(), cleaned_text

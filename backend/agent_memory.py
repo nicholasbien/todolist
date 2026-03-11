@@ -14,8 +14,9 @@ from typing import Any, Dict, List, Optional
 
 from bson import ObjectId
 from bson.errors import InvalidId
-from db import db
 from pydantic import BaseModel, Field
+
+from db import db
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -42,7 +43,9 @@ async def init_memory_indexes() -> None:
 
         # Daily log indexes
         await memory_logs_collection.create_index("user_id")
-        await memory_logs_collection.create_index([("user_id", 1), ("space_id", 1), ("date", -1)])
+        await memory_logs_collection.create_index(
+            [("user_id", 1), ("space_id", 1), ("date", -1)]
+        )
         await memory_logs_collection.create_index(
             [("user_id", 1), ("space_id", 1), ("date", 1)],
             unique=True,
@@ -115,8 +118,12 @@ def _serialize(doc: Dict[str, Any]) -> Dict[str, Any]:
         "key": doc.get("key", ""),
         "value": doc.get("value", ""),
         "category": doc.get("category", ""),
-        "created_at": doc.get("created_at", "").isoformat() if doc.get("created_at") else None,
-        "updated_at": doc.get("updated_at", "").isoformat() if doc.get("updated_at") else None,
+        "created_at": (
+            doc.get("created_at", "").isoformat() if doc.get("created_at") else None
+        ),
+        "updated_at": (
+            doc.get("updated_at", "").isoformat() if doc.get("updated_at") else None
+        ),
     }
 
 
@@ -159,9 +166,13 @@ async def save_memory(
     return MemoryFact(**result)
 
 
-async def get_memory(user_id: str, key: str, space_id: Optional[str] = None) -> Optional[MemoryFact]:
+async def get_memory(
+    user_id: str, key: str, space_id: Optional[str] = None
+) -> Optional[MemoryFact]:
     """Get a specific memory fact by key."""
-    doc = await memories_collection.find_one({"user_id": user_id, "space_id": space_id, "key": key})
+    doc = await memories_collection.find_one(
+        {"user_id": user_id, "space_id": space_id, "key": key}
+    )
     if doc:
         doc["_id"] = str(doc["_id"])
         return MemoryFact(**doc)
@@ -218,9 +229,13 @@ async def delete_memory(memory_id: str, user_id: str) -> bool:
     return result.deleted_count > 0
 
 
-async def delete_memory_by_key(user_id: str, key: str, space_id: Optional[str] = None) -> bool:
+async def delete_memory_by_key(
+    user_id: str, key: str, space_id: Optional[str] = None
+) -> bool:
     """Delete a specific memory fact by key."""
-    result = await memories_collection.delete_one({"user_id": user_id, "space_id": space_id, "key": key})
+    result = await memories_collection.delete_one(
+        {"user_id": user_id, "space_id": space_id, "key": key}
+    )
     if result.deleted_count > 0:
         logger.info(f"Deleted memory '{key}' for user {user_id}, space {space_id}")
         return True
@@ -229,8 +244,12 @@ async def delete_memory_by_key(user_id: str, key: str, space_id: Optional[str] =
 
 async def delete_all_memories(user_id: str, space_id: Optional[str] = None) -> int:
     """Delete all memory facts for a user/space. Returns count deleted."""
-    result = await memories_collection.delete_many({"user_id": user_id, "space_id": space_id})
-    logger.info(f"Deleted {result.deleted_count} memories for user {user_id}, space {space_id}")
+    result = await memories_collection.delete_many(
+        {"user_id": user_id, "space_id": space_id}
+    )
+    logger.info(
+        f"Deleted {result.deleted_count} memories for user {user_id}, space {space_id}"
+    )
     return result.deleted_count
 
 
@@ -266,7 +285,9 @@ async def append_memory_log(
         return_document=True,
     )
     result["_id"] = str(result["_id"])
-    logger.info(f"Appended memory log for user {user_id}, space {space_id}, date {date}")
+    logger.info(
+        f"Appended memory log for user {user_id}, space {space_id}, date {date}"
+    )
     return MemoryLog(**result)
 
 
@@ -276,7 +297,9 @@ async def get_memory_log(
     space_id: Optional[str] = None,
 ) -> Optional[MemoryLog]:
     """Get a memory log for a specific date."""
-    doc = await memory_logs_collection.find_one({"user_id": user_id, "space_id": space_id, "date": date})
+    doc = await memory_logs_collection.find_one(
+        {"user_id": user_id, "space_id": space_id, "date": date}
+    )
     if doc:
         doc["_id"] = str(doc["_id"])
         return MemoryLog(**doc)
@@ -289,7 +312,11 @@ async def get_recent_memory_logs(
     limit: int = 7,
 ) -> List[MemoryLog]:
     """Get recent daily memory logs."""
-    cursor = memory_logs_collection.find({"user_id": user_id, "space_id": space_id}).sort("date", -1).limit(limit)
+    cursor = (
+        memory_logs_collection.find({"user_id": user_id, "space_id": space_id})
+        .sort("date", -1)
+        .limit(limit)
+    )
     docs = await cursor.to_list(length=limit)
 
     results = []
@@ -328,7 +355,10 @@ async def get_memories_for_context(
     for doc in docs:
         lines.append(f"- {doc['key']}: {doc['value']}")
 
-    return "## Agent Memory\nThings you've previously learned about this user:\n" + "\n".join(lines)
+    return (
+        "## Agent Memory\nThings you've previously learned about this user:\n"
+        + "\n".join(lines)
+    )
 
 
 async def build_memory_context(user_id: str, space_id: Optional[str] = None) -> str:

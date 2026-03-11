@@ -39,7 +39,9 @@ async def fetch_webpage(url: str, selector: Optional[str] = None) -> dict:
             if selector:
                 elements = soup.select(selector)
                 if elements:
-                    content = "\n".join([elem.get_text(strip=True) for elem in elements])
+                    content = "\n".join(
+                        [elem.get_text(strip=True) for elem in elements]
+                    )
                 else:
                     content = f"No elements found matching selector: {selector}"
             else:
@@ -48,8 +50,14 @@ async def fetch_webpage(url: str, selector: Optional[str] = None) -> dict:
                     script.decompose()
 
                 # Get main content
-                main_content = soup.find("main") or soup.find("article") or soup.find("body")
-                content = main_content.get_text(separator="\n", strip=True) if main_content else ""
+                main_content = (
+                    soup.find("main") or soup.find("article") or soup.find("body")
+                )
+                content = (
+                    main_content.get_text(separator="\n", strip=True)
+                    if main_content
+                    else ""
+                )
 
             # Get title
             title = soup.find("title")
@@ -71,7 +79,11 @@ async def fetch_webpage(url: str, selector: Optional[str] = None) -> dict:
             }
 
     except httpx.HTTPStatusError as e:
-        return {"success": False, "error": f"HTTP {e.response.status_code}: {e.response.reason_phrase}", "url": url}
+        return {
+            "success": False,
+            "error": f"HTTP {e.response.status_code}: {e.response.reason_phrase}",
+            "url": url,
+        }
     except Exception as e:
         logger.error(f"Error fetching {url}: {e}")
         return {"success": False, "error": str(e), "url": url}
@@ -101,7 +113,11 @@ async def fetch_json(url: str) -> dict:
             }
 
     except httpx.HTTPStatusError as e:
-        return {"success": False, "error": f"HTTP {e.response.status_code}: {e.response.reason_phrase}", "url": url}
+        return {
+            "success": False,
+            "error": f"HTTP {e.response.status_code}: {e.response.reason_phrase}",
+            "url": url,
+        }
     except Exception as e:
         logger.error(f"Error fetching JSON from {url}: {e}")
         return {"success": False, "error": str(e), "url": url}
@@ -139,7 +155,11 @@ async def extract_links(url: str, pattern: Optional[str] = None) -> dict:
                     href = urljoin(str(response.url), href)
 
                 # Filter by pattern if provided
-                if pattern and pattern.lower() not in href.lower() and pattern.lower() not in text.lower():
+                if (
+                    pattern
+                    and pattern.lower() not in href.lower()
+                    and pattern.lower() not in text.lower()
+                ):
                     continue
 
                 links.append({"url": href, "text": text[:100]})  # Limit text length

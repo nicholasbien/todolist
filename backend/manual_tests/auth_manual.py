@@ -30,7 +30,9 @@ def test_login(email, code):
     """Test user login with verification code."""
     print(f"\n🔹 Testing login for {email} with code {code}")
 
-    response = requests.post(f"{BASE_URL}/auth/login", json={"email": email, "code": code})
+    response = requests.post(
+        f"{BASE_URL}/auth/login", json={"email": email, "code": code}
+    )
 
     print(f"Status: {response.status_code}")
     result = response.json()

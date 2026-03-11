@@ -73,14 +73,17 @@ async function setupServerTodo() {
 // ─── Happy path: operations with correct server ID after sync ───
 
 describe('delete synced todo offline', () => {
-  test('removes from IndexedDB and queues DELETE', async () => {
+  test('soft-deletes in IndexedDB and queues DELETE', async () => {
     await setupSyncedTodo();
 
     const res = await sw.handleApiRequest(new Request('/todos/server_abc123', { method: 'DELETE' }));
-    expect(res.status).toBe(204);
+    expect(res.status).toBe(200);
 
+    // Soft-delete: todo is still in IDB but marked as closed
     const todos = await sw.getTodos('user1', 'space1');
-    expect(todos).toHaveLength(0);
+    expect(todos).toHaveLength(1);
+    expect(todos[0].closed).toBe(true);
+    expect(todos[0].completed).toBe(true);
 
     const queue = await sw.readQueue('user1');
     const deleteOp = queue.find((op: any) => op.type === 'DELETE');

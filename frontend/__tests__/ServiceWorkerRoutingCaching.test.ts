@@ -49,7 +49,8 @@ describe('API_ROUTES and isApiPath', () => {
     const sw = require('../public/sw.js');
     const expected = [
       '/todos', '/categories', '/spaces', '/journals', '/insights',
-      '/agent', '/auth', '/email', '/contact', '/export', '/health'
+      '/agent', '/auth', '/email', '/contact', '/export', '/health',
+      '/briefings', '/activity-feed', '/memories', '/memory-logs'
     ];
     expect(sw.API_ROUTES).toEqual(expected);
   });

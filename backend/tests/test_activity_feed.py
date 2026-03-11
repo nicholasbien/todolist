@@ -1,6 +1,7 @@
 """Tests for the /activity-feed endpoint."""
 
 import pytest
+
 from tests.conftest import get_token
 
 

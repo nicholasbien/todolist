@@ -1,4 +1,5 @@
 import pytest
+
 from tests.test_auth import get_verification_code_from_db
 
 
@@ -25,7 +26,9 @@ async def test_create_space(client, test_email, test_email2):
     token1 = await get_token(client, test_email)
     headers1 = {"Authorization": f"Bearer {token1}"}
 
-    create_resp = await client.post("/spaces", json={"name": "Collab"}, headers=headers1)
+    create_resp = await client.post(
+        "/spaces", json={"name": "Collab"}, headers=headers1
+    )
     assert create_resp.status_code == 200
     space_id = create_resp.json()["_id"]
 
@@ -54,7 +57,9 @@ async def test_edit_space(client, test_email, test_email2):
     assert create_resp.status_code == 200
     space_id = create_resp.json()["_id"]
 
-    update_resp = await client.put(f"/spaces/{space_id}", json={"name": "Team Updated"}, headers=headers1)
+    update_resp = await client.put(
+        f"/spaces/{space_id}", json={"name": "Team Updated"}, headers=headers1
+    )
     assert update_resp.status_code == 200
     assert update_resp.json()["name"] == "Team Updated"
 
@@ -79,7 +84,9 @@ async def test_make_space_private_removes_members(client, test_email, test_email
     token1 = await get_token(client, test_email)
     headers1 = {"Authorization": f"Bearer {token1}"}
 
-    create_resp = await client.post("/spaces", json={"name": "Secret"}, headers=headers1)
+    create_resp = await client.post(
+        "/spaces", json={"name": "Secret"}, headers=headers1
+    )
     assert create_resp.status_code == 200
     space_id = create_resp.json()["_id"]
 
@@ -139,7 +146,9 @@ async def test_private_clears_pending_invites(client, test_email, test_email3):
 
 
 @pytest.mark.asyncio
-async def test_invite_and_member_listing(client, test_email, test_email2, test_email3, monkeypatch):
+async def test_invite_and_member_listing(
+    client, test_email, test_email2, test_email3, monkeypatch
+):
     token1 = await get_token(client, test_email)
     headers1 = {"Authorization": f"Bearer {token1}"}
 
@@ -152,7 +161,9 @@ async def test_invite_and_member_listing(client, test_email, test_email2, test_e
     monkeypatch.setattr("email_summary.send_email", fake_send_email)
 
     # Create space
-    create_resp = await client.post("/spaces", json={"name": "Roster"}, headers=headers1)
+    create_resp = await client.post(
+        "/spaces", json={"name": "Roster"}, headers=headers1
+    )
     assert create_resp.status_code == 200
     space_id = create_resp.json()["_id"]
 

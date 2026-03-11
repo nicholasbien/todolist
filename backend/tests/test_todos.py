@@ -1,6 +1,7 @@
 from datetime import datetime
 
 import pytest
+
 from tests.test_auth import get_verification_code_from_db
 
 
@@ -39,7 +40,9 @@ async def test_todo_crud_flow(client, test_email):
     default_space = next((s for s in spaces if s.get("is_default", False)), None)
     assert default_space is not None
 
-    get_resp = await client.get(f"/todos?space_id={default_space['_id']}", headers=headers)
+    get_resp = await client.get(
+        f"/todos?space_id={default_space['_id']}", headers=headers
+    )
     assert get_resp.status_code == 200
     todos = get_resp.json()
     assert any(t["_id"] == todo_id for t in todos)
@@ -71,14 +74,20 @@ async def test_category_management(client, test_email):
     default_space = spaces_resp.json()[0]["_id"]  # This will be None for default space
 
     # Add category to default space (space_id = None)
-    add_resp = await client.post("/categories", json={"name": "Errands", "space_id": default_space}, headers=headers)
+    add_resp = await client.post(
+        "/categories",
+        json={"name": "Errands", "space_id": default_space},
+        headers=headers,
+    )
     assert add_resp.status_code == 200
 
     # Ensure category exists (for default space, don't pass space_id)
     if default_space is None:
         categories_resp = await client.get("/categories", headers=headers)
     else:
-        categories_resp = await client.get(f"/categories?space_id={default_space}", headers=headers)
+        categories_resp = await client.get(
+            f"/categories?space_id={default_space}", headers=headers
+        )
     assert categories_resp.status_code == 200
     categories = categories_resp.json()
     assert "Errands" in categories
@@ -98,13 +107,17 @@ async def test_category_management(client, test_email):
     if default_space is None:
         delete_resp = await client.delete("/categories/Errands", headers=headers)
     else:
-        delete_resp = await client.delete(f"/categories/Errands?space_id={default_space}", headers=headers)
+        delete_resp = await client.delete(
+            f"/categories/Errands?space_id={default_space}", headers=headers
+        )
     assert delete_resp.status_code == 200
 
     if default_space is None:
         get_todos_resp = await client.get("/todos", headers=headers)
     else:
-        get_todos_resp = await client.get(f"/todos?space_id={default_space}", headers=headers)
+        get_todos_resp = await client.get(
+            f"/todos?space_id={default_space}", headers=headers
+        )
     assert get_todos_resp.status_code == 200
     todos = get_todos_resp.json()
     todo = next(t for t in todos if t["_id"] == todo_id)
