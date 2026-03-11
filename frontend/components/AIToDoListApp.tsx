@@ -216,7 +216,6 @@ export default function AIToDoListApp({
     }
     return '';
   });
-  const [newTodoRecurrence, setNewTodoRecurrence] = useState<string>('');
 
   // Long-press to edit category
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -838,7 +837,6 @@ export default function AIToDoListApp({
         completed: false,
         space_id: activeSpace ? activeSpace._id : null,
         agent_id: newTodoAgent || null,
-        recurrence_rule: newTodoRecurrence || null,
       };
 
       // Include notes if provided
@@ -880,7 +878,6 @@ export default function AIToDoListApp({
       setNewTodo('');
       setNewTodoNotes('');
       setNewTodoAgent('');
-      setNewTodoRecurrence('');
     } catch (err) {
       if (err.name === 'AbortError') {
         setError('Request timed out. Please try again.');
@@ -1714,18 +1711,6 @@ export default function AIToDoListApp({
             <option value="">Built-in</option>
             <option value="openclaw">OpenClaw</option>
             <option value="claude">Claude</option>
-          </select>
-          <select
-            value={newTodoRecurrence}
-            onChange={(e) => setNewTodoRecurrence(e.target.value)}
-            className={`h-12 px-2 rounded-xl bg-gray-900 border text-sm focus:border-accent focus:outline-none transition-colors appearance-none cursor-pointer ${
-              newTodoRecurrence ? 'border-accent text-accent' : 'border-gray-700 text-gray-200'
-            }`}
-          >
-            <option value="">Once</option>
-            <option value="daily">Daily</option>
-            <option value="weekly">Weekly</option>
-            <option value="monthly">Monthly</option>
           </select>
           <button
             onClick={handleAddTodo}
