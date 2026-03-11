@@ -192,10 +192,9 @@ export default function AgentChatbot({
     if (shouldAutoScrollRef.current && isActive && messages.length > 0) {
       setTimeout(() => {
         scrollToBottom();
-        shouldAutoScrollRef.current = true;
       }, 10);
     }
-  }, [messages, isActive]);
+  }, [messages, isActive, loading, needsHumanResponse]);
 
   // Whether we're waiting for an external agent (e.g. openclaw) to respond
   const isWaitingForExternalAgent = sessionAgentId && currentSessionId && messages.length > 0 && messages[messages.length - 1]?.role === 'user';
