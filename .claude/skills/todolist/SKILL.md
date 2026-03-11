@@ -66,7 +66,7 @@ protocol (they will be available as `mcp__todolist__<tool_name>`):
 | `list_todos` | List all todos |
 | `update_todo` | Update a todo's text, category, priority, or notes |
 | `complete_todo` | Mark a todo as done |
-| `add_todo` | Create new todos or sub-tasks (pass `parent_id` for sub-tasks). **Keep title short; use `notes` for details.** |
+| `add_todo` | Create new todos or sub-tasks (pass `parent_id` for sub-tasks) |
 | `complete_todo` | Mark a todo as done (triggers subtask orchestration) |
 | `create_session` | Create a session linked to a new todo |
 | `write_journal` | Log progress in the journal |
@@ -239,10 +239,6 @@ The TodoList backend supports multi-agent routing via `agent_id`:
   follow-ups and new tasks.
 - **Isolation**: Other agents (like openclaw) only see their own claimed
   sessions + unclaimed ones. They won't steal your sessions.
-- **Pausing for human input**: Pass `needs_human_response=true` when posting
-  a question to the user. This sets `needs_human_response=True` on the session
-  and clears `needs_agent_response`, removing it from the pending queue until
-  the human replies.
 
 ## Sub-Task Management
 
