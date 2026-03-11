@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { ChevronDown, ArrowLeft, CheckCircle2 } from 'lucide-react';
 import { MessageRenderer, PlainTextRenderer } from './MessageRenderer';
 import { getStreamingBackendUrl } from '../utils/api';
+import AgentMemoryViewer from './AgentMemoryViewer';
 
 interface ChatbotProps {
   activeSpace: any;
@@ -69,6 +70,8 @@ export default function AgentChatbot({
   const [needsHumanResponse, setNeedsHumanResponse] = useState(false);
   // Direct agent chat: selected agent before a session is created
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
+  // Memory viewer
+  const [showMemoryViewer, setShowMemoryViewer] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
@@ -647,6 +650,19 @@ export default function AgentChatbot({
 
   const isWaiting = loading;
 
+  // Show memory viewer when toggled
+  if (showMemoryViewer) {
+    return (
+      <div className="flex flex-col h-full">
+        <AgentMemoryViewer
+          token={token || ''}
+          activeSpace={activeSpace}
+          onClose={() => setShowMemoryViewer(false)}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col h-full">
       {/* Top bar */}
@@ -811,15 +827,23 @@ export default function AgentChatbot({
           </div>
         )}
 
-        {/* New Chat button */}
+        {/* New Chat + Memory buttons */}
         {!isTaskSession && !(sessionAgentId && currentSessionId) && (messages.length > 0 || currentSessionId) && (
-          <button
-            onClick={handleNewChat}
-            disabled={loading}
-            className="ml-auto border border-gray-600 text-gray-300 px-3 py-1 rounded text-sm hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
-            New Chat
-          </button>
+          <div className="ml-auto flex items-center gap-2">
+            <button
+              onClick={() => setShowMemoryViewer(true)}
+              className="border border-gray-600 text-gray-400 px-3 py-1 rounded text-sm hover:bg-gray-800 hover:text-gray-200 transition-colors"
+            >
+              Memory
+            </button>
+            <button
+              onClick={handleNewChat}
+              disabled={loading}
+              className="border border-gray-600 text-gray-300 px-3 py-1 rounded text-sm hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              New Chat
+            </button>
+          </div>
         )}
       </div>
 
@@ -897,6 +921,15 @@ export default function AgentChatbot({
                 <p className="text-sm text-gray-500 italic">
                   Try: &quot;What should I get done today?&quot; or &quot;Summarize my latest journals&quot;
                 </p>
+              </div>
+
+              <div className="mt-2">
+                <button
+                  onClick={() => setShowMemoryViewer(true)}
+                  className="text-xs text-gray-500 hover:text-gray-300 transition-colors underline underline-offset-2"
+                >
+                  View agent memory
+                </button>
               </div>
 
               <div className="mt-4 pt-4 border-t border-gray-800">

@@ -9,6 +9,7 @@ from typing import List, Optional, Union
 
 import httpx
 from agent import agent_router
+from agent_memory import delete_memory, get_memories
 from auth import (
     LoginRequest,
     SignupRequest,
@@ -1423,6 +1424,34 @@ async def api_update_briefing_preferences(
         logger.warning("Could not update briefing schedule: %s", e)
 
     return {"message": "Briefing preferences updated"}
+
+
+# ---------------------------------------------------------------------------
+# Agent Memory endpoints
+# ---------------------------------------------------------------------------
+
+
+@app.get("/memories")
+async def api_get_memories(
+    space_id: Optional[str] = None,
+    agent_id: str = "default",
+    current_user: dict = Depends(get_current_user),
+):
+    """List all agent memories for the current user in a space."""
+    sid = space_id or current_user.get("active_space_id", "")
+    return await get_memories(current_user["user_id"], sid, agent_id)
+
+
+@app.delete("/memories/{memory_id}")
+async def api_delete_memory(
+    memory_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    """Delete a single memory by its ID."""
+    deleted = await delete_memory(memory_id, current_user["user_id"])
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Memory not found")
+    return {"ok": True}
 
 
 if __name__ == "__main__":
