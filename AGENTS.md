@@ -163,6 +163,52 @@ Agents only see their own claimed sessions + unclaimed ones when polling. This p
 
 ---
 
+## PR Agent Skills
+
+Two skills for managing pull requests are available as Claude Code slash commands.
+
+### `/write-pr` — Generate PR Title & Description
+
+Analyzes the current branch's commits and diffs to produce a well-structured PR with a clear title, summary, change breakdown, and test plan.
+
+```
+/write-pr              # Compare against main (default)
+/write-pr develop      # Compare against a specific base branch
+```
+
+**What it does:**
+1. Gathers all commits and diffs since diverging from the base branch
+2. Categorizes changes (feature, bug fix, refactor, etc.)
+3. Generates a concise title (under 70 characters, starts with a verb)
+4. Writes a structured description with Summary, Changes, and Test Plan sections
+5. Creates the PR via `gh pr create` (or outputs the content for manual use)
+
+### `/review-pr` — Code Review Agent
+
+Performs a thorough code review analyzing correctness, security, performance, code quality, and test coverage.
+
+```
+/review-pr 123                                    # Review PR #123
+/review-pr https://github.com/owner/repo/pull/123  # Review by URL
+/review-pr                                         # Review current branch diff
+```
+
+**What it does:**
+1. Fetches PR metadata, diff, and existing review comments
+2. Reviews each file for bugs, security issues, performance problems, and style
+3. Categorizes feedback by severity (must fix, should fix, suggestions, questions)
+4. Outputs a structured review with line-specific comments
+5. Optionally posts the review to GitHub via `gh pr review`
+
+### Files
+
+| File | Purpose |
+|------|---------|
+| `.claude/skills/write-pr/SKILL.md` | PR writing skill definition |
+| `.claude/skills/review-pr/SKILL.md` | PR review skill definition |
+
+---
+
 ## Quick Setup
 
 ```bash
