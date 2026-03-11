@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { ChevronDown, ArrowLeft, CheckCircle2, RotateCcw } from 'lucide-react';
+import { ChevronDown, ArrowLeft, CheckCircle2, RotateCcw, Search, X } from 'lucide-react';
 import { MessageRenderer, PlainTextRenderer } from './MessageRenderer';
 import { getStreamingBackendUrl } from '../utils/api';
 import AgentMemoryViewer from './AgentMemoryViewer';
@@ -964,6 +964,70 @@ export default function AgentChatbot({
                 >
                   View agent memory
                 </button>
+              </div>
+
+              {/* Session search */}
+              <div className="mt-4 pt-4 border-t border-gray-800">
+                <p className="text-xs text-gray-500 mb-2">Search past conversations:</p>
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-500 pointer-events-none" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => handleSearch(e.target.value)}
+                    placeholder="Search sessions by title or content..."
+                    className="w-full bg-gray-900 text-gray-200 text-sm pl-8 pr-8 py-2 rounded-lg border border-gray-700 focus:border-accent focus:outline-none placeholder-gray-500"
+                  />
+                  {searchQuery && (
+                    <button
+                      onClick={() => { handleSearch(''); }}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 transition-colors"
+                      aria-label="Clear search"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+                {/* Inline search results */}
+                {searchQuery.trim() && (
+                  <div className="mt-2 bg-gray-900 border border-gray-700 rounded-lg max-h-64 overflow-y-auto custom-scrollbar">
+                    {isSearching && (
+                      <div className="px-3 py-3 text-sm text-gray-500 text-center">
+                        Searching...
+                      </div>
+                    )}
+                    {!isSearching && searchResults.length === 0 && (
+                      <div className="px-3 py-3 text-sm text-gray-500 text-center">
+                        No results found
+                      </div>
+                    )}
+                    {searchResults.map((result) => (
+                      <div
+                        key={result._id}
+                        onClick={() => {
+                          loadSession(result._id);
+                          handleSearch('');
+                        }}
+                        className="px-3 py-2 text-sm cursor-pointer hover:bg-gray-800 transition-colors border-b border-gray-800 last:border-b-0"
+                      >
+                        <div className="flex items-center gap-1.5">
+                          <p className="text-gray-200 truncate text-left">{result.title}</p>
+                          <span className={`px-1 py-0 rounded text-[10px] font-medium flex-shrink-0 ${
+                            result.match_source === 'title'
+                              ? 'bg-blue-600/20 text-blue-300 border border-blue-500/30'
+                              : 'bg-green-600/20 text-green-300 border border-green-500/30'
+                          }`}>
+                            {result.match_source === 'title' ? 'title' : 'message'}
+                          </span>
+                        </div>
+                        {result.preview && result.match_source === 'content' && (
+                          <p className="text-gray-400 text-xs mt-0.5 truncate text-left">{result.preview}</p>
+                        )}
+                        <p className="text-gray-500 text-xs text-left">{formatSessionDate(result.updated_at)}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div className="mt-4 pt-4 border-t border-gray-800">
