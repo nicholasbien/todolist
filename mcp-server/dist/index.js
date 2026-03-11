@@ -71,13 +71,14 @@ class TodolistMCPServer {
                     // --- Todo tools ---
                     {
                         name: 'add_todo',
-                        description: 'Add a new todo item. Pass parent_id to create a sub-task of an existing todo.',
+                        description: 'Add a new todo item. Pass parent_id to create a sub-task of an existing todo. Sub-tasks run in parallel by default. Use depends_on to specify ordering constraints between sibling sub-tasks.',
                         inputSchema: {
                             type: 'object',
                             properties: {
                                 text: { type: 'string', description: 'The todo item text' },
                                 space_id: { type: 'string', description: 'Space ID (auto-detected if not provided)' },
-                                parent_id: { type: 'string', description: 'Parent todo ID to create as a sub-task (optional). Sub-tasks execute in linear order.' },
+                                parent_id: { type: 'string', description: 'Parent todo ID to create as a sub-task (optional).' },
+                                depends_on: { type: 'array', items: { type: 'string' }, description: 'Array of sibling sub-task IDs this task depends on (optional). Task starts only after all dependencies complete. Omit for parallel execution.' },
                             },
                             required: ['text'],
                         },
@@ -344,10 +345,13 @@ class TodolistMCPServer {
         const body = { text: args.text, space_id: spaceId };
         if (args.parent_id)
             body.parent_id = args.parent_id;
+        if (args.depends_on && args.depends_on.length > 0)
+            body.depends_on = args.depends_on;
         const response = await api.post('/todos', body);
         const todo = response.data;
         const prefix = args.parent_id ? 'Added sub-task' : 'Added todo';
-        return this.textResult(`${prefix}: "${todo.text}" (ID: ${todo._id}, Category: ${todo.category})`);
+        const depsInfo = args.depends_on && args.depends_on.length > 0 ? ` (depends on: ${args.depends_on.join(', ')})` : '';
+        return this.textResult(`${prefix}: "${todo.text}" (ID: ${todo._id}, Category: ${todo.category})${depsInfo}`);
     }
     async listTodos(args) {
         const spaceId = await this.resolveSpaceId(args.space_id);
@@ -388,7 +392,8 @@ class TodolistMCPServer {
             const subtaskInfo = subtasks.length > 0 ? ` [${subtasks.filter(s => s.completed).length}/${subtasks.length} sub-tasks]` : '';
             lines.push(`${i++}. ${t.completed ? '[done]' : '[  ]'} ${t.text} [${t.category || 'General'}] (ID: ${t._id})${subtaskInfo}`);
             for (const c of subtasks) {
-                lines.push(`   └─ ${c.completed ? '[done]' : '[  ]'} ${c.text} (ID: ${c._id})`);
+                const deps = c.depends_on && c.depends_on.length > 0 ? ` [depends on: ${c.depends_on.join(', ')}]` : '';
+                lines.push(`   └─ ${c.completed ? '[done]' : '[  ]'} ${c.text} (ID: ${c._id})${deps}`);
             }
         }
         return this.textResult(lines.join('\n'));
