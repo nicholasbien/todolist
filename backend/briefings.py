@@ -19,6 +19,7 @@ from typing import Any, Dict, List, Optional
 
 import openai
 from bson import ObjectId
+
 from db import db
 
 logger = logging.getLogger(__name__)
@@ -104,7 +105,9 @@ async def update_briefing_preferences(
 # ---------------------------------------------------------------------------
 
 
-async def _get_open_tasks(user_id: str, space_id: Optional[str] = None) -> List[Dict[str, Any]]:
+async def _get_open_tasks(
+    user_id: str, space_id: Optional[str] = None
+) -> List[Dict[str, Any]]:
     """Fetch open (incomplete) tasks for a user."""
     query: Dict[str, Any] = {"user_id": user_id, "completed": False}
     if space_id:
@@ -116,7 +119,9 @@ async def _get_open_tasks(user_id: str, space_id: Optional[str] = None) -> List[
     return tasks
 
 
-async def _get_recent_completions(user_id: str, days: int = 7, space_id: Optional[str] = None) -> List[Dict[str, Any]]:
+async def _get_recent_completions(
+    user_id: str, days: int = 7, space_id: Optional[str] = None
+) -> List[Dict[str, Any]]:
     """Fetch tasks completed in the last N days."""
     cutoff = (datetime.utcnow() - timedelta(days=days)).isoformat()
     query: Dict[str, Any] = {
@@ -133,7 +138,9 @@ async def _get_recent_completions(user_id: str, days: int = 7, space_id: Optiona
     return tasks
 
 
-async def _get_recent_journals(user_id: str, days: int = 7, space_id: Optional[str] = None) -> List[Dict[str, Any]]:
+async def _get_recent_journals(
+    user_id: str, days: int = 7, space_id: Optional[str] = None
+) -> List[Dict[str, Any]]:
     """Fetch journal entries from the last N days."""
     cutoff_date = (datetime.utcnow() - timedelta(days=days)).strftime("%Y-%m-%d")
     query: Dict[str, Any] = {
@@ -149,7 +156,9 @@ async def _get_recent_journals(user_id: str, days: int = 7, space_id: Optional[s
     return entries
 
 
-async def _get_stale_tasks(user_id: str, stale_days: int = 3, space_id: Optional[str] = None) -> List[Dict[str, Any]]:
+async def _get_stale_tasks(
+    user_id: str, stale_days: int = 3, space_id: Optional[str] = None
+) -> List[Dict[str, Any]]:
     """Find tasks open for at least ``stale_days`` with no recent activity.
 
     A task is considered stale if:
@@ -179,10 +188,14 @@ async def _get_stale_tasks(user_id: str, stale_days: int = 3, space_id: Optional
     stale: List[Dict[str, Any]] = []
     for t in tasks:
         t["_id"] = str(t["_id"])
-        session = await sessions_collection.find_one({"user_id": user_id, "todo_id": t["_id"]})
+        session = await sessions_collection.find_one(
+            {"user_id": user_id, "todo_id": t["_id"]}
+        )
         if session:
             last_update = session.get("updated_at", datetime.min)
-            if isinstance(last_update, datetime) and last_update > datetime.utcnow() - timedelta(days=stale_days):
+            if isinstance(
+                last_update, datetime
+            ) and last_update > datetime.utcnow() - timedelta(days=stale_days):
                 continue  # Session was recently active — skip
         stale.append(t)
 
@@ -225,7 +238,9 @@ def _build_briefing_prompt(
 
     completion_lines = []
     for t in recent_completions[:15]:
-        completion_lines.append(f"- {t['text']} (completed: {t.get('dateCompleted', 'unknown')})")
+        completion_lines.append(
+            f"- {t['text']} (completed: {t.get('dateCompleted', 'unknown')})"
+        )
 
     journal_lines = []
     for j in recent_journals[:7]:
@@ -278,7 +293,9 @@ async def generate_morning_briefing(
     recent_completions = await _get_recent_completions(user_id, 7, space_id)
     recent_journals = await _get_recent_journals(user_id, 7, space_id)
 
-    prompt = _build_briefing_prompt(open_tasks, recent_completions, recent_journals, user_name)
+    prompt = _build_briefing_prompt(
+        open_tasks, recent_completions, recent_journals, user_name
+    )
 
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
@@ -292,13 +309,18 @@ async def generate_morning_briefing(
         response = await client.chat.completions.create(
             model="gpt-4.1-mini",
             messages=[
-                {"role": "system", "content": "You are a concise, helpful task prioritisation assistant."},
+                {
+                    "role": "system",
+                    "content": "You are a concise, helpful task prioritisation assistant.",
+                },
                 {"role": "user", "content": prompt},
             ],
             max_tokens=600,
             temperature=0.7,
         )
-        return response.choices[0].message.content or _fallback_briefing(open_tasks, recent_completions, user_name)
+        return response.choices[0].message.content or _fallback_briefing(
+            open_tasks, recent_completions, user_name
+        )
     except Exception as e:
         logger.error("OpenAI briefing generation failed: %s", e)
         return _fallback_briefing(open_tasks, recent_completions, user_name)
@@ -338,7 +360,10 @@ def _fallback_briefing(
             lines.append(f"- {t['text']} (due: {t['dueDate']})")
 
     lines.append("")
-    lines.append(f"You completed **{len(recent_completions)}** tasks in the last week. " "Keep up the momentum!")
+    lines.append(
+        f"You completed **{len(recent_completions)}** tasks in the last week. "
+        "Keep up the momentum!"
+    )
     return "\n".join(lines)
 
 
@@ -355,7 +380,10 @@ def generate_stale_task_nudge(task: Dict[str, Any]) -> str:
     except Exception:
         pass
 
-    nudge = f"Hey! Just checking in on **{text}**. " f"This task has been open for {days_old} days. "
+    nudge = (
+        f"Hey! Just checking in on **{text}**. "
+        f"This task has been open for {days_old} days. "
+    )
 
     if task.get("dueDate"):
         due = task["dueDate"]
@@ -381,7 +409,9 @@ def generate_stale_task_nudge(task: Dict[str, Any]) -> str:
 # ---------------------------------------------------------------------------
 
 
-async def post_morning_briefing(user_id: str, space_id: Optional[str] = None) -> Optional[str]:
+async def post_morning_briefing(
+    user_id: str, space_id: Optional[str] = None
+) -> Optional[str]:
     """Generate and post a morning briefing to a new session.
 
     Returns the session_id or None on failure.

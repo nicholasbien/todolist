@@ -32,7 +32,11 @@ class TestSubtasks:
         space_id = await _get_space_id(client, headers)
 
         # Create parent task
-        resp = await client.post("/todos", json={"text": "Parent task", "space_id": space_id}, headers=headers)
+        resp = await client.post(
+            "/todos",
+            json={"text": "Parent task", "space_id": space_id},
+            headers=headers,
+        )
         assert resp.status_code == 200
         parent = resp.json()
         parent_id = parent["_id"]
@@ -59,7 +63,9 @@ class TestSubtasks:
         space_id = await _get_space_id(client, headers)
 
         # Create parent
-        resp = await client.post("/todos", json={"text": "Parent", "space_id": space_id}, headers=headers)
+        resp = await client.post(
+            "/todos", json={"text": "Parent", "space_id": space_id}, headers=headers
+        )
         parent_id = resp.json()["_id"]
 
         # Create 3 subtasks
@@ -67,7 +73,11 @@ class TestSubtasks:
         for i in range(3):
             resp = await client.post(
                 "/todos",
-                json={"text": f"Step {i+1}", "parent_id": parent_id, "space_id": space_id},
+                json={
+                    "text": f"Step {i+1}",
+                    "parent_id": parent_id,
+                    "space_id": space_id,
+                },
                 headers=headers,
             )
             assert resp.status_code == 200
@@ -137,7 +147,9 @@ class TestSubtasks:
         headers = {"Authorization": f"Bearer {token}"}
         space_id = await _get_space_id(client, headers)
 
-        resp = await client.post("/todos", json={"text": "Parent", "space_id": space_id}, headers=headers)
+        resp = await client.post(
+            "/todos", json={"text": "Parent", "space_id": space_id}, headers=headers
+        )
         parent_id = resp.json()["_id"]
 
         # Create 2 subtasks
@@ -145,7 +157,11 @@ class TestSubtasks:
         for i in range(2):
             resp = await client.post(
                 "/todos",
-                json={"text": f"Step {i+1}", "parent_id": parent_id, "space_id": space_id},
+                json={
+                    "text": f"Step {i+1}",
+                    "parent_id": parent_id,
+                    "space_id": space_id,
+                },
                 headers=headers,
             )
             child_ids.append(resp.json()["_id"])
@@ -159,7 +175,9 @@ class TestSubtasks:
         assert parent_fresh["subtask_ids"] == child_ids
 
         # First subtask should be closed
-        todos = (await client.get(f"/todos?space_id={space_id}", headers=headers)).json()
+        todos = (
+            await client.get(f"/todos?space_id={space_id}", headers=headers)
+        ).json()
         closed_subtask = [t for t in todos if t["_id"] == child_ids[0]][0]
         assert closed_subtask["closed"] is True
         assert closed_subtask["completed"] is True
@@ -173,20 +191,28 @@ class TestSubtasks:
         assert parent_fresh["subtask_ids"] == [child_ids[1]]
 
     @pytest.mark.asyncio
-    async def test_completing_subtask_does_not_auto_complete_parent(self, client, test_email):
+    async def test_completing_subtask_does_not_auto_complete_parent(
+        self, client, test_email
+    ):
         """Completing all sub-tasks does NOT auto-complete the parent (agent handles that)."""
         token = await get_token(client, test_email)
         headers = {"Authorization": f"Bearer {token}"}
         space_id = await _get_space_id(client, headers)
 
-        resp = await client.post("/todos", json={"text": "Parent", "space_id": space_id}, headers=headers)
+        resp = await client.post(
+            "/todos", json={"text": "Parent", "space_id": space_id}, headers=headers
+        )
         parent_id = resp.json()["_id"]
 
         subtask_ids = []
         for i in range(2):
             resp = await client.post(
                 "/todos",
-                json={"text": f"Step {i+1}", "parent_id": parent_id, "space_id": space_id},
+                json={
+                    "text": f"Step {i+1}",
+                    "parent_id": parent_id,
+                    "space_id": space_id,
+                },
                 headers=headers,
             )
             subtask_ids.append(resp.json()["_id"])
@@ -231,7 +257,9 @@ class TestSubtasks:
         headers = {"Authorization": f"Bearer {token}"}
         space_id = await _get_space_id(client, headers)
 
-        resp = await client.post("/todos", json={"text": "Parent", "space_id": space_id}, headers=headers)
+        resp = await client.post(
+            "/todos", json={"text": "Parent", "space_id": space_id}, headers=headers
+        )
         parent_id = resp.json()["_id"]
 
         await client.post(
@@ -260,7 +288,9 @@ class TestDependsOn:
         space_id = await _get_space_id(client, headers)
 
         # Create parent
-        resp = await client.post("/todos", json={"text": "Parent", "space_id": space_id}, headers=headers)
+        resp = await client.post(
+            "/todos", json={"text": "Parent", "space_id": space_id}, headers=headers
+        )
         parent_id = resp.json()["_id"]
 
         # Create first subtask (no deps)
@@ -294,7 +324,9 @@ class TestDependsOn:
         headers = {"Authorization": f"Bearer {token}"}
         space_id = await _get_space_id(client, headers)
 
-        resp = await client.post("/todos", json={"text": "Parent", "space_id": space_id}, headers=headers)
+        resp = await client.post(
+            "/todos", json={"text": "Parent", "space_id": space_id}, headers=headers
+        )
         parent_id = resp.json()["_id"]
 
         # Create subtask with bogus dependency
@@ -318,9 +350,13 @@ class TestDependsOn:
         space_id = await _get_space_id(client, headers)
 
         # Create two parents
-        resp = await client.post("/todos", json={"text": "Parent A", "space_id": space_id}, headers=headers)
+        resp = await client.post(
+            "/todos", json={"text": "Parent A", "space_id": space_id}, headers=headers
+        )
         parent_a_id = resp.json()["_id"]
-        resp = await client.post("/todos", json={"text": "Parent B", "space_id": space_id}, headers=headers)
+        resp = await client.post(
+            "/todos", json={"text": "Parent B", "space_id": space_id}, headers=headers
+        )
         parent_b_id = resp.json()["_id"]
 
         # Create subtask under parent A
@@ -369,7 +405,9 @@ class TestDependsOn:
         headers = {"Authorization": f"Bearer {token}"}
         space_id = await _get_space_id(client, headers)
 
-        resp = await client.post("/todos", json={"text": "Parent", "space_id": space_id}, headers=headers)
+        resp = await client.post(
+            "/todos", json={"text": "Parent", "space_id": space_id}, headers=headers
+        )
         parent_id = resp.json()["_id"]
 
         # Create step 1 (no deps)
@@ -411,7 +449,9 @@ class TestDependsOn:
         headers = {"Authorization": f"Bearer {token}"}
         space_id = await _get_space_id(client, headers)
 
-        resp = await client.post("/todos", json={"text": "Parent", "space_id": space_id}, headers=headers)
+        resp = await client.post(
+            "/todos", json={"text": "Parent", "space_id": space_id}, headers=headers
+        )
         parent_id = resp.json()["_id"]
 
         # Create step 1

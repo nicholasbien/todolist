@@ -25,7 +25,8 @@ const DEFAULT_CATEGORIES = ['General'];
 // Single source of truth — used by the fetch listener, tests, and route validation.
 const API_ROUTES = [
   '/todos', '/categories', '/spaces', '/journals', '/insights',
-  '/agent', '/auth', '/email', '/contact', '/export', '/health'
+  '/agent', '/auth', '/email', '/contact', '/export', '/health',
+  '/briefings', '/activity-feed', '/memories', '/memory-logs'
 ];
 
 function isApiPath(pathname) {
@@ -1579,6 +1580,7 @@ async function syncQueue() {
               headers
             });
             if (res && res.ok) {
+              await delTodo(deleteId, authData.userId);
               success = true;
             }
           } else {

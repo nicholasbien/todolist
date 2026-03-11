@@ -2,10 +2,12 @@
 """
 Script to print out the entire todo database in a readable format.
 """
+
 import asyncio
 
-from db import MONGODB_URL, client, db
 from dotenv import load_dotenv
+
+from db import MONGODB_URL, client, db
 
 # Load environment variables
 load_dotenv()

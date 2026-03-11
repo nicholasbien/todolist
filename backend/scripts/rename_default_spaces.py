@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """One-time script to rename default spaces from 'Default' to 'Personal'."""
+
 import asyncio
 import os
 

@@ -47,14 +47,18 @@ async def cleanup_duplicate_defaults():
         # Check if this space has any todos or categories
         space_id_str = str(space["_id"])
         todo_count = await todos_collection.count_documents({"space_id": space_id_str})
-        category_count = await categories_collection.count_documents({"space_id": space_id_str})
+        category_count = await categories_collection.count_documents(
+            {"space_id": space_id_str}
+        )
 
         print(f"  - Todos in this space: {todo_count}")
         print(f"  - Categories in this space: {category_count}")
 
         if todo_count == 0 and category_count == 0:
             print("This Default space is empty and can be safely deleted.")
-            confirmation = input("Delete this empty Default space? (y/N): ").strip().lower()
+            confirmation = (
+                input("Delete this empty Default space? (y/N): ").strip().lower()
+            )
             if confirmation == "y":
                 await spaces_collection.delete_one({"_id": space["_id"]})
                 print("✅ Deleted empty Default space")
@@ -66,9 +70,15 @@ async def cleanup_duplicate_defaults():
         print("Multiple Default spaces found!")
         for i, space in enumerate(default_spaces):
             space_id_str = str(space["_id"])
-            todo_count = await todos_collection.count_documents({"space_id": space_id_str})
-            category_count = await categories_collection.count_documents({"space_id": space_id_str})
-            print(f"  Space {i+1}: ID={space['_id']}, Todos={todo_count}, Categories={category_count}")
+            todo_count = await todos_collection.count_documents(
+                {"space_id": space_id_str}
+            )
+            category_count = await categories_collection.count_documents(
+                {"space_id": space_id_str}
+            )
+            print(
+                f"  Space {i+1}: ID={space['_id']}, Todos={todo_count}, Categories={category_count}"
+            )
 
         print("\nRecommendation: Keep one with data, delete empty ones")
 
@@ -86,14 +96,22 @@ async def migrate_default_space_data():
         space_id_str = str(space["_id"])
 
         # Migrate todos from this space to space_id = None
-        result = await todos_collection.update_many({"space_id": space_id_str}, {"$set": {"space_id": None}})
+        result = await todos_collection.update_many(
+            {"space_id": space_id_str}, {"$set": {"space_id": None}}
+        )
         if result.modified_count > 0:
-            print(f"Migrated {result.modified_count} todos from space {space_id_str} to default space")
+            print(
+                f"Migrated {result.modified_count} todos from space {space_id_str} to default space"
+            )
 
         # Migrate categories from this space to space_id = None
-        result = await categories_collection.update_many({"space_id": space_id_str}, {"$set": {"space_id": None}})
+        result = await categories_collection.update_many(
+            {"space_id": space_id_str}, {"$set": {"space_id": None}}
+        )
         if result.modified_count > 0:
-            print(f"Migrated {result.modified_count} categories from space {space_id_str} to default space")
+            print(
+                f"Migrated {result.modified_count} categories from space {space_id_str} to default space"
+            )
 
 
 async def main():
@@ -101,7 +119,13 @@ async def main():
     await cleanup_duplicate_defaults()
 
     print("\n" + "=" * 50)
-    choice = input("\nDo you want to migrate data from Default spaces to conceptual default? (y/N): ").strip().lower()
+    choice = (
+        input(
+            "\nDo you want to migrate data from Default spaces to conceptual default? (y/N): "
+        )
+        .strip()
+        .lower()
+    )
 
     if choice == "y":
         print("\n📦 Migrating data to conceptual default space...")

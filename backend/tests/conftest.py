@@ -22,6 +22,8 @@ async def client():
     os.environ.setdefault("USE_MOCK_DB", "true")
 
     # Reset database connections to avoid event loop issues between tests
+    from mongomock_motor import AsyncMongoMockClient
+
     import activity_feed
     import auth
     import categories
@@ -31,7 +33,6 @@ async def client():
     import journals
     import spaces
     import todos
-    from mongomock_motor import AsyncMongoMockClient
 
     # Recreate database connections in the current event loop context
     # This ensures each test gets a fresh database connection in the correct event loop
@@ -71,7 +72,9 @@ async def client():
     mcp_sessions.clear()
     mcp_contexts.clear()
 
-    async with httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://testserver") as async_client:
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app), base_url="http://testserver"
+    ) as async_client:
         yield async_client
 
 

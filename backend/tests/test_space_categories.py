@@ -1,6 +1,7 @@
 from datetime import datetime
 
 import pytest
+
 from tests.test_auth import get_verification_code_from_db
 
 
@@ -55,11 +56,19 @@ async def test_space_specific_categories(client, test_email):
     space2_id = await create_test_space(client, token, "Space 2")
 
     # Add custom category to space 1
-    resp = await client.post("/categories", json={"name": "Space1 Category", "space_id": space1_id}, headers=headers)
+    resp = await client.post(
+        "/categories",
+        json={"name": "Space1 Category", "space_id": space1_id},
+        headers=headers,
+    )
     assert resp.status_code == 200
 
     # Add different category to space 2
-    resp = await client.post("/categories", json={"name": "Space2 Category", "space_id": space2_id}, headers=headers)
+    resp = await client.post(
+        "/categories",
+        json={"name": "Space2 Category", "space_id": space2_id},
+        headers=headers,
+    )
     assert resp.status_code == 200
 
     # Verify space 1 categories
@@ -86,7 +95,11 @@ async def test_category_operations_in_spaces(client, test_email):
     space_id = await create_test_space(client, token, "Category Test Space")
 
     # Add a custom category
-    resp = await client.post("/categories", json={"name": "Custom Category", "space_id": space_id}, headers=headers)
+    resp = await client.post(
+        "/categories",
+        json={"name": "Custom Category", "space_id": space_id},
+        headers=headers,
+    )
     assert resp.status_code == 200
 
     # Verify category exists
@@ -97,7 +110,9 @@ async def test_category_operations_in_spaces(client, test_email):
 
     # Rename the category
     resp = await client.put(
-        f"/categories/Custom Category?space_id={space_id}", json={"new_name": "Renamed Category"}, headers=headers
+        f"/categories/Custom Category?space_id={space_id}",
+        json={"new_name": "Renamed Category"},
+        headers=headers,
     )
     assert resp.status_code == 200
 
@@ -109,7 +124,9 @@ async def test_category_operations_in_spaces(client, test_email):
     assert "Custom Category" not in categories
 
     # Delete the category
-    resp = await client.delete(f"/categories/Renamed Category?space_id={space_id}", headers=headers)
+    resp = await client.delete(
+        f"/categories/Renamed Category?space_id={space_id}", headers=headers
+    )
     assert resp.status_code == 200
 
     # Verify deletion worked
@@ -126,7 +143,11 @@ async def test_default_space_category_operations(client, test_email):
     headers = {"Authorization": f"Bearer {token}"}
 
     # Add category to default space
-    resp = await client.post("/categories", json={"name": "Default Space Category", "space_id": None}, headers=headers)
+    resp = await client.post(
+        "/categories",
+        json={"name": "Default Space Category", "space_id": None},
+        headers=headers,
+    )
     assert resp.status_code == 200
 
     # Verify category exists in default space
@@ -137,7 +158,9 @@ async def test_default_space_category_operations(client, test_email):
 
     # Rename category in default space
     resp = await client.put(
-        "/categories/Default Space Category", json={"new_name": "Renamed Default Category"}, headers=headers
+        "/categories/Default Space Category",
+        json={"new_name": "Renamed Default Category"},
+        headers=headers,
     )
     assert resp.status_code == 200
 
@@ -164,11 +187,17 @@ async def test_category_isolation_between_spaces(client, test_email):
 
     # Add same-named category to both spaces
     for space_id in [space1_id, space2_id]:
-        resp = await client.post("/categories", json={"name": "Shared Name", "space_id": space_id}, headers=headers)
+        resp = await client.post(
+            "/categories",
+            json={"name": "Shared Name", "space_id": space_id},
+            headers=headers,
+        )
         assert resp.status_code == 200
 
     # Delete category from space 1
-    resp = await client.delete(f"/categories/Shared Name?space_id={space1_id}", headers=headers)
+    resp = await client.delete(
+        f"/categories/Shared Name?space_id={space1_id}", headers=headers
+    )
     assert resp.status_code == 200
 
     # Verify category still exists in space 2
@@ -194,10 +223,16 @@ async def test_collaborative_category_management(client, test_email, test_email2
 
     # Create space and invite user 2
     space_id = await create_test_space(client, token1, "Collaboration")
-    await client.post(f"/spaces/{space_id}/invite", json={"emails": [test_email2]}, headers=headers1)
+    await client.post(
+        f"/spaces/{space_id}/invite", json={"emails": [test_email2]}, headers=headers1
+    )
 
     # User 1 adds a category
-    resp = await client.post("/categories", json={"name": "Team Category", "space_id": space_id}, headers=headers1)
+    resp = await client.post(
+        "/categories",
+        json={"name": "Team Category", "space_id": space_id},
+        headers=headers1,
+    )
     assert resp.status_code == 200
 
     # User 2 should see the category
@@ -208,7 +243,9 @@ async def test_collaborative_category_management(client, test_email, test_email2
 
     # User 2 can rename the category
     resp = await client.put(
-        f"/categories/Team Category?space_id={space_id}", json={"new_name": "Updated Team Category"}, headers=headers2
+        f"/categories/Team Category?space_id={space_id}",
+        json={"new_name": "Updated Team Category"},
+        headers=headers2,
     )
     assert resp.status_code == 200
 
@@ -229,13 +266,21 @@ async def test_category_todo_relationship_in_spaces(client, test_email):
     space_id = await create_test_space(client, token, "Todo Category Space")
 
     # Add custom category
-    resp = await client.post("/categories", json={"name": "Project Alpha", "space_id": space_id}, headers=headers)
+    resp = await client.post(
+        "/categories",
+        json={"name": "Project Alpha", "space_id": space_id},
+        headers=headers,
+    )
     assert resp.status_code == 200
 
     # Add todo with custom category
     resp = await client.post(
         "/todos",
-        json={"text": "Complete project alpha task", "category": "Project Alpha", "space_id": space_id},
+        json={
+            "text": "Complete project alpha task",
+            "category": "Project Alpha",
+            "space_id": space_id,
+        },
         headers=headers,
     )
     assert resp.status_code == 200
@@ -249,7 +294,9 @@ async def test_category_todo_relationship_in_spaces(client, test_email):
     assert todos[0]["category"] == "Project Alpha"
 
     # Delete the category (should move todos to General)
-    resp = await client.delete(f"/categories/Project Alpha?space_id={space_id}", headers=headers)
+    resp = await client.delete(
+        f"/categories/Project Alpha?space_id={space_id}", headers=headers
+    )
     assert resp.status_code == 200
 
     # Verify todo was moved to General category
@@ -287,7 +334,9 @@ async def test_general_category_recreated_on_delete(client, test_email):
     assert resp.status_code == 200
 
     # Delete the General category if present
-    resp = await client.delete(f"/categories/General?space_id={space_id}", headers=headers)
+    resp = await client.delete(
+        f"/categories/General?space_id={space_id}", headers=headers
+    )
     assert resp.status_code == 200
 
     # General category should be recreated automatically

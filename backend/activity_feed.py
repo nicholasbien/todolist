@@ -48,7 +48,9 @@ async def get_activity_feed(
     ]
 
     try:
-        cursor = todos_collection.find(todo_query).sort("dateAdded", -1).limit(limit * 2)
+        cursor = (
+            todos_collection.find(todo_query).sort("dateAdded", -1).limit(limit * 2)
+        )
         todos = await cursor.to_list(length=limit * 2)
 
         for todo in todos:
@@ -93,7 +95,9 @@ async def get_activity_feed(
         session_query["space_id"] = space_id
 
     try:
-        cursor = sessions_collection.find(session_query).sort("updated_at", -1).limit(limit)
+        cursor = (
+            sessions_collection.find(session_query).sort("updated_at", -1).limit(limit)
+        )
         sessions = await cursor.to_list(length=limit)
 
         session_ids = [str(s["_id"]) for s in sessions]
@@ -194,7 +198,12 @@ def _parse_date(value: Any) -> Optional[datetime]:
     if not isinstance(value, str) or not value:
         return None
     # Try common formats
-    for fmt in ("%Y-%m-%dT%H:%M:%S.%f", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M:%S", "%Y-%m-%d"):
+    for fmt in (
+        "%Y-%m-%dT%H:%M:%S.%f",
+        "%Y-%m-%dT%H:%M:%S",
+        "%Y-%m-%d %H:%M:%S",
+        "%Y-%m-%d",
+    ):
         try:
             return datetime.strptime(value.split("+")[0].rstrip("Z"), fmt)
         except ValueError:

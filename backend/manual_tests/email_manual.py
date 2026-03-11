@@ -2,6 +2,7 @@
 """
 Test script to debug SMTP email issues
 """
+
 import os
 import smtplib
 from email.mime.multipart import MIMEMultipart
@@ -46,7 +47,9 @@ def test_smtp_connection():
         print("✅ SMTP connection successful!")
 
         # Send test email
-        test_email = input("Enter email to send test to (or press Enter to skip): ").strip()
+        test_email = input(
+            "Enter email to send test to (or press Enter to skip): "
+        ).strip()
 
         if test_email:
             print(f"📧 Sending test email to {test_email}...")
@@ -61,9 +64,7 @@ This is a test email from your Todo App SMTP configuration.
 
 If you received this, your email setup is working correctly!
 
-Time: """ + str(
-                __import__("datetime").datetime.now()
-            )
+Time: """ + str(__import__("datetime").datetime.now())
 
             msg.attach(MIMEText(body, "plain"))
 
