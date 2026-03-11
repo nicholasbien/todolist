@@ -89,11 +89,12 @@ class TodolistMCPServer {
           // --- Todo tools ---
           {
             name: 'add_todo',
-            description: 'Add a new todo item. Pass parent_id to create a sub-task of an existing todo. Sub-tasks run in parallel by default. Use depends_on to specify ordering constraints between sibling sub-tasks.',
+            description: 'Add a new todo item. Keep the title (text) short — one line, a few words. Put details, context, and descriptions in the notes field. Pass parent_id to create a sub-task of an existing todo. Sub-tasks run in parallel by default. Use depends_on to specify ordering constraints between sibling sub-tasks.',
             inputSchema: {
               type: 'object',
               properties: {
-                text: { type: 'string', description: 'The todo item text' },
+                text: { type: 'string', description: 'Short task title (keep it to one concise line)' },
+                notes: { type: 'string', description: 'Detailed notes, context, or description for the task (optional). Put any details here instead of in the title.' },
                 space_id: { type: 'string', description: 'Space ID (auto-detected if not provided)' },
                 parent_id: { type: 'string', description: 'Parent todo ID to create as a sub-task (optional).' },
                 depends_on: { type: 'array', items: { type: 'string' }, description: 'Array of sibling sub-task IDs this task depends on (optional). Task starts only after all dependencies complete. Omit for parallel execution.' },
@@ -375,9 +376,10 @@ class TodolistMCPServer {
 
   // --- Todo tools ---
 
-  private async addTodo(args: { text: string; space_id?: string; parent_id?: string; depends_on?: string[] }) {
+  private async addTodo(args: { text: string; notes?: string; space_id?: string; parent_id?: string; depends_on?: string[] }) {
     const spaceId = await this.resolveSpaceId(args.space_id);
     const body: any = { text: args.text, space_id: spaceId };
+    if (args.notes) body.notes = args.notes;
     if (args.parent_id) body.parent_id = args.parent_id;
     if (args.depends_on && args.depends_on.length > 0) body.depends_on = args.depends_on;
     const response = await api.post('/todos', body);
