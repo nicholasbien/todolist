@@ -118,7 +118,7 @@ A Claude Code skill and subagent are available in `.claude/skills/todolist/` for
 ### How It Works
 
 1. Users create tasks with `#claude` in the text (e.g., "Fix login bug #claude")
-2. The backend auto-routes these to `agent_id="claude"` (just like `#openclaw`)
+2. The backend auto-routes these to `agent_id="claude"`
 3. The task manager skill polls for pending sessions every 5 minutes
 4. Each task gets its own subagent worker (runs in background for parallelism)
 5. Follow-up messages from users route back to the correct worker
@@ -143,13 +143,13 @@ A Claude Code skill and subagent are available in `.claude/skills/todolist/` for
 
 The app supports multi-agent routing via `agent_id` on sessions:
 
-| Tag | Agent ID | Handler |
-|-----|----------|---------|
-| `#claude` | `claude` | Claude Code `/todolist` skill |
-| `#openclaw` | `openclaw` | OpenClaw agent |
-| (none) | (none) | Built-in AI agent |
+| Agent ID | Handler |
+|----------|---------|
+| `claude` | Claude Code `/todolist` skill |
+| `openclaw` | OpenClaw agent |
+| (none) | Built-in AI agent |
 
-Agents only see their own claimed sessions + unclaimed ones when polling. This prevents conflicts and double-replies.
+Routing is based on `agent_id`, not hashtags. Agents only see their own claimed sessions + unclaimed ones when polling `GET /agent/sessions/pending?agent_id=<id>`. This prevents conflicts and double-replies.
 
 ### Files
 

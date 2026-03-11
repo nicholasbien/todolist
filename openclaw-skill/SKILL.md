@@ -175,19 +175,6 @@ curl -s -X POST -H "Authorization: Bearer $TODOLIST_AUTH_TOKEN" \
 
 Posting as `assistant` clears the pending flag and notifies the user. The `agent_id` claims the session so followups route back to openclaw.
 
-### Pause Polling Until Human Responds
-
-When asking the user a question and you need their answer before continuing, pass `needs_human_response: true`:
-
-```bash
-curl -s -X POST -H "Authorization: Bearer $TODOLIST_AUTH_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"content": "Which option do you prefer: A or B?", "role": "assistant", "agent_id": "openclaw", "needs_human_response": true}' \
-  "${TODOLIST_API_URL:-https://app.todolist.nyc}/agent/sessions/SESSION_ID/messages" | jq '.'
-```
-
-This sets `needs_human_response=true` on the session and clears `needs_agent_response`, effectively removing the session from the pending queue. When the human replies, `needs_human_response` is cleared and `needs_agent_response` is set back to true, so the session reappears in your next poll.
-
 ### Post a Progress Update (Interim)
 
 ```bash
@@ -236,12 +223,11 @@ curl -s -X DELETE -H "Authorization: Bearer $TODOLIST_AUTH_TOKEN" \
 
 ### Responding to Pending Sessions (Agent Loop)
 
-**How tasks get assigned:** Users assign tasks to OpenClaw in two ways:
+**Routing source of truth:** `GET /agent/sessions/pending?agent_id=openclaw`
 
-1. **Agent dropdown** (primary) — when creating a task, the user selects "OpenClaw" from a dropdown. This stamps `agent_id=openclaw` on the session at creation time.
-2. **`#openclaw` hashtag** (fallback) — users can include `#openclaw` in the task text. The backend auto-detects this and sets `agent_id=openclaw`.
+Sessions assigned to OpenClaw arrive with `agent_id=openclaw`; when OpenClaw replies, it claims routing for followups.
 
-Either way, the session arrives pre-routed when you poll. The built-in agent handles everything else.
+Backend behavior: polling pending sessions with `agent_id=openclaw` returns sessions already claimed by OpenClaw plus unclaimed sessions.
 
 **Agent routing:** Sessions support an `agent_id` field. When you reply to a session, always include `agent_id=openclaw` — this claims the session so that followup messages from the user route back to you instead of the built-in agent.
 
@@ -363,7 +349,7 @@ openclaw cron add \
   --name "todolist-watcher" \
   --every "5m" \
   --session isolated \
-  --message "Check for pending TodoList sessions and respond to them. Use the todolist skill. Follow the 'Responding to Pending Sessions' workflow: poll pending sessions with agent_id=openclaw. Handle sessions where is_followup is true (check recent_messages for context). Handle new sessions with agent_id=openclaw (pre-routed via dropdown). For unclaimed sessions, check todo text for #openclaw — skip if absent. Post an interim ack before starting work. Always reply with agent_id=openclaw to claim sessions. If there are no pending sessions, do nothing."
+  --message "Check for pending TodoList sessions and respond to them. Use the todolist skill. Follow the 'Responding to Pending Sessions' workflow: routing source of truth is GET /agent/sessions/pending?agent_id=openclaw. This returns sessions claimed by openclaw plus unclaimed sessions. Do not require extra #openclaw filtering. Use is_followup/recent_messages for followups, post an interim ack before work, and always reply with agent_id=openclaw to claim routing. If there are no pending sessions, do nothing."
 ```
 
 This creates an isolated session every 5 minutes that checks for work. Adjust the interval based on user preference.
