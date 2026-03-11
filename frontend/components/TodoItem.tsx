@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Check, RotateCcw, X, MessageCircle, Clock, User, Bot, UserCircle, Repeat } from "lucide-react";
+import ImageThumbnails from './ImageThumbnails';
 
 interface SubtaskItem {
   _id: string;
@@ -163,6 +164,9 @@ export default function TodoItem({
               todo.text
             )}
           </p>
+          {todo.image_ids && todo.image_ids.length > 0 && (
+            <ImageThumbnails imageIds={todo.image_ids} size="small" />
+          )}
           {subtaskCount != null && subtaskCount > 0 && (
             <p className="text-xs text-gray-400 mt-1">
               {subtaskDoneCount || 0}/{subtaskCount} sub-tasks done

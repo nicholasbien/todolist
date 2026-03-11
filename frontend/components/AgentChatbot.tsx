@@ -4,6 +4,7 @@ import { ChevronDown, ArrowLeft, CheckCircle2, RotateCcw } from 'lucide-react';
 import { MessageRenderer, PlainTextRenderer } from './MessageRenderer';
 import { getStreamingBackendUrl } from '../utils/api';
 import AgentMemoryViewer from './AgentMemoryViewer';
+import ImageThumbnails from './ImageThumbnails';
 
 interface ChatbotProps {
   activeSpace: any;
@@ -37,7 +38,7 @@ export default function AgentChatbot({
   onNavigateToTasks,
 }: ChatbotProps) {
   const [question, setQuestion] = useState('');
-  const [messages, setMessages] = useState<{ role: string; content: string; toolData?: any; agent_id?: string }[]>([]);
+  const [messages, setMessages] = useState<{ role: string; content: string; toolData?: any; agent_id?: string; image_ids?: string[] }[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [thinkingDots, setThinkingDots] = useState(0);
@@ -1001,6 +1002,9 @@ export default function AgentChatbot({
                 <MessageRenderer content={msg.content} className="text-base" />
               ) : (
                 <PlainTextRenderer content={msg.content} className="text-sm" />
+              )}
+              {msg.image_ids && msg.image_ids.length > 0 && (
+                <ImageThumbnails imageIds={msg.image_ids} size="medium" />
               )}
             </div>
           </div>
