@@ -73,6 +73,7 @@ from todos import (
     complete_todo,
     create_todo,
     delete_todo,
+    get_subtasks,
     get_todos,
     handle_subtask_completion,
     health_check,
@@ -1126,8 +1127,6 @@ async def api_get_subtasks(
     current_user: dict = Depends(get_current_user),
 ):
     """Get subtasks of a parent todo, ordered by the parent's subtask_ids array."""
-    from todos import get_subtasks
-
     return await get_subtasks(todo_id)
 
 

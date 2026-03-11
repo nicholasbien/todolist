@@ -233,3 +233,198 @@ class TestSubtasks:
         # But the child has parent_id set for frontend filtering
         child = [t for t in todos if t.get("parent_id")][0]
         assert child["parent_id"] == parent_id
+
+
+class TestDependsOn:
+    """Tests for the depends_on subtask dependency feature."""
+
+    @pytest.mark.asyncio
+    async def test_create_subtask_with_valid_dependency(self, client, test_email):
+        """A subtask can depend on an existing sibling subtask."""
+        token = await get_token(client, test_email)
+        headers = {"Authorization": f"Bearer {token}"}
+        space_id = await _get_space_id(client, headers)
+
+        # Create parent
+        resp = await client.post("/todos", json={"text": "Parent", "space_id": space_id}, headers=headers)
+        parent_id = resp.json()["_id"]
+
+        # Create first subtask (no deps)
+        resp = await client.post(
+            "/todos",
+            json={"text": "Step 1", "parent_id": parent_id, "space_id": space_id},
+            headers=headers,
+        )
+        assert resp.status_code == 200
+        step1_id = resp.json()["_id"]
+
+        # Create second subtask that depends on first
+        resp = await client.post(
+            "/todos",
+            json={
+                "text": "Step 2",
+                "parent_id": parent_id,
+                "space_id": space_id,
+                "depends_on": [step1_id],
+            },
+            headers=headers,
+        )
+        assert resp.status_code == 200
+        step2 = resp.json()
+        assert step2["depends_on"] == [step1_id]
+
+    @pytest.mark.asyncio
+    async def test_depends_on_rejects_nonexistent_id(self, client, test_email):
+        """depends_on with a non-existent ID is rejected."""
+        token = await get_token(client, test_email)
+        headers = {"Authorization": f"Bearer {token}"}
+        space_id = await _get_space_id(client, headers)
+
+        resp = await client.post("/todos", json={"text": "Parent", "space_id": space_id}, headers=headers)
+        parent_id = resp.json()["_id"]
+
+        # Create subtask with bogus dependency
+        resp = await client.post(
+            "/todos",
+            json={
+                "text": "Step 1",
+                "parent_id": parent_id,
+                "space_id": space_id,
+                "depends_on": ["000000000000000000000000"],
+            },
+            headers=headers,
+        )
+        assert resp.status_code == 500  # wraps 400
+
+    @pytest.mark.asyncio
+    async def test_depends_on_rejects_non_sibling(self, client, test_email):
+        """depends_on with a subtask from a different parent is rejected."""
+        token = await get_token(client, test_email)
+        headers = {"Authorization": f"Bearer {token}"}
+        space_id = await _get_space_id(client, headers)
+
+        # Create two parents
+        resp = await client.post("/todos", json={"text": "Parent A", "space_id": space_id}, headers=headers)
+        parent_a_id = resp.json()["_id"]
+        resp = await client.post("/todos", json={"text": "Parent B", "space_id": space_id}, headers=headers)
+        parent_b_id = resp.json()["_id"]
+
+        # Create subtask under parent A
+        resp = await client.post(
+            "/todos",
+            json={"text": "A-child", "parent_id": parent_a_id, "space_id": space_id},
+            headers=headers,
+        )
+        a_child_id = resp.json()["_id"]
+
+        # Try to create subtask under parent B depending on parent A's child
+        resp = await client.post(
+            "/todos",
+            json={
+                "text": "B-child",
+                "parent_id": parent_b_id,
+                "space_id": space_id,
+                "depends_on": [a_child_id],
+            },
+            headers=headers,
+        )
+        assert resp.status_code == 500  # wraps 400
+
+    @pytest.mark.asyncio
+    async def test_depends_on_without_parent_id_rejected(self, client, test_email):
+        """depends_on without parent_id is rejected (only subtasks can have deps)."""
+        token = await get_token(client, test_email)
+        headers = {"Authorization": f"Bearer {token}"}
+        space_id = await _get_space_id(client, headers)
+
+        resp = await client.post(
+            "/todos",
+            json={
+                "text": "Top-level with deps",
+                "space_id": space_id,
+                "depends_on": ["000000000000000000000000"],
+            },
+            headers=headers,
+        )
+        assert resp.status_code == 500  # wraps 400
+
+    @pytest.mark.asyncio
+    async def test_circular_dependency_rejected(self, client, test_email):
+        """Circular dependencies (A->B->A) are rejected."""
+        token = await get_token(client, test_email)
+        headers = {"Authorization": f"Bearer {token}"}
+        space_id = await _get_space_id(client, headers)
+
+        resp = await client.post("/todos", json={"text": "Parent", "space_id": space_id}, headers=headers)
+        parent_id = resp.json()["_id"]
+
+        # Create step 1 (no deps)
+        resp = await client.post(
+            "/todos",
+            json={"text": "Step 1", "parent_id": parent_id, "space_id": space_id},
+            headers=headers,
+        )
+        step1_id = resp.json()["_id"]
+
+        # Create step 2 depending on step 1
+        resp = await client.post(
+            "/todos",
+            json={
+                "text": "Step 2",
+                "parent_id": parent_id,
+                "space_id": space_id,
+                "depends_on": [step1_id],
+            },
+            headers=headers,
+        )
+        assert resp.status_code == 200
+        step2_id = resp.json()["_id"]
+
+        # Now try to update step 1 to depend on step 2 (would create cycle)
+        # We test this via the update endpoint
+        resp = await client.put(
+            f"/todos/{step1_id}",
+            json={"depends_on": [step2_id]},
+            headers=headers,
+        )
+        # Should fail due to circular dependency
+        assert resp.status_code in (400, 500)
+
+    @pytest.mark.asyncio
+    async def test_delete_subtask_cleans_depends_on(self, client, test_email):
+        """Deleting a subtask removes it from siblings' depends_on arrays."""
+        token = await get_token(client, test_email)
+        headers = {"Authorization": f"Bearer {token}"}
+        space_id = await _get_space_id(client, headers)
+
+        resp = await client.post("/todos", json={"text": "Parent", "space_id": space_id}, headers=headers)
+        parent_id = resp.json()["_id"]
+
+        # Create step 1
+        resp = await client.post(
+            "/todos",
+            json={"text": "Step 1", "parent_id": parent_id, "space_id": space_id},
+            headers=headers,
+        )
+        step1_id = resp.json()["_id"]
+
+        # Create step 2 depending on step 1
+        resp = await client.post(
+            "/todos",
+            json={
+                "text": "Step 2",
+                "parent_id": parent_id,
+                "space_id": space_id,
+                "depends_on": [step1_id],
+            },
+            headers=headers,
+        )
+        step2_id = resp.json()["_id"]
+
+        # Delete step 1
+        resp = await client.delete(f"/todos/{step1_id}", headers=headers)
+        assert resp.status_code == 200
+
+        # Step 2's depends_on should now be empty
+        step2_fresh = await _get_todo(client, headers, space_id, step2_id)
+        assert step2_fresh["depends_on"] == []
