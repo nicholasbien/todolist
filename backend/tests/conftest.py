@@ -37,6 +37,8 @@ async def client():
     db.client = AsyncMongoMockClient()
     db.db = db.client.todo_db
 
+    import briefings
+
     # Update all module collection references to use the new shared connection
     auth.users_collection = db.db.users
     auth.sessions_collection = db.db.sessions
@@ -48,6 +50,9 @@ async def client():
     journals.journals_collection = db.db.journals
     chat_sessions.sessions_collection = db.db.chat_sessions
     chat_sessions.trajectories_collection = db.db.chat_trajectories
+    briefings.users_collection = db.db.users
+    briefings.todos_collection = db.db.todos
+    briefings.journals_collection = db.db.journals
 
     # Clear global MCP session state to prevent stale connections across tests
     from agent.agent import mcp_contexts, mcp_sessions

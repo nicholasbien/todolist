@@ -77,6 +77,11 @@ class User(BaseModel):
     timezone: str = "America/New_York"
     email_enabled: bool = False
     email_spaces: List[str] = []
+    # Proactive briefing preferences
+    briefing_enabled: bool = False
+    briefing_hour: int = 8
+    briefing_minute: int = 0
+    stale_task_days: int = 3
 
     class Config:
         arbitrary_types_allowed = True
@@ -123,6 +128,11 @@ class UserResponse(BaseModel):
     timezone: str = "America/New_York"
     email_enabled: bool = False
     email_spaces: List[str] = []
+    # Proactive briefing preferences
+    briefing_enabled: bool = False
+    briefing_hour: int = 8
+    briefing_minute: int = 0
+    stale_task_days: int = 3
 
     @classmethod
     def from_db(cls, user_dict: dict) -> "UserResponse":
@@ -137,6 +147,10 @@ class UserResponse(BaseModel):
             timezone=user_dict.get("timezone", "America/New_York"),
             email_enabled=user_dict.get("email_enabled", False),
             email_spaces=user_dict.get("email_spaces", []),
+            briefing_enabled=user_dict.get("briefing_enabled", False),
+            briefing_hour=user_dict.get("briefing_hour", 8),
+            briefing_minute=user_dict.get("briefing_minute", 0),
+            stale_task_days=user_dict.get("stale_task_days", 3),
         )
 
 
@@ -395,6 +409,10 @@ async def verify_session(token: str) -> dict:
             "timezone": user.get("timezone", "America/New_York"),
             "email_enabled": user.get("email_enabled", False),
             "email_spaces": user.get("email_spaces", []),
+            "briefing_enabled": user.get("briefing_enabled", False),
+            "briefing_hour": user.get("briefing_hour", 8),
+            "briefing_minute": user.get("briefing_minute", 0),
+            "stale_task_days": user.get("stale_task_days", 3),
         }
 
     except HTTPException:
