@@ -10,7 +10,7 @@ export default function HomePage() {
         <meta name="description" content="Smart task management with AI categorization, collaborative spaces, and offline-first PWA." />
       </Head>
 
-      <div className="min-h-screen min-h-[100dvh] bg-zinc-950">
+      <div className="min-h-screen min-h-[100dvh] bg-background">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           {/* Header */}
           <header className="text-center pt-20 pb-16">

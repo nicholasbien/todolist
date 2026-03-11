@@ -2,9 +2,53 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Theme CSS variables - using space-separated RGB for Tailwind opacity support */
+:root,
+[data-theme="dark"] {
+  --color-background: 28 28 28;       /* #1c1c1c */
+  --color-surface: 36 36 36;          /* #242424 */
+  --color-foreground: 243 242 239;    /* #f3f2ef */
+  --color-muted: 168 162 158;         /* #a8a29e */
+  --color-gray-100: 243 244 246;
+  --color-gray-200: 229 231 235;
+  --color-gray-300: 209 213 219;
+  --color-gray-400: 156 163 175;
+  --color-gray-500: 107 114 128;
+  --color-gray-600: 75 85 99;
+  --color-gray-700: 55 65 81;
+  --color-gray-800: 31 41 55;
+  --color-gray-900: 17 24 39;
+  --color-black: 0 0 0;
+  --color-white: 255 255 255;
+  --scrollbar-thumb: #444;
+  --select-bg: #242424;
+}
+
+[data-theme="light"] {
+  --color-background: 245 245 240;    /* #f5f5f0 */
+  --color-surface: 255 255 255;       /* #ffffff */
+  --color-foreground: 28 28 28;       /* #1c1c1c */
+  --color-muted: 107 114 128;        /* #6b7280 */
+  --color-gray-100: 31 41 55;        /* inverted: dark text */
+  --color-gray-200: 55 65 81;
+  --color-gray-300: 75 85 99;
+  --color-gray-400: 107 114 128;
+  --color-gray-500: 156 163 175;
+  --color-gray-600: 209 213 219;
+  --color-gray-700: 229 231 235;
+  --color-gray-800: 232 232 227;     /* #e8e8e3 */
+  --color-gray-900: 240 240 235;     /* #f0f0eb */
+  --color-black: 255 255 255;        /* inverted */
+  --color-white: 28 28 28;           /* inverted */
+  --scrollbar-thumb: #c0c0c0;
+  --select-bg: #ffffff;
+}
+
 html,
 body {
-  @apply bg-background text-foreground font-serif;
+  background-color: rgb(var(--color-background));
+  color: rgb(var(--color-foreground));
+  @apply font-serif;
   overflow-x: hidden;
   /* Prevent bounce scrolling on iOS */
   overscroll-behavior-y: none;
@@ -30,10 +74,10 @@ body {
   animation: fade-in 0.3s ease-out;
 }
 
-/* Dark, subtle scrollbar styling */
+/* Subtle scrollbar styling */
 .custom-scrollbar {
   scrollbar-width: thin;
-  scrollbar-color: #444 transparent; /* firefox */
+  scrollbar-color: var(--scrollbar-thumb) transparent;
 }
 .custom-scrollbar::-webkit-scrollbar {
   width: 8px;
@@ -42,7 +86,7 @@ body {
   background: transparent;
 }
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background-color: #444;
+  background-color: var(--scrollbar-thumb);
   border-radius: 4px;
 }
 
@@ -67,4 +111,10 @@ body {
 body.modal-open {
   overflow: hidden;
   touch-action: none;
+}
+
+/* Theme-aware select elements */
+select option {
+  background-color: var(--select-bg);
+  color: rgb(var(--color-foreground));
 }

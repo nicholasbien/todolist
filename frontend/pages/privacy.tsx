@@ -8,7 +8,7 @@ export default function PrivacyPage() {
         <title>Privacy Policy - todolist.nyc</title>
       </Head>
 
-      <div className="min-h-screen min-h-[100dvh] bg-zinc-950">
+      <div className="min-h-screen min-h-[100dvh] bg-background">
         <div className="max-w-4xl mx-auto px-4 py-12">
           <Link href="/home" className="text-accent hover:text-accent-light mb-8 inline-block transition-colors">
             ← Back to Home

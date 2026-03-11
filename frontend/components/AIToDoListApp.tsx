@@ -9,6 +9,7 @@ import JournalComponent from "./JournalComponent";
 import SpaceDropdown from "./SpaceDropdown";
 import { sortSpaces } from "../utils/spaceUtils";
 import { loadSortModePreference, saveSortModePreference, type SortMode } from "../utils/sortPreferences";
+import { useTheme } from "../context/ThemeContext";
 import SwipeableViews from "react-swipeable-views-react-18-fix";
 import {
   DndContext,
@@ -99,6 +100,7 @@ export default function AIToDoListApp({
   isOffline,
 }: Props) {
   const { logout, clearAuthExpired, authenticatedFetch } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const [todos, setTodos] = useState<any[]>([]);
   const [newTodo, setNewTodo] = useState("");
   const [isNewTodoFocused, setIsNewTodoFocused] = useState(false);
@@ -1362,6 +1364,7 @@ export default function AIToDoListApp({
                 else if (action === 'insights') onShowInsights?.();
                 else if (action === 'export') onShowExportModal?.();
                 else if (action === 'contact') onShowContactModal?.();
+                else if (action === 'theme') toggleTheme();
                 else if (action === 'logout') onLogout?.();
               }}
               className="bg-transparent text-gray-100 text-sm rounded border-0 focus:outline-none cursor-pointer"
@@ -1371,6 +1374,7 @@ export default function AIToDoListApp({
               <option value="account">Account</option>
               <option value="email">Email Settings</option>
               <option value="insights">Insights</option>
+              <option value="theme">{theme === 'dark' ? 'Light Mode' : 'Dark Mode'}</option>
               <option value="export">Export Data</option>
               <option value="contact">Contact</option>
               <option value="logout">Logout</option>

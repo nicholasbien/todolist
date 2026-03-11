@@ -177,7 +177,7 @@ function LoginForm({ onLogin }: LoginFormProps) {
   };
 
   return (
-    <div className="min-h-screen bg-zinc-950 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <div className="max-w-md w-full">
         <div className="bg-black border border-gray-800 rounded-xl shadow-2xl p-8">
         <div className="text-center mb-8">
@@ -538,7 +538,7 @@ export default function Home() {
         <Head>
           <title>todolist</title>
         </Head>
-        <main className="min-h-screen bg-zinc-950 text-white flex items-center justify-center">
+        <main className="min-h-screen bg-background text-white flex items-center justify-center">
           <div className="animate-pulse text-center">Loading...</div>
         </main>
       </>
@@ -561,7 +561,7 @@ export default function Home() {
       <Head>
         <title>todolist</title>
       </Head>
-      <main className="h-screen h-[100dvh] overflow-hidden bg-zinc-950 text-white">
+      <main className="h-screen h-[100dvh] overflow-hidden bg-background text-white">
         <AIToDoListApp
           user={user}
           token={token!}
