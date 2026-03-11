@@ -23,6 +23,8 @@ interface SessionMeta {
   agent_id?: string;
 }
 
+const BUILT_IN_AGENT_ID = 'claude';
+
 const AGENTS = [
   { id: 'claude', label: 'Claude' },
   { id: 'openclaw', label: 'OpenClaw' },
@@ -211,7 +213,7 @@ export default function AgentChatbot({
         const agentId = data.agent_id || null;
         setSessionAgentId(agentId);
         setNeedsHumanResponse(!!data.needs_human_response);
-        if (lastMsg?.role === 'user' && !agentId) {
+        if (lastMsg?.role === 'user' && (!agentId || agentId === BUILT_IN_AGENT_ID)) {
           // Don't pre-populate messages — let handleStreamingAsk add the user message itself
           // Show any earlier messages (if multi-turn), but skip the last user message
           const earlier = displayMessages.slice(0, -1);
@@ -281,7 +283,7 @@ export default function AgentChatbot({
   }, [messages, isActive, loading, needsHumanResponse]);
 
   // Whether we're waiting for an external agent (e.g. openclaw) to respond
-  const isWaitingForExternalAgent = sessionAgentId && currentSessionId && messages.length > 0 && messages[messages.length - 1]?.role === 'user';
+  const isWaitingForExternalAgent = sessionAgentId && sessionAgentId !== BUILT_IN_AGENT_ID && currentSessionId && messages.length > 0 && messages[messages.length - 1]?.role === 'user';
 
   // Thinking dots animation
   useEffect(() => {
@@ -481,6 +483,12 @@ export default function AgentChatbot({
 
     // Direct agent chat: create a new session for the selected agent
     if (selectedAgentId && !currentSessionId) {
+      // Built-in agent (claude): use the streaming path instead of external agent flow
+      if (selectedAgentId === BUILT_IN_AGENT_ID) {
+        setSelectedAgentId(null);
+        handleStreamingAsk(userMessage);
+        return;
+      }
       setMessages((prev) => [...prev, { role: 'user', content: userMessage }]);
       try {
         const res = await fetch('/agent/sessions', {
@@ -505,8 +513,9 @@ export default function AgentChatbot({
     }
 
     // If session is owned by an external agent, post via messaging API
-    // so the external agent picks it up (don't stream to built-in agent)
-    if (sessionAgentId && currentSessionId) {
+    // so the external agent picks it up (don't stream to built-in agent).
+    // Sessions tagged with the built-in agent ID should still use streaming.
+    if (sessionAgentId && sessionAgentId !== BUILT_IN_AGENT_ID && currentSessionId) {
       setMessages((prev) => [...prev, { role: 'user', content: userMessage }]);
       setNeedsHumanResponse(false);
       try {
