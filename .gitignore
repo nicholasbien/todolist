@@ -31,7 +31,7 @@ frontend/.claude/
 .playwright-mcp/
 
 # Screenshots (dev artifacts, not app assets)
-/screenshots/
+screenshots/
 
 # iOS build artifacts
 frontend/ios/App/.DS_Store
