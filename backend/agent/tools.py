@@ -31,6 +31,7 @@ from .schemas import (  # noqa: E402
     MemoryListRequest,
     MemorySaveRequest,
     SearchRequest,
+    SearchSessionsRequest,
     SendEmailRequest,
     TaskAddRequest,
     TaskListRequest,
@@ -628,6 +629,19 @@ async def delete_memory_tool(
         return {"ok": False, "error": f"Failed to delete memory: {str(e)}"}
 
 
+async def search_sessions_tool(
+    request: SearchSessionsRequest, user_id: str, space_id: Optional[str] = None
+) -> Dict[str, Any]:
+    """Search chat sessions by title and message content."""
+    try:
+        from chat_sessions import search_sessions
+
+        results = await search_sessions(user_id, request.query, space_id, request.limit)
+        return {"ok": True, "results": results, "count": len(results)}
+    except Exception as e:
+        return {"ok": False, "error": f"Failed to search sessions: {str(e)}"}
+
+
 # Tool registry for easy access
 AVAILABLE_TOOLS: Dict[str, Dict[str, Any]] = {
     "add_task": {"func": add_task, "description": "Add a new task to user's todo list", "schema": TaskAddRequest},
@@ -677,5 +691,10 @@ AVAILABLE_TOOLS: Dict[str, Dict[str, Any]] = {
         "func": delete_memory_tool,
         "description": "Delete a specific memory fact",
         "schema": MemoryDeleteRequest,
+    },
+    "search_sessions": {
+        "func": search_sessions_tool,
+        "description": "Search chat sessions by title and message content",
+        "schema": SearchSessionsRequest,
     },
 }
