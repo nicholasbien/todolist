@@ -297,9 +297,22 @@ async def test_todo_operations_in_collaborative_space(client, test_email, test_e
         assert todos[0]["category"] == "Personal"
         assert todos[0]["priority"] == "High"
 
-    # User 2 deletes the todo created by User 1
+    # User 2 soft-deletes (closes) the todo created by User 1
     delete_resp = await client.delete(f"/todos/{todo_id}", headers=headers2)
     assert delete_resp.status_code == 200
+
+    # Both users should see the todo is now closed and completed
+    for headers in [headers1, headers2]:
+        todos_resp = await client.get(f"/todos?space_id={space_id}", headers=headers)
+        assert todos_resp.status_code == 200
+        todos = todos_resp.json()
+        assert len(todos) == 1
+        assert todos[0]["closed"] is True
+        assert todos[0]["completed"] is True
+
+    # User 2 permanently deletes the todo
+    perm_delete_resp = await client.delete(f"/todos/{todo_id}/permanent", headers=headers2)
+    assert perm_delete_resp.status_code == 200
 
     # Both users should see the todo is gone
     for headers in [headers1, headers2]:

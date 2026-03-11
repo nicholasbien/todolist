@@ -77,6 +77,7 @@ from todos import (
     get_todos,
     handle_subtask_completion,
     health_check,
+    permanent_delete_todo,
     todos_collection,
     update_todo_fields,
 )
@@ -536,8 +537,14 @@ async def api_reorder_todos(request: Request, current_user: dict = Depends(get_c
 
 @app.delete("/todos/{todo_id}")
 async def api_delete_todo(todo_id: str, current_user: dict = Depends(get_current_user)):
-    logger.info(f"Deleting todo with ID: {todo_id} for user: {current_user['email']}")
+    logger.info(f"Soft-deleting (closing) todo with ID: {todo_id} for user: {current_user['email']}")
     return await delete_todo(todo_id, current_user["user_id"])
+
+
+@app.delete("/todos/{todo_id}/permanent")
+async def api_permanent_delete_todo(todo_id: str, current_user: dict = Depends(get_current_user)):
+    logger.info(f"Permanently deleting todo with ID: {todo_id} for user: {current_user['email']}")
+    return await permanent_delete_todo(todo_id, current_user["user_id"])
 
 
 @app.put("/todos/{todo_id}/complete")

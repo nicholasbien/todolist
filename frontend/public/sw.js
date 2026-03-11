@@ -1192,8 +1192,8 @@ async function handleOfflineRequest(request, url) {
     }
   }
 
-  // Delete todo
-  if (request.method === 'DELETE' && apiPath.startsWith('/todos/')) {
+  // Permanent delete todo (actual DB removal)
+  if (request.method === 'DELETE' && apiPath.match(/^\/todos\/[^/]+\/permanent$/)) {
     const id = apiPath.split('/')[2];
     const existingTodos = await getTodos(authData.userId);
     const todoExists = existingTodos.find(t => t._id === id);
@@ -1202,7 +1202,6 @@ async function handleOfflineRequest(request, url) {
       await delTodo(id, authData.userId);
 
       if (id.startsWith('offline_')) {
-        // Remove the CREATE operation from queue to prevent resurrection (Bug 6 fix: atomic removal)
         const queue = await readQueue(authData.userId);
         for (const op of queue) {
           if (op.type === 'CREATE' && op.data._id === id) {
@@ -1210,9 +1209,50 @@ async function handleOfflineRequest(request, url) {
           }
         }
       } else {
-        await addQueue({ type: 'DELETE', data: { _id: id } }, authData.userId);
+        await addQueue({ type: 'PERMANENT_DELETE', data: { _id: id } }, authData.userId);
       }
       return new Response(null, { status: 204 });
+    } else {
+      return new Response(JSON.stringify({ error: 'Todo not found' }), {
+        status: 404, headers: { 'Content-Type': 'application/json' }
+      });
+    }
+  }
+
+  // Soft-delete todo (mark as closed)
+  if (request.method === 'DELETE' && apiPath.startsWith('/todos/')) {
+    const id = apiPath.split('/')[2];
+    const existingTodos = await getTodos(authData.userId);
+    const todoExists = existingTodos.find(t => t._id === id);
+
+    if (todoExists) {
+      const now = new Date().toISOString();
+      const updated = { ...todoExists, closed: true, dateClosed: now, completed: true, dateCompleted: now };
+      await putTodo(updated, authData.userId);
+
+      // Also close subtasks
+      if (todoExists.subtask_ids && todoExists.subtask_ids.length > 0) {
+        const allTodos = await getTodos(authData.userId);
+        for (const st of allTodos) {
+          if (st.parent_id === id) {
+            const updatedSt = { ...st, closed: true, dateClosed: now, completed: true, dateCompleted: now };
+            await putTodo(updatedSt, authData.userId);
+          }
+        }
+      }
+
+      if (id.startsWith('offline_')) {
+        // Update the CREATE operation in queue to include closed status
+        const queue = await readQueue(authData.userId);
+        for (const op of queue) {
+          if ((op.type === 'CREATE' || op.type === 'UPDATE') && op.data._id === id) {
+            await updateQueueItem(op.id, { ...op, data: { ...op.data, closed: true, dateClosed: now, completed: true, dateCompleted: now }, timestamp: Date.now() }, authData.userId);
+          }
+        }
+      } else {
+        await addQueue({ type: 'DELETE', data: { _id: id } }, authData.userId);
+      }
+      return new Response(JSON.stringify({ message: 'Todo closed' }), { headers: { 'Content-Type': 'application/json' } });
     } else {
       return new Response(JSON.stringify({ error: 'Todo not found' }), {
         status: 404, headers: { 'Content-Type': 'application/json' }
@@ -1539,13 +1579,33 @@ async function syncQueue() {
               headers
             });
             if (res && res.ok) {
-              await delTodo(deleteId, authData.userId);
               success = true;
             }
           } else {
             // Unmapped offline ID — keep in queue until CREATE succeeds and mapping exists
             deferred = true;
             console.log(`⏳ Deferring DELETE for unmapped offline ID: ${op.data._id}`);
+          }
+          break;
+        case 'PERMANENT_DELETE':
+          let permDeleteId = op.data._id;
+          if (permDeleteId.startsWith('offline_') && idMap[permDeleteId]) {
+            permDeleteId = idMap[permDeleteId];
+            console.log(`🗺️ Translating PERMANENT_DELETE ID: ${op.data._id} -> ${permDeleteId}`);
+          }
+
+          if (!permDeleteId.startsWith('offline_')) {
+            res = await fetch(`${backendUrl}/todos/${permDeleteId}/permanent`, {
+              method: 'DELETE',
+              headers
+            });
+            if (res && res.ok) {
+              await delTodo(permDeleteId, authData.userId);
+              success = true;
+            }
+          } else {
+            deferred = true;
+            console.log(`⏳ Deferring PERMANENT_DELETE for unmapped offline ID: ${op.data._id}`);
           }
           break;
         case 'CREATE_CATEGORY':
