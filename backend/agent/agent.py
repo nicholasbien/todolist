@@ -45,7 +45,7 @@ router = APIRouter(prefix="/agent")
 _prompts_dir = os.path.join(os.path.dirname(__file__), "..", "prompts")
 _jinja_env = jinja2.Environment(
     loader=jinja2.FileSystemLoader(_prompts_dir),
-    autoescape=False,
+    autoescape=True,
     keep_trailing_newline=True,
 )
 
@@ -448,15 +448,9 @@ async def stream_agent_response(
                     stream=True,
                 )
             except Exception as api_error:
-                logger.error(f"OpenAI API Error: {type(api_error).__name__}")
-                logger.error(f"Error details: {str(api_error)}")
-                if hasattr(api_error, "response"):
-                    logger.error(f"Response status: {api_error.response.status_code}")
-                    logger.error(f"Response body: {api_error.response.text}")
-                if hasattr(api_error, "body"):
-                    logger.error(f"Error body: {api_error.body}")
+                logger.error(f"OpenAI API Error: {type(api_error).__name__}: {api_error}")
                 yield format_sse_message(
-                    "error", {"message": f"API Error: {str(api_error)}", "type": type(api_error).__name__}
+                    "error", {"message": "An error occurred while processing your request. Please try again."}
                 )
                 return
 
@@ -660,15 +654,9 @@ async def stream_agent_response(
                     stream=True,
                 )
             except Exception as api_error:
-                logger.error(f"OpenAI API Error (final response): {type(api_error).__name__}")
-                logger.error(f"Error details: {str(api_error)}")
-                if hasattr(api_error, "response"):
-                    logger.error(f"Response status: {api_error.response.status_code}")
-                    logger.error(f"Response body: {api_error.response.text}")
-                if hasattr(api_error, "body"):
-                    logger.error(f"Error body: {api_error.body}")
+                logger.error(f"OpenAI API Error (final response): {type(api_error).__name__}: {api_error}")
                 yield format_sse_message(
-                    "error", {"message": f"API Error: {str(api_error)}", "type": type(api_error).__name__}
+                    "error", {"message": "An error occurred while processing your request. Please try again."}
                 )
                 return
 
