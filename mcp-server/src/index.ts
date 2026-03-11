@@ -242,6 +242,7 @@ class TodolistMCPServer {
                 role: { type: 'string', enum: ['user', 'assistant'], description: 'Message role (default: assistant)' },
                 agent_id: { type: 'string', description: 'Agent ID to claim this session (optional). Followups will route back to this agent.' },
                 interim: { type: 'boolean', description: 'If true, post as a progress update without clearing the pending flag. Default: false.' },
+                needs_human_response: { type: 'boolean', description: 'If true, pause agent polling until the human responds. Use when asking the user a question. Default: false.' },
               },
               required: ['session_id', 'content'],
             },
@@ -545,12 +546,13 @@ class TodolistMCPServer {
     return this.textResult(`Pending sessions:\n${lines.join('\n')}`);
   }
 
-  private async postToSession(args: { session_id: string; content: string; role?: string; agent_id?: string; interim?: boolean }) {
+  private async postToSession(args: { session_id: string; content: string; role?: string; agent_id?: string; interim?: boolean; needs_human_response?: boolean }) {
     await api.post(`/agent/sessions/${args.session_id}/messages`, {
       role: args.role || 'assistant',
       content: args.content,
       ...(args.agent_id && { agent_id: args.agent_id }),
       ...(args.interim !== undefined && { interim: args.interim }),
+      ...(args.needs_human_response !== undefined && { needs_human_response: args.needs_human_response }),
     });
     return this.textResult(`Posted ${args.role || 'assistant'} message to session ${args.session_id}`);
   }

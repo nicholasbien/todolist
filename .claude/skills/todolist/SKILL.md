@@ -231,6 +231,10 @@ The TodoList backend supports multi-agent routing via `agent_id`:
   follow-ups and new tasks.
 - **Isolation**: Other agents (like openclaw) only see their own claimed
   sessions + unclaimed ones. They won't steal your sessions.
+- **Pausing for human input**: Pass `needs_human_response=true` when posting
+  a question to the user. This sets `needs_human_response=True` on the session
+  and clears `needs_agent_response`, removing it from the pending queue until
+  the human replies.
 
 ## Sub-Task Management
 
