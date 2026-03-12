@@ -53,8 +53,6 @@ export default function TodoItem({
   const [hoveredButton, setHoveredButton] = useState<string | null>(null);
   const [subtasksExpanded, setSubtasksExpanded] = useState(false);
   const containerRef = React.useRef<HTMLDivElement>(null);
-  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const longPressTriggeredRef = useRef(false);
 
   useEffect(() => {
     setShouldAnimate(true);
@@ -110,30 +108,10 @@ export default function TodoItem({
     <div
       ref={containerRef}
       key={todo._id}
-      onContextMenu={(e) => {
-        e.preventDefault();
+      onClick={() => {
         onEdit(todo);
       }}
-      onTouchStart={() => {
-        longPressTriggeredRef.current = false;
-        longPressTimerRef.current = setTimeout(() => {
-          longPressTriggeredRef.current = true;
-          onEdit(todo);
-        }, 500);
-      }}
-      onTouchEnd={() => {
-        if (longPressTimerRef.current) {
-          clearTimeout(longPressTimerRef.current);
-          longPressTimerRef.current = null;
-        }
-      }}
-      onTouchMove={() => {
-        if (longPressTimerRef.current) {
-          clearTimeout(longPressTimerRef.current);
-          longPressTimerRef.current = null;
-        }
-      }}
-      className={`disable-longpress-select p-4 border rounded-xl transition-all duration-300 ease-in-out ${
+      className={`cursor-pointer p-4 border rounded-xl transition-all duration-300 ease-in-out ${
         shouldAnimate ? 'opacity-100 transform translate-y-0' : 'opacity-0 transform translate-y-2'
       } ${
         isDeleting
