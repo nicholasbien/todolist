@@ -80,7 +80,8 @@ async def upload_image(
 async def get_image(image_id: str) -> Optional[dict]:
     """Retrieve an image by ID.
 
-    Returns a dict with keys: data (bytes), content_type (str), filename (str).
+    Returns a dict with keys: data (bytes), content_type (str), filename (str),
+    user_id (str), space_id (str|None).
     Returns None if not found.
     """
     try:
@@ -100,6 +101,32 @@ async def get_image(image_id: str) -> Optional[dict]:
         "data": data,
         "content_type": metadata.get("content_type", "application/octet-stream"),
         "filename": grid_out.filename,
+        "user_id": metadata.get("user_id"),
+        "space_id": metadata.get("space_id"),
+    }
+
+
+async def get_image_metadata(image_id: str) -> Optional[dict]:
+    """Retrieve image metadata without downloading the file data.
+
+    Returns a dict with keys: user_id (str), space_id (str|None), content_type (str).
+    Returns None if not found.
+    """
+    try:
+        oid = ObjectId(image_id)
+    except Exception:
+        return None
+
+    # Query the GridFS files collection directly for metadata only
+    file_doc = await db["images.files"].find_one({"_id": oid})
+    if not file_doc:
+        return None
+
+    metadata = file_doc.get("metadata") or {}
+    return {
+        "user_id": metadata.get("user_id"),
+        "space_id": metadata.get("space_id"),
+        "content_type": metadata.get("content_type", "application/octet-stream"),
     }
 
 

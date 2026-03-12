@@ -550,7 +550,7 @@ export default function AgentChatbot({
       return;
     }
 
-    handleStreamingAsk(userMessage);
+    handleStreamingAsk(userMessage, false, undefined, imageIds);
   };
 
   // -----------------------------------------------------------------------
@@ -564,9 +564,9 @@ export default function AgentChatbot({
     }
   };
 
-  const handleStreamingAsk = async (userQuestion: string, skipAddMessage?: boolean, overrideSessionId?: string) => {
+  const handleStreamingAsk = async (userQuestion: string, skipAddMessage?: boolean, overrideSessionId?: string, imageIds?: string[]) => {
     if (!skipAddMessage) {
-      setMessages((prev) => [...prev, { role: 'user', content: userQuestion }]);
+      setMessages((prev) => [...prev, { role: 'user', content: userQuestion, image_ids: imageIds && imageIds.length > 0 ? imageIds : undefined }]);
     }
     isStreamingRef.current = true;
     setLoading(true);
@@ -587,6 +587,9 @@ export default function AgentChatbot({
       }
       if (token) {
         params.append('token', token);
+      }
+      if (imageIds && imageIds.length > 0) {
+        params.append('image_ids', imageIds.join(','));
       }
 
       const backendUrl = getStreamingBackendUrl();

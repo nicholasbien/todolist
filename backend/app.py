@@ -16,7 +16,7 @@ from pydantic import BaseModel
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from activity_feed import get_activity_feed
-from images import delete_image, get_image, upload_image
+from images import delete_image, get_image, get_image_metadata, upload_image
 from agent import agent_router
 from agent_memory import get_recent_memory_logs
 from auth import (
@@ -1543,6 +1543,25 @@ async def api_mark_session_read(
 # ---------------------------------------------------------------------------
 
 
+def _detect_image_type(data: bytes) -> Optional[str]:
+    """Detect image content-type from magic bytes. Returns None if not a known image type."""
+    if len(data) < 4:
+        return None
+    # JPEG: starts with FF D8 FF
+    if data[:3] == b"\xff\xd8\xff":
+        return "image/jpeg"
+    # PNG: starts with 89 50 4E 47 0D 0A 1A 0A
+    if data[:8] == b"\x89PNG\r\n\x1a\n":
+        return "image/png"
+    # GIF: starts with GIF87a or GIF89a
+    if data[:6] in (b"GIF87a", b"GIF89a"):
+        return "image/gif"
+    # WebP: starts with RIFF....WEBP
+    if data[:4] == b"RIFF" and len(data) >= 12 and data[8:12] == b"WEBP":
+        return "image/webp"
+    return None
+
+
 @app.post("/images/upload")
 async def api_upload_image(
     file: UploadFile = File(...),
@@ -1553,11 +1572,19 @@ async def api_upload_image(
     user_id = current_user["user_id"]
     data = await file.read()
 
+    # Server-side content-type detection from magic bytes (don't trust client)
+    detected_type = _detect_image_type(data)
+    if detected_type is None:
+        raise HTTPException(
+            status_code=400,
+            detail="File does not appear to be a valid image (JPEG, PNG, GIF, or WebP)",
+        )
+
     try:
         image_id = await upload_image(
             file_data=data,
             filename=file.filename or "image",
-            content_type=file.content_type or "application/octet-stream",
+            content_type=detected_type,
             user_id=user_id,
             space_id=space_id,
         )
@@ -1568,17 +1595,31 @@ async def api_upload_image(
 
 
 @app.get("/images/{image_id}")
-async def api_get_image(image_id: str):
-    """Serve an image by ID."""
+async def api_get_image(
+    image_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    """Serve an image by ID. Requires authentication and ownership/space membership."""
     result = await get_image(image_id)
     if not result:
         raise HTTPException(status_code=404, detail="Image not found")
+
+    # Ownership check: user must be the uploader or a member of the image's space
+    user_id = current_user["user_id"]
+    image_owner = result.get("user_id")
+    image_space = result.get("space_id")
+
+    if image_owner != user_id:
+        if not image_space or not await user_in_space(user_id, image_space):
+            raise HTTPException(status_code=403, detail="Access denied")
 
     return Response(
         content=result["data"],
         media_type=result["content_type"],
         headers={
-            "Cache-Control": "public, max-age=86400",
+            "Cache-Control": "private, max-age=86400",
+            "X-Content-Type-Options": "nosniff",
+            "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'",
         },
     )
 
@@ -1588,7 +1629,21 @@ async def api_delete_image(
     image_id: str,
     current_user: dict = Depends(get_current_user),
 ):
-    """Delete an uploaded image."""
+    """Delete an uploaded image. Only the uploader or a space member can delete."""
+    user_id = current_user["user_id"]
+
+    # Check ownership before deleting
+    metadata = await get_image_metadata(image_id)
+    if not metadata:
+        raise HTTPException(status_code=404, detail="Image not found")
+
+    image_owner = metadata.get("user_id")
+    image_space = metadata.get("space_id")
+
+    if image_owner != user_id:
+        if not image_space or not await user_in_space(user_id, image_space):
+            raise HTTPException(status_code=403, detail="Access denied")
+
     ok = await delete_image(image_id)
     if not ok:
         raise HTTPException(status_code=404, detail="Image not found")

@@ -305,6 +305,7 @@ async def stream_agent_response(
     space_id: Optional[str] = None,
     user_name: Optional[str] = None,
     session_id: Optional[str] = None,
+    image_ids: Optional[list[str]] = None,
 ) -> AsyncGenerator[str, None]:
     """Stream agent responses with sequential tool execution and summarization."""
 
@@ -482,7 +483,10 @@ async def stream_agent_response(
     # Append user message to trajectory + display_messages
     # -----------------------------------------------------------------------
     input_messages.append({"role": "user", "content": user_message})
-    display_messages.append({"role": "user", "content": user_message})
+    user_display_msg: dict[str, Any] = {"role": "user", "content": user_message}
+    if image_ids:
+        user_display_msg["image_ids"] = image_ids
+    display_messages.append(user_display_msg)
 
     try:
         api_call_count = 0
@@ -933,6 +937,9 @@ async def agent_stream(
     session_id: Optional[str] = Query(
         None, description="Session ID to resume; omit for new session"
     ),
+    image_ids: Optional[str] = Query(
+        None, description="Comma-separated image IDs attached to the message"
+    ),
     user_data: dict = Depends(get_current_user),
 ):
     """Stream agent responses with tool calls via Server-Sent Events."""
@@ -943,10 +950,17 @@ async def agent_stream(
 
     user_name = user_data.get("first_name")
 
+    # Parse comma-separated image_ids into a list
+    parsed_image_ids = (
+        [iid.strip() for iid in image_ids.split(",") if iid.strip()]
+        if image_ids
+        else None
+    )
+
     # Create async generator
     async def generate():
         async for chunk in stream_agent_response(
-            q, user_id, space_id, user_name, session_id
+            q, user_id, space_id, user_name, session_id, parsed_image_ids
         ):
             yield chunk
 

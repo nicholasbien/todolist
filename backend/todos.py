@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 
 import auth
 from db import db
+from images import delete_image
 from spaces import user_in_space
 
 # Configure logging
@@ -382,6 +383,13 @@ async def permanent_delete_todo(todo_id: str, user_id: str):
             raise HTTPException(status_code=403, detail="Not in space")
         result = await todos_collection.delete_one(query)
         if result.deleted_count == 1:
+            # Clean up attached images
+            for img_id in todo.get("image_ids", []):
+                try:
+                    await delete_image(img_id)
+                except Exception as img_err:
+                    logger.warning("Failed to delete image %s for todo %s: %s", img_id, todo_id, img_err)
+
             # If this was a subtask, remove its ID from the parent's subtask_ids
             # and clean it from siblings' depends_on arrays
             if todo.get("parent_id"):
@@ -394,7 +402,14 @@ async def permanent_delete_todo(todo_id: str, user_id: str):
                     {"parent_id": todo["parent_id"]},
                     {"$pull": {"depends_on": todo_id}},
                 )
-            # Cascade delete: remove all sub-tasks if this was a parent
+            # Cascade delete: remove all sub-tasks and their images
+            subtasks = await todos_collection.find({"parent_id": todo_id}).to_list(length=None)
+            for subtask in subtasks:
+                for img_id in subtask.get("image_ids", []):
+                    try:
+                        await delete_image(img_id)
+                    except Exception as img_err:
+                        logger.warning("Failed to delete image %s for subtask %s: %s", img_id, str(subtask["_id"]), img_err)
             await todos_collection.delete_many({"parent_id": todo_id})
             return {"message": "Todo permanently deleted"}
         raise HTTPException(status_code=404, detail="Todo not found")
