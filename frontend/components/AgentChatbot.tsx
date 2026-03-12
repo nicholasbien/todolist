@@ -179,6 +179,7 @@ export default function AgentChatbot({
       setLoading(true);
       setError('');
       setIsTaskSession(true);
+      shouldAutoScrollRef.current = true;
       try {
         const res = await fetch(`/agent/sessions/${pendingSessionId}`, {
           headers: { Authorization: `Bearer ${token}` },
@@ -276,9 +277,12 @@ export default function AgentChatbot({
 
   useEffect(() => {
     if (shouldAutoScrollRef.current && isActive && messages.length > 0) {
-      setTimeout(() => {
-        scrollToBottom();
-      }, 10);
+      // Use requestAnimationFrame + setTimeout to ensure DOM has rendered all messages
+      requestAnimationFrame(() => {
+        setTimeout(() => {
+          scrollToBottom();
+        }, 10);
+      });
     }
   }, [messages, isActive, loading, needsHumanResponse]);
 
@@ -357,6 +361,7 @@ export default function AgentChatbot({
     setShowSessionDropdown(false);
     setLoading(true);
     setError('');
+    shouldAutoScrollRef.current = true;
 
     // Determine if this is a task-linked session
     const sessionMeta = sessions.find(s => s._id === sessionId);
