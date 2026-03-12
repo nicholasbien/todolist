@@ -1,14 +1,47 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { ArrowUpDown, GripVertical, Search, X } from "lucide-react";
+import dynamic from "next/dynamic";
 import TodoItem from "./TodoItem";
-import AgentChatbot from "./AgentChatbot";
 import { useAuth } from "../context/AuthContext";
 import Link from "next/link";
-import InsightsComponent from "./InsightsComponent";
-import JournalComponent from "./JournalComponent";
-import BriefingSettings from "./BriefingSettings";
-import ActivityFeed from "./ActivityFeed";
 import SpaceDropdown from "./SpaceDropdown";
+
+// Dynamic imports for tab and modal components to reduce initial bundle size
+const AgentChatbot = dynamic(() => import("./AgentChatbot"), {
+  loading: () => (
+    <div className="flex items-center justify-center h-full">
+      <div className="text-gray-400 text-sm">Loading assistant...</div>
+    </div>
+  ),
+  ssr: false,
+});
+
+const ActivityFeed = dynamic(() => import("./ActivityFeed"), {
+  loading: () => (
+    <div className="flex items-center justify-center h-full">
+      <div className="text-gray-400 text-sm">Loading activity...</div>
+    </div>
+  ),
+  ssr: false,
+});
+
+const InsightsComponent = dynamic(() => import("./InsightsComponent"), {
+  loading: () => (
+    <div className="flex items-center justify-center py-12">
+      <div className="text-gray-400 text-sm">Loading insights...</div>
+    </div>
+  ),
+  ssr: false,
+});
+
+const BriefingSettings = dynamic(() => import("./BriefingSettings"), {
+  loading: () => (
+    <div className="flex items-center justify-center py-12">
+      <div className="text-gray-400 text-sm">Loading settings...</div>
+    </div>
+  ),
+  ssr: false,
+});
 import { sortSpaces } from "../utils/spaceUtils";
 import { loadSortModePreference, saveSortModePreference, type SortMode } from "../utils/sortPreferences";
 import SwipeableViews from "react-swipeable-views-react-18-fix";
