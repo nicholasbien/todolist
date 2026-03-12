@@ -73,7 +73,7 @@ async def client():
     app_module.journals_collection = db.db.journals
 
     # Update router module collection references (same local-binding issue)
-    from routers import todos_router, misc_router
+    from routers import misc_router, todos_router
 
     todos_router.todos_collection = db.db.todos
     misc_router.todos_collection = db.db.todos

@@ -8,11 +8,11 @@ import httpx
 from bs4 import BeautifulSoup
 from fastapi import APIRouter, Depends, HTTPException, Request
 
+from categories import get_categories
 from chat_sessions import append_message
 from chat_sessions import create_session as create_chat_session
 from chat_sessions import find_session_by_todo
 from classify import classify_task
-from categories import get_categories
 from spaces import user_in_space
 from todos import (
     Todo,
@@ -22,7 +22,6 @@ from todos import (
     get_subtasks,
     get_todos,
     handle_subtask_completion,
-    health_check,
     permanent_delete_todo,
     todos_collection,
     update_todo_fields,
