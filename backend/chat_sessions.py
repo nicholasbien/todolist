@@ -597,11 +597,7 @@ async def _regex_substring_search(
     if seen_session_ids:
         title_filter["_id"] = {"$nin": [ObjectId(s) for s in seen_session_ids]}
 
-    cursor = (
-        sessions_collection.find(title_filter)
-        .sort("updated_at", -1)
-        .limit(limit)
-    )
+    cursor = sessions_collection.find(title_filter).sort("updated_at", -1).limit(limit)
     title_hits = await cursor.to_list(length=limit)
 
     for doc in title_hits:
@@ -662,7 +658,9 @@ async def _regex_substring_search(
         content_sids = [t["session_id"] for t in new_content_hits]
         content_session_ids = [ObjectId(sid) for sid in content_sids]
         session_cursor = sessions_collection.find({"_id": {"$in": content_session_ids}})
-        session_docs_list = await session_cursor.to_list(length=len(content_session_ids))
+        session_docs_list = await session_cursor.to_list(
+            length=len(content_session_ids)
+        )
         session_docs_map: Dict[str, Dict[str, Any]] = {
             str(doc["_id"]): doc for doc in session_docs_list
         }
