@@ -138,7 +138,10 @@ export default function AgentChatbot({
         });
         if (res.ok) {
           const data = await res.json();
-          setSearchResults(data);
+          setSearchResults(Array.isArray(data) ? data : []);
+        } else {
+          console.error('Session search failed:', res.status, res.statusText);
+          setSearchResults([]);
         }
       } catch (err: any) {
         // Ignore abort errors; silently ignore other search errors

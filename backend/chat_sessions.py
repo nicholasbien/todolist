@@ -7,6 +7,7 @@ Sessions can be:
 """
 
 import logging
+import re
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
@@ -378,15 +379,34 @@ async def search_sessions(
     space_id: Optional[str] = None,
     limit: int = 20,
 ) -> List[Dict[str, Any]]:
-    """Search sessions by title and message content using MongoDB text indexes.
+    """Search sessions by title and message content.
 
-    Returns sessions where the title or message content matches the query,
-    sorted by text relevance score. Each result includes a preview snippet
-    from the best-matching message.
+    Tries MongoDB text indexes first for relevance-ranked results. Falls back
+    to case-insensitive regex search when text indexes are unavailable (e.g.
+    first deploy before indexes are built, or Atlas free-tier limitations).
+
+    Returns sessions where the title or message content matches the query.
+    Each result includes a preview snippet from the best-matching message.
     """
     if not query or not query.strip():
         return []
 
+    try:
+        return await _text_index_search(user_id, query, space_id, limit)
+    except Exception as e:
+        logger.warning(
+            "Text-index search failed (%s), falling back to regex search", e
+        )
+        return await _regex_search(user_id, query, space_id, limit)
+
+
+async def _text_index_search(
+    user_id: str,
+    query: str,
+    space_id: Optional[str],
+    limit: int,
+) -> List[Dict[str, Any]]:
+    """Search using MongoDB $text indexes (requires text indexes to exist)."""
     results: List[Dict[str, Any]] = []
     seen_session_ids: set = set()
 
@@ -444,7 +464,87 @@ async def search_sessions(
     )
     content_hits = await cursor.to_list(length=limit)
 
-    # Filter to unseen session IDs and build a lookup of trajectory data
+    # Batch-fetch session docs for content hits and build result entries
+    await _hydrate_content_results(results, seen_session_ids, content_hits, query)
+
+    # Sort all results by score descending, cap at limit
+    results.sort(key=lambda r: r.get("score", 0), reverse=True)
+    return results[:limit]
+
+
+async def _regex_search(
+    user_id: str,
+    query: str,
+    space_id: Optional[str],
+    limit: int,
+) -> List[Dict[str, Any]]:
+    """Fallback search using case-insensitive regex (no text index required)."""
+    results: List[Dict[str, Any]] = []
+    seen_session_ids: set = set()
+    escaped = re.escape(query)
+    pattern = {"$regex": escaped, "$options": "i"}
+
+    # 1) Search session titles
+    title_filter: Dict[str, Any] = {"user_id": user_id, "title": pattern}
+    if space_id is not None:
+        title_filter["space_id"] = space_id
+
+    cursor = (
+        sessions_collection.find(title_filter)
+        .sort("updated_at", -1)
+        .limit(limit)
+    )
+    title_hits = await cursor.to_list(length=limit)
+
+    for doc in title_hits:
+        sid = str(doc["_id"])
+        seen_session_ids.add(sid)
+        results.append(
+            {
+                "_id": sid,
+                "title": doc.get("title", ""),
+                "space_id": doc.get("space_id"),
+                "todo_id": doc.get("todo_id"),
+                "agent_id": doc.get("agent_id"),
+                "updated_at": doc.get("updated_at"),
+                "created_at": doc.get("created_at"),
+                "match_source": "title",
+                "preview": doc.get("title", ""),
+                "score": 1,
+            }
+        )
+
+    # 2) Search message content in trajectories
+    content_filter: Dict[str, Any] = {
+        "user_id": user_id,
+        "display_messages.content": pattern,
+    }
+    if space_id is not None:
+        content_filter["space_id"] = space_id
+
+    cursor = (
+        trajectories_collection.find(
+            content_filter,
+            {"session_id": 1, "display_messages": 1},
+        )
+        .sort("updated_at", -1)
+        .limit(limit)
+    )
+    content_hits = await cursor.to_list(length=limit)
+
+    await _hydrate_content_results(results, seen_session_ids, content_hits, query)
+
+    return results[:limit]
+
+
+async def _hydrate_content_results(
+    results: List[Dict[str, Any]],
+    seen_session_ids: set,
+    content_hits: List[Dict[str, Any]],
+    query: str,
+) -> None:
+    """Given trajectory hits, fetch their session docs and build result entries."""
+    # Filter to unseen session IDs
     new_content_hits = []
     for traj in content_hits:
         sid = traj.get("session_id")
@@ -453,7 +553,7 @@ async def search_sessions(
         seen_session_ids.add(sid)
         new_content_hits.append(traj)
 
-    # Batch-fetch all session docs in a single query instead of N individual lookups
+    # Batch-fetch all session docs in a single query
     if new_content_hits:
         content_sids = [t["session_id"] for t in new_content_hits]
         content_session_ids = [ObjectId(sid) for sid in content_sids]
@@ -467,6 +567,7 @@ async def search_sessions(
     else:
         session_docs_map = {}
 
+    query_lower = query.lower()
     for traj in new_content_hits:
         sid = traj["session_id"]
         session_doc = session_docs_map.get(sid)
@@ -475,11 +576,9 @@ async def search_sessions(
 
         # Find the best matching message snippet
         preview = ""
-        query_lower = query.lower()
         for msg in reversed(traj.get("display_messages", [])):
             content = msg.get("content", "")
             if query_lower in content.lower():
-                # Extract a snippet around the match
                 idx = content.lower().index(query_lower)
                 start = max(0, idx - 40)
                 end = min(len(content), idx + len(query) + 80)
@@ -492,7 +591,6 @@ async def search_sessions(
                 break
 
         if not preview and traj.get("display_messages"):
-            # Fallback: use last message as preview
             last_msg = traj["display_messages"][-1]
             preview = last_msg.get("content", "")[:120]
 
@@ -507,13 +605,9 @@ async def search_sessions(
                 "created_at": session_doc.get("created_at"),
                 "match_source": "content",
                 "preview": preview,
-                "score": traj.get("score", 0),
+                "score": traj.get("score", 0.5),
             }
         )
-
-    # Sort all results by score descending, cap at limit
-    results.sort(key=lambda r: r.get("score", 0), reverse=True)
-    return results[:limit]
 
 
 async def init_chat_session_indexes() -> None:
