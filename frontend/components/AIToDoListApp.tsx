@@ -1397,7 +1397,7 @@ export default function AIToDoListApp({
 
   return (
     <div
-      className="flex flex-col w-full max-w-2xl mx-auto overflow-hidden"
+      className="flex flex-col w-full max-w-4xl mx-auto overflow-hidden"
       style={{
         height: '100dvh',
         paddingTop: 'env(safe-area-inset-top)',
