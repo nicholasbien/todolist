@@ -450,14 +450,23 @@ export default function AgentChatbot({
   };
 
   // -----------------------------------------------------------------------
-  // Reset to direct assistant when the user clicks the Assistant tab directly
+  // Resume most recent assistant session when user clicks the Assistant tab
   // -----------------------------------------------------------------------
   const directAssistantKeyRef = useRef(directAssistantKey);
   useEffect(() => {
     // Skip the initial render — only react to subsequent changes
     if (directAssistantKeyRef.current === directAssistantKey) return;
     directAssistantKeyRef.current = directAssistantKey;
-    handleNewChat();
+
+    // Find the most recent non-task, non-external-agent session to resume
+    const recentSession = sessions.find(
+      (s) => !s.todo_id && (!s.agent_id || s.agent_id === 'claude')
+    );
+    if (recentSession) {
+      loadSession(recentSession._id);
+    } else {
+      handleNewChat();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [directAssistantKey]);
 
