@@ -9,7 +9,7 @@ from typing import List, Optional, Union
 
 import httpx
 from bs4 import BeautifulSoup
-from fastapi import Depends, FastAPI, Header, HTTPException, Request
+from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from pydantic import BaseModel
@@ -44,7 +44,11 @@ from categories import (
 )
 from chat_sessions import append_message
 from chat_sessions import create_session as create_chat_session
-from chat_sessions import find_session_by_todo, mark_session_read
+from chat_sessions import (
+    find_session_by_todo,
+    get_agent_responsiveness_summary,
+    mark_session_read,
+)
 
 # Import the classification function and todo management
 from classify import classify_task
@@ -1458,6 +1462,40 @@ class PostMessageRequest(BaseModel):
     agent_id: Optional[str] = None
     interim: bool = False
     needs_human_response: bool = False
+
+
+@app.get("/agent/metrics/responsiveness")
+async def api_get_agent_responsiveness_metrics(
+    space_id: Optional[str] = Query(None),
+    agent_id: str = Query("openclaw"),
+    days: int = Query(7, ge=1, le=30),
+    first_response_sla_ms: int = Query(5 * 60 * 1000, ge=0),
+    final_response_sla_ms: int = Query(15 * 60 * 1000, ge=0),
+    followup_response_sla_ms: int = Query(10 * 60 * 1000, ge=0),
+    pending_backlog_sla_count: int = Query(5, ge=0),
+    postback_completeness_sla_ratio: float = Query(0.95, ge=0.0, le=1.0),
+    current_user: dict = Depends(get_current_user),
+):
+    """Return daily and rolling responsiveness metrics for the requested agent."""
+    if agent_id != "openclaw":
+        raise HTTPException(
+            status_code=400, detail="Only agent_id=openclaw is supported"
+        )
+
+    try:
+        return await get_agent_responsiveness_summary(
+            current_user["user_id"],
+            space_id=space_id,
+            agent_id=agent_id,
+            days=days,
+            first_response_sla_ms=first_response_sla_ms,
+            final_response_sla_ms=final_response_sla_ms,
+            followup_response_sla_ms=followup_response_sla_ms,
+            pending_backlog_sla_count=pending_backlog_sla_count,
+            postback_completeness_sla_ratio=postback_completeness_sla_ratio,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
 
 
 @app.post("/agent/sessions")

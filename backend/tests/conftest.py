@@ -53,6 +53,10 @@ async def client():
     journals.journals_collection = db.db.journals
     chat_sessions.sessions_collection = db.db.chat_sessions
     chat_sessions.trajectories_collection = db.db.chat_trajectories
+    chat_sessions.agent_responsiveness_events_collection = (
+        db.db.agent_responsiveness_events
+    )
+    chat_sessions.agent_backlog_snapshots_collection = db.db.agent_backlog_snapshots
     briefings.users_collection = db.db.users
     briefings.todos_collection = db.db.todos
     briefings.journals_collection = db.db.journals
