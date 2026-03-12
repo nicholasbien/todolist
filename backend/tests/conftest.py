@@ -72,6 +72,13 @@ async def client():
     app_module.todos_collection = db.db.todos
     app_module.journals_collection = db.db.journals
 
+    # Update router module collection references (same local-binding issue)
+    from routers import misc_router, todos_router
+
+    todos_router.todos_collection = db.db.todos
+    misc_router.todos_collection = db.db.todos
+    misc_router.journals_collection = db.db.journals
+
     # Clear global MCP session state to prevent stale connections across tests
     from agent.agent import mcp_contexts, mcp_sessions
 
