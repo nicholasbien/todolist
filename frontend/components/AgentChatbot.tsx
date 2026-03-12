@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { ChevronDown, ArrowLeft, CheckCircle2, RotateCcw, Search, X, Brain } from 'lucide-react';
+import { ChevronDown, ArrowLeft, CheckCircle2, RotateCcw, Search, X, Brain, Plus } from 'lucide-react';
 import { MessageRenderer, PlainTextRenderer } from './MessageRenderer';
 import { getStreamingBackendUrl } from '../utils/api';
 import AgentMemoryViewer from './AgentMemoryViewer';
@@ -450,15 +450,24 @@ export default function AgentChatbot({
   };
 
   // -----------------------------------------------------------------------
-  // Resume most recent assistant session when user clicks the Assistant tab
+  // Select an agent and resume the most recent session with that agent,
+  // or fall back to new-chat mode with that agent pre-selected.
   // -----------------------------------------------------------------------
-  const directAssistantKeyRef = useRef(directAssistantKey);
-  useEffect(() => {
-    // Skip the initial render — only react to subsequent changes
-    if (directAssistantKeyRef.current === directAssistantKey) return;
-    directAssistantKeyRef.current = directAssistantKey;
+  const handleSelectAgent = (agentId: string) => {
+    const recentSession = sessions.find(
+      (s) => !s.todo_id && s.agent_id === agentId
+    );
+    if (recentSession) {
+      loadSession(recentSession._id);
+    } else {
+      // No prior sessions — enter new-chat mode with this agent pre-selected
+      handleNewChat();
+      setSelectedAgentId(agentId);
+    }
+  };
 
-    // Find the most recent non-task, non-external-agent session to resume
+  // Select the built-in assistant and resume the most recent session
+  const handleSelectBuiltInAssistant = () => {
     const recentSession = sessions.find(
       (s) => !s.todo_id && (!s.agent_id || s.agent_id === 'claude')
     );
@@ -467,6 +476,17 @@ export default function AgentChatbot({
     } else {
       handleNewChat();
     }
+  };
+
+  // -----------------------------------------------------------------------
+  // Reset to direct assistant when the user clicks the Assistant tab directly
+  // -----------------------------------------------------------------------
+  const directAssistantKeyRef = useRef(directAssistantKey);
+  useEffect(() => {
+    // Skip the initial render — only react to subsequent changes
+    if (directAssistantKeyRef.current === directAssistantKey) return;
+    directAssistantKeyRef.current = directAssistantKey;
+    handleSelectBuiltInAssistant();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [directAssistantKey]);
 
@@ -757,7 +777,7 @@ export default function AgentChatbot({
             )}
           </div>
         ) : sessionAgentId && currentSessionId ? (
-          // Back button + agent badge for direct agent chat sessions
+          // Back button + agent badge + new chat for direct agent chat sessions
           <div className="flex items-center gap-2">
             <button
               onClick={handleNewChat}
@@ -769,6 +789,19 @@ export default function AgentChatbot({
             <span className="bg-purple-600/20 text-purple-300 border border-purple-500/30 px-2 py-0.5 rounded text-xs font-medium">
               {AGENTS.find(a => a.id === sessionAgentId)?.label || sessionAgentId}
             </span>
+            <button
+              onClick={() => {
+                const agentId = sessionAgentId;
+                handleNewChat();
+                setSelectedAgentId(agentId);
+              }}
+              disabled={loading}
+              className="ml-auto text-gray-400 hover:text-gray-200 transition-colors flex items-center gap-1 text-xs"
+              title={`New chat with ${AGENTS.find(a => a.id === sessionAgentId)?.label || sessionAgentId}`}
+            >
+              <Plus className="w-3 h-3" />
+              New Chat
+            </button>
           </div>
         ) : (
           // Past Chats dropdown (main assistant mode — always visible)
@@ -1050,7 +1083,7 @@ export default function AgentChatbot({
                 <p className="text-xs text-gray-500 mb-2">Or chat directly with an agent:</p>
                 <div className="flex flex-wrap gap-2 justify-center">
                   <button
-                    onClick={() => setSelectedAgentId(null)}
+                    onClick={handleSelectBuiltInAssistant}
                     className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
                       selectedAgentId === null
                         ? 'bg-accent/20 text-accent border border-accent/40'
@@ -1059,19 +1092,28 @@ export default function AgentChatbot({
                   >
                     Built-in Assistant
                   </button>
-                  {AGENTS.map((agent) => (
-                    <button
-                      key={agent.id}
-                      onClick={() => setSelectedAgentId(agent.id)}
-                      className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
-                        selectedAgentId === agent.id
-                          ? 'bg-purple-600/20 text-purple-300 border border-purple-500/40'
-                          : 'bg-gray-800 text-gray-400 border border-gray-700 hover:bg-gray-700'
-                      }`}
-                    >
-                      {agent.label}
-                    </button>
-                  ))}
+                  {AGENTS.map((agent) => {
+                    const hasRecentSession = sessions.some(
+                      (s) => !s.todo_id && s.agent_id === agent.id
+                    );
+                    return (
+                      <button
+                        key={agent.id}
+                        onClick={() => handleSelectAgent(agent.id)}
+                        className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                          selectedAgentId === agent.id
+                            ? 'bg-purple-600/20 text-purple-300 border border-purple-500/40'
+                            : 'bg-gray-800 text-gray-400 border border-gray-700 hover:bg-gray-700'
+                        }`}
+                        title={hasRecentSession ? `Resume latest ${agent.label} chat` : `Start new ${agent.label} chat`}
+                      >
+                        {agent.label}
+                        {hasRecentSession && (
+                          <span className="ml-1 text-[10px] opacity-60">&bull;</span>
+                        )}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             </div>
