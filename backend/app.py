@@ -9,7 +9,7 @@ from typing import List, Optional, Union
 
 import httpx
 from bs4 import BeautifulSoup
-from fastapi import Depends, FastAPI, Header, HTTPException, Request
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from pydantic import BaseModel
@@ -17,60 +17,19 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 from activity_feed import get_activity_feed
 from agent import agent_router
-from agent_memory import get_recent_memory_logs
-from auth import (
-    LoginRequest,
-    SignupRequest,
-    UpdateNameRequest,
-    delete_user_account,
-    login_user,
-    logout_user,
-    signup_user,
-    update_user_email_instructions,
-    update_user_email_spaces,
-    update_user_name,
-    update_user_summary_time,
-    verify_session,
-)
-from categories import (
-    Category,
-    CategoryRename,
-    add_category,
-    delete_category,
-    get_categories,
-    init_default_categories,
-    migrate_legacy_categories,
-    rename_category,
-)
+from categories import get_categories, init_default_categories, migrate_legacy_categories
 from chat_sessions import append_message
 from chat_sessions import create_session as create_chat_session
 from chat_sessions import find_session_by_todo, mark_session_read
 
 # Import the classification function and todo management
 from classify import classify_task
-from email_summary import send_daily_summary
 
-# Import journal functions
-from journals import (
-    JournalEntry,
-    create_journal_entry,
-    delete_journal_entry,
-    get_journal_entries,
-    get_journal_entry_by_date,
-    journals_collection,
-)
-from scheduler import get_scheduler_status, start_scheduler, update_schedule_time
-from spaces import (
-    Space,
-    create_space,
-    delete_space,
-    get_spaces_for_user,
-    invite_members,
-    leave_space,
-    list_space_members,
-    update_space,
-    user_in_space,
-)
+# Import journal functions (journals_collection still needed for export endpoint)
+from journals import journals_collection
+from routers.deps import get_current_user, get_current_user_optional
+from scheduler import start_scheduler
+from spaces import get_spaces_for_user, user_in_space
 from todos import (
     Todo,
     complete_todo,
@@ -84,6 +43,14 @@ from todos import (
     todos_collection,
     update_todo_fields,
 )
+
+# Import routers
+from routers.auth_routes import router as auth_router
+from routers.category_routes import router as category_router
+from routers.email_routes import router as email_router
+from routers.journal_routes import router as journal_router
+from routers.memory_routes import router as memory_router
+from routers.space_routes import router as space_router
 
 # Set up logging with more detail
 logging.basicConfig(
@@ -185,8 +152,14 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="AI Todo List API", lifespan=lifespan)
 
-# Include agent router
+# Include routers
 app.include_router(agent_router)
+app.include_router(auth_router)
+app.include_router(category_router)
+app.include_router(space_router)
+app.include_router(email_router)
+app.include_router(journal_router)
+app.include_router(memory_router)
 
 MAX_HISTORY = 10
 
@@ -220,42 +193,9 @@ app.add_middleware(
 )
 
 
-# Authentication dependency
-async def get_current_user(authorization: str = Header(None)):
-    """Extract user from Authorization header."""
-    if not authorization:
-        raise HTTPException(status_code=401, detail="Authorization header required")
-
-    # Expect format: "Bearer <token>"
-    try:
-        scheme, token = authorization.split()
-        if scheme.lower() != "bearer":
-            raise HTTPException(status_code=401, detail="Invalid authentication scheme")
-    except ValueError:
-        raise HTTPException(
-            status_code=401, detail="Invalid authorization header format"
-        )
-
-    # Verify the session token
-    user_info = await verify_session(token)
-    user_info["token"] = token  # Add token to user info for logout
-    return user_info
-
-
-# Optional authentication dependency (for backward compatibility)
-async def get_current_user_optional(authorization: str = Header(None)):
-    """Extract user from Authorization header, but don't require it."""
-    if not authorization:
-        return None
-
-    try:
-        scheme, token = authorization.split()
-        if scheme.lower() != "bearer":
-            return None
-        user_info = await verify_session(token)
-        return user_info
-    except Exception:
-        return None
+# Authentication dependencies are imported from routers.deps
+# get_current_user and get_current_user_optional are available at module level
+# for backward compatibility with existing code
 
 
 @app.get("/")
@@ -263,50 +203,8 @@ async def root():
     return {"message": "AI Todo List API is running"}
 
 
-# Authentication endpoints
-@app.post("/auth/signup")
-async def api_signup(request: SignupRequest):
-    """Send verification code to email for signup/login."""
-    logger.info(f"Signup request for email: {request.email}")
-    return await signup_user(request.email)
 
-
-@app.post("/auth/login")
-async def api_login(request: LoginRequest):
-    """Verify code and create session."""
-    logger.info(f"Login request for email: {request.email}")
-    return await login_user(request.email, request.code)
-
-
-@app.post("/auth/logout")
-async def api_logout(current_user: dict = Depends(get_current_user)):
-    """Logout and deactivate session."""
-    logger.info(f"Logout request for user: {current_user['email']}")
-    return await logout_user(current_user["token"])
-
-
-@app.get("/auth/me")
-async def api_get_current_user(current_user: dict = Depends(get_current_user)):
-    """Get current user info."""
-    return current_user
-
-
-@app.post("/auth/update-name")
-async def api_update_name(
-    request: UpdateNameRequest, current_user: dict = Depends(get_current_user)
-):
-    """Update user's first name."""
-    logger.info(
-        f"Update name request for user: {current_user['email']}, name: {request.first_name}"
-    )
-    return await update_user_name(current_user["user_id"], request.first_name)
-
-
-@app.delete("/auth/me")
-async def api_delete_account(current_user: dict = Depends(get_current_user)):
-    """Delete user account and all associated data."""
-    logger.info(f"Account deletion request for user: {current_user['email']}")
-    return await delete_user_account(current_user["user_id"])
+# Authentication endpoints moved to routers/auth_routes.py
 
 
 # Add todo management endpoints
@@ -767,366 +665,13 @@ async def rename_default_spaces_to_personal():
         logger.error(f"Error renaming Default spaces to Personal: {e}")
 
 
-# Category management endpoints
-@app.get("/categories", response_model=List[str])
-async def api_get_categories(
-    space_id: Optional[str] = None, current_user: dict = Depends(get_current_user)
-):
-    """Get categories for a space, or default categories if no space_id provided."""
-    if space_id is not None and not await user_in_space(
-        current_user["user_id"], space_id
-    ):
-        raise HTTPException(status_code=403, detail="Not in space")
-    logger.info("Fetching categories for space %s", space_id or "default")
-    return await get_categories(space_id)
 
+# Category endpoints moved to routers/category_routes.py
+# Space endpoints moved to routers/space_routes.py
 
-@app.post("/categories")
-async def api_add_category(
-    category: Category, current_user: dict = Depends(get_current_user)
-):
-    """Add a new category to a space."""
-    if category.space_id is not None and not await user_in_space(
-        current_user["user_id"], category.space_id
-    ):
-        raise HTTPException(status_code=403, detail="Not in space")
-    logger.info(
-        "Adding new category %s to space %s",
-        category.name,
-        category.space_id or "default",
-    )
-    return await add_category(category)
 
 
-@app.put("/categories/{name}")
-async def api_rename_category(
-    name: str,
-    body: CategoryRename,
-    space_id: Optional[str] = None,
-    current_user: dict = Depends(get_current_user),
-):
-    """Rename an existing category within a space."""
-    if space_id is not None and not await user_in_space(
-        current_user["user_id"], space_id
-    ):
-        raise HTTPException(status_code=403, detail="Not in space")
-    logger.info(
-        "Renaming category %s to %s in space %s",
-        name,
-        body.new_name,
-        space_id or "default",
-    )
-    return await rename_category(name, body.new_name, space_id)
-
-
-@app.delete("/categories/{name}")
-async def api_delete_category(
-    name: str,
-    space_id: Optional[str] = None,
-    current_user: dict = Depends(get_current_user),
-):
-    """Delete a category from a space."""
-    if space_id is not None and not await user_in_space(
-        current_user["user_id"], space_id
-    ):
-        raise HTTPException(status_code=403, detail="Not in space")
-    logger.info("Deleting category %s from space %s", name, space_id or "default")
-    return await delete_category(name, space_id)
-
-
-class SpaceCreateRequest(BaseModel):
-    name: str
-
-
-class InviteRequest(BaseModel):
-    emails: List[str]
-
-
-class SpaceUpdateRequest(BaseModel):
-    name: Optional[str] = None
-    collaborative: Optional[bool] = None
-
-
-# Space management endpoints
-@app.get("/spaces", response_model=List[Space])
-async def api_get_spaces(current_user: dict = Depends(get_current_user)):
-    return await get_spaces_for_user(current_user["user_id"])
-
-
-@app.post("/spaces", response_model=Space)
-async def api_create_space_endpoint(
-    req: SpaceCreateRequest, current_user: dict = Depends(get_current_user)
-):
-    return await create_space(req.name, current_user["user_id"])
-
-
-@app.post("/spaces/{space_id}/invite")
-async def api_invite_members(
-    space_id: str, req: InviteRequest, current_user: dict = Depends(get_current_user)
-):
-    await invite_members(
-        space_id,
-        current_user["email"],
-        req.emails,
-        inviter_user_id=current_user["user_id"],
-    )
-    return {"message": "Invitations sent"}
-
-
-@app.get("/spaces/{space_id}/members")
-async def api_list_members(
-    space_id: str, current_user: dict = Depends(get_current_user)
-):
-    if not await user_in_space(current_user["user_id"], space_id):
-        raise HTTPException(status_code=403, detail="Not authorized")
-    return await list_space_members(space_id, current_user["user_id"])
-
-
-@app.post("/spaces/{space_id}/leave")
-async def api_leave_space(
-    space_id: str, current_user: dict = Depends(get_current_user)
-):
-    if not await user_in_space(current_user["user_id"], space_id):
-        raise HTTPException(status_code=403, detail="Not authorized")
-    return await leave_space(space_id, current_user["user_id"])
-
-
-@app.put("/spaces/{space_id}", response_model=Space)
-async def api_update_space(
-    space_id: str,
-    req: SpaceUpdateRequest,
-    current_user: dict = Depends(get_current_user),
-):
-    return await update_space(
-        space_id, current_user["user_id"], req.name, req.collaborative
-    )
-
-
-@app.delete("/spaces/{space_id}")
-async def api_delete_space(
-    space_id: str, current_user: dict = Depends(get_current_user)
-):
-    return await delete_space(space_id, current_user["user_id"])
-
-
-# Email summary endpoints
-@app.post("/email/send-summary")
-async def api_send_summary(current_user: dict = Depends(get_current_user)):
-    """Send daily summary email to current user."""
-    logger.info(f"Manual summary request for user: {current_user['email']}")
-    success = await send_daily_summary(
-        current_user["user_id"],
-        current_user["email"],
-        current_user.get("first_name") or "",
-        current_user.get("email_instructions", ""),
-    )
-
-    if success:
-        return {"message": "Summary email sent successfully"}
-    else:
-        raise HTTPException(status_code=500, detail="Failed to send summary email")
-
-
-@app.get("/email/scheduler-status")
-async def api_scheduler_status():
-    """Get scheduler status."""
-    return get_scheduler_status()
-
-
-class UpdateScheduleRequest(BaseModel):
-    hour: int
-    minute: int
-    timezone: str = "America/New_York"
-    email_enabled: bool = False
-
-
-class UpdateInstructionsRequest(BaseModel):
-    instructions: str
-
-
-class UpdateEmailSpacesRequest(BaseModel):
-    space_ids: List[str]
-
-
-@app.post("/email/update-schedule")
-async def api_update_schedule(
-    req: UpdateScheduleRequest,
-    current_user: dict = Depends(get_current_user),
-):
-    """Update daily summary schedule time, timezone, and enabled status."""
-    logger.info(
-        "Schedule update requested by %s to %02d:%02d %s (enabled: %s)",
-        current_user["email"],
-        req.hour,
-        req.minute,
-        req.timezone,
-        req.email_enabled,
-    )
-    await update_user_summary_time(
-        current_user["user_id"], req.email_enabled, req.hour, req.minute, req.timezone
-    )
-
-    if req.email_enabled:
-        update_schedule_time(
-            current_user["user_id"],
-            current_user["email"],
-            current_user.get("first_name", ""),
-            req.hour,
-            req.minute,
-            req.timezone,
-        )
-    else:
-        # Remove the scheduled job if email is disabled
-        from scheduler import remove_user_schedule
-
-        remove_user_schedule(current_user["user_id"])
-    return {"message": "Schedule updated"}
-
-
-@app.post("/email/update-instructions")
-async def api_update_instructions(
-    req: UpdateInstructionsRequest,
-    current_user: dict = Depends(get_current_user),
-):
-    """Update custom summary instructions for the current user."""
-    logger.info("Instructions update requested by %s", current_user["email"])
-    return await update_user_email_instructions(
-        current_user["user_id"], req.instructions
-    )
-
-
-@app.post("/email/update-spaces")
-async def api_update_email_spaces(
-    req: UpdateEmailSpacesRequest,
-    current_user: dict = Depends(get_current_user),
-):
-    """Update which spaces are included in the user's daily summary emails."""
-    logger.info("Email spaces update requested by %s", current_user["email"])
-    return await update_user_email_spaces(current_user["user_id"], req.space_ids)
-
-
-# ---------------------------------------------------------------------------
-# Proactive Agent Briefings
-# ---------------------------------------------------------------------------
-
-
-class UpdateBriefingRequest(BaseModel):
-    briefing_enabled: bool = False
-    briefing_hour: int = 8
-    briefing_minute: int = 0
-    stale_task_days: int = 3
-    timezone: str = "America/New_York"
-
-
-@app.get("/briefings/preferences")
-async def api_get_briefing_preferences(
-    current_user: dict = Depends(get_current_user),
-):
-    """Get the current user's briefing preferences."""
-    from briefings import get_briefing_preferences
-
-    return await get_briefing_preferences(current_user["user_id"])
-
-
-@app.post("/briefings/preferences")
-async def api_update_briefing_preferences(
-    req: UpdateBriefingRequest,
-    current_user: dict = Depends(get_current_user),
-):
-    """Update the current user's briefing preferences and reschedule jobs."""
-    from briefings import update_briefing_preferences
-    from scheduler import remove_briefing_schedule, update_briefing_schedule
-
-    logger.info(
-        "Briefing update requested by %s: enabled=%s hour=%02d:%02d stale_days=%d",
-        current_user["email"],
-        req.briefing_enabled,
-        req.briefing_hour,
-        req.briefing_minute,
-        req.stale_task_days,
-    )
-
-    prefs = await update_briefing_preferences(
-        current_user["user_id"],
-        briefing_enabled=req.briefing_enabled,
-        briefing_hour=req.briefing_hour,
-        briefing_minute=req.briefing_minute,
-        stale_task_days=req.stale_task_days,
-        timezone=req.timezone,
-    )
-
-    if req.briefing_enabled:
-        update_briefing_schedule(
-            current_user["user_id"],
-            req.briefing_hour,
-            req.briefing_minute,
-            req.timezone,
-        )
-    else:
-        remove_briefing_schedule(current_user["user_id"])
-
-    return {"message": "Briefing preferences updated", "preferences": prefs}
-
-
-@app.post("/briefings/trigger")
-async def api_trigger_briefing(
-    current_user: dict = Depends(get_current_user),
-):
-    """Manually trigger a morning briefing for the current user (for testing)."""
-    from briefings import post_morning_briefing
-
-    session_id = await post_morning_briefing(current_user["user_id"])
-    if session_id:
-        return {"ok": True, "session_id": session_id}
-    raise HTTPException(status_code=500, detail="Failed to generate briefing")
-
-
-@app.post("/briefings/trigger-nudges")
-async def api_trigger_nudges(
-    current_user: dict = Depends(get_current_user),
-):
-    """Manually trigger stale task nudges for the current user (for testing)."""
-    from briefings import get_briefing_preferences, post_stale_task_nudges
-
-    prefs = await get_briefing_preferences(current_user["user_id"])
-    stale_days = prefs.get("stale_task_days", 3)
-    nudged = await post_stale_task_nudges(
-        current_user["user_id"], stale_days=stale_days
-    )
-    return {"ok": True, "nudged_sessions": nudged, "count": len(nudged)}
-
-
-class ContactRequest(BaseModel):
-    message: str
-
-
-@app.post("/contact")
-async def api_contact(
-    req: ContactRequest,
-    current_user: dict = Depends(get_current_user),
-):
-    """Send contact message to admin email."""
-    try:
-        if len(req.message) > 5000:
-            raise HTTPException(
-                status_code=400, detail="Message too long (max 5000 chars)"
-            )
-
-        logger.info("Contact message from %s", current_user["email"])
-
-        # Import email sending function
-        from email_summary import send_contact_message
-
-        await send_contact_message(
-            sender_email=current_user["email"],
-            sender_name=current_user.get("first_name", ""),
-            message=req.message,
-        )
-
-        return {"message": "Contact message sent successfully"}
-    except Exception as e:
-        logger.error(f"Error sending contact message: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to send contact message")
+# Email, briefing, and contact endpoints moved to routers/email_routes.py
 
 
 @app.get("/insights")
@@ -1195,181 +740,9 @@ async def api_get_activity_feed(
         raise HTTPException(status_code=500, detail="Failed to get activity feed")
 
 
-class JournalCreateRequest(BaseModel):
-    date: str  # YYYY-MM-DD format
-    text: str
-    space_id: Optional[str] = None
 
-
-# Journal endpoints
-@app.get("/journals", response_model=Union[JournalEntry, List[JournalEntry], None])
-async def api_get_journal_entries(
-    date: Optional[str] = None,
-    space_id: Optional[str] = None,
-    current_user: dict = Depends(get_current_user),
-):
-    """Get journal entries. If date is provided, get entry for that specific date. Otherwise get recent entries."""
-    try:
-        # Check space access if space_id provided
-        if space_id is not None and not await user_in_space(
-            current_user["user_id"], space_id
-        ):
-            raise HTTPException(status_code=403, detail="Access denied to this space")
-
-        if date:
-            # Get specific date entry
-            entry = await get_journal_entry_by_date(
-                current_user["user_id"], date, space_id
-            )
-            return entry
-        else:
-            # Get recent entries
-            entries = await get_journal_entries(current_user["user_id"], space_id)
-            return entries
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error fetching journal entries: {e}")
-        raise HTTPException(status_code=500, detail="Failed to fetch journal entries")
-
-
-@app.post("/journals", response_model=JournalEntry)
-async def api_create_journal_entry(
-    request: JournalCreateRequest, current_user: dict = Depends(get_current_user)
-):
-    """Create or update a journal entry."""
-    try:
-        # Input length validation
-        if len(request.text) > 50000:
-            raise HTTPException(
-                status_code=400, detail="Journal text too long (max 50000 chars)"
-            )
-
-        # Check space access if space_id provided
-        if request.space_id is not None and not await user_in_space(
-            current_user["user_id"], request.space_id
-        ):
-            raise HTTPException(status_code=403, detail="Access denied to this space")
-
-        # Create journal entry
-        entry = JournalEntry(
-            user_id=current_user["user_id"],
-            space_id=request.space_id,
-            date=request.date,
-            text=request.text,
-        )
-
-        result = await create_journal_entry(entry, current_user.get("timezone", "UTC"))
-        logger.info(
-            f"Journal entry created/updated for user {current_user['email']}, date {request.date}"
-        )
-        return result
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error creating journal entry: {e}")
-        raise HTTPException(status_code=500, detail="Failed to create journal entry")
-
-
-@app.delete("/journals/{entry_id}")
-async def api_delete_journal_entry(
-    entry_id: str, current_user: dict = Depends(get_current_user)
-):
-    """Delete a journal entry."""
-    try:
-        success = await delete_journal_entry(entry_id, current_user["user_id"])
-        if success:
-            logger.info(
-                f"Journal entry {entry_id} deleted by user {current_user['email']}"
-            )
-            return {"message": "Journal entry deleted successfully"}
-        else:
-            raise HTTPException(status_code=404, detail="Journal entry not found")
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error deleting journal entry: {e}")
-        raise HTTPException(status_code=500, detail="Failed to delete journal entry")
-
-
-# ── Agent Memory Endpoints ────────────────────────────────────────────
-
-
-@app.get("/memories")
-async def api_list_memories(
-    space_id: Optional[str] = None,
-    category: Optional[str] = None,
-    current_user: dict = Depends(get_current_user),
-):
-    """List all agent memory facts for the current user/space."""
-    from agent_memory import list_memories
-
-    facts = await list_memories(current_user["user_id"], space_id, category)
-    return [
-        {
-            "_id": f.id,
-            "key": f.key,
-            "value": f.value,
-            "category": f.category,
-            "agent_id": f.agent_id,
-            "created_at": f.created_at.isoformat() if f.created_at else None,
-            "updated_at": f.updated_at.isoformat() if f.updated_at else None,
-        }
-        for f in facts
-    ]
-
-
-@app.put("/memories")
-async def api_save_memory(
-    request: Request,
-    space_id: Optional[str] = None,
-    current_user: dict = Depends(get_current_user),
-):
-    """Save or update a memory fact."""
-    from agent_memory import save_memory
-
-    body = await request.json()
-    key = body.get("key", "").strip()
-    value = body.get("value", "").strip()
-    category = body.get("category")
-
-    if not key or not value:
-        raise HTTPException(status_code=400, detail="key and value are required")
-
-    fact = await save_memory(current_user["user_id"], key, value, space_id, category)
-    return {"key": fact.key, "value": fact.value, "category": fact.category}
-
-
-@app.delete("/memories/{memory_id}")
-async def api_delete_memory(
-    memory_id: str,
-    current_user: dict = Depends(get_current_user),
-):
-    """Delete a specific memory fact by its _id."""
-    from agent_memory import delete_memory, delete_memory_by_key
-
-    # Try deleting by ObjectId first, then fall back to key-based delete
-    deleted = await delete_memory(memory_id, current_user["user_id"])
-    if not deleted:
-        deleted = await delete_memory_by_key(current_user["user_id"], memory_id)
-    if deleted:
-        return {"ok": True}
-    raise HTTPException(status_code=404, detail="Memory not found")
-
-
-@app.delete("/memories")
-async def api_delete_all_memories(
-    space_id: Optional[str] = None,
-    current_user: dict = Depends(get_current_user),
-):
-    """Delete all memory facts for the current user/space."""
-    from agent_memory import delete_all_memories
-
-    count = await delete_all_memories(current_user["user_id"], space_id)
-    return {"deleted_count": count}
+# Journal endpoints moved to routers/journal_routes.py
+# Memory endpoints moved to routers/memory_routes.py
 
 
 @app.get("/export")
@@ -1573,30 +946,6 @@ async def api_get_single_todo(
         doc["first_name"] = ""
     return doc
 
-
-@app.get("/memory-logs")
-async def api_get_memory_logs(
-    space_id: Optional[str] = None,
-    limit: int = 14,
-    current_user: dict = Depends(get_current_user),
-):
-    """Return recent daily memory logs for the current user."""
-    sid = space_id or current_user.get("active_space_id", "")
-    logs = await get_recent_memory_logs(
-        current_user["user_id"], sid, limit=min(limit, 30)
-    )
-    result = []
-    for log in logs:
-        result.append(
-            {
-                "_id": log.id,
-                "date": log.date,
-                "entries": log.entries,
-                "created_at": log.created_at.isoformat() if log.created_at else None,
-                "updated_at": log.updated_at.isoformat() if log.updated_at else None,
-            }
-        )
-    return result
 
 
 if __name__ == "__main__":
