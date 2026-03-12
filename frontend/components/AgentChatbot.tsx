@@ -977,46 +977,8 @@ export default function AgentChatbot({
         {messages.length === 0 && !loading && !isTaskSession && (
           <div className="flex items-center justify-center min-h-full py-8">
             <div className="max-w-md text-center space-y-4 px-6">
-              <p className="text-gray-300 text-base leading-relaxed">
-                Hi, I&apos;m your personal assistant
-              </p>
-              <p className="text-gray-400 text-sm leading-relaxed">
-                Ask me anything! I can help you manage your tasks, find information, and more.
-              </p>
-
-              <div className="text-left space-y-4 mt-4">
-                <div>
-                  <h4 className="text-sm font-semibold text-gray-200 mb-2">Task Management</h4>
-                  <ul className="text-sm text-gray-400 space-y-1 ml-4">
-                    <li>- Add, update, and search your tasks</li>
-                    <li>- Get task recommendations and suggestions</li>
-                  </ul>
-                </div>
-
-                <div>
-                  <h4 className="text-sm font-semibold text-gray-200 mb-2">Journal Access</h4>
-                  <ul className="text-sm text-gray-400 space-y-1 ml-4">
-                    <li>- Add journal entries</li>
-                    <li>- Search through your past reflections</li>
-                  </ul>
-                </div>
-
-                <div>
-                  <h4 className="text-sm font-semibold text-gray-200 mb-2">Information & Resources</h4>
-                  <ul className="text-sm text-gray-400 space-y-1 ml-4">
-                    <li>- Search the web for current information</li>
-                  </ul>
-                </div>
-              </div>
-
-              <div className="mt-4 pt-4 border-t border-gray-800">
-                <p className="text-sm text-gray-500 italic">
-                  Try: &quot;What should I get done today?&quot; or &quot;Summarize my latest journals&quot;
-                </p>
-              </div>
-
               {/* Session search */}
-              <div className="mt-4 pt-4 border-t border-gray-800">
+              <div>
                 <p className="text-xs text-gray-500 mb-2">Search past conversations:</p>
                 <div className="relative">
                   <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-500 pointer-events-none" />
@@ -1080,7 +1042,7 @@ export default function AgentChatbot({
               </div>
 
               <div className="mt-4 pt-4 border-t border-gray-800">
-                <p className="text-xs text-gray-500 mb-2">Or chat directly with an agent:</p>
+                <p className="text-xs text-gray-500 mb-2">Chat with an agent:</p>
                 <div className="flex flex-wrap gap-2 justify-center">
                   <button
                     onClick={handleSelectBuiltInAssistant}
