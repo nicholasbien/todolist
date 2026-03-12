@@ -137,7 +137,7 @@ export default function AIToDoListApp({
   const [editCatName, setEditCatName] = useState("");
   const [editingCategory, setEditingCategory] = useState<string | null>(null);
   const [sendingEmail, setSendingEmail] = useState(false);
-  const [showCompleted, setShowCompleted] = useState(false);
+  const [taskViewTab, setTaskViewTab] = useState<'active' | 'completed'>('active');
   const [visibleUncompletedCount, setVisibleUncompletedCount] = useState(10);
   const [visibleCompletedCount, setVisibleCompletedCount] = useState(10);
   const [showUpdatePrompt, setShowUpdatePrompt] = useState(false);
@@ -1932,88 +1932,124 @@ export default function AIToDoListApp({
         </div>
       )}
 
+      {/* Task view tabs: Active / Completed */}
+      <div className="flex mb-4 border-b border-gray-800">
+        <button
+          onClick={() => setTaskViewTab('active')}
+          className={`flex-1 py-2.5 text-sm font-medium transition-colors relative ${
+            taskViewTab === 'active'
+              ? 'text-accent'
+              : 'text-gray-400 hover:text-gray-200'
+          }`}
+        >
+          Active{uncompletedTodos.length > 0 ? ` (${uncompletedTodos.length})` : ''}
+          {taskViewTab === 'active' && (
+            <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-accent rounded-full" />
+          )}
+        </button>
+        <button
+          onClick={() => setTaskViewTab('completed')}
+          className={`flex-1 py-2.5 text-sm font-medium transition-colors relative ${
+            taskViewTab === 'completed'
+              ? 'text-accent'
+              : 'text-gray-400 hover:text-gray-200'
+          }`}
+        >
+          Completed{completedTodos.length > 0 ? ` (${completedTodos.length})` : ''}
+          {taskViewTab === 'completed' && (
+            <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-accent rounded-full" />
+          )}
+        </button>
+      </div>
+
       {/* Todo list */}
       {loadingTodos && (
         <div className="text-gray-400 mb-2 text-center">Loading tasks...</div>
       )}
-      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-        <SortableContext items={uncompletedTodoIds} strategy={verticalListSortingStrategy}>
+
+      {/* Active tasks tab */}
+      {taskViewTab === 'active' && (
+        <>
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+            <SortableContext items={uncompletedTodoIds} strategy={verticalListSortingStrategy}>
+              <div className="space-y-3">
+                {uncompletedTodos.slice(0, visibleUncompletedCount).map((todo) => (
+                  <React.Fragment key={todo._id}>
+                    <SortableItem id={todo._id} disabled={!isSortModeActive}>
+                      <TodoItem
+                        todo={todo}
+                        categories={categories}
+                        editingCategory={editingCategory}
+                        setEditingCategory={setEditingCategory}
+                        handleUpdateCategory={handleUpdateCategory}
+                        handleUpdatePriority={handleUpdatePriority}
+                        handleCompleteTodo={handleCompleteTodo}
+                        handleDeleteTodo={handleDeleteTodo}
+                        isCollaborative={(activeSpace?.member_ids?.length ?? 0) > 1}
+                        onEdit={handleEditTodo}
+                        onChat={handleChatAboutTodo}
+                        sessionStatus={todoSessionStatuses[todo._id] as any}
+                        subtaskCount={childrenByParent.get(todo._id)?.length}
+                        subtaskDoneCount={childrenByParent.get(todo._id)?.filter(c => c.completed).length}
+                        subtasks={childrenByParent.get(todo._id)}
+                        subtaskSessionStatuses={todoSessionStatuses as any}
+                      />
+                    </SortableItem>
+                  </React.Fragment>
+                ))}
+              </div>
+            </SortableContext>
+          </DndContext>
+
+          {!loadingTodos && uncompletedTodos.length === 0 && (
+            <div className="text-gray-500 text-center py-8">No active tasks</div>
+          )}
+
+          {uncompletedTodos.length > visibleUncompletedCount && (
+            <div className="mt-4 mb-2 flex justify-center">
+              <button
+                onClick={() => setVisibleUncompletedCount(prev => prev + 10)}
+                className="bg-gray-900 hover:bg-gray-800 text-gray-300 px-4 py-2 rounded-lg transition-colors border border-gray-800"
+              >
+                Show More ({uncompletedTodos.length - visibleUncompletedCount})
+              </button>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Completed tasks tab */}
+      {taskViewTab === 'completed' && (
+        <>
           <div className="space-y-3">
-            {uncompletedTodos.slice(0, visibleUncompletedCount).map((todo) => (
+            {completedTodos.slice(0, visibleCompletedCount).map((todo) => (
               <React.Fragment key={todo._id}>
-                <SortableItem id={todo._id} disabled={!isSortModeActive}>
-                  <TodoItem
-                    todo={todo}
-                    categories={categories}
-                    editingCategory={editingCategory}
-                    setEditingCategory={setEditingCategory}
-                    handleUpdateCategory={handleUpdateCategory}
-                    handleUpdatePriority={handleUpdatePriority}
-                    handleCompleteTodo={handleCompleteTodo}
-                    handleDeleteTodo={handleDeleteTodo}
-                    isCollaborative={(activeSpace?.member_ids?.length ?? 0) > 1}
-                    onEdit={handleEditTodo}
-                    onChat={handleChatAboutTodo}
-                    sessionStatus={todoSessionStatuses[todo._id] as any}
-                    subtaskCount={childrenByParent.get(todo._id)?.length}
-                    subtaskDoneCount={childrenByParent.get(todo._id)?.filter(c => c.completed).length}
-                    subtasks={childrenByParent.get(todo._id)}
-                    subtaskSessionStatuses={todoSessionStatuses as any}
-                  />
-                </SortableItem>
+                <TodoItem
+                  todo={todo}
+                  categories={categories}
+                  editingCategory={editingCategory}
+                  setEditingCategory={setEditingCategory}
+                  handleUpdateCategory={handleUpdateCategory}
+                  handleUpdatePriority={handleUpdatePriority}
+                  handleCompleteTodo={handleCompleteTodo}
+                  handleDeleteTodo={handleDeleteTodo}
+                  isCollaborative={(activeSpace?.member_ids?.length ?? 0) > 1}
+                  onEdit={handleEditTodo}
+                  onChat={handleChatAboutTodo}
+                  sessionStatus={todoSessionStatuses[todo._id] as any}
+                  subtaskCount={childrenByParent.get(todo._id)?.length}
+                  subtaskDoneCount={childrenByParent.get(todo._id)?.filter(c => c.completed).length}
+                  subtasks={childrenByParent.get(todo._id)}
+                  subtaskSessionStatuses={todoSessionStatuses as any}
+                />
               </React.Fragment>
             ))}
           </div>
-        </SortableContext>
-      </DndContext>
 
-      {uncompletedTodos.length > visibleUncompletedCount && (
-        <div className="mt-4 mb-2 flex justify-center">
-          <button
-            onClick={() => setVisibleUncompletedCount(prev => prev + 10)}
-            className="bg-gray-900 hover:bg-gray-800 text-gray-300 px-4 py-2 rounded-lg transition-colors border border-gray-800"
-          >
-            Show More ({uncompletedTodos.length - visibleUncompletedCount})
-          </button>
-        </div>
-      )}
+          {!loadingTodos && completedTodos.length === 0 && (
+            <div className="text-gray-500 text-center py-8">No completed tasks</div>
+          )}
 
-      {/* Show/Hide Completed Toggle Button */}
-      {completedTodos.length > 0 && (
-        <div className="mt-6 mb-4 flex justify-center">
-          <button
-            onClick={() => setShowCompleted(!showCompleted)}
-            className="bg-gray-900 hover:bg-gray-800 text-gray-300 px-4 py-2 rounded-lg transition-colors border border-gray-800"
-          >
-            {showCompleted ? 'Hide Completed' : 'Show Completed'} ({completedTodos.length})
-          </button>
-        </div>
-      )}
-
-      {showCompleted && completedTodos.length > 0 && (
-        <div className="mt-6 mb-4 space-y-3">
-          {completedTodos.slice(0, visibleCompletedCount).map((todo) => (
-            <React.Fragment key={todo._id}>
-              <TodoItem
-                todo={todo}
-                categories={categories}
-                editingCategory={editingCategory}
-                setEditingCategory={setEditingCategory}
-                handleUpdateCategory={handleUpdateCategory}
-                handleUpdatePriority={handleUpdatePriority}
-                handleCompleteTodo={handleCompleteTodo}
-                handleDeleteTodo={handleDeleteTodo}
-                isCollaborative={(activeSpace?.member_ids?.length ?? 0) > 1}
-                onEdit={handleEditTodo}
-                onChat={handleChatAboutTodo}
-                sessionStatus={todoSessionStatuses[todo._id] as any}
-                subtaskCount={childrenByParent.get(todo._id)?.length}
-                subtaskDoneCount={childrenByParent.get(todo._id)?.filter(c => c.completed).length}
-                subtasks={childrenByParent.get(todo._id)}
-                subtaskSessionStatuses={todoSessionStatuses as any}
-              />
-            </React.Fragment>
-          ))}
           {completedTodos.length > visibleCompletedCount && (
             <div className="mt-4 mb-2 flex justify-center">
               <button
@@ -2024,7 +2060,7 @@ export default function AIToDoListApp({
               </button>
             </div>
           )}
-        </div>
+        </>
       )}
 
 
