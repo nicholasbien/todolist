@@ -12,9 +12,7 @@ from categories import DEFAULT_CATEGORIES
 from dateparse import manual_parse_due_date
 
 # Configure logging
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 # Load environment variables from .env file
@@ -48,9 +46,7 @@ class TaskClassification(BaseModel):
     dueDate: str | None
 
 
-async def classify_task(
-    text: str, categories: List[str], date_added: str
-) -> Dict[str, Any]:
+async def classify_task(text: str, categories: List[str], date_added: str) -> Dict[str, Any]:
     """
     Classify a task using OpenAI's API to determine category and priority.
 
@@ -117,9 +113,7 @@ async def classify_task(
             temperature=0,
         )
 
-        logger.info(
-            f"OpenAI API call completed in {time.time() - start_time:.2f} seconds"
-        )
+        logger.info(f"OpenAI API call completed in {time.time() - start_time:.2f} seconds")
 
         try:
             # Structured output is automatically parsed into Pydantic model
@@ -137,14 +131,10 @@ async def classify_task(
             # Ensure the category is one of the available categories
             category = result_dict.get("category", "General")
             if category not in categories:
-                logger.warning(
-                    f"Category {category} not in available categories, defaulting to General"
-                )
+                logger.warning(f"Category {category} not in available categories, defaulting to General")
                 category = "General"
 
-            due_date, cleaned_text = result_dict.get("dueDate"), result_dict.get(
-                "text", text
-            )
+            due_date, cleaned_text = result_dict.get("dueDate"), result_dict.get("text", text)
             if not due_date:
                 fallback_due, fallback_text = manual_parse_due_date(text, date_added)
                 if fallback_due:

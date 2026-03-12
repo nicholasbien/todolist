@@ -73,9 +73,7 @@ async def api_update_schedule(
         req.timezone,
         req.email_enabled,
     )
-    await update_user_summary_time(
-        current_user["user_id"], req.email_enabled, req.hour, req.minute, req.timezone
-    )
+    await update_user_summary_time(current_user["user_id"], req.email_enabled, req.hour, req.minute, req.timezone)
 
     if req.email_enabled:
         update_schedule_time(
@@ -101,9 +99,7 @@ async def api_update_instructions(
 ):
     """Update custom summary instructions for the current user."""
     logger.info("Instructions update requested by %s", current_user["email"])
-    return await update_user_email_instructions(
-        current_user["user_id"], req.instructions
-    )
+    return await update_user_email_instructions(current_user["user_id"], req.instructions)
 
 
 @router.post("/update-spaces")

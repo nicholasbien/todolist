@@ -35,9 +35,7 @@ router = APIRouter(tags=["todos"])
 
 
 @router.get("/todos", response_model=List[Todo])
-async def api_get_todos(
-    space_id: str | None = None, current_user: dict = Depends(get_current_user)
-):
+async def api_get_todos(space_id: str | None = None, current_user: dict = Depends(get_current_user)):
     logger.info(f"Fetching todos for user: {current_user['email']} in space {space_id}")
     result = await get_todos(current_user["user_id"], space_id)
     logger.info(f"Fetched {len(result)} todos")
@@ -45,9 +43,7 @@ async def api_get_todos(
 
 
 @router.post("/todos", response_model=Todo)
-async def api_create_todo(
-    request: Request, current_user: dict = Depends(get_current_user)
-):
+async def api_create_todo(request: Request, current_user: dict = Depends(get_current_user)):
     try:
         body = await request.json()
 
@@ -60,14 +56,10 @@ async def api_create_todo(
         if not text:
             raise HTTPException(status_code=400, detail="Task text is required")
         if len(text) > 2000:
-            raise HTTPException(
-                status_code=400, detail="Task text too long (max 2000 chars)"
-            )
+            raise HTTPException(status_code=400, detail="Task text too long (max 2000 chars)")
         notes = body.get("notes", "")
         if notes and len(notes) > 10000:
-            raise HTTPException(
-                status_code=400, detail="Notes too long (max 10000 chars)"
-            )
+            raise HTTPException(status_code=400, detail="Notes too long (max 10000 chars)")
 
         # Determine the text to classify
         classify_text = text
@@ -87,26 +79,15 @@ async def api_create_todo(
                 _blocked = False
                 try:
                     ip = ipaddress.ip_address(hostname)
-                    if (
-                        ip.is_private
-                        or ip.is_loopback
-                        or ip.is_reserved
-                        or ip.is_link_local
-                    ):
+                    if ip.is_private or ip.is_loopback or ip.is_reserved or ip.is_link_local:
                         _blocked = True
                 except ValueError:
                     # hostname is not an IP — block common internal names
-                    if (
-                        hostname in ("localhost",)
-                        or hostname.endswith(".local")
-                        or hostname.endswith(".internal")
-                    ):
+                    if hostname in ("localhost",) or hostname.endswith(".local") or hostname.endswith(".internal"):
                         _blocked = True
 
                 if _blocked:
-                    logger.warning(
-                        f"Blocked URL fetch to private/internal host: {hostname}"
-                    )
+                    logger.warning(f"Blocked URL fetch to private/internal host: {hostname}")
                 else:
                     req_headers = {
                         "User-Agent": (
@@ -137,11 +118,7 @@ async def api_create_todo(
         if not body.get("created_offline", False) and not body.get("category"):
             try:
                 # Get categories (this automatically ensures "General" exists)
-                categories_list = (
-                    await get_categories(body.get("space_id"))
-                    if body.get("space_id")
-                    else []
-                )
+                categories_list = await get_categories(body.get("space_id")) if body.get("space_id") else []
 
                 classification = await classify_task(
                     classify_text,
@@ -198,13 +175,9 @@ async def api_create_todo(
                     # For subtasks, include parent context
                     from bson import ObjectId as _ObjId
 
-                    parent_doc = await todos_collection.find_one(
-                        {"_id": _ObjId(body["parent_id"])}
-                    )
+                    parent_doc = await todos_collection.find_one({"_id": _ObjId(body["parent_id"])})
                     parent_text = parent_doc.get("text", "") if parent_doc else ""
-                    initial_msg = (
-                        f"Subtask of: \"{parent_text}\"\n\nTask: {todo_dict['text']}"
-                    )
+                    initial_msg = f"Subtask of: \"{parent_text}\"\n\nTask: {todo_dict['text']}"
                     if details:
                         initial_msg += "\n" + "\n".join(details)
                 else:
@@ -225,9 +198,7 @@ async def api_create_todo(
 
                 # For subtasks, inherit agent_id from parent session if not set
                 if is_subtask and not auto_agent_id and parent_doc:
-                    parent_session = await find_session_by_todo(
-                        current_user["user_id"], body["parent_id"]
-                    )
+                    parent_session = await find_session_by_todo(current_user["user_id"], body["parent_id"])
                     if parent_session and parent_session.get("agent_id"):
                         auto_agent_id = parent_session["agent_id"]
 
@@ -238,9 +209,7 @@ async def api_create_todo(
                     todo_id=todo_id,
                     agent_id=auto_agent_id,
                 )
-                await append_message(
-                    session_id, current_user["user_id"], role, initial_msg
-                )
+                await append_message(session_id, current_user["user_id"], role, initial_msg)
 
                 # For subtasks with dependencies, make session dormant
                 # (will be activated when all dependencies complete)
@@ -269,9 +238,7 @@ async def api_create_todo(
 
 
 @router.put("/todos/reorder")
-async def api_reorder_todos(
-    request: Request, current_user: dict = Depends(get_current_user)
-):
+async def api_reorder_todos(request: Request, current_user: dict = Depends(get_current_user)):
     try:
         body = await request.json()
         todo_ids = body.get("todoIds", [])
@@ -284,29 +251,21 @@ async def api_reorder_todos(
         user_id = current_user["user_id"]
         # Verify the user owns all the todos being reordered
         oid_list = [ObjectId(tid) for tid in todo_ids]
-        owned_count = await todos_collection.count_documents(
-            {"_id": {"$in": oid_list}, "user_id": user_id}
-        )
+        owned_count = await todos_collection.count_documents({"_id": {"$in": oid_list}, "user_id": user_id})
         if owned_count != len(oid_list):
             # Fall back to checking space membership for collaborative todos
-            space_docs = await todos_collection.find(
-                {"_id": {"$in": oid_list}}, {"space_id": 1}
-            ).to_list(length=len(oid_list))
+            space_docs = await todos_collection.find({"_id": {"$in": oid_list}}, {"space_id": 1}).to_list(
+                length=len(oid_list)
+            )
             if len(space_docs) != len(oid_list):
-                raise HTTPException(
-                    status_code=403, detail="Not authorized to reorder these todos"
-                )
+                raise HTTPException(status_code=403, detail="Not authorized to reorder these todos")
             for doc in space_docs:
                 sid = doc.get("space_id")
                 if not sid or not await user_in_space(user_id, sid):
-                    raise HTTPException(
-                        status_code=403, detail="Not authorized to reorder these todos"
-                    )
+                    raise HTTPException(status_code=403, detail="Not authorized to reorder these todos")
 
         for i, todo_id in enumerate(todo_ids):
-            await todos_collection.update_one(
-                {"_id": ObjectId(todo_id)}, {"$set": {"sortOrder": i}}
-            )
+            await todos_collection.update_one({"_id": ObjectId(todo_id)}, {"$set": {"sortOrder": i}})
         return {"ok": True}
     except HTTPException:
         raise
@@ -317,29 +276,19 @@ async def api_reorder_todos(
 
 @router.delete("/todos/{todo_id}")
 async def api_delete_todo(todo_id: str, current_user: dict = Depends(get_current_user)):
-    logger.info(
-        f"Soft-deleting (closing) todo with ID: {todo_id} for user: {current_user['email']}"
-    )
+    logger.info(f"Soft-deleting (closing) todo with ID: {todo_id} for user: {current_user['email']}")
     return await delete_todo(todo_id, current_user["user_id"])
 
 
 @router.delete("/todos/{todo_id}/permanent")
-async def api_permanent_delete_todo(
-    todo_id: str, current_user: dict = Depends(get_current_user)
-):
-    logger.info(
-        f"Permanently deleting todo with ID: {todo_id} for user: {current_user['email']}"
-    )
+async def api_permanent_delete_todo(todo_id: str, current_user: dict = Depends(get_current_user)):
+    logger.info(f"Permanently deleting todo with ID: {todo_id} for user: {current_user['email']}")
     return await permanent_delete_todo(todo_id, current_user["user_id"])
 
 
 @router.put("/todos/{todo_id}/complete")
-async def api_complete_todo(
-    todo_id: str, current_user: dict = Depends(get_current_user)
-):
-    logger.info(
-        f"Marking todo as complete with ID: {todo_id} for user: {current_user['email']}"
-    )
+async def api_complete_todo(todo_id: str, current_user: dict = Depends(get_current_user)):
+    logger.info(f"Marking todo as complete with ID: {todo_id} for user: {current_user['email']}")
     result = await complete_todo(todo_id, current_user["user_id"])
     # Trigger subtask orchestration (activate next subtask, post final results)
     try:
@@ -350,32 +299,22 @@ async def api_complete_todo(
 
 
 @router.post("/todos/{todo_id}/restore", response_model=Todo)
-async def api_restore_todo(
-    todo_id: str, current_user: dict = Depends(get_current_user)
-):
+async def api_restore_todo(todo_id: str, current_user: dict = Depends(get_current_user)):
     """Restore a soft-deleted (closed) todo by setting closed=false."""
-    logger.info(
-        f"Restoring soft-deleted todo {todo_id} for user: {current_user['email']}"
-    )
+    logger.info(f"Restoring soft-deleted todo {todo_id} for user: {current_user['email']}")
     return await update_todo_fields(todo_id, {"closed": False}, current_user["user_id"])
 
 
 @router.put("/todos/{todo_id}", response_model=Todo)
-async def api_update_todo(
-    todo_id: str, request: Request, current_user: dict = Depends(get_current_user)
-):
+async def api_update_todo(todo_id: str, request: Request, current_user: dict = Depends(get_current_user)):
     try:
         body = await request.json()
 
         # Input length validation
         if "text" in body and len(body["text"]) > 2000:
-            raise HTTPException(
-                status_code=400, detail="Task text too long (max 2000 chars)"
-            )
+            raise HTTPException(status_code=400, detail="Task text too long (max 2000 chars)")
         if "notes" in body and body["notes"] and len(body["notes"]) > 10000:
-            raise HTTPException(
-                status_code=400, detail="Notes too long (max 10000 chars)"
-            )
+            raise HTTPException(status_code=400, detail="Notes too long (max 10000 chars)")
         if "category" in body and len(body["category"]) > 100:
             raise HTTPException(status_code=400, detail="Category name too long")
 
@@ -396,12 +335,8 @@ async def api_update_todo(
         if "space_id" in body:
             new_space_id = body["space_id"]
             # Validate user has access to destination space
-            if new_space_id and not await user_in_space(
-                current_user["user_id"], new_space_id
-            ):
-                raise HTTPException(
-                    status_code=403, detail="Not authorized to move to target space"
-                )
+            if new_space_id and not await user_in_space(current_user["user_id"], new_space_id):
+                raise HTTPException(status_code=403, detail="Not authorized to move to target space")
             updates["space_id"] = new_space_id
         if "agent_id" in body:
             updates["agent_id"] = body["agent_id"]
@@ -486,9 +421,7 @@ async def api_get_single_todo(
         raise HTTPException(status_code=404, detail="Todo not found")
     # Check ownership: user must own the todo or be in the same space
     is_owner = doc.get("user_id") == current_user["user_id"]
-    is_space_member = doc.get("space_id") and await user_in_space(
-        current_user["user_id"], doc["space_id"]
-    )
+    is_space_member = doc.get("space_id") and await user_in_space(current_user["user_id"], doc["space_id"])
     if not is_owner and not is_space_member:
         raise HTTPException(status_code=403, detail="Not authorized")
     doc["_id"] = str(doc["_id"])

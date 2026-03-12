@@ -55,11 +55,7 @@ def generate_insights(todos):
     Works in both Python backend and JavaScript service worker contexts.
     """
     # Convert todos to consistent format
-    todo_array = (
-        list(todos)
-        if hasattr(todos, "__iter__")
-        else list(todos.values()) if hasattr(todos, "values") else []
-    )
+    todo_array = list(todos) if hasattr(todos, "__iter__") else list(todos.values()) if hasattr(todos, "values") else []
 
     # Initialize tracking
     weekly_stats = {}
@@ -126,18 +122,12 @@ def generate_insights(todos):
     weekly_data = []
     for week in sorted(weekly_stats.keys()):
         stats = weekly_stats[week]
-        weekly_data.append(
-            {"week": week, "created": stats["created"], "completed": stats["completed"]}
-        )
+        weekly_data.append({"week": week, "created": stats["created"], "completed": stats["completed"]})
 
     # Convert category stats to list
     category_data = []
     for category, stats in category_stats.items():
-        completion_rate_cat = (
-            round((stats["completed"] / stats["total"]) * 1000) / 10
-            if stats["total"] > 0
-            else 0
-        )
+        completion_rate_cat = round((stats["completed"] / stats["total"]) * 1000) / 10 if stats["total"] > 0 else 0
         category_data.append(
             {
                 "category": category,
@@ -150,11 +140,7 @@ def generate_insights(todos):
     # Convert priority stats to list
     priority_data = []
     for priority, stats in priority_stats.items():
-        completion_rate_pri = (
-            round((stats["completed"] / stats["total"]) * 1000) / 10
-            if stats["total"] > 0
-            else 0
-        )
+        completion_rate_pri = round((stats["completed"] / stats["total"]) * 1000) / 10 if stats["total"] > 0 else 0
         priority_data.append(
             {
                 "priority": priority,

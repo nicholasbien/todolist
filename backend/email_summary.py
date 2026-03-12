@@ -97,9 +97,7 @@ def load_haiku_collection() -> List[str]:
         with open(haiku_file, "r", encoding="utf-8") as f:
             haiku_collection = json.load(f)
 
-        logger.info(
-            f"Loaded {len(haiku_collection)} haikus from {os.path.basename(haiku_file)}"
-        )
+        logger.info(f"Loaded {len(haiku_collection)} haikus from {os.path.basename(haiku_file)}")
         return haiku_collection
     except Exception as e:
         logger.error(f"Error loading haiku collection: {e}")
@@ -173,9 +171,7 @@ async def generate_todo_summary(
         spaces_json = json.dumps(spaces_data, indent=2, default=str)
 
         journal_entries_json = (
-            json.dumps(journal_entries_data, indent=2, default=str)
-            if journal_entries_data is not None
-            else "[]"
+            json.dumps(journal_entries_data, indent=2, default=str) if journal_entries_data is not None else "[]"
         )
 
         # Get a haiku to include in the prompt so AI can choose matching emoji
@@ -224,9 +220,7 @@ def create_simple_summary(spaces_data: list, user_name: str = "there") -> str:
     due_soon = [
         t
         for t in pending
-        if t.get("dueDate")
-        and datetime.fromisoformat(str(t["dueDate"]))
-        <= datetime.now() + timedelta(days=1)
+        if t.get("dueDate") and datetime.fromisoformat(str(t["dueDate"])) <= datetime.now() + timedelta(days=1)
     ]
 
     summary = f"""Good morning {user_name}!
@@ -291,9 +285,7 @@ def generate_top_items_section(todos: List[dict]) -> Tuple[str, str]:
     return text_section.strip(), html_section
 
 
-async def send_email(
-    to_email: str, subject: str, body_text: str, body_html: str | None = None
-) -> bool:
+async def send_email(to_email: str, subject: str, body_text: str, body_html: str | None = None) -> bool:
     """
     Send an email using SMTP.
     """
@@ -367,24 +359,16 @@ async def send_daily_summary(
         all_todos = []
         for space in spaces:
             space_todos = await get_todos(user_id, space.id)
-            todos_dict = [
-                t.dict(by_alias=True) if hasattr(t, "dict") else t for t in space_todos
-            ]
+            todos_dict = [t.dict(by_alias=True) if hasattr(t, "dict") else t for t in space_todos]
             relative: List[dict] = []
             for t in todos_dict:
                 t_copy = dict(t)
                 if t_copy.get("dueDate"):
-                    t_copy["dueDateRelative"] = format_date_with_relative(
-                        t_copy["dueDate"]
-                    )
+                    t_copy["dueDateRelative"] = format_date_with_relative(t_copy["dueDate"])
                 if t_copy.get("dateAdded"):
-                    t_copy["dateAddedRelative"] = format_date_with_relative(
-                        t_copy["dateAdded"]
-                    )
+                    t_copy["dateAddedRelative"] = format_date_with_relative(t_copy["dateAdded"])
                 if t_copy.get("dateCompleted"):
-                    t_copy["dateCompletedRelative"] = format_date_with_relative(
-                        t_copy["dateCompleted"]
-                    )
+                    t_copy["dateCompletedRelative"] = format_date_with_relative(t_copy["dateCompleted"])
                 t_copy["_space"] = space.name
                 relative.append(t_copy)
                 all_todos.append(t_copy)
@@ -423,23 +407,15 @@ async def send_daily_summary(
             # Use only Buddhist monk instructions if no custom ones
             custom_instructions = buddhist_instructions
 
-        user_timezone = (
-            user.get("timezone", "America/New_York") if user else "America/New_York"
-        )
+        user_timezone = user.get("timezone", "America/New_York") if user else "America/New_York"
 
         # Filter out invalid todos (those without dateAdded)
         valid_todos_dict = [todo for todo in all_todos if todo.get("dateAdded")]
-        logger.info(
-            f"Filtered {len(all_todos) - len(valid_todos_dict)} todos with missing dateAdded"
-        )
+        logger.info(f"Filtered {len(all_todos) - len(valid_todos_dict)} todos with missing dateAdded")
 
         # Separate completed and uncompleted tasks from valid todos
-        completed_todos = [
-            todo for todo in valid_todos_dict if todo.get("completed", False)
-        ]
-        uncompleted_todos = [
-            todo for todo in valid_todos_dict if not todo.get("completed", False)
-        ]
+        completed_todos = [todo for todo in valid_todos_dict if todo.get("completed", False)]
+        uncompleted_todos = [todo for todo in valid_todos_dict if not todo.get("completed", False)]
 
         # Sort uncompleted todos using same logic as UI: priority first, then most recent dateAdded
         def uncompleted_sort_key(todo):
@@ -464,9 +440,7 @@ async def send_daily_summary(
         def completed_sort_key(todo):
             date_completed = todo.get("dateCompleted") or todo.get("dateAdded")
             try:
-                completed_dt = datetime.fromisoformat(
-                    date_completed.replace("Z", "+00:00")
-                )
+                completed_dt = datetime.fromisoformat(date_completed.replace("Z", "+00:00"))
                 return -completed_dt.timestamp()  # Negative for descending order
             except (ValueError, AttributeError):
                 return 0
@@ -481,9 +455,7 @@ async def send_daily_summary(
         for todo in limited:
             space_name = todo.pop("_space", "Personal")
             limited_by_space.setdefault(space_name, []).append(todo)
-        limited_spaces = [
-            {"space": name, "todos": items} for name, items in limited_by_space.items()
-        ]
+        limited_spaces = [{"space": name, "todos": items} for name, items in limited_by_space.items()]
 
         # Generate summary
         display_name = user_name or user_email.split("@")[0]
@@ -526,9 +498,7 @@ async def send_daily_summary(
         return False
 
 
-async def send_contact_message(
-    sender_email: str, sender_name: str, message: str
-) -> bool:
+async def send_contact_message(sender_email: str, sender_name: str, message: str) -> bool:
     """Send a contact message to the admin email."""
     try:
         # Format the contact message

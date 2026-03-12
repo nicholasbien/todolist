@@ -38,19 +38,13 @@ async def init_todo_indexes() -> None:
         await todos_collection.create_index([("space_id", 1), ("user_id", 1)])
 
         # Queries for completed/uncompleted todos within a space
-        await todos_collection.create_index(
-            [("user_id", 1), ("space_id", 1), ("completed", 1)]
-        )
+        await todos_collection.create_index([("user_id", 1), ("space_id", 1), ("completed", 1)])
 
         # Queries sorted by date (most recent first)
-        await todos_collection.create_index(
-            [("user_id", 1), ("space_id", 1), ("dateAdded", -1)]
-        )
+        await todos_collection.create_index([("user_id", 1), ("space_id", 1), ("dateAdded", -1)])
 
         # Queries by category within a space
-        await todos_collection.create_index(
-            [("user_id", 1), ("space_id", 1), ("category", 1)]
-        )
+        await todos_collection.create_index([("user_id", 1), ("space_id", 1), ("category", 1)])
 
         # Sub-task lookups by parent
         await todos_collection.create_index("parent_id")
@@ -159,9 +153,7 @@ async def create_todo(todo: Todo):
         if not todo.space_id:
             from spaces import spaces_collection
 
-            default_space = await spaces_collection.find_one(
-                {"owner_id": todo.user_id, "is_default": True}
-            )
+            default_space = await spaces_collection.find_one({"owner_id": todo.user_id, "is_default": True})
             if default_space:
                 todo_dict["space_id"] = str(default_space["_id"])
 
@@ -176,18 +168,12 @@ async def create_todo(todo: Todo):
             if not parent:
                 raise HTTPException(status_code=404, detail="Parent todo not found")
             if parent.get("space_id") != final_space_id:
-                raise HTTPException(
-                    status_code=403, detail="Parent todo not in same space"
-                )
+                raise HTTPException(status_code=403, detail="Parent todo not in same space")
             if not parent.get("space_id") and parent.get("user_id") != todo.user_id:
-                raise HTTPException(
-                    status_code=403, detail="Parent todo not owned by user"
-                )
+                raise HTTPException(status_code=403, detail="Parent todo not owned by user")
             # Single-level nesting only
             if parent.get("parent_id"):
-                raise HTTPException(
-                    status_code=400, detail="Cannot create sub-task of a sub-task"
-                )
+                raise HTTPException(status_code=400, detail="Cannot create sub-task of a sub-task")
 
         # Validate depends_on
         if todo.depends_on:
@@ -242,9 +228,7 @@ async def create_todo(todo: Todo):
 
         # Add user's first name for collaborative spaces
         try:
-            user = await auth.users_collection.find_one(
-                {"_id": ObjectId(created_todo["user_id"])}
-            )
+            user = await auth.users_collection.find_one({"_id": ObjectId(created_todo["user_id"])})
             if user:
                 created_todo["first_name"] = user.get("first_name", "")
         except Exception:
@@ -313,9 +297,7 @@ async def delete_todo(todo_id: str, user_id: str):
         try:
             object_id = ObjectId(todo_id)
         except Exception:
-            raise HTTPException(
-                status_code=400, detail=f"Invalid todo ID format: {todo_id}"
-            )
+            raise HTTPException(status_code=400, detail=f"Invalid todo ID format: {todo_id}")
 
         query = {"_id": object_id}
         todo = await todos_collection.find_one(query)
@@ -369,9 +351,7 @@ async def permanent_delete_todo(todo_id: str, user_id: str):
         try:
             object_id = ObjectId(todo_id)
         except Exception:
-            raise HTTPException(
-                status_code=400, detail=f"Invalid todo ID format: {todo_id}"
-            )
+            raise HTTPException(status_code=400, detail=f"Invalid todo ID format: {todo_id}")
 
         query = {"_id": object_id}
         todo = await todos_collection.find_one(query)
@@ -401,9 +381,7 @@ async def permanent_delete_todo(todo_id: str, user_id: str):
         raise he
     except Exception as e:
         logger.error(f"Error permanently deleting todo: {str(e)}")
-        raise HTTPException(
-            status_code=500, detail=f"Error permanently deleting todo: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Error permanently deleting todo: {str(e)}")
 
 
 async def complete_todo(todo_id: str, user_id: str):
@@ -415,9 +393,7 @@ async def complete_todo(todo_id: str, user_id: str):
         try:
             object_id = ObjectId(todo_id)
         except Exception:
-            raise HTTPException(
-                status_code=400, detail=f"Invalid todo ID format: {todo_id}"
-            )
+            raise HTTPException(status_code=400, detail=f"Invalid todo ID format: {todo_id}")
 
         query = {"_id": object_id}
         todo = await todos_collection.find_one(query)
@@ -479,9 +455,7 @@ async def complete_todo(todo_id: str, user_id: str):
 
 async def update_todo_fields(todo_id: str, updates: dict, user_id: str):
     try:
-        logger.info(
-            f"UPDATE DEBUG - todo_id: {todo_id}, updates: {updates}, user_id: {user_id}"
-        )
+        logger.info(f"UPDATE DEBUG - todo_id: {todo_id}, updates: {updates}, user_id: {user_id}")
 
         # Check if todo_id is valid
         if not todo_id or todo_id == "None" or todo_id == "undefined":
@@ -490,9 +464,7 @@ async def update_todo_fields(todo_id: str, updates: dict, user_id: str):
         try:
             object_id = ObjectId(todo_id)
         except Exception:
-            raise HTTPException(
-                status_code=400, detail=f"Invalid todo ID format: {todo_id}"
-            )
+            raise HTTPException(status_code=400, detail=f"Invalid todo ID format: {todo_id}")
 
         query = {"_id": object_id}
         todo = await todos_collection.find_one(query)
@@ -514,12 +486,8 @@ async def update_todo_fields(todo_id: str, updates: dict, user_id: str):
                 # Validate each dep is a sibling
                 for dep_id in new_deps:
                     if dep_id == todo_id:
-                        raise HTTPException(
-                            status_code=400, detail="A subtask cannot depend on itself"
-                        )
-                    dep_todo = await todos_collection.find_one(
-                        {"_id": ObjectId(dep_id)}
-                    )
+                        raise HTTPException(status_code=400, detail="A subtask cannot depend on itself")
+                    dep_todo = await todos_collection.find_one({"_id": ObjectId(dep_id)})
                     if not dep_todo:
                         raise HTTPException(
                             status_code=400,
@@ -548,9 +516,7 @@ async def update_todo_fields(todo_id: str, updates: dict, user_id: str):
 
                 # Add user's first name for collaborative spaces
                 try:
-                    user = await auth.users_collection.find_one(
-                        {"_id": ObjectId(updated_todo["user_id"])}
-                    )
+                    user = await auth.users_collection.find_one({"_id": ObjectId(updated_todo["user_id"])})
                     if user:
                         updated_todo["first_name"] = user.get("first_name", "")
                 except Exception:
@@ -563,9 +529,7 @@ async def update_todo_fields(todo_id: str, updates: dict, user_id: str):
     except HTTPException as he:
         raise he
     except Exception as e:
-        logger.error(
-            f"Error updating todo - Exception type: {type(e)}, Exception args: {e.args}, Exception: {repr(e)}"
-        )
+        logger.error(f"Error updating todo - Exception type: {type(e)}, Exception args: {e.args}, Exception: {repr(e)}")
         raise HTTPException(status_code=500, detail=f"Error updating todo: {repr(e)}")
 
 
@@ -573,13 +537,9 @@ async def update_todo_fields(todo_id: str, updates: dict, user_id: str):
 async def migrate_legacy_todos() -> None:
     try:
         # Update all todos that don't have space_id field to have space_id: None
-        result = await todos_collection.update_many(
-            {"space_id": {"$exists": False}}, {"$set": {"space_id": None}}
-        )
+        result = await todos_collection.update_many({"space_id": {"$exists": False}}, {"$set": {"space_id": None}})
         if result.modified_count > 0:
-            logger.info(
-                "Migrated %d legacy todos to have space_id: None", result.modified_count
-            )
+            logger.info("Migrated %d legacy todos to have space_id: None", result.modified_count)
 
         # Ensure parent_id and subtask_ids fields exist on all todos
         result = await todos_collection.update_many(
@@ -607,9 +567,7 @@ async def migrate_legacy_todos() -> None:
             {"$set": {"depends_on": []}},
         )
         if result.modified_count > 0:
-            logger.info(
-                "Migrated %d legacy todos to have depends_on: []", result.modified_count
-            )
+            logger.info("Migrated %d legacy todos to have depends_on: []", result.modified_count)
 
         # Ensure closed field exists on all todos (default: false)
         result = await todos_collection.update_many(
@@ -617,9 +575,7 @@ async def migrate_legacy_todos() -> None:
             {"$set": {"closed": False}},
         )
         if result.modified_count > 0:
-            logger.info(
-                "Migrated %d legacy todos to have closed: false", result.modified_count
-            )
+            logger.info("Migrated %d legacy todos to have closed: false", result.modified_count)
 
         result = await todos_collection.update_many(
             {"recurrence_rule": {"$exists": False}},
@@ -721,9 +677,7 @@ async def handle_subtask_completion(todo_id: str, user_id: str):
             "user",
             f"Dependencies satisfied ({deps_msg} completed). You may now begin this subtask.",
         )
-        logger.info(
-            f"Activated unblocked subtask session {session_id} for todo {sub_todo_id}"
-        )
+        logger.info(f"Activated unblocked subtask session {session_id} for todo {sub_todo_id}")
 
     # Post progress update to parent session
     done_count = len(completed_ids)
@@ -740,9 +694,7 @@ async def handle_subtask_completion(todo_id: str, user_id: str):
                 "user",
                 f"All {total_count} subtasks are now complete. Please review the results and provide a final summary.",
             )
-            logger.info(
-                f"All subtasks done — notified parent session {parent_session_id}"
-            )
+            logger.info(f"All subtasks done — notified parent session {parent_session_id}")
         else:
             # Progress update
             await append_message(
@@ -751,9 +703,7 @@ async def handle_subtask_completion(todo_id: str, user_id: str):
                 "user",
                 f"Subtask completed: \"{todo.get('text', '')}\" ({done_count}/{total_count} done)",
             )
-            logger.info(
-                f"Posted progress to parent session: {done_count}/{total_count}"
-            )
+            logger.info(f"Posted progress to parent session: {done_count}/{total_count}")
 
 
 def _compute_next_occurrence(rule: str, from_date: datetime | None = None) -> str:
@@ -844,6 +794,4 @@ async def health_check():
             await db.list_collection_names()
         return {"status": "healthy", "database": "connected"}
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Database connection error: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Database connection error: {str(e)}")

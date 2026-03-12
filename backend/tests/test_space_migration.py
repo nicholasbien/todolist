@@ -41,36 +41,22 @@ async def test_rename_default_spaces_to_personal(client, test_email, test_email2
     space2_id = personal_space2["_id"]
 
     # Manually update these spaces back to "Default" to test the migration
-    await spaces.spaces_collection.update_one(
-        {"_id": ObjectId(space1_id)}, {"$set": {"name": "Default"}}
-    )
-    await spaces.spaces_collection.update_one(
-        {"_id": ObjectId(space2_id)}, {"$set": {"name": "Default"}}
-    )
+    await spaces.spaces_collection.update_one({"_id": ObjectId(space1_id)}, {"$set": {"name": "Default"}})
+    await spaces.spaces_collection.update_one({"_id": ObjectId(space2_id)}, {"$set": {"name": "Default"}})
 
     # Verify they are now "Default"
-    default_spaces = await spaces.spaces_collection.find({"name": "Default"}).to_list(
-        None
-    )
+    default_spaces = await spaces.spaces_collection.find({"name": "Default"}).to_list(None)
     assert len(default_spaces) >= 2, "Should have at least 2 Default spaces"
 
     # Run the migration
     await rename_default_spaces_to_personal()
 
     # Verify migration worked
-    default_spaces_after = await spaces.spaces_collection.find(
-        {"name": "Default"}
-    ).to_list(None)
-    personal_spaces_after = await spaces.spaces_collection.find(
-        {"name": "Personal"}
-    ).to_list(None)
+    default_spaces_after = await spaces.spaces_collection.find({"name": "Default"}).to_list(None)
+    personal_spaces_after = await spaces.spaces_collection.find({"name": "Personal"}).to_list(None)
 
-    assert (
-        len(default_spaces_after) == 0
-    ), "Should have no Default spaces after migration"
-    assert (
-        len(personal_spaces_after) >= 2
-    ), "Should have at least 2 Personal spaces after migration"
+    assert len(default_spaces_after) == 0, "Should have no Default spaces after migration"
+    assert len(personal_spaces_after) >= 2, "Should have at least 2 Personal spaces after migration"
 
     # Verify through API that spaces are now "Personal" again
     spaces1_after = await client.get("/spaces", headers=headers1)
@@ -82,19 +68,11 @@ async def test_rename_default_spaces_to_personal(client, test_email, test_email2
     spaces1_data = spaces1_after.json()
     spaces2_data = spaces2_after.json()
 
-    personal_space1_after = next(
-        (s for s in spaces1_data if s["_id"] == space1_id), None
-    )
-    personal_space2_after = next(
-        (s for s in spaces2_data if s["_id"] == space2_id), None
-    )
+    personal_space1_after = next((s for s in spaces1_data if s["_id"] == space1_id), None)
+    personal_space2_after = next((s for s in spaces2_data if s["_id"] == space2_id), None)
 
-    assert (
-        personal_space1_after["name"] == "Personal"
-    ), "User 1's space should be renamed to Personal"
-    assert (
-        personal_space2_after["name"] == "Personal"
-    ), "User 2's space should be renamed to Personal"
+    assert personal_space1_after["name"] == "Personal", "User 1's space should be renamed to Personal"
+    assert personal_space2_after["name"] == "Personal", "User 2's space should be renamed to Personal"
 
 
 @pytest.mark.asyncio
@@ -110,23 +88,15 @@ async def test_migration_with_no_default_spaces(client, test_email):
     await spaces.spaces_collection.delete_many({"name": "Default"})
 
     # Verify no Default spaces exist
-    default_spaces_before = await spaces.spaces_collection.find(
-        {"name": "Default"}
-    ).to_list(None)
-    assert (
-        len(default_spaces_before) == 0
-    ), "Should have no Default spaces before migration"
+    default_spaces_before = await spaces.spaces_collection.find({"name": "Default"}).to_list(None)
+    assert len(default_spaces_before) == 0, "Should have no Default spaces before migration"
 
     # Run migration - should not error and should log appropriately
     await rename_default_spaces_to_personal()
 
     # Should still have no Default spaces
-    default_spaces_after = await spaces.spaces_collection.find(
-        {"name": "Default"}
-    ).to_list(None)
-    assert (
-        len(default_spaces_after) == 0
-    ), "Should have no Default spaces after migration"
+    default_spaces_after = await spaces.spaces_collection.find({"name": "Default"}).to_list(None)
+    assert len(default_spaces_after) == 0, "Should have no Default spaces after migration"
 
 
 @pytest.mark.asyncio
@@ -141,16 +111,12 @@ async def test_migration_preserves_other_spaces(client, test_email):
     headers = {"Authorization": f"Bearer {token}"}
 
     # Create a custom space
-    custom_resp = await client.post(
-        "/spaces", json={"name": "My Custom Space"}, headers=headers
-    )
+    custom_resp = await client.post("/spaces", json={"name": "My Custom Space"}, headers=headers)
     assert custom_resp.status_code == 200
     custom_space_id = custom_resp.json()["_id"]
 
     # Create another space with a different name
-    work_resp = await client.post(
-        "/spaces", json={"name": "Work Projects"}, headers=headers
-    )
+    work_resp = await client.post("/spaces", json={"name": "Work Projects"}, headers=headers)
     assert work_resp.status_code == 200
     work_space_id = work_resp.json()["_id"]
 
@@ -168,23 +134,15 @@ async def test_migration_preserves_other_spaces(client, test_email):
     )
 
     # Verify we have the test Default space
-    default_spaces_before = await spaces.spaces_collection.find(
-        {"name": "Default"}
-    ).to_list(None)
-    assert (
-        len(default_spaces_before) >= 1
-    ), "Should have at least 1 Default space before migration"
+    default_spaces_before = await spaces.spaces_collection.find({"name": "Default"}).to_list(None)
+    assert len(default_spaces_before) >= 1, "Should have at least 1 Default space before migration"
 
     # Run migration
     await rename_default_spaces_to_personal()
 
     # Verify Default spaces were renamed but other spaces preserved
-    default_spaces_after = await spaces.spaces_collection.find(
-        {"name": "Default"}
-    ).to_list(None)
-    assert (
-        len(default_spaces_after) == 0
-    ), "Should have no Default spaces after migration"
+    default_spaces_after = await spaces.spaces_collection.find({"name": "Default"}).to_list(None)
+    assert len(default_spaces_after) == 0, "Should have no Default spaces after migration"
 
     # Verify custom spaces are unchanged through API
     spaces_resp = await client.get("/spaces", headers=headers)
@@ -196,7 +154,5 @@ async def test_migration_preserves_other_spaces(client, test_email):
 
     assert custom_space is not None, "Custom space should still exist"
     assert work_space is not None, "Work space should still exist"
-    assert (
-        custom_space["name"] == "My Custom Space"
-    ), "Custom space name should be unchanged"
+    assert custom_space["name"] == "My Custom Space", "Custom space name should be unchanged"
     assert work_space["name"] == "Work Projects", "Work space name should be unchanged"

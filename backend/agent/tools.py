@@ -49,15 +49,11 @@ def _map_priority_to_ui_format(priority: str) -> str:
     return priority.capitalize() if priority else "Medium"
 
 
-def _prepare_task_title_and_notes(
-    text: str, explicit_notes: Optional[str]
-) -> Tuple[str, Optional[str]]:
+def _prepare_task_title_and_notes(text: str, explicit_notes: Optional[str]) -> Tuple[str, Optional[str]]:
     """Ensure tasks have concise titles with additional context stored in notes."""
 
     normalized_text = (text or "").strip()
-    provided_notes = (
-        explicit_notes.strip() if explicit_notes and explicit_notes.strip() else None
-    )
+    provided_notes = explicit_notes.strip() if explicit_notes and explicit_notes.strip() else None
 
     if not normalized_text:
         return "", provided_notes
@@ -97,9 +93,7 @@ def _prepare_task_title_and_notes(
     return title, notes or None
 
 
-async def add_task(
-    request: TaskAddRequest, user_id: str, space_id: Optional[str] = None
-) -> Dict[str, Any]:
+async def add_task(request: TaskAddRequest, user_id: str, space_id: Optional[str] = None) -> Dict[str, Any]:
     """Add a new task to user's todo list."""
     try:
         # Map priority from agent format to UI format
@@ -136,9 +130,7 @@ async def add_task(
 
             # Build initial message
             if is_subtask:
-                parent_doc = await collections.todos.find_one(
-                    {"_id": ObjectId(request.parent_id)}
-                )
+                parent_doc = await collections.todos.find_one({"_id": ObjectId(request.parent_id)})
                 parent_text = parent_doc.get("text", "") if parent_doc else ""
                 initial_msg = f'Subtask of: "{parent_text}"\n\nTask: {title}'
                 if notes:
@@ -151,9 +143,7 @@ async def add_task(
             # Inherit agent_id from parent session for subtasks
             auto_agent_id = None
             if is_subtask:
-                parent_session = await find_session_by_todo(
-                    user_id, request.parent_id or ""
-                )
+                parent_session = await find_session_by_todo(user_id, request.parent_id or "")
                 if parent_session and parent_session.get("agent_id"):
                     auto_agent_id = parent_session["agent_id"]
 
@@ -168,12 +158,8 @@ async def add_task(
 
             # Dormant session for non-first subtasks
             if is_subtask:
-                parent_doc_fresh = await collections.todos.find_one(
-                    {"_id": ObjectId(request.parent_id)}
-                )
-                parent_subtask_ids = (
-                    parent_doc_fresh.get("subtask_ids", []) if parent_doc_fresh else []
-                )
+                parent_doc_fresh = await collections.todos.find_one({"_id": ObjectId(request.parent_id)})
+                parent_subtask_ids = parent_doc_fresh.get("subtask_ids", []) if parent_doc_fresh else []
                 if parent_subtask_ids and parent_subtask_ids[0] != todo_id:
                     from chat_sessions import sessions_collection as sess_coll
 
@@ -184,9 +170,7 @@ async def add_task(
         except Exception as e:
             import logging
 
-            logging.getLogger(__name__).error(
-                f"Failed to create session for agent task: {e}"
-            )
+            logging.getLogger(__name__).error(f"Failed to create session for agent task: {e}")
 
         return {
             "ok": True,
@@ -208,9 +192,7 @@ async def add_task(
         return {"ok": False, "error": f"Failed to add task: {str(e)}"}
 
 
-async def list_tasks(
-    request: TaskListRequest, user_id: str, space_id: Optional[str] = None
-) -> Dict[str, Any]:
+async def list_tasks(request: TaskListRequest, user_id: str, space_id: Optional[str] = None) -> Dict[str, Any]:
     """List tasks in the current space."""
     try:
         # Use existing backend function
@@ -243,9 +225,7 @@ async def list_tasks(
         return {"ok": False, "error": f"Failed to list tasks: {str(e)}"}
 
 
-async def update_task(
-    request: TaskUpdateRequest, user_id: str, space_id: Optional[str] = None
-) -> Dict[str, Any]:
+async def update_task(request: TaskUpdateRequest, user_id: str, space_id: Optional[str] = None) -> Dict[str, Any]:
     """Update an existing task."""
     try:
         # Prepare update data
@@ -262,9 +242,7 @@ async def update_task(
             update_data["priority"] = _map_priority_to_ui_format(request.priority)
 
         # Update using existing backend function
-        await update_todo_fields(
-            todo_id=request.id, updates=update_data, user_id=user_id
-        )
+        await update_todo_fields(todo_id=request.id, updates=update_data, user_id=user_id)
 
         # Trigger subtask orchestration if completing
         if request.completed:
@@ -275,9 +253,7 @@ async def update_task(
             except Exception as e:
                 import logging
 
-                logging.getLogger(__name__).error(
-                    f"Subtask orchestration error in agent: {e}"
-                )
+                logging.getLogger(__name__).error(f"Subtask orchestration error in agent: {e}")
 
         # Get updated task
         updated_task = await collections.todos.find_one({"_id": ObjectId(request.id)})
@@ -305,9 +281,7 @@ async def update_task(
         return {"ok": False, "error": f"Failed to update task: {error_msg}"}
 
 
-async def add_journal_entry(
-    request: JournalAddRequest, user_id: str, space_id: Optional[str] = None
-) -> Dict[str, Any]:
+async def add_journal_entry(request: JournalAddRequest, user_id: str, space_id: Optional[str] = None) -> Dict[str, Any]:
     """Append content to a journal entry for the given date."""
     try:
         # Use today's date if not specified
@@ -323,9 +297,7 @@ async def add_journal_entry(
         if existing_entry and existing_entry.get("text"):
             content = f"{existing_entry['text']}\n{content}".strip()
 
-        journal_entry = JournalEntry(
-            user_id=user_id, space_id=space_id, date=entry_date, text=content
-        )
+        journal_entry = JournalEntry(user_id=user_id, space_id=space_id, date=entry_date, text=content)
 
         # Create journal entry (default to UTC timezone)
         created_entry = await db_create_journal_entry(journal_entry, "UTC")
@@ -364,9 +336,7 @@ async def read_journal_entry(
                     "ok": True,
                     "entry": {
                         "id": str(journal["_id"]),
-                        "content": journal.get(
-                            "text", ""
-                        ),  # Database uses 'text' field
+                        "content": journal.get("text", ""),  # Database uses 'text' field
                         "date": journal.get("date", ""),
                         "space_id": journal.get("space_id"),
                     },
@@ -390,9 +360,7 @@ async def read_journal_entry(
                 entries.append(
                     {
                         "id": str(journal["_id"]),
-                        "content": journal.get(
-                            "text", ""
-                        ),  # Database uses 'text' field
+                        "content": journal.get("text", ""),  # Database uses 'text' field
                         "date": journal.get("date", ""),
                         "space_id": journal.get("space_id"),
                     }
@@ -403,9 +371,7 @@ async def read_journal_entry(
         return {"ok": False, "error": f"Failed to read journal entries: {str(e)}"}
 
 
-async def search_content(
-    request: SearchRequest, user_id: str, space_id: Optional[str] = None
-) -> Dict[str, Any]:
+async def search_content(request: SearchRequest, user_id: str, space_id: Optional[str] = None) -> Dict[str, Any]:
     """Search through tasks and journal entries."""
     try:
         hits = []
@@ -465,9 +431,7 @@ async def search_content(
         return {"ok": False, "error": f"Failed to search content: {str(e)}"}
 
 
-async def web_search(
-    request: WebSearchRequest, user_id: str, space_id: Optional[str] = None
-) -> Dict[str, Any]:
+async def web_search(request: WebSearchRequest, user_id: str, space_id: Optional[str] = None) -> Dict[str, Any]:
     """
     Search the web using Brave Search API.
 
@@ -558,9 +522,7 @@ async def web_search(
         return {"ok": False, "error": f"Failed to perform web search: {str(e)}"}
 
 
-async def send_email_to_user(
-    request: SendEmailRequest, user_id: str, space_id: Optional[str] = None
-) -> Dict[str, Any]:
+async def send_email_to_user(request: SendEmailRequest, user_id: str, space_id: Optional[str] = None) -> Dict[str, Any]:
     """Send an email with the provided text content to the current user."""
     del space_id  # Space context is not required for direct emails
 
@@ -568,9 +530,7 @@ async def send_email_to_user(
     if not message_text:
         return {"ok": False, "error": "Email text cannot be empty."}
 
-    subject_override = (
-        (request.title or "").strip() if request.title is not None else None
-    )
+    subject_override = (request.title or "").strip() if request.title is not None else None
     if subject_override == "":
         return {"ok": False, "error": "Email title cannot be empty when provided."}
 
@@ -602,9 +562,7 @@ async def send_email_to_user(
     return {"ok": False, "error": "Failed to send email to the user."}
 
 
-async def web_scraping(
-    request: WebScrapingRequest, user_id: str, space_id: Optional[str] = None
-) -> Dict[str, Any]:
+async def web_scraping(request: WebScrapingRequest, user_id: str, space_id: Optional[str] = None) -> Dict[str, Any]:
     """
     Scrape web content using Puppeteer MCP server.
 
@@ -620,9 +578,7 @@ async def web_scraping(
     return {"ok": False, "error": "Web scraping via MCP is currently disabled"}
 
 
-async def save_memory_tool(
-    request: MemorySaveRequest, user_id: str, space_id: Optional[str] = None
-) -> Dict[str, Any]:
+async def save_memory_tool(request: MemorySaveRequest, user_id: str, space_id: Optional[str] = None) -> Dict[str, Any]:
     """Save a memory fact about the user."""
     try:
         from agent_memory import save_memory
@@ -660,9 +616,7 @@ async def list_memories_tool(
         )
         return {
             "ok": True,
-            "memories": [
-                {"key": f.key, "value": f.value, "category": f.category} for f in facts
-            ],
+            "memories": [{"key": f.key, "value": f.value, "category": f.category} for f in facts],
             "count": len(facts),
         }
     except Exception as e:

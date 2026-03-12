@@ -48,8 +48,7 @@ async def test_classification_timeout_faster_than_frontend():
         # Backend must timeout before frontend's 5s timeout
         # Allow small buffer for processing overhead
         assert elapsed < 4.0, (
-            f"Backend timeout ({elapsed:.2f}s) exceeded safe threshold (4s). "
-            "This will cause duplicate todos!"
+            f"Backend timeout ({elapsed:.2f}s) exceeded safe threshold (4s). " "This will cause duplicate todos!"
         )
         assert result["category"] == "General"  # Fallback defaults
 
@@ -65,9 +64,7 @@ async def test_classification_normal_speed():
 
     with patch("classify.client.responses.parse", return_value=mock_response):
         start = time.time()
-        result = await classify_task(
-            "finish report", ["Work", "Personal"], "2025-11-30T10:00:00"
-        )
+        result = await classify_task("finish report", ["Work", "Personal"], "2025-11-30T10:00:00")
         elapsed = time.time() - start
 
         # Normal classification should be very fast (< 1s typically)
@@ -97,7 +94,6 @@ async def test_classification_with_manual_date_parsing_on_timeout():
         for text, expected_date in test_cases:
             result = await classify_task(text, [], "2025-11-30T10:00:00")
             assert result["dueDate"] == expected_date, (
-                f"Manual date parsing failed for '{text}': "
-                f"expected {expected_date}, got {result['dueDate']}"
+                f"Manual date parsing failed for '{text}': " f"expected {expected_date}, got {result['dueDate']}"
             )
             assert result["category"] == "General"  # Fallback category

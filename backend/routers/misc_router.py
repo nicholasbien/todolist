@@ -41,9 +41,7 @@ async def api_contact(
     """Send contact message to admin email."""
     try:
         if len(req.message) > 5000:
-            raise HTTPException(
-                status_code=400, detail="Message too long (max 5000 chars)"
-            )
+            raise HTTPException(status_code=400, detail="Message too long (max 5000 chars)")
 
         logger.info("Contact message from %s", current_user["email"])
 
@@ -75,9 +73,7 @@ async def get_insights(
         if space_id:
             # Check if user has access to this space
             if not await user_in_space(current_user["user_id"], space_id):
-                raise HTTPException(
-                    status_code=403, detail="Access denied to this space"
-                )
+                raise HTTPException(status_code=403, detail="Access denied to this space")
             todos = await get_todos(current_user["user_id"], space_id)
         else:
             # Get todos from all accessible spaces
@@ -141,9 +137,7 @@ async def export_data(
         raise HTTPException(status_code=400, detail="Invalid data type")
 
     if not await user_in_space(current_user["user_id"], space_id):
-        raise HTTPException(
-            status_code=403, detail="Not a member of the specified space"
-        )
+        raise HTTPException(status_code=403, detail="Not a member of the specified space")
 
     collection = valid_types[data]
     query = {"user_id": current_user["user_id"], "space_id": space_id}
@@ -279,9 +273,7 @@ async def api_get_memory_logs(
 ):
     """Return recent daily memory logs for the current user."""
     sid = space_id or current_user.get("active_space_id", "")
-    logs = await get_recent_memory_logs(
-        current_user["user_id"], sid, limit=min(limit, 30)
-    )
+    logs = await get_recent_memory_logs(current_user["user_id"], sid, limit=min(limit, 30))
     result = []
     for log in logs:
         result.append(

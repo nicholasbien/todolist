@@ -31,18 +31,12 @@ async def init_auth_indexes() -> None:
     """Create indexes used for authentication and session management."""
     try:
         # User collection indexes
-        await users_collection.create_index(
-            "email", unique=True
-        )  # Unique constraint for login
+        await users_collection.create_index("email", unique=True)  # Unique constraint for login
 
         # Session collection indexes
-        await sessions_collection.create_index(
-            "token", unique=True
-        )  # Fast token lookup
+        await sessions_collection.create_index("token", unique=True)  # Fast token lookup
         await sessions_collection.create_index("user_id")  # Find sessions by user
-        await sessions_collection.create_index(
-            "expires_at"
-        )  # Cleanup expired sessions efficiently
+        await sessions_collection.create_index("expires_at")  # Cleanup expired sessions efficiently
 
         # Compound index for session validation (token + expiry check)
         await sessions_collection.create_index([("token", 1), ("expires_at", 1)])
@@ -287,9 +281,7 @@ async def signup_user(email: str) -> dict:
         if email_sent:
             return {"message": "Verification code sent to your email"}
         else:
-            raise HTTPException(
-                status_code=500, detail="Failed to send verification email"
-            )
+            raise HTTPException(status_code=500, detail="Failed to send verification email")
 
     except Exception as e:
         logger.error(f"Error in signup_user: {str(e)}")
@@ -336,13 +328,8 @@ async def login_user(email: str, code: str) -> dict:
             if user.get("verification_code") != code:
                 raise HTTPException(status_code=400, detail="Invalid verification code")
 
-            if (
-                not user.get("code_expires_at")
-                or datetime.now() > user["code_expires_at"]
-            ):
-                raise HTTPException(
-                    status_code=400, detail="Verification code has expired"
-                )
+            if not user.get("code_expires_at") or datetime.now() > user["code_expires_at"]:
+                raise HTTPException(status_code=400, detail="Verification code has expired")
 
         # Mark user as verified and update last login
         await users_collection.update_one(
@@ -406,14 +393,10 @@ async def verify_session(token: str) -> dict:
 
         # Extend expiration to one month from last activity
         new_expiration = datetime.now() + timedelta(hours=JWT_EXPIRATION_HOURS)
-        await sessions_collection.update_one(
-            {"_id": session["_id"]}, {"$set": {"expires_at": new_expiration}}
-        )
+        await sessions_collection.update_one({"_id": session["_id"]}, {"$set": {"expires_at": new_expiration}})
 
         # Record last active time
-        await users_collection.update_one(
-            {"_id": user["_id"]}, {"$set": {"last_login": datetime.now()}}
-        )
+        await users_collection.update_one({"_id": user["_id"]}, {"$set": {"last_login": datetime.now()}})
 
         # Return consistent user data structure (using 'id' to match login response)
         return {
@@ -443,9 +426,7 @@ async def verify_session(token: str) -> dict:
 async def logout_user(token: str) -> dict:
     """Deactivate user session."""
     try:
-        result = await sessions_collection.update_one(
-            {"token": token}, {"$set": {"is_active": False}}
-        )
+        result = await sessions_collection.update_one({"token": token}, {"$set": {"is_active": False}})
 
         if result.modified_count == 0:
             raise HTTPException(status_code=404, detail="Session not found")
@@ -463,9 +444,7 @@ async def update_user_name(user_id: str, first_name: str) -> dict:
     """Update user's first name."""
     try:
         # Update user's first name
-        result = await users_collection.update_one(
-            {"_id": ObjectId(user_id)}, {"$set": {"first_name": first_name}}
-        )
+        result = await users_collection.update_one({"_id": ObjectId(user_id)}, {"$set": {"first_name": first_name}})
 
         if result.matched_count == 0:
             raise HTTPException(status_code=404, detail="User not found")
@@ -520,52 +499,36 @@ async def delete_user_account(user_id: str) -> dict:
 
         # 2. Delete all journals owned by this user
         journals_result = await collections.journals.delete_many({"user_id": user_id})
-        logger.info(
-            f"Deleted {journals_result.deleted_count} journals for user {user_email}"
-        )
+        logger.info(f"Deleted {journals_result.deleted_count} journals for user {user_email}")
 
         # 3. Get all spaces owned by this user to delete their categories
-        owned_spaces = await spaces_collection.find({"owner_id": user_id}).to_list(
-            length=None
-        )
+        owned_spaces = await spaces_collection.find({"owner_id": user_id}).to_list(length=None)
         space_ids = [str(space["_id"]) for space in owned_spaces]
 
         # Delete categories for all spaces owned by this user
         if space_ids:
-            categories_result = await collections.categories.delete_many(
-                {"space_id": {"$in": space_ids}}
-            )
-            logger.info(
-                f"Deleted {categories_result.deleted_count} categories for user {user_email}"
-            )
+            categories_result = await collections.categories.delete_many({"space_id": {"$in": space_ids}})
+            logger.info(f"Deleted {categories_result.deleted_count} categories for user {user_email}")
 
         # 4. Delete all spaces owned by this user
         spaces_result = await spaces_collection.delete_many({"owner_id": user_id})
-        logger.info(
-            f"Deleted {spaces_result.deleted_count} spaces owned by user {user_email}"
-        )
+        logger.info(f"Deleted {spaces_result.deleted_count} spaces owned by user {user_email}")
 
         # 5. Remove user from member_ids of any shared spaces
         shared_spaces_result = await spaces_collection.update_many(
             {"member_ids": user_id}, {"$pull": {"member_ids": user_id}}
         )
-        logger.info(
-            f"Removed user {user_email} from {shared_spaces_result.modified_count} shared spaces"
-        )
+        logger.info(f"Removed user {user_email} from {shared_spaces_result.modified_count} shared spaces")
 
         # 6. Remove user email from pending_emails of any spaces
         pending_spaces_result = await spaces_collection.update_many(
             {"pending_emails": user_email}, {"$pull": {"pending_emails": user_email}}
         )
-        logger.info(
-            f"Removed user {user_email} from {pending_spaces_result.modified_count} pending invites"
-        )
+        logger.info(f"Removed user {user_email} from {pending_spaces_result.modified_count} pending invites")
 
         # 7. Delete all sessions for this user
         sessions_result = await sessions_collection.delete_many({"user_id": user_id})
-        logger.info(
-            f"Deleted {sessions_result.deleted_count} sessions for user {user_email}"
-        )
+        logger.info(f"Deleted {sessions_result.deleted_count} sessions for user {user_email}")
 
         # 8. Finally, delete the user account itself
         user_result = await users_collection.delete_one({"_id": user_object_id})
@@ -589,9 +552,7 @@ async def delete_user_account(user_id: str) -> dict:
         raise
     except Exception as e:
         logger.error(f"Error in delete_user_account: {str(e)}")
-        raise HTTPException(
-            status_code=500, detail=f"Failed to delete account: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to delete account: {str(e)}")
 
 
 async def ensure_user_has_default_space(user_id: str) -> None:
@@ -601,9 +562,7 @@ async def ensure_user_has_default_space(user_id: str) -> None:
         from spaces import spaces_collection
 
         # Check if user already has a default space
-        existing_default = await spaces_collection.find_one(
-            {"owner_id": user_id, "is_default": True}
-        )
+        existing_default = await spaces_collection.find_one({"owner_id": user_id, "is_default": True})
 
         if not existing_default:
             # Create default space
@@ -655,11 +614,7 @@ async def update_user_summary_time(
         if result.matched_count == 0:
             raise HTTPException(status_code=404, detail="User not found")
 
-        status = (
-            "enabled"
-            if email_enabled
-            else "disabled" if email_enabled is False else "unchanged"
-        )
+        status = "enabled" if email_enabled else "disabled" if email_enabled is False else "unchanged"
         logger.info(
             "Updated summary time for user %s to %02d:%02d %s (email %s)",
             user_id,
@@ -697,9 +652,7 @@ async def update_user_email_instructions(user_id: str, instructions: str) -> dic
         raise
     except Exception as e:
         logger.error(f"Error in update_user_email_instructions: {str(e)}")
-        raise HTTPException(
-            status_code=500, detail="Failed to update email instructions"
-        )
+        raise HTTPException(status_code=500, detail="Failed to update email instructions")
 
 
 async def update_user_email_spaces(user_id: str, space_ids: List[str]) -> dict:

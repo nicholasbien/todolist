@@ -20,9 +20,7 @@ async def get_current_user(authorization: str = Header(None)):
         if scheme.lower() != "bearer":
             raise HTTPException(status_code=401, detail="Invalid authentication scheme")
     except ValueError:
-        raise HTTPException(
-            status_code=401, detail="Invalid authorization header format"
-        )
+        raise HTTPException(status_code=401, detail="Invalid authorization header format")
 
     # Verify the session token
     user_info = await verify_session(token)

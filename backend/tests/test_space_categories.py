@@ -124,9 +124,7 @@ async def test_category_operations_in_spaces(client, test_email):
     assert "Custom Category" not in categories
 
     # Delete the category
-    resp = await client.delete(
-        f"/categories/Renamed Category?space_id={space_id}", headers=headers
-    )
+    resp = await client.delete(f"/categories/Renamed Category?space_id={space_id}", headers=headers)
     assert resp.status_code == 200
 
     # Verify deletion worked
@@ -195,9 +193,7 @@ async def test_category_isolation_between_spaces(client, test_email):
         assert resp.status_code == 200
 
     # Delete category from space 1
-    resp = await client.delete(
-        f"/categories/Shared Name?space_id={space1_id}", headers=headers
-    )
+    resp = await client.delete(f"/categories/Shared Name?space_id={space1_id}", headers=headers)
     assert resp.status_code == 200
 
     # Verify category still exists in space 2
@@ -223,9 +219,7 @@ async def test_collaborative_category_management(client, test_email, test_email2
 
     # Create space and invite user 2
     space_id = await create_test_space(client, token1, "Collaboration")
-    await client.post(
-        f"/spaces/{space_id}/invite", json={"emails": [test_email2]}, headers=headers1
-    )
+    await client.post(f"/spaces/{space_id}/invite", json={"emails": [test_email2]}, headers=headers1)
 
     # User 1 adds a category
     resp = await client.post(
@@ -294,9 +288,7 @@ async def test_category_todo_relationship_in_spaces(client, test_email):
     assert todos[0]["category"] == "Project Alpha"
 
     # Delete the category (should move todos to General)
-    resp = await client.delete(
-        f"/categories/Project Alpha?space_id={space_id}", headers=headers
-    )
+    resp = await client.delete(f"/categories/Project Alpha?space_id={space_id}", headers=headers)
     assert resp.status_code == 200
 
     # Verify todo was moved to General category
@@ -334,9 +326,7 @@ async def test_general_category_recreated_on_delete(client, test_email):
     assert resp.status_code == 200
 
     # Delete the General category if present
-    resp = await client.delete(
-        f"/categories/General?space_id={space_id}", headers=headers
-    )
+    resp = await client.delete(f"/categories/General?space_id={space_id}", headers=headers)
     assert resp.status_code == 200
 
     # General category should be recreated automatically

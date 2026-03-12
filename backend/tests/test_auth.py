@@ -78,9 +78,7 @@ class TestAuthentication:
         assert signup_response.status_code == 200
 
         # Try login with invalid code
-        response = await client.post(
-            "/auth/login", json={"email": test_email, "code": "invalid-code"}
-        )
+        response = await client.post("/auth/login", json={"email": test_email, "code": "invalid-code"})
 
         assert response.status_code == 400
 
@@ -145,9 +143,7 @@ class TestAuthenticationWithDatabase:
             pytest.skip("Could not retrieve verification code from database")
 
         # Login
-        login_response = await client.post(
-            "/auth/login", json={"email": test_email, "code": code}
-        )
+        login_response = await client.post("/auth/login", json={"email": test_email, "code": code})
         assert login_response.status_code == 200
         result = login_response.json()
         assert "token" in result
@@ -187,18 +183,14 @@ class TestAuthenticationWithDatabase:
         assert default_space is not None, "User should have a default space"
 
         # Get todos from the default space
-        get_response = await client.get(
-            f"/todos?space_id={default_space['_id']}", headers=headers
-        )
+        get_response = await client.get(f"/todos?space_id={default_space['_id']}", headers=headers)
         assert get_response.status_code == 200
         todos = get_response.json()
         assert len(todos) >= 1
         assert any(t["_id"] == todo_id for t in todos)
 
         # Complete todo
-        complete_response = await client.put(
-            f"/todos/{todo_id}/complete", headers=headers
-        )
+        complete_response = await client.put(f"/todos/{todo_id}/complete", headers=headers)
         assert complete_response.status_code == 200
 
         # Delete todo
@@ -226,9 +218,7 @@ class TestAuthenticationWithDatabase:
             pytest.skip("Could not retrieve verification code")
 
         # Login
-        login_response = await client.post(
-            "/auth/login", json={"email": test_email, "code": code}
-        )
+        login_response = await client.post("/auth/login", json={"email": test_email, "code": code})
         assert login_response.status_code == 200
         token = login_response.json()["token"]
         headers = {"Authorization": f"Bearer {token}"}
@@ -256,9 +246,7 @@ class TestAuthenticationWithDatabase:
         if not code:
             pytest.skip("Could not retrieve verification code")
 
-        login_response = await client.post(
-            "/auth/login", json={"email": test_email, "code": code}
-        )
+        login_response = await client.post("/auth/login", json={"email": test_email, "code": code})
         token = login_response.json()["token"]
         headers = {"Authorization": f"Bearer {token}"}
 
@@ -281,9 +269,7 @@ class TestAuthenticationWithDatabase:
         assert create_response.status_code == 200
 
         # Get todos and verify it's in the default space
-        todos_response = await client.get(
-            f"/todos?space_id={default_space_id}", headers=headers
-        )
+        todos_response = await client.get(f"/todos?space_id={default_space_id}", headers=headers)
         assert todos_response.status_code == 200
         todos = todos_response.json()
 
@@ -292,9 +278,7 @@ class TestAuthenticationWithDatabase:
         assert todos[0]["space_id"] == default_space_id
 
     @pytest.mark.asyncio
-    async def test_user_data_consistency_between_login_and_auth_me(
-        self, client, test_email
-    ):
+    async def test_user_data_consistency_between_login_and_auth_me(self, client, test_email):
         """Test that login and /auth/me return consistent user data structures.
 
         This test would have caught the bug where login returned 'id' field
@@ -310,9 +294,7 @@ class TestAuthenticationWithDatabase:
             pytest.skip("Could not retrieve verification code")
 
         # Login and get user data
-        login_response = await client.post(
-            "/auth/login", json={"email": test_email, "code": code}
-        )
+        login_response = await client.post("/auth/login", json={"email": test_email, "code": code})
         assert login_response.status_code == 200
         login_data = login_response.json()
         assert "token" in login_data
@@ -348,9 +330,7 @@ class TestAuthenticationWithDatabase:
         ]:
             login_value = login_user.get(field)
             me_value = me_user.get(field)
-            assert (
-                login_value == me_value
-            ), f"Field '{field}' should match: login={login_value}, me={me_value}"
+            assert login_value == me_value, f"Field '{field}' should match: login={login_value}, me={me_value}"
 
     @pytest.mark.asyncio
     async def test_user_isolation(self, client, test_email, test_email2):
@@ -361,9 +341,7 @@ class TestAuthenticationWithDatabase:
         if not code1:
             pytest.skip("Could not retrieve verification code for user 1")
 
-        login1_response = await client.post(
-            "/auth/login", json={"email": test_email, "code": code1}
-        )
+        login1_response = await client.post("/auth/login", json={"email": test_email, "code": code1})
         assert login1_response.status_code == 200
         token1 = login1_response.json()["token"]
 
@@ -373,9 +351,7 @@ class TestAuthenticationWithDatabase:
         if not code2:
             pytest.skip("Could not retrieve verification code for user 2")
 
-        login2_response = await client.post(
-            "/auth/login", json={"email": test_email2, "code": code2}
-        )
+        login2_response = await client.post("/auth/login", json={"email": test_email2, "code": code2})
         assert login2_response.status_code == 200
         token2 = login2_response.json()["token"]
 
@@ -406,9 +382,7 @@ class TestAuthenticationWithDatabase:
         if not code:
             pytest.skip("Could not retrieve verification code")
 
-        login_response = await client.post(
-            "/auth/login", json={"email": test_email, "code": code}
-        )
+        login_response = await client.post("/auth/login", json={"email": test_email, "code": code})
         assert login_response.status_code == 200
         token = login_response.json()["token"]
         user_id = login_response.json()["user"]["id"]
@@ -468,22 +442,16 @@ class TestAuthenticationWithDatabase:
         assert category_response.status_code == 200
 
         # Create an additional space
-        new_space_response = await client.post(
-            "/spaces", json={"name": "Test Space"}, headers=headers
-        )
+        new_space_response = await client.post("/spaces", json={"name": "Test Space"}, headers=headers)
         assert new_space_response.status_code == 200
 
         # Verify data exists
-        todos_response = await client.get(
-            f"/todos?space_id={default_space_id}", headers=headers
-        )
+        todos_response = await client.get(f"/todos?space_id={default_space_id}", headers=headers)
         assert todos_response.status_code == 200
         todos_before = todos_response.json()
         assert len(todos_before) == 2
 
-        categories_response = await client.get(
-            f"/categories?space_id={default_space_id}", headers=headers
-        )
+        categories_response = await client.get(f"/categories?space_id={default_space_id}", headers=headers)
         assert categories_response.status_code == 200
         categories_before = categories_response.json()
         assert len(categories_before) >= 1  # At least our custom category
@@ -507,9 +475,7 @@ class TestAuthenticationWithDatabase:
         assert me_response.status_code == 401
 
         # Verify user cannot log back in (user account deleted)
-        login_again = await client.post(
-            "/auth/login", json={"email": test_email, "code": code}
-        )
+        login_again = await client.post("/auth/login", json={"email": test_email, "code": code})
         # The code is now invalid since the user was deleted
         assert login_again.status_code in [400, 404]
 
@@ -531,24 +497,18 @@ class TestAuthenticationWithDatabase:
 
         try:
             user_object_id = ObjectId(user_id)
-            journals = await collections.journals.find(
-                {"user_id": user_object_id}
-            ).to_list(length=100)
+            journals = await collections.journals.find({"user_id": user_object_id}).to_list(length=100)
             assert len(journals) == 0
         except Exception:
             # If user_id is not a valid ObjectId, skip journal check
             pass
 
         # Check spaces owned by user are deleted
-        owned_spaces = await spaces_collection.find({"owner_id": user_id}).to_list(
-            length=100
-        )
+        owned_spaces = await spaces_collection.find({"owner_id": user_id}).to_list(length=100)
         assert len(owned_spaces) == 0
 
         # Check sessions are deleted
-        sessions = await auth.sessions_collection.find(
-            {"user_id": user_object_id}
-        ).to_list(length=100)
+        sessions = await auth.sessions_collection.find({"user_id": user_object_id}).to_list(length=100)
         assert len(sessions) == 0
 
 

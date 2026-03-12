@@ -18,9 +18,7 @@ from routers.spaces_router import router as spaces_router
 from routers.todos_router import router as todos_router
 
 # Set up logging with more detail
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 
@@ -30,14 +28,10 @@ async def rename_default_spaces_to_personal():
         from spaces import spaces_collection
 
         # Update all spaces with name "Default" to "Personal"
-        result = await spaces_collection.update_many(
-            {"name": "Default"}, {"$set": {"name": "Personal"}}
-        )
+        result = await spaces_collection.update_many({"name": "Default"}, {"$set": {"name": "Personal"}})
 
         if result.modified_count > 0:
-            logger.info(
-                f"Renamed {result.modified_count} 'Default' spaces to 'Personal'"
-            )
+            logger.info(f"Renamed {result.modified_count} 'Default' spaces to 'Personal'")
         else:
             logger.info("No 'Default' spaces found to rename")
 
@@ -121,9 +115,7 @@ async def lifespan(app: FastAPI):
             failed_steps.append("scheduler")
 
         if failed_steps:
-            logger.warning(
-                f"Startup completed with {len(failed_steps)} failed steps: {', '.join(failed_steps)}"
-            )
+            logger.warning(f"Startup completed with {len(failed_steps)} failed steps: {', '.join(failed_steps)}")
         else:
             logger.info("All initialization completed successfully")
 
@@ -132,9 +124,7 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error(f"Critical startup error: {e}")
         # Don't re-raise to prevent crash loop
-        logger.error(
-            "App started with startup errors - some features may not work correctly"
-        )
+        logger.error("App started with startup errors - some features may not work correctly")
 
     # Application is now running
     yield
