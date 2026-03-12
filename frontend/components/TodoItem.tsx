@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Check, RotateCcw, X, MessageCircle, Clock, User, Bot, UserCircle, Repeat } from "lucide-react";
+import { Check, RotateCcw, X, MessageCircle, Clock, User, Bot, UserCircle, Repeat, ChevronDown, ChevronRight } from "lucide-react";
 
 interface SubtaskItem {
   _id: string;
@@ -51,6 +51,7 @@ export default function TodoItem({
   const [isDeleting, setIsDeleting] = useState(false);
   const [shouldAnimate, setShouldAnimate] = useState(false);
   const [hoveredButton, setHoveredButton] = useState<string | null>(null);
+  const [subtasksExpanded, setSubtasksExpanded] = useState(false);
   const containerRef = React.useRef<HTMLDivElement>(null);
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const longPressTriggeredRef = useRef(false);
@@ -164,9 +165,18 @@ export default function TodoItem({
             )}
           </p>
           {subtaskCount != null && subtaskCount > 0 && (
-            <p className="text-xs text-gray-400 mt-1">
+            <button
+              onClick={(e) => { e.stopPropagation(); setSubtasksExpanded(!subtasksExpanded); }}
+              className="flex items-center gap-1 text-xs text-gray-400 mt-1 hover:text-gray-200 transition-colors"
+              aria-label={subtasksExpanded ? "Hide subtasks" : "Show subtasks"}
+            >
+              {subtasksExpanded ? (
+                <ChevronDown className="w-3.5 h-3.5" />
+              ) : (
+                <ChevronRight className="w-3.5 h-3.5" />
+              )}
               {subtaskDoneCount || 0}/{subtaskCount} sub-tasks done
-            </p>
+            </button>
           )}
         </div>
 
@@ -383,7 +393,7 @@ export default function TodoItem({
       </div>
 
       {/* Subtasks rendered inside parent card */}
-      {subtasks && subtasks.length > 0 && (
+      {subtasksExpanded && subtasks && subtasks.length > 0 && (
         <div className="mt-3 pt-3 border-t border-gray-800 space-y-1.5">
           {subtasks.map((st, idx) => (
             <div
