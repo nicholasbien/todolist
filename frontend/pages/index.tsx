@@ -9,7 +9,7 @@ import { apiRequest } from '../utils/api';
 const AIToDoListApp = dynamic(() => import('../components/AIToDoListApp'), {
   ssr: false,
   loading: () => (
-    <div className="container mx-auto p-4 max-w-md">
+    <div className="container mx-auto p-4 max-w-md lg:max-w-4xl">
       <div className="animate-pulse text-center">Loading...</div>
     </div>
   )
