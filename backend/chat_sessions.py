@@ -387,6 +387,25 @@ async def search_sessions(
     if not query or not query.strip():
         return []
 
+    try:
+        return await _text_index_search(user_id, query, space_id, limit)
+    except Exception as e:
+        logger.error(
+            "Text-index search failed for query %r: %s. "
+            "Ensure text indexes exist by checking init_chat_session_indexes logs.",
+            query,
+            e,
+        )
+        return []
+
+
+async def _text_index_search(
+    user_id: str,
+    query: str,
+    space_id: Optional[str],
+    limit: int,
+) -> List[Dict[str, Any]]:
+    """Search using MongoDB $text indexes (requires text indexes to exist)."""
     results: List[Dict[str, Any]] = []
     seen_session_ids: set = set()
 
@@ -444,7 +463,22 @@ async def search_sessions(
     )
     content_hits = await cursor.to_list(length=limit)
 
-    # Filter to unseen session IDs and build a lookup of trajectory data
+    # Batch-fetch session docs for content hits and build result entries
+    await _hydrate_content_results(results, seen_session_ids, content_hits, query)
+
+    # Sort all results by score descending, cap at limit
+    results.sort(key=lambda r: r.get("score", 0), reverse=True)
+    return results[:limit]
+
+
+async def _hydrate_content_results(
+    results: List[Dict[str, Any]],
+    seen_session_ids: set,
+    content_hits: List[Dict[str, Any]],
+    query: str,
+) -> None:
+    """Given trajectory hits, fetch their session docs and build result entries."""
+    # Filter to unseen session IDs
     new_content_hits = []
     for traj in content_hits:
         sid = traj.get("session_id")
@@ -453,7 +487,7 @@ async def search_sessions(
         seen_session_ids.add(sid)
         new_content_hits.append(traj)
 
-    # Batch-fetch all session docs in a single query instead of N individual lookups
+    # Batch-fetch all session docs in a single query
     if new_content_hits:
         content_sids = [t["session_id"] for t in new_content_hits]
         content_session_ids = [ObjectId(sid) for sid in content_sids]
@@ -467,6 +501,7 @@ async def search_sessions(
     else:
         session_docs_map = {}
 
+    query_lower = query.lower()
     for traj in new_content_hits:
         sid = traj["session_id"]
         session_doc = session_docs_map.get(sid)
@@ -475,11 +510,9 @@ async def search_sessions(
 
         # Find the best matching message snippet
         preview = ""
-        query_lower = query.lower()
         for msg in reversed(traj.get("display_messages", [])):
             content = msg.get("content", "")
             if query_lower in content.lower():
-                # Extract a snippet around the match
                 idx = content.lower().index(query_lower)
                 start = max(0, idx - 40)
                 end = min(len(content), idx + len(query) + 80)
@@ -492,7 +525,6 @@ async def search_sessions(
                 break
 
         if not preview and traj.get("display_messages"):
-            # Fallback: use last message as preview
             last_msg = traj["display_messages"][-1]
             preview = last_msg.get("content", "")[:120]
 
@@ -507,50 +539,121 @@ async def search_sessions(
                 "created_at": session_doc.get("created_at"),
                 "match_source": "content",
                 "preview": preview,
-                "score": traj.get("score", 0),
+                "score": traj.get("score", 0.5),
             }
         )
 
-    # Sort all results by score descending, cap at limit
-    results.sort(key=lambda r: r.get("score", 0), reverse=True)
-    return results[:limit]
+
+async def _ensure_text_index(collection, index_spec, index_name: str) -> None:
+    """Create a text index, handling conflicts with existing text indexes.
+
+    MongoDB only allows one text index per collection. If a different text
+    index already exists, this drops it first before creating the new one.
+    """
+    try:
+        await collection.create_index(index_spec, name=index_name)
+        logger.info("Text index '%s' ready on %s", index_name, collection.name)
+    except Exception as e:
+        error_str = str(e)
+        # MongoDB error when a different text index already exists
+        if "text index" in error_str.lower() or "IndexOptionsConflict" in error_str:
+            logger.warning(
+                "Conflicting text index on %s, dropping and recreating: %s",
+                collection.name,
+                e,
+            )
+            # Find and drop the existing text index
+            try:
+                existing_indexes = await collection.index_information()
+                for name, info in existing_indexes.items():
+                    key = info.get("key", [])
+                    # Text indexes have a key entry like ('_fts', 'text')
+                    if any(v == "text" for _, v in key):
+                        await collection.drop_index(name)
+                        logger.info(
+                            "Dropped conflicting text index '%s' on %s",
+                            name,
+                            collection.name,
+                        )
+                        break
+                await collection.create_index(index_spec, name=index_name)
+                logger.info(
+                    "Text index '%s' recreated on %s", index_name, collection.name
+                )
+            except Exception as inner_e:
+                logger.error(
+                    "Failed to recreate text index '%s' on %s: %s",
+                    index_name,
+                    collection.name,
+                    inner_e,
+                )
+        else:
+            logger.error(
+                "Failed to create text index '%s' on %s: %s",
+                index_name,
+                collection.name,
+                e,
+            )
 
 
 async def init_chat_session_indexes() -> None:
-    """Create indexes for chat sessions and trajectories."""
-    try:
-        await sessions_collection.create_index(
-            [("user_id", 1), ("space_id", 1), ("updated_at", -1)]
-        )
-        await sessions_collection.create_index("user_id")
-        # Index for pending session queries
-        await sessions_collection.create_index(
-            [("user_id", 1), ("needs_agent_response", 1)]
-        )
-        # Index for unread reply queries
-        await sessions_collection.create_index(
-            [("user_id", 1), ("has_unread_reply", 1)]
-        )
-        # Unique partial index: one session per user+todo
-        await sessions_collection.create_index(
+    """Create indexes for chat sessions and trajectories.
+
+    Each index is created independently so a failure in one does not
+    prevent the others from being created.
+    """
+    # -- Regular indexes on sessions --
+    regular_indexes = [
+        (
+            sessions_collection,
+            [("user_id", 1), ("space_id", 1), ("updated_at", -1)],
+            {},
+        ),
+        (sessions_collection, "user_id", {}),
+        (
+            sessions_collection,
+            [("user_id", 1), ("needs_agent_response", 1)],
+            {},
+        ),
+        (
+            sessions_collection,
+            [("user_id", 1), ("has_unread_reply", 1)],
+            {},
+        ),
+        (
+            sessions_collection,
             [("user_id", 1), ("todo_id", 1)],
-            unique=True,
-            partialFilterExpression={"todo_id": {"$exists": True}},
-        )
+            {
+                "unique": True,
+                "partialFilterExpression": {"todo_id": {"$exists": True}},
+            },
+        ),
+    ]
 
-        # Text index on session titles for search
-        await sessions_collection.create_index(
-            [("title", "text")],
-            name="title_text_search",
-        )
+    # -- Regular indexes on trajectories --
+    regular_indexes += [
+        (trajectories_collection, "session_id", {"unique": True}),
+        (trajectories_collection, "user_id", {}),
+    ]
 
-        await trajectories_collection.create_index("session_id", unique=True)
-        await trajectories_collection.create_index("user_id")
-        # Text index on message content for search
-        await trajectories_collection.create_index(
-            [("display_messages.content", "text")],
-            name="message_content_text_search",
-        )
-        logger.info("Chat session indexes created successfully")
-    except Exception as e:
-        logger.error(f"Error creating chat session indexes: {e}")
+    for collection, spec, kwargs in regular_indexes:
+        try:
+            await collection.create_index(spec, **kwargs)
+        except Exception as e:
+            logger.error(
+                "Failed to create index %s on %s: %s", spec, collection.name, e
+            )
+
+    # -- Text indexes (special handling for conflicts) --
+    await _ensure_text_index(
+        sessions_collection,
+        [("title", "text")],
+        "title_text_search",
+    )
+    await _ensure_text_index(
+        trajectories_collection,
+        [("display_messages.content", "text")],
+        "message_content_text_search",
+    )
+
+    logger.info("Chat session index initialization complete")
