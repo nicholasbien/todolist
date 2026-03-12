@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { ChevronDown, ArrowLeft, CheckCircle2, RotateCcw, Search, X } from 'lucide-react';
+import { ChevronDown, ArrowLeft, CheckCircle2, RotateCcw, Search, X, Brain } from 'lucide-react';
 import { MessageRenderer, PlainTextRenderer } from './MessageRenderer';
 import { getStreamingBackendUrl } from '../utils/api';
 import AgentMemoryViewer from './AgentMemoryViewer';
@@ -875,15 +875,9 @@ export default function AgentChatbot({
           </div>
         )}
 
-        {/* New Chat + Memory buttons */}
-        {!isTaskSession && !(sessionAgentId && currentSessionId) && (messages.length > 0 || currentSessionId) && (
-          <div className="ml-auto flex items-center gap-2">
-            <button
-              onClick={() => setShowMemoryViewer(true)}
-              className="border border-gray-600 text-gray-400 px-3 py-1 rounded text-sm hover:bg-gray-800 hover:text-gray-200 transition-colors"
-            >
-              Memory
-            </button>
+        {/* New Chat button (conditional) + Memory button (always visible) */}
+        <div className="ml-auto flex items-center gap-2">
+          {!isTaskSession && !(sessionAgentId && currentSessionId) && (messages.length > 0 || currentSessionId) && (
             <button
               onClick={handleNewChat}
               disabled={loading}
@@ -891,8 +885,16 @@ export default function AgentChatbot({
             >
               New Chat
             </button>
-          </div>
-        )}
+          )}
+          <button
+            onClick={() => setShowMemoryViewer(true)}
+            className="text-gray-500 hover:text-gray-300 transition-colors p-1.5 rounded-lg hover:bg-gray-800"
+            aria-label="View agent memory"
+            title="Agent Memory"
+          >
+            <Brain className="w-4 h-4" />
+          </button>
+        </div>
       </div>
 
       {sessionToDelete && createPortal(
@@ -969,15 +971,6 @@ export default function AgentChatbot({
                 <p className="text-sm text-gray-500 italic">
                   Try: &quot;What should I get done today?&quot; or &quot;Summarize my latest journals&quot;
                 </p>
-              </div>
-
-              <div className="mt-2">
-                <button
-                  onClick={() => setShowMemoryViewer(true)}
-                  className="text-xs text-gray-500 hover:text-gray-300 transition-colors underline underline-offset-2"
-                >
-                  View agent memory
-                </button>
               </div>
 
               {/* Session search */}
