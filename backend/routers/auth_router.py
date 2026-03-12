@@ -50,13 +50,9 @@ async def api_get_current_user(current_user: dict = Depends(get_current_user)):
 
 
 @router.post("/update-name")
-async def api_update_name(
-    request: UpdateNameRequest, current_user: dict = Depends(get_current_user)
-):
+async def api_update_name(request: UpdateNameRequest, current_user: dict = Depends(get_current_user)):
     """Update user's first name."""
-    logger.info(
-        f"Update name request for user: {current_user['email']}, name: {request.first_name}"
-    )
+    logger.info(f"Update name request for user: {current_user['email']}, name: {request.first_name}")
     return await update_user_name(current_user["user_id"], request.first_name)
 
 

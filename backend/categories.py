@@ -34,9 +34,7 @@ async def init_category_indexes() -> None:
         await categories_collection.create_index("name")
 
         # Compound index for space-specific category queries
-        await categories_collection.create_index(
-            [("space_id", 1), ("name", 1)], unique=True
-        )
+        await categories_collection.create_index([("space_id", 1), ("name", 1)], unique=True)
 
         logger.info("Category indexes created successfully")
     except Exception as e:
@@ -67,9 +65,7 @@ async def get_categories(space_id: Optional[str] = None) -> List[str]:
         await ensure_general_category(space_id)
 
         # Query for categories with matching space_id (including None)
-        cursor = categories_collection.find(
-            {"space_id": space_id}, {"name": 1, "_id": 0}
-        )
+        cursor = categories_collection.find({"space_id": space_id}, {"name": 1, "_id": 0})
 
         categories = []
         async for doc in cursor:
@@ -78,9 +74,7 @@ async def get_categories(space_id: Optional[str] = None) -> List[str]:
         return categories
     except Exception as e:
         logger.error(f"Error fetching categories: {str(e)}")
-        raise HTTPException(
-            status_code=500, detail=f"Error fetching categories: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Error fetching categories: {str(e)}")
 
 
 async def add_category(category: Category) -> dict:
@@ -121,9 +115,7 @@ async def delete_category(name: str, space_id: Optional[str] = None) -> dict:
         # Update todos
         todo_query = {"category": name, "space_id": space_id}
 
-        update_result = await todos_collection.update_many(
-            todo_query, {"$set": {"category": "General"}}
-        )
+        update_result = await todos_collection.update_many(todo_query, {"$set": {"category": "General"}})
 
         delete_result = await categories_collection.delete_one(query)
 
@@ -144,14 +136,10 @@ async def delete_category(name: str, space_id: Optional[str] = None) -> dict:
         raise he
     except Exception as e:
         logger.error(f"Error deleting category: {str(e)}")
-        raise HTTPException(
-            status_code=500, detail=f"Error deleting category: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Error deleting category: {str(e)}")
 
 
-async def rename_category(
-    old_name: str, new_name: str, space_id: Optional[str] = None
-) -> dict:
+async def rename_category(old_name: str, new_name: str, space_id: Optional[str] = None) -> dict:
     """Rename a category within a space and update todos referencing it."""
     try:
         # Query for existing category
@@ -165,9 +153,7 @@ async def rename_category(
         new_query = {"name": new_name, "space_id": space_id}
 
         if await categories_collection.find_one(new_query):
-            raise HTTPException(
-                status_code=400, detail="Category with new name already exists"
-            )
+            raise HTTPException(status_code=400, detail="Category with new name already exists")
 
         await categories_collection.update_one(query, {"$set": {"name": new_name}})
 
@@ -184,18 +170,14 @@ async def rename_category(
         raise he
     except Exception as e:
         logger.error(f"Error renaming category: {str(e)}")
-        raise HTTPException(
-            status_code=500, detail=f"Error renaming category: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Error renaming category: {str(e)}")
 
 
 # Migrate legacy categories to have space_id field
 async def migrate_legacy_categories() -> None:
     try:
         # Update all categories that don't have space_id field to have space_id: None
-        result = await categories_collection.update_many(
-            {"space_id": {"$exists": False}}, {"$set": {"space_id": None}}
-        )
+        result = await categories_collection.update_many({"space_id": {"$exists": False}}, {"$set": {"space_id": None}})
         if result.modified_count > 0:
             logger.info(
                 "Migrated %d legacy categories to have space_id: None",
@@ -211,11 +193,7 @@ async def init_default_categories(space_id: Optional[str] = None) -> None:
         # Initialize default categories for the specified space_id (including None)
         count = await categories_collection.count_documents({"space_id": space_id})
         if count == 0:
-            await categories_collection.insert_many(
-                [{"name": cat, "space_id": space_id} for cat in DEFAULT_CATEGORIES]
-            )
-            logger.info(
-                "Initialized default categories for space %s", space_id or "default"
-            )
+            await categories_collection.insert_many([{"name": cat, "space_id": space_id} for cat in DEFAULT_CATEGORIES])
+            logger.info("Initialized default categories for space %s", space_id or "default")
     except Exception as e:
         logger.error(f"Error initializing default categories: {str(e)}")

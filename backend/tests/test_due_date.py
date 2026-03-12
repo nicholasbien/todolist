@@ -15,9 +15,7 @@ async def test_prompt_contains_date_context():
     def fake_parse(*args, **kwargs):
         captured["input"] = kwargs.get("input", args[0] if args else None)
         mock_response = MagicMock()
-        mock_response.output_parsed = TaskClassification(
-            category="General", priority="Low", text="task", dueDate=None
-        )
+        mock_response.output_parsed = TaskClassification(category="General", priority="Low", text="task", dueDate=None)
         return mock_response
 
     with patch.object(classify.client.responses, "parse", side_effect=fake_parse):
@@ -44,9 +42,7 @@ async def test_fallback_manual_parse():
         return mock_response
 
     with patch.object(classify.client.responses, "parse", side_effect=fake_parse):
-        result = await classify.classify_task(
-            "Bike to Bear Mountain in two weeks", [], "2025-06-10"
-        )
+        result = await classify.classify_task("Bike to Bear Mountain in two weeks", [], "2025-06-10")
 
     assert result["dueDate"] == "2025-06-24"
     assert result["text"] == "Bike to Bear Mountain"

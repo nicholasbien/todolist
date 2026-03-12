@@ -45,8 +45,8 @@ jobs:
       - name: Lint backend
         run: |
           flake8 .
-          black --check .
-          isort --check-only .
+          black --check --config pyproject.toml .
+          isort --check-only --settings-path pyproject.toml .
 
       - name: Test backend
         run: pytest

@@ -212,9 +212,7 @@ class TestAgentToolsUnit:
     @pytest.mark.asyncio
     @patch("agent.tools.collections")
     @patch("agent.tools.db_create_journal_entry")
-    async def test_add_journal_entry_appends(
-        self, mock_create_journal, mock_collections
-    ):
+    async def test_add_journal_entry_appends(self, mock_create_journal, mock_collections):
         """Test journal entry appends to existing content."""
         existing = {"text": "Existing"}
         mock_collections.journals.find_one = AsyncMock(return_value=existing)
@@ -250,9 +248,7 @@ class TestAgentToolsUnit:
         # Mock journals - mock the entire collections object
         mock_cursor = MagicMock()
         mock_cursor.to_list = AsyncMock(
-            return_value=[
-                {"_id": "journal_123", "text": "Met with team about important project"}
-            ]
+            return_value=[{"_id": "journal_123", "text": "Met with team about important project"}]
         )
         mock_collections.journals.find.return_value = mock_cursor
 
@@ -284,9 +280,7 @@ class TestAgentToolsUnit:
         mock_collections.journals.find_one = AsyncMock(return_value=mock_journal)
 
         request = JournalReadRequest(date="2025-08-31")
-        result = await read_journal_entry(
-            request, "6843a5933e5a5d8cf5b169f8", "space123"
-        )
+        result = await read_journal_entry(request, "6843a5933e5a5d8cf5b169f8", "space123")
 
         assert result["ok"] is True
         assert result["entry"]["content"] == "Today was a productive day"
@@ -321,9 +315,7 @@ class TestAgentToolsUnit:
         mock_collections.journals.find.return_value = mock_cursor
 
         request = JournalReadRequest(limit=2)
-        result = await read_journal_entry(
-            request, "6843a5933e5a5d8cf5b169f8", "space123"
-        )
+        result = await read_journal_entry(request, "6843a5933e5a5d8cf5b169f8", "space123")
 
         assert result["ok"] is True
         assert len(result["entries"]) == 2
@@ -347,9 +339,7 @@ class TestAgentToolsUnit:
     @patch("agent.tools.collections")
     async def test_read_journal_entry_database_error(self, mock_collections):
         """Test read journal entry database error handling."""
-        mock_collections.journals.find_one = AsyncMock(
-            side_effect=Exception("Database error")
-        )
+        mock_collections.journals.find_one = AsyncMock(side_effect=Exception("Database error"))
 
         request = JournalReadRequest(date="2025-08-31")
         result = await read_journal_entry(request, "user123")
@@ -387,12 +377,8 @@ class TestAgentStreaming:
         new_callable=AsyncMock,
         return_value="mock_session_id",
     )
-    @patch(
-        "categories.get_categories", new_callable=AsyncMock, return_value=["General"]
-    )
-    @patch(
-        "agent.agent.connect_to_mcp_server", new_callable=AsyncMock, return_value=None
-    )
+    @patch("categories.get_categories", new_callable=AsyncMock, return_value=["General"])
+    @patch("agent.agent.connect_to_mcp_server", new_callable=AsyncMock, return_value=None)
     @patch("agent.agent.AsyncOpenAI")
     async def test_stream_agent_response_success(
         self, mock_openai_class, _mock_mcp, _mock_cats, _mock_session, _mock_persist
@@ -435,21 +421,15 @@ class TestAgentStreaming:
         new_callable=AsyncMock,
         return_value="mock_session_id",
     )
-    @patch(
-        "categories.get_categories", new_callable=AsyncMock, return_value=["General"]
-    )
-    @patch(
-        "agent.agent.connect_to_mcp_server", new_callable=AsyncMock, return_value=None
-    )
+    @patch("categories.get_categories", new_callable=AsyncMock, return_value=["General"])
+    @patch("agent.agent.connect_to_mcp_server", new_callable=AsyncMock, return_value=None)
     @patch("agent.agent.AsyncOpenAI")
     async def test_stream_agent_response_openai_error(
         self, mock_openai_class, _mock_mcp, _mock_cats, _mock_session, _mock_persist
     ):
         """Test streaming with OpenAI API error."""
         mock_client = AsyncMock()
-        mock_client.responses.create = AsyncMock(
-            side_effect=Exception("OpenAI API Error")
-        )
+        mock_client.responses.create = AsyncMock(side_effect=Exception("OpenAI API Error"))
         mock_openai_class.return_value = mock_client
 
         with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
@@ -523,9 +503,7 @@ class TestAgentIntegration:
                 with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
                     # Agent endpoint expects token in Authorization header
                     headers = {"Authorization": f"Bearer {token}"}
-                    response = await client.get(
-                        "/agent/stream?q=hello", headers=headers
-                    )
+                    response = await client.get("/agent/stream?q=hello", headers=headers)
 
         assert response.status_code == 200
         assert response.headers["content-type"] == "text/event-stream; charset=utf-8"
@@ -575,9 +553,7 @@ class TestAgentIntegration:
         headers = {"Authorization": f"Bearer {token}"}
 
         # Create a space first
-        space_response = await client.post(
-            "/spaces", headers=headers, json={"name": "Test Space"}
-        )
+        space_response = await client.post("/spaces", headers=headers, json={"name": "Test Space"})
         assert space_response.status_code == 200
         space_data = space_response.json()
         space_id = space_data.get("_id") or space_data.get("id")
@@ -608,9 +584,7 @@ class TestAgentIntegration:
                 with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
                     # Agent endpoint expects token in Authorization header
                     headers = {"Authorization": f"Bearer {token}"}
-                    response = await client.get(
-                        f"/agent/stream?q=help&space_id={space_id}", headers=headers
-                    )
+                    response = await client.get(f"/agent/stream?q=help&space_id={space_id}", headers=headers)
 
         assert response.status_code == 200
 
@@ -730,9 +704,7 @@ class TestAgentSystemPrompt:
         new_callable=AsyncMock,
         return_value="mock_session_id",
     )
-    @patch(
-        "agent.agent.connect_to_mcp_server", new_callable=AsyncMock, return_value=None
-    )
+    @patch("agent.agent.connect_to_mcp_server", new_callable=AsyncMock, return_value=None)
     @patch("categories.get_categories", new_callable=AsyncMock)
     @patch("db.collections")
     async def test_agent_context_includes_date_space_categories(
@@ -786,17 +758,11 @@ class TestAgentSystemPrompt:
         assert f"Today's date: {current_date}" in captured_instructions
 
         # Verify space context is included (defaults to "Default" when no space_id lookup succeeds)
-        assert (
-            '"Default" space' in captured_instructions
-            or '"Work" space' in captured_instructions
-        )
+        assert '"Default" space' in captured_instructions or '"Work" space' in captured_instructions
 
         # Verify categories are included
         assert "Work, Personal, Health" in captured_instructions
-        assert (
-            'choose a category from that list, or use "General"'
-            in captured_instructions
-        )
+        assert 'choose a category from that list, or use "General"' in captured_instructions
 
 
 class TestAgentErrorHandling:
@@ -832,9 +798,7 @@ class TestAgentErrorHandling:
         """Test task update with task not found."""
         from fastapi import HTTPException
 
-        mock_update_todo_fields.side_effect = HTTPException(
-            status_code=404, detail="Todo not found"
-        )
+        mock_update_todo_fields.side_effect = HTTPException(status_code=404, detail="Todo not found")
 
         request = TaskUpdateRequest(id="nonexistent_id", completed=True)
         result = await update_task(request, "test_user", "test_space")

@@ -35,9 +35,7 @@ class PostMessageRequest(BaseModel):
 
 
 @router.post("/sessions")
-async def api_create_agent_session(
-    req: CreateSessionRequest, current_user: dict = Depends(get_current_user)
-):
+async def api_create_agent_session(req: CreateSessionRequest, current_user: dict = Depends(get_current_user)):
     """Create a new messaging session, optionally linked to a todo."""
     user_id = current_user["user_id"]
 
@@ -49,9 +47,7 @@ async def api_create_agent_session(
             return existing
 
     title = req.title or req.initial_message or "New session"
-    session_id = await create_chat_session(
-        user_id, req.space_id, title, todo_id=req.todo_id, agent_id=req.agent_id
-    )
+    session_id = await create_chat_session(user_id, req.space_id, title, todo_id=req.todo_id, agent_id=req.agent_id)
 
     # Post initial message if provided
     if req.initial_message:

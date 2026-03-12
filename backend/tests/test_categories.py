@@ -58,9 +58,7 @@ async def test_rename_category(client, test_email):
     headers = {"Authorization": f"Bearer {token}"}
 
     await client.post("/categories", json={"name": "OldName"}, headers=headers)
-    resp = await client.put(
-        "/categories/OldName", json={"new_name": "NewName"}, headers=headers
-    )
+    resp = await client.put("/categories/OldName", json={"new_name": "NewName"}, headers=headers)
     assert resp.status_code == 200
 
     cats = (await client.get("/categories", headers=headers)).json()
@@ -74,9 +72,7 @@ async def test_rename_nonexistent_category(client, test_email):
     token = await get_token(client, test_email)
     headers = {"Authorization": f"Bearer {token}"}
 
-    resp = await client.put(
-        "/categories/NoSuchCat", json={"new_name": "X"}, headers=headers
-    )
+    resp = await client.put("/categories/NoSuchCat", json={"new_name": "X"}, headers=headers)
     assert resp.status_code == 404
 
 

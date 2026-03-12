@@ -40,16 +40,12 @@ async def briefing_job(user_id: str):
 
         # Post morning briefing
         session_id = await post_morning_briefing(user_id)
-        logger.info(
-            "Morning briefing posted for user %s: session %s", user_id, session_id
-        )
+        logger.info("Morning briefing posted for user %s: session %s", user_id, session_id)
 
         # Post stale task nudges
         stale_days = prefs.get("stale_task_days", 3)
         nudged = await post_stale_task_nudges(user_id, stale_days=stale_days)
-        logger.info(
-            "Stale task nudges posted for user %s: %d tasks", user_id, len(nudged)
-        )
+        logger.info("Stale task nudges posted for user %s: %d tasks", user_id, len(nudged))
 
     except Exception as e:
         logger.error("Error in briefing job for user %s: %s", user_id, e)
@@ -95,9 +91,7 @@ def schedule_user_job(
         logger.error("Failed to schedule job for %s: %s", email, e)
 
 
-def schedule_briefing_job(
-    user_id: str, hour: int, minute: int, timezone: str = "America/New_York"
-) -> None:
+def schedule_briefing_job(user_id: str, hour: int, minute: int, timezone: str = "America/New_York") -> None:
     """Schedule or reschedule a briefing job for a user."""
     global scheduler
     if scheduler is None:
@@ -212,9 +206,7 @@ def update_schedule_time(
     schedule_user_job(user_id, email, first_name, hour, minute, timezone)
 
 
-def update_briefing_schedule(
-    user_id: str, hour: int, minute: int, timezone: str = "America/New_York"
-) -> None:
+def update_briefing_schedule(user_id: str, hour: int, minute: int, timezone: str = "America/New_York") -> None:
     """Update a user's briefing schedule."""
     schedule_briefing_job(user_id, hour, minute, timezone)
 
@@ -244,9 +236,7 @@ def get_scheduler_status():
         jobs.append(
             {
                 "id": job.id,
-                "next_run": (
-                    job.next_run_time.isoformat() if job.next_run_time else None
-                ),
+                "next_run": (job.next_run_time.isoformat() if job.next_run_time else None),
                 "trigger": str(job.trigger),
             }
         )

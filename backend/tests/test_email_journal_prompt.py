@@ -62,7 +62,4 @@ async def test_email_includes_recent_journals_only(client, test_email, monkeypat
 
     assert captured["limit"] == 7
     assert len(captured["journals"]) == 3
-    assert all(
-        datetime.fromisoformat(j["date"]) >= datetime.now() - timedelta(days=7)
-        for j in captured["journals"]
-    )
+    assert all(datetime.fromisoformat(j["date"]) >= datetime.now() - timedelta(days=7) for j in captured["journals"])

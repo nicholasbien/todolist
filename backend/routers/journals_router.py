@@ -37,16 +37,12 @@ async def api_get_journal_entries(
     """Get journal entries. If date is provided, get entry for that specific date. Otherwise get recent entries."""
     try:
         # Check space access if space_id provided
-        if space_id is not None and not await user_in_space(
-            current_user["user_id"], space_id
-        ):
+        if space_id is not None and not await user_in_space(current_user["user_id"], space_id):
             raise HTTPException(status_code=403, detail="Access denied to this space")
 
         if date:
             # Get specific date entry
-            entry = await get_journal_entry_by_date(
-                current_user["user_id"], date, space_id
-            )
+            entry = await get_journal_entry_by_date(current_user["user_id"], date, space_id)
             return entry
         else:
             # Get recent entries
@@ -61,21 +57,15 @@ async def api_get_journal_entries(
 
 
 @router.post("/journals", response_model=JournalEntry)
-async def api_create_journal_entry(
-    request: JournalCreateRequest, current_user: dict = Depends(get_current_user)
-):
+async def api_create_journal_entry(request: JournalCreateRequest, current_user: dict = Depends(get_current_user)):
     """Create or update a journal entry."""
     try:
         # Input length validation
         if len(request.text) > 50000:
-            raise HTTPException(
-                status_code=400, detail="Journal text too long (max 50000 chars)"
-            )
+            raise HTTPException(status_code=400, detail="Journal text too long (max 50000 chars)")
 
         # Check space access if space_id provided
-        if request.space_id is not None and not await user_in_space(
-            current_user["user_id"], request.space_id
-        ):
+        if request.space_id is not None and not await user_in_space(current_user["user_id"], request.space_id):
             raise HTTPException(status_code=403, detail="Access denied to this space")
 
         # Create journal entry
@@ -87,9 +77,7 @@ async def api_create_journal_entry(
         )
 
         result = await create_journal_entry(entry, current_user.get("timezone", "UTC"))
-        logger.info(
-            f"Journal entry created/updated for user {current_user['email']}, date {request.date}"
-        )
+        logger.info(f"Journal entry created/updated for user {current_user['email']}, date {request.date}")
         return result
 
     except HTTPException:
@@ -100,16 +88,12 @@ async def api_create_journal_entry(
 
 
 @router.delete("/journals/{entry_id}")
-async def api_delete_journal_entry(
-    entry_id: str, current_user: dict = Depends(get_current_user)
-):
+async def api_delete_journal_entry(entry_id: str, current_user: dict = Depends(get_current_user)):
     """Delete a journal entry."""
     try:
         success = await delete_journal_entry(entry_id, current_user["user_id"])
         if success:
-            logger.info(
-                f"Journal entry {entry_id} deleted by user {current_user['email']}"
-            )
+            logger.info(f"Journal entry {entry_id} deleted by user {current_user['email']}")
             return {"message": "Journal entry deleted successfully"}
         else:
             raise HTTPException(status_code=404, detail="Journal entry not found")

@@ -85,9 +85,7 @@ async def client():
     mcp_sessions.clear()
     mcp_contexts.clear()
 
-    async with httpx.AsyncClient(
-        transport=httpx.ASGITransport(app), base_url="http://testserver"
-    ) as async_client:
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://testserver") as async_client:
         yield async_client
 
 

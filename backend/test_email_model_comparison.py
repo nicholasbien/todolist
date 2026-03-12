@@ -29,9 +29,7 @@ SAMPLE_DATA = {
                         "priority": "Medium",
                         "dateAdded": (datetime.now() - timedelta(days=2)).isoformat(),
                         "dateAddedRelative": "2 days ago",
-                        "dateCompleted": (
-                            datetime.now() - timedelta(hours=12)
-                        ).isoformat(),
+                        "dateCompleted": (datetime.now() - timedelta(hours=12)).isoformat(),
                         "dateCompletedRelative": "12 hours ago",
                         "completed": True,
                     },
@@ -41,9 +39,7 @@ SAMPLE_DATA = {
                         "priority": "Low",
                         "dateAdded": (datetime.now() - timedelta(days=1)).isoformat(),
                         "dateAddedRelative": "1 day ago",
-                        "dateCompleted": (
-                            datetime.now() - timedelta(hours=6)
-                        ).isoformat(),
+                        "dateCompleted": (datetime.now() - timedelta(hours=6)).isoformat(),
                         "dateCompletedRelative": "6 hours ago",
                         "completed": True,
                     },
@@ -81,9 +77,7 @@ SAMPLE_DATA = {
                         "priority": "Medium",
                         "dateAdded": (datetime.now() - timedelta(days=5)).isoformat(),
                         "dateAddedRelative": "5 days ago",
-                        "dueDate": (datetime.now() + timedelta(days=1)).strftime(
-                            "%Y-%m-%d"
-                        ),
+                        "dueDate": (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d"),
                         "dueDateRelative": "in 1 day",
                         "completed": False,
                     },
@@ -93,9 +87,7 @@ SAMPLE_DATA = {
                         "priority": "High",
                         "dateAdded": (datetime.now() - timedelta(days=45)).isoformat(),
                         "dateAddedRelative": "1 month ago",
-                        "dueDate": (datetime.now() - timedelta(days=41)).strftime(
-                            "%Y-%m-%d"
-                        ),
+                        "dueDate": (datetime.now() - timedelta(days=41)).strftime("%Y-%m-%d"),
                         "dueDateRelative": "1 month ago",
                         "completed": False,
                     },
@@ -181,9 +173,7 @@ async def test_model(model_name: str, model_version: str) -> str:
 
     # Create prompt
     spaces_json = json.dumps(SAMPLE_DATA["spaces"], indent=2, default=str)
-    journal_entries_json = json.dumps(
-        SAMPLE_DATA["journal_entries"], indent=2, default=str
-    )
+    journal_entries_json = json.dumps(SAMPLE_DATA["journal_entries"], indent=2, default=str)
 
     prompt = create_summary_prompt(
         spaces_json=spaces_json,
@@ -224,13 +214,9 @@ async def main():
     print("EMAIL MODEL COMPARISON TEST")
     print("=" * 80)
     print("\nSample data:")
-    print(
-        f"- Completed tasks (last 48h): {len(SAMPLE_DATA['spaces'][0]['todos']['completed'])}"
-    )
+    print(f"- Completed tasks (last 48h): {len(SAMPLE_DATA['spaces'][0]['todos']['completed'])}")
     print(f"- Pending tasks: {len(SAMPLE_DATA['spaces'][0]['todos']['pending'])}")
-    print(
-        f"- High priority: {sum(1 for t in SAMPLE_DATA['spaces'][0]['todos']['pending'] if t['priority'] == 'High')}"
-    )
+    print(f"- High priority: {sum(1 for t in SAMPLE_DATA['spaces'][0]['todos']['pending'] if t['priority'] == 'High')}")
     print(f"- Journal entries: {len(SAMPLE_DATA['journal_entries'])}")
 
     # Test both models
@@ -268,11 +254,7 @@ async def main():
             "has_recent_wins": "Recent Wins" in text or "Wins" in text,
             "has_priority_focus": "Priority" in text or "🔥" in text,
             "has_haiku": SAMPLE_HAIKU.split("\n")[0] in text,
-            "section_count": sum(
-                1
-                for line in lines
-                if line.strip().startswith(("**", "🎯", "✨", "🔥", "⚡", "📊"))
-            ),
+            "section_count": sum(1 for line in lines if line.strip().startswith(("**", "🎯", "✨", "🔥", "⚡", "📊"))),
         }
 
     analysis_41 = analyze_output(result_41)

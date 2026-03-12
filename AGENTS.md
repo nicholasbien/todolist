@@ -243,6 +243,26 @@ cd backend && source venv/bin/activate && pre-commit run --all-files
 cd frontend && npm run lint
 ```
 
+## Pre-commit Checks
+
+### Setup
+
+Install pre-commit hooks (one-time, from repo root):
+
+```bash
+pre-commit install
+```
+
+### Running Checks
+
+Before committing any backend changes, run:
+
+```bash
+pre-commit run --all-files
+```
+
+This ensures black, isort, flake8, autoflake, and mypy all pass. Configuration for black and isort lives in `backend/pyproject.toml` — do not pass explicit `--line-length` args in CLI commands or CI; the tools read from `pyproject.toml` automatically.
+
 ---
 
 ## Architecture

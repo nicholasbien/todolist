@@ -47,9 +47,7 @@ def test_smtp_connection():
         print("✅ SMTP connection successful!")
 
         # Send test email
-        test_email = input(
-            "Enter email to send test to (or press Enter to skip): "
-        ).strip()
+        test_email = input("Enter email to send test to (or press Enter to skip): ").strip()
 
         if test_email:
             print(f"📧 Sending test email to {test_email}...")

@@ -39,9 +39,7 @@ async def fetch_webpage(url: str, selector: Optional[str] = None) -> dict:
             if selector:
                 elements = soup.select(selector)
                 if elements:
-                    content = "\n".join(
-                        [elem.get_text(strip=True) for elem in elements]
-                    )
+                    content = "\n".join([elem.get_text(strip=True) for elem in elements])
                 else:
                     content = f"No elements found matching selector: {selector}"
             else:
@@ -50,14 +48,8 @@ async def fetch_webpage(url: str, selector: Optional[str] = None) -> dict:
                     script.decompose()
 
                 # Get main content
-                main_content = (
-                    soup.find("main") or soup.find("article") or soup.find("body")
-                )
-                content = (
-                    main_content.get_text(separator="\n", strip=True)
-                    if main_content
-                    else ""
-                )
+                main_content = soup.find("main") or soup.find("article") or soup.find("body")
+                content = main_content.get_text(separator="\n", strip=True) if main_content else ""
 
             # Get title
             title = soup.find("title")
@@ -155,11 +147,7 @@ async def extract_links(url: str, pattern: Optional[str] = None) -> dict:
                     href = urljoin(str(response.url), href)
 
                 # Filter by pattern if provided
-                if (
-                    pattern
-                    and pattern.lower() not in href.lower()
-                    and pattern.lower() not in text.lower()
-                ):
+                if pattern and pattern.lower() not in href.lower() and pattern.lower() not in text.lower():
                     continue
 
                 links.append({"url": href, "text": text[:100]})  # Limit text length

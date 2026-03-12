@@ -92,7 +92,5 @@ async def api_trigger_nudges(
 
     prefs = await get_briefing_preferences(current_user["user_id"])
     stale_days = prefs.get("stale_task_days", 3)
-    nudged = await post_stale_task_nudges(
-        current_user["user_id"], stale_days=stale_days
-    )
+    nudged = await post_stale_task_nudges(current_user["user_id"], stale_days=stale_days)
     return {"ok": True, "nudged_sessions": nudged, "count": len(nudged)}

@@ -5,3 +5,13 @@ See **AGENTS.md** for all development instructions, architecture documentation, 
 ## Task Tracking
 
 Always create a todolist task (via `mcp__todolist__add_todo`) for each new piece of work before starting it. This ensures all work is visible in the web app and linked to a chat session for status updates.
+
+## Pre-commit Checks
+
+Before committing backend changes, always run:
+
+```bash
+cd backend && pre-commit run --all-files
+```
+
+This runs black, isort, flake8, autoflake, and mypy. Fix any issues before committing.
