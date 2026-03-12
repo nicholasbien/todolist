@@ -1,7 +1,5 @@
 """Tests for insights_utils module — get_week_key and generate_insights."""
 
-import pytest
-
 from insights_utils import generate_insights, get_week_key
 
 
@@ -78,18 +76,57 @@ class TestGenerateInsights:
 
     def test_completion_rate_rounding(self):
         todos = [
-            {"text": "A", "completed": True, "category": "General", "priority": "Medium", "dateAdded": "2026-03-10T10:00:00", "dateCompleted": "2026-03-10T10:00:00"},
-            {"text": "B", "completed": True, "category": "General", "priority": "Medium", "dateAdded": "2026-03-10T10:00:00", "dateCompleted": "2026-03-10T10:00:00"},
-            {"text": "C", "completed": False, "category": "General", "priority": "Medium", "dateAdded": "2026-03-10T10:00:00"},
+            {
+                "text": "A",
+                "completed": True,
+                "category": "General",
+                "priority": "Medium",
+                "dateAdded": "2026-03-10T10:00:00",
+                "dateCompleted": "2026-03-10T10:00:00",
+            },
+            {
+                "text": "B",
+                "completed": True,
+                "category": "General",
+                "priority": "Medium",
+                "dateAdded": "2026-03-10T10:00:00",
+                "dateCompleted": "2026-03-10T10:00:00",
+            },
+            {
+                "text": "C",
+                "completed": False,
+                "category": "General",
+                "priority": "Medium",
+                "dateAdded": "2026-03-10T10:00:00",
+            },
         ]
         result = generate_insights(todos)
         assert result["overview"]["completion_rate"] == 66.7
 
     def test_category_breakdown(self):
         todos = [
-            {"text": "A", "completed": True, "category": "Work", "priority": "High", "dateAdded": "2026-03-10T10:00:00", "dateCompleted": "2026-03-10T10:00:00"},
-            {"text": "B", "completed": False, "category": "Work", "priority": "High", "dateAdded": "2026-03-10T10:00:00"},
-            {"text": "C", "completed": False, "category": "Personal", "priority": "Low", "dateAdded": "2026-03-10T10:00:00"},
+            {
+                "text": "A",
+                "completed": True,
+                "category": "Work",
+                "priority": "High",
+                "dateAdded": "2026-03-10T10:00:00",
+                "dateCompleted": "2026-03-10T10:00:00",
+            },
+            {
+                "text": "B",
+                "completed": False,
+                "category": "Work",
+                "priority": "High",
+                "dateAdded": "2026-03-10T10:00:00",
+            },
+            {
+                "text": "C",
+                "completed": False,
+                "category": "Personal",
+                "priority": "Low",
+                "dateAdded": "2026-03-10T10:00:00",
+            },
         ]
         result = generate_insights(todos)
         cats = {c["category"]: c for c in result["category_breakdown"]}
@@ -102,8 +139,21 @@ class TestGenerateInsights:
 
     def test_priority_breakdown(self):
         todos = [
-            {"text": "A", "completed": True, "category": "General", "priority": "High", "dateAdded": "2026-03-10T10:00:00", "dateCompleted": "2026-03-10T10:00:00"},
-            {"text": "B", "completed": False, "category": "General", "priority": "Low", "dateAdded": "2026-03-10T10:00:00"},
+            {
+                "text": "A",
+                "completed": True,
+                "category": "General",
+                "priority": "High",
+                "dateAdded": "2026-03-10T10:00:00",
+                "dateCompleted": "2026-03-10T10:00:00",
+            },
+            {
+                "text": "B",
+                "completed": False,
+                "category": "General",
+                "priority": "Low",
+                "dateAdded": "2026-03-10T10:00:00",
+            },
         ]
         result = generate_insights(todos)
         pris = {p["priority"]: p for p in result["priority_breakdown"]}
@@ -114,8 +164,21 @@ class TestGenerateInsights:
 
     def test_weekly_stats(self):
         todos = [
-            {"text": "A", "completed": True, "category": "General", "priority": "Medium", "dateAdded": "2026-03-10T10:00:00", "dateCompleted": "2026-03-11T10:00:00"},
-            {"text": "B", "completed": False, "category": "General", "priority": "Medium", "dateAdded": "2026-03-10T10:00:00"},
+            {
+                "text": "A",
+                "completed": True,
+                "category": "General",
+                "priority": "Medium",
+                "dateAdded": "2026-03-10T10:00:00",
+                "dateCompleted": "2026-03-11T10:00:00",
+            },
+            {
+                "text": "B",
+                "completed": False,
+                "category": "General",
+                "priority": "Medium",
+                "dateAdded": "2026-03-10T10:00:00",
+            },
         ]
         result = generate_insights(todos)
         assert len(result["weekly_stats"]) >= 1
@@ -134,6 +197,14 @@ class TestGenerateInsights:
 
     def test_dict_access_pattern(self):
         """generate_insights should work with dict-like todos."""
-        todos = {"1": {"text": "A", "completed": False, "category": "X", "priority": "High", "dateAdded": "2026-03-10T10:00:00"}}
+        todos = {
+            "1": {
+                "text": "A",
+                "completed": False,
+                "category": "X",
+                "priority": "High",
+                "dateAdded": "2026-03-10T10:00:00",
+            }
+        }
         result = generate_insights(todos)
         assert result["overview"]["total_tasks"] == 1

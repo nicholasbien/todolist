@@ -33,9 +33,7 @@ async def test_add_category(client, test_email):
     token = await get_token(client, test_email)
     headers = {"Authorization": f"Bearer {token}"}
 
-    resp = await client.post(
-        "/categories", json={"name": "Work"}, headers=headers
-    )
+    resp = await client.post("/categories", json={"name": "Work"}, headers=headers)
     assert resp.status_code == 200
 
     resp = await client.get("/categories", headers=headers)
