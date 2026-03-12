@@ -1,14 +1,28 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { ArrowUpDown, GripVertical, Search, X } from "lucide-react";
+import dynamic from "next/dynamic";
 import TodoItem from "./TodoItem";
-import AgentChatbot from "./AgentChatbot";
 import { useAuth } from "../context/AuthContext";
 import Link from "next/link";
-import InsightsComponent from "./InsightsComponent";
-import JournalComponent from "./JournalComponent";
-import BriefingSettings from "./BriefingSettings";
-import ActivityFeed from "./ActivityFeed";
 import SpaceDropdown from "./SpaceDropdown";
+
+// Dynamic imports for tab components to reduce initial bundle size
+const AgentChatbot = dynamic(() => import("./AgentChatbot"), {
+  loading: () => <div className="flex items-center justify-center p-8"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500" /></div>,
+  ssr: false,
+});
+const InsightsComponent = dynamic(() => import("./InsightsComponent"), {
+  loading: () => <div className="flex items-center justify-center p-8"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500" /></div>,
+});
+const JournalComponent = dynamic(() => import("./JournalComponent"), {
+  loading: () => <div className="flex items-center justify-center p-8"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500" /></div>,
+});
+const BriefingSettings = dynamic(() => import("./BriefingSettings"), {
+  loading: () => <div className="flex items-center justify-center p-8"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500" /></div>,
+});
+const ActivityFeed = dynamic(() => import("./ActivityFeed"), {
+  loading: () => <div className="flex items-center justify-center p-8"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500" /></div>,
+});
 import { sortSpaces } from "../utils/spaceUtils";
 import { loadSortModePreference, saveSortModePreference, type SortMode } from "../utils/sortPreferences";
 import SwipeableViews from "react-swipeable-views-react-18-fix";
