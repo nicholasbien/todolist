@@ -37,12 +37,20 @@ polling is handled via `/loop`, not a background daemon.
 │  - Routes follow-ups to the right subagent           │
 └──────────────┬───────────────────────────────────────┘
                │  spawns
-    ┌──────────┴──────────┐
-    │   task-worker agent  │  (one per task)
-    │   - Reads session    │
-    │   - Does the work    │
-    │   - Posts reply      │
-    └─────────────────────┘
+    ┌──────────┴──────────────────────────────┐
+    │         task-worker agent                │  (one per task)
+    │  - Simple task: does work directly       │
+    │  - Complex task: creates subtasks,       │
+    │    dispatches child subagents in         │
+    │    parallel, monitors & summarizes       │
+    └──────────────┬───────────────────────────┘
+                   │  spawns (for complex tasks)
+        ┌──────────┼──────────┐
+        │          │          │
+    ┌───┴───┐ ┌───┴───┐ ┌───┴───┐
+    │child A│ │child B│ │child C│  (parallel)
+    │subtask│ │subtask│ │subtask│
+    └───────┘ └───────┘ └───────┘
 ```
 
 ## Commands
@@ -142,9 +150,18 @@ task assigned to you.
       CRITICAL: Every subtask MUST include parent_id={todo_id}.
       Without parent_id, you create orphaned top-level tasks instead of subtasks.
    d. Sub-tasks run in parallel by default — use depends_on to specify ordering
-   e. Use /todolist check (or mcp__todolist__get_pending_sessions) to poll
-      for subtask progress — the backend activates subtasks as dependencies clear
-   f. Monitor progress and handle any issues as subtasks complete
+   e. **Dispatch a child subagent for each subtask** that doesn't have unmet
+      dependencies. Use the Agent tool with `run_in_background: true` so they
+      execute in parallel. Use `isolation: "worktree"` for code-modifying
+      subtasks. Each child subagent should:
+      - Read the subtask session via mcp__todolist__get_session
+      - Do the work for that specific subtask
+      - Post results to the subtask session via mcp__todolist__post_to_session
+      - Complete the subtask via mcp__todolist__complete_todo
+   f. After dispatching child subagents, poll for progress using
+      mcp__todolist__get_pending_sessions. When subtasks with dependencies
+      become unblocked (their dependencies completed), dispatch new child
+      subagents for those too.
    g. When all subtasks are done, read their sessions, post a final summary,
       and complete the parent task via mcp__todolist__complete_todo
 3. If the task is simple, do the work directly:
@@ -159,8 +176,9 @@ task assigned to you.
 
 IMPORTANT: Always include agent_id="claude" when posting to claim/maintain
 routing. The user will see your reply in their TodoList app.
-IMPORTANT: If you create subtasks, use /todolist check to poll for updates
-from your subtasks rather than trying to do all the work yourself.
+IMPORTANT: For complex tasks with subtasks, ALWAYS dispatch separate child
+subagents for each subtask so they run truly in parallel. Never do all
+subtask work sequentially in a single agent.
 IMPORTANT: NEVER create subtasks without parent_id. If you call add_todo
 without parent_id, it creates a standalone top-level task — NOT a subtask.
 ```
@@ -337,30 +355,73 @@ needs to be broken into sub-tasks:
      and their dependency relationships:
      e.g. "Breaking this into 3 sub-tasks:\n1. Research the problem (TASK_A)\n2. Set up infra (TASK_B)\n3. Implement solution (TASK_C, depends on A)\n\nTasks A and B will run in parallel. Task C starts when A finishes."
    - All sub-tasks without `depends_on` start immediately (parallel by default)
+   - **Dispatch a child subagent per subtask** — see "Managing Agent Responsibilities"
 3. If the task is simple:
    - Do the work directly and post the result
 
 ### Managing Agent Responsibilities
 
 The managing agent (subagent assigned to the parent task) is responsible for
-monitoring subtask progress, handling issues, and providing the final summary.
+dispatching child subagents, monitoring progress, handling issues, and providing
+the final summary.
 
-**The managing agent should use `/todolist check` (or `mcp__todolist__get_pending_sessions`)
-to poll for updates.** When a subtask completes, the backend posts a progress
-message to the parent session (e.g. "Subtask completed: Step 1 (1/3 done)").
-The parent session's `needs_agent_response` is set to true, so the managing
-agent picks it up on the next poll.
+**Key principle: the managing agent orchestrates but does NOT do subtask work
+itself.** It creates subtasks, dispatches child subagents to do the actual work
+in parallel, monitors their progress, and compiles the final summary.
 
-The managing agent should:
-1. **Poll regularly** using `/todolist check` or `get_pending_sessions` to
-   monitor subtask progress
-2. **Post progress updates** to the parent session as subtasks complete
-3. **Handle issues** — if a subtask fails or needs intervention, read its
-   session and take corrective action
-4. When all subtasks are complete:
-   - Read each subtask's session to gather results (use `get_session`)
-   - Post a final summary to the parent session
-   - Complete the parent task via `complete_todo`
+#### Dispatching Child Subagents
+
+After creating subtasks, the managing agent should immediately dispatch a
+**child subagent** for each subtask that has no unmet dependencies:
+
+```
+Agent(
+  description: "Subtask: <brief description>",
+  subagent_type: "general-purpose",
+  run_in_background: true,
+  isolation: "worktree",  // for code-modifying subtasks
+  prompt: "You are a subtask worker. Do the following work and report results.
+
+  ## Subtask
+  - Session ID: {subtask_session_id}
+  - Todo ID: {subtask_todo_id}
+  - Task: {subtask_description}
+
+  ## Instructions
+  1. Do the work described above
+  2. Post your results to mcp__todolist__post_to_session:
+     - session_id: \"{subtask_session_id}\"
+     - content: Your detailed results
+     - role: \"assistant\"
+     - agent_id: \"claude\"
+  3. Mark complete via mcp__todolist__complete_todo(id=\"{subtask_todo_id}\")
+  "
+)
+```
+
+Launch all independent subtasks simultaneously with `run_in_background: true`
+so they execute in true parallel.
+
+#### Monitoring and Handling Dependencies
+
+After dispatching the initial batch:
+
+1. **Poll regularly** using `mcp__todolist__get_pending_sessions` to monitor
+   subtask progress
+2. **When a subtask completes**, the backend automatically:
+   - Posts a progress message to the parent session
+   - Unblocks any dependent subtasks whose dependencies are now satisfied
+3. **Dispatch new child subagents** for any newly-unblocked subtasks
+4. **Post progress updates** to the parent session as subtasks complete
+5. **Handle issues** — if a child subagent fails, read its session and take
+   corrective action (retry, fix, or escalate)
+
+#### Completing the Parent Task
+
+When all subtasks are done:
+1. Read each subtask's session to gather results (use `get_session`)
+2. Post a final summary to the parent session
+3. Complete the parent task via `complete_todo`
 
 ### Sub-Task Display
 
