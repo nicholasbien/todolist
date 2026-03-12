@@ -97,10 +97,10 @@ describe('Todo Space Change in Edit Modal', () => {
       expect(screen.getByText('Test todo')).toBeInTheDocument();
     });
 
-    // Right-click the todo to open the edit modal (onContextMenu triggers it)
+    // Click the todo to open the edit modal
     const todoElement = screen.getByText('Test todo');
     await act(async () => {
-      fireEvent.contextMenu(todoElement);
+      fireEvent.click(todoElement);
     });
 
     // Wait for modal to appear
@@ -175,9 +175,9 @@ describe('Todo Space Change in Edit Modal', () => {
       expect(screen.getByText('Test todo')).toBeInTheDocument();
     });
 
-    // Right-click the todo to open the edit modal (onContextMenu triggers it)
+    // Click the todo to open the edit modal
     await act(async () => {
-      fireEvent.contextMenu(screen.getByText('Test todo'));
+      fireEvent.click(screen.getByText('Test todo'));
     });
 
     // Wait for modal to appear
@@ -254,9 +254,9 @@ describe('Todo Space Change in Edit Modal', () => {
       expect(screen.getByText('Test todo')).toBeInTheDocument();
     });
 
-    // Right-click the todo to open the edit modal (onContextMenu triggers it)
+    // Click the todo to open the edit modal
     await act(async () => {
-      fireEvent.contextMenu(screen.getByText('Test todo'));
+      fireEvent.click(screen.getByText('Test todo'));
     });
 
     // Wait for modal to appear
@@ -334,9 +334,9 @@ describe('Todo Space Change in Edit Modal', () => {
       expect(screen.getByText('Test todo')).toBeInTheDocument();
     });
 
-    // Right-click the todo to open the edit modal (onContextMenu triggers it)
+    // Click the todo to open the edit modal
     await act(async () => {
-      fireEvent.contextMenu(screen.getByText('Test todo'));
+      fireEvent.click(screen.getByText('Test todo'));
     });
 
     // Wait for modal to appear
