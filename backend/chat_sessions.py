@@ -7,6 +7,7 @@ Sessions can be:
 """
 
 import logging
+import re
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
@@ -378,25 +379,50 @@ async def search_sessions(
     space_id: Optional[str] = None,
     limit: int = 20,
 ) -> List[Dict[str, Any]]:
-    """Search sessions by title and message content using MongoDB text indexes.
+    """Search sessions by title and message content.
 
-    Returns sessions where the title or message content matches the query,
-    sorted by text relevance score. Each result includes a preview snippet
-    from the best-matching message.
+    Uses a hybrid strategy:
+    1. Try MongoDB $text search first (fast, relevance-ranked, word-stem matching).
+    2. Supplement with $regex substring search to catch partial/substring matches
+       that $text misses (e.g. typing "ses" to find "session").
+
+    $text results are returned first (higher relevance), followed by any
+    additional $regex-only matches, deduplicated by session ID.
     """
     if not query or not query.strip():
         return []
 
+    query = query.strip()
+    results: List[Dict[str, Any]] = []
+    seen_session_ids: set = set()
+
+    # 1) $text search (fast, ranked)
     try:
-        return await _text_index_search(user_id, query, space_id, limit)
+        text_results = await _text_index_search(user_id, query, space_id, limit)
+        for r in text_results:
+            seen_session_ids.add(r["_id"])
+        results.extend(text_results)
     except Exception as e:
         logger.error(
             "Text-index search failed for query %r: %s. "
-            "Ensure text indexes exist by checking init_chat_session_indexes logs.",
+            "Falling back to regex-only search.",
             query,
             e,
         )
-        return []
+
+    # 2) Supplement with $regex substring search for partial matches.
+    #    This catches cases $text misses (e.g. "ses" -> "session").
+    remaining = limit - len(results)
+    if remaining > 0:
+        try:
+            regex_results = await _regex_substring_search(
+                user_id, query, space_id, remaining, seen_session_ids
+            )
+            results.extend(regex_results)
+        except Exception as e:
+            logger.error("Regex substring search failed for query %r: %s", query, e)
+
+    return results[:limit]
 
 
 async def _text_index_search(
@@ -542,6 +568,148 @@ async def _hydrate_content_results(
                 "score": traj.get("score", 0.5),
             }
         )
+
+
+async def _regex_substring_search(
+    user_id: str,
+    query: str,
+    space_id: Optional[str],
+    limit: int,
+    seen_session_ids: set,
+) -> List[Dict[str, Any]]:
+    """Supplement search with $regex to catch substring/partial-word matches.
+
+    Searches session titles and trajectory message content for the query
+    as a case-insensitive substring. Skips sessions already found by $text.
+    Results get a synthetic score of 0 so they sort after $text hits.
+    """
+    results: List[Dict[str, Any]] = []
+    escaped = re.escape(query)
+    regex_pattern = {"$regex": escaped, "$options": "i"}
+
+    # 1) Search session titles by regex
+    title_filter: Dict[str, Any] = {
+        "user_id": user_id,
+        "title": regex_pattern,
+    }
+    if space_id is not None:
+        title_filter["space_id"] = space_id
+    if seen_session_ids:
+        title_filter["_id"] = {"$nin": [ObjectId(s) for s in seen_session_ids]}
+
+    cursor = (
+        sessions_collection.find(title_filter)
+        .sort("updated_at", -1)
+        .limit(limit)
+    )
+    title_hits = await cursor.to_list(length=limit)
+
+    for doc in title_hits:
+        sid = str(doc["_id"])
+        if sid in seen_session_ids:
+            continue
+        seen_session_ids.add(sid)
+        results.append(
+            {
+                "_id": sid,
+                "title": doc.get("title", ""),
+                "space_id": doc.get("space_id"),
+                "todo_id": doc.get("todo_id"),
+                "agent_id": doc.get("agent_id"),
+                "updated_at": doc.get("updated_at"),
+                "created_at": doc.get("created_at"),
+                "match_source": "title",
+                "preview": doc.get("title", ""),
+                "score": 0,
+            }
+        )
+
+    # 2) Search message content by regex on trajectories
+    remaining = limit - len(results)
+    if remaining <= 0:
+        return results
+
+    content_filter: Dict[str, Any] = {
+        "user_id": user_id,
+        "display_messages.content": regex_pattern,
+    }
+    if space_id is not None:
+        content_filter["space_id"] = space_id
+
+    cursor = (
+        trajectories_collection.find(
+            content_filter,
+            {"session_id": 1, "display_messages": 1},
+        )
+        .sort("updated_at", -1)
+        .limit(remaining + len(seen_session_ids))  # over-fetch to allow dedup
+    )
+    content_hits = await cursor.to_list(length=remaining + len(seen_session_ids))
+
+    # Filter out already-seen sessions
+    new_content_hits = []
+    for traj in content_hits:
+        sid = traj.get("session_id")
+        if not sid or sid in seen_session_ids:
+            continue
+        seen_session_ids.add(sid)
+        new_content_hits.append(traj)
+        if len(new_content_hits) >= remaining:
+            break
+
+    # Hydrate with session docs (reuse the existing helper logic)
+    if new_content_hits:
+        content_sids = [t["session_id"] for t in new_content_hits]
+        content_session_ids = [ObjectId(sid) for sid in content_sids]
+        session_cursor = sessions_collection.find({"_id": {"$in": content_session_ids}})
+        session_docs_list = await session_cursor.to_list(length=len(content_session_ids))
+        session_docs_map: Dict[str, Dict[str, Any]] = {
+            str(doc["_id"]): doc for doc in session_docs_list
+        }
+
+        query_lower = query.lower()
+        for traj in new_content_hits:
+            sid = traj["session_id"]
+            session_doc = session_docs_map.get(sid)
+            if not session_doc:
+                continue
+
+            # Find best matching message snippet
+            preview = ""
+            for msg in reversed(traj.get("display_messages", [])):
+                content = msg.get("content", "")
+                if query_lower in content.lower():
+                    idx = content.lower().index(query_lower)
+                    start = max(0, idx - 40)
+                    end = min(len(content), idx + len(query) + 80)
+                    snippet = content[start:end]
+                    if start > 0:
+                        snippet = "..." + snippet
+                    if end < len(content):
+                        snippet = snippet + "..."
+                    preview = snippet
+                    break
+
+            if not preview and traj.get("display_messages"):
+                last_msg = traj["display_messages"][-1]
+                preview = last_msg.get("content", "")[:120]
+
+            results.append(
+                {
+                    "_id": sid,
+                    "title": session_doc.get("title", ""),
+                    "space_id": session_doc.get("space_id"),
+                    "todo_id": session_doc.get("todo_id"),
+                    "agent_id": session_doc.get("agent_id"),
+                    "updated_at": session_doc.get("updated_at"),
+                    "created_at": session_doc.get("created_at"),
+                    "match_source": "content",
+                    "preview": preview,
+                    "score": 0,
+                }
+            )
+
+    return results
 
 
 async def _ensure_text_index(collection, index_spec, index_name: str) -> None:
