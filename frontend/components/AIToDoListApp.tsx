@@ -124,6 +124,8 @@ export default function AIToDoListApp({
   const [editingCategory, setEditingCategory] = useState<string | null>(null);
   const [sendingEmail, setSendingEmail] = useState(false);
   const [showCompleted, setShowCompleted] = useState(false);
+  const [visibleUncompletedCount, setVisibleUncompletedCount] = useState(10);
+  const [visibleCompletedCount, setVisibleCompletedCount] = useState(10);
   const [showUpdatePrompt, setShowUpdatePrompt] = useState(false);
   const isIosCapacitorApp = useRef(false);
   const [emailTime, setEmailTime] = useState('09:00');
@@ -155,6 +157,12 @@ export default function AIToDoListApp({
       localStorage.removeItem('active_space_id');
     }
   }, [activeSpace]);
+
+  // Reset pagination when filters change
+  useEffect(() => {
+    setVisibleUncompletedCount(10);
+    setVisibleCompletedCount(10);
+  }, [activeSpace, activeCat, searchQuery]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -1360,7 +1368,8 @@ export default function AIToDoListApp({
     .filter(todo => !todo.completed && !todo.parent_id)
     .sort(sortTodos);
 
-  const uncompletedTodoIds = uncompletedTodos.map(t => t._id);
+  const visibleUncompletedTodos = uncompletedTodos.slice(0, visibleUncompletedCount);
+  const uncompletedTodoIds = visibleUncompletedTodos.map(t => t._id);
 
   const completedTodos = allFilteredTodos
     .filter((todo) => todo.completed && !todo.parent_id)
@@ -1916,7 +1925,7 @@ export default function AIToDoListApp({
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
         <SortableContext items={uncompletedTodoIds} strategy={verticalListSortingStrategy}>
           <div className="space-y-3">
-            {uncompletedTodos.map((todo) => (
+            {uncompletedTodos.slice(0, visibleUncompletedCount).map((todo) => (
               <React.Fragment key={todo._id}>
                 <SortableItem id={todo._id} disabled={!isSortModeActive}>
                   <TodoItem
@@ -1944,6 +1953,17 @@ export default function AIToDoListApp({
         </SortableContext>
       </DndContext>
 
+      {uncompletedTodos.length > visibleUncompletedCount && (
+        <div className="mt-4 mb-2 flex justify-center">
+          <button
+            onClick={() => setVisibleUncompletedCount(prev => prev + 10)}
+            className="bg-gray-900 hover:bg-gray-800 text-gray-300 px-4 py-2 rounded-lg transition-colors border border-gray-800"
+          >
+            Show More ({uncompletedTodos.length - visibleUncompletedCount})
+          </button>
+        </div>
+      )}
+
       {/* Show/Hide Completed Toggle Button */}
       {completedTodos.length > 0 && (
         <div className="mt-6 mb-4 flex justify-center">
@@ -1958,7 +1978,7 @@ export default function AIToDoListApp({
 
       {showCompleted && completedTodos.length > 0 && (
         <div className="mt-6 mb-4 space-y-3">
-          {completedTodos.map((todo) => (
+          {completedTodos.slice(0, visibleCompletedCount).map((todo) => (
             <React.Fragment key={todo._id}>
               <TodoItem
                 todo={todo}
@@ -1980,6 +2000,16 @@ export default function AIToDoListApp({
               />
             </React.Fragment>
           ))}
+          {completedTodos.length > visibleCompletedCount && (
+            <div className="mt-4 mb-2 flex justify-center">
+              <button
+                onClick={() => setVisibleCompletedCount(prev => prev + 10)}
+                className="bg-gray-900 hover:bg-gray-800 text-gray-300 px-4 py-2 rounded-lg transition-colors border border-gray-800"
+              >
+                Show More ({completedTodos.length - visibleCompletedCount})
+              </button>
+            </div>
+          )}
         </div>
       )}
 
