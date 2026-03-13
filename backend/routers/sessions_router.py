@@ -9,6 +9,7 @@ from pydantic import BaseModel
 from chat_sessions import append_message
 from chat_sessions import create_session as create_chat_session
 from chat_sessions import find_session_by_todo, mark_session_read
+from rate_limit import rate_limit_by_user
 
 from .dependencies import get_current_user
 
@@ -38,6 +39,7 @@ class PostMessageRequest(BaseModel):
 async def api_create_agent_session(req: CreateSessionRequest, current_user: dict = Depends(get_current_user)):
     """Create a new messaging session, optionally linked to a todo."""
     user_id = current_user["user_id"]
+    rate_limit_by_user(user_id, max_requests=10, window_seconds=60, endpoint="create_session")
 
     # If todo_id provided, check for existing session
     if req.todo_id:

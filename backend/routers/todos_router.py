@@ -13,6 +13,7 @@ from chat_sessions import append_message
 from chat_sessions import create_session as create_chat_session
 from chat_sessions import find_session_by_todo
 from classify import classify_task
+from rate_limit import rate_limit_by_user
 from spaces import user_in_space
 from todos import (
     Todo,
@@ -45,6 +46,12 @@ async def api_get_todos(space_id: str | None = None, current_user: dict = Depend
 @router.post("/todos", response_model=Todo)
 async def api_create_todo(request: Request, current_user: dict = Depends(get_current_user)):
     try:
+        rate_limit_by_user(
+            current_user["user_id"],
+            max_requests=30,
+            window_seconds=60,
+            endpoint="create_todo",
+        )
         body = await request.json()
 
         body["user_id"] = current_user["user_id"]

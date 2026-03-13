@@ -2,7 +2,7 @@
 
 import logging
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 
 from auth import (
     LoginRequest,
@@ -14,6 +14,7 @@ from auth import (
     signup_user,
     update_user_name,
 )
+from rate_limit import rate_limit_by_ip
 
 from .dependencies import get_current_user
 
@@ -23,15 +24,17 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 @router.post("/signup")
-async def api_signup(request: SignupRequest):
+async def api_signup(request: SignupRequest, raw_request: Request):
     """Send verification code to email for signup/login."""
+    rate_limit_by_ip(raw_request, max_requests=5, window_seconds=60, endpoint="signup")
     logger.info(f"Signup request for email: {request.email}")
     return await signup_user(request.email)
 
 
 @router.post("/login")
-async def api_login(request: LoginRequest):
+async def api_login(request: LoginRequest, raw_request: Request):
     """Verify code and create session."""
+    rate_limit_by_ip(raw_request, max_requests=10, window_seconds=60, endpoint="login")
     logger.info(f"Login request for email: {request.email}")
     return await login_user(request.email, request.code)
 

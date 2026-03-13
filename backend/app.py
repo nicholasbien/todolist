@@ -87,9 +87,7 @@ from todos import (
 )
 
 # Set up logging with more detail
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 
@@ -162,9 +160,7 @@ async def lifespan(app: FastAPI):
             failed_steps.append("scheduler")
 
         if failed_steps:
-            logger.warning(
-                f"⚠️  Startup completed with {len(failed_steps)} failed steps: {', '.join(failed_steps)}"
-            )
+            logger.warning(f"⚠️  Startup completed with {len(failed_steps)} failed steps: {', '.join(failed_steps)}")
         else:
             logger.info("🚀 All initialization completed successfully")
 
@@ -173,9 +169,7 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error(f"Critical startup error: {e}")
         # Don't re-raise to prevent crash loop
-        logger.error(
-            "App started with startup errors - some features may not work correctly"
-        )
+        logger.error("App started with startup errors - some features may not work correctly")
 
     # Application is now running
     yield
@@ -233,9 +227,7 @@ async def get_current_user(authorization: str = Header(None)):
         if scheme.lower() != "bearer":
             raise HTTPException(status_code=401, detail="Invalid authentication scheme")
     except ValueError:
-        raise HTTPException(
-            status_code=401, detail="Invalid authorization header format"
-        )
+        raise HTTPException(status_code=401, detail="Invalid authorization header format")
 
     # Verify the session token
     user_info = await verify_session(token)
@@ -295,13 +287,9 @@ async def api_get_current_user(current_user: dict = Depends(get_current_user)):
 
 
 @app.post("/auth/update-name")
-async def api_update_name(
-    request: UpdateNameRequest, current_user: dict = Depends(get_current_user)
-):
+async def api_update_name(request: UpdateNameRequest, current_user: dict = Depends(get_current_user)):
     """Update user's first name."""
-    logger.info(
-        f"Update name request for user: {current_user['email']}, name: {request.first_name}"
-    )
+    logger.info(f"Update name request for user: {current_user['email']}, name: {request.first_name}")
     return await update_user_name(current_user["user_id"], request.first_name)
 
 
@@ -314,9 +302,7 @@ async def api_delete_account(current_user: dict = Depends(get_current_user)):
 
 # Add todo management endpoints
 @app.get("/todos", response_model=List[Todo])
-async def api_get_todos(
-    space_id: str | None = None, current_user: dict = Depends(get_current_user)
-):
+async def api_get_todos(space_id: str | None = None, current_user: dict = Depends(get_current_user)):
     logger.info(f"Fetching todos for user: {current_user['email']} in space {space_id}")
     result = await get_todos(current_user["user_id"], space_id)
     logger.info(f"Fetched {len(result)} todos")
@@ -324,9 +310,7 @@ async def api_get_todos(
 
 
 @app.post("/todos", response_model=Todo)
-async def api_create_todo(
-    request: Request, current_user: dict = Depends(get_current_user)
-):
+async def api_create_todo(request: Request, current_user: dict = Depends(get_current_user)):
     try:
         rate_limit_by_user(current_user["user_id"], max_requests=30, window_seconds=60, endpoint="create_todo")
         body = await request.json()
@@ -340,14 +324,10 @@ async def api_create_todo(
         if not text:
             raise HTTPException(status_code=400, detail="Task text is required")
         if len(text) > 2000:
-            raise HTTPException(
-                status_code=400, detail="Task text too long (max 2000 chars)"
-            )
+            raise HTTPException(status_code=400, detail="Task text too long (max 2000 chars)")
         notes = body.get("notes", "")
         if notes and len(notes) > 10000:
-            raise HTTPException(
-                status_code=400, detail="Notes too long (max 10000 chars)"
-            )
+            raise HTTPException(status_code=400, detail="Notes too long (max 10000 chars)")
 
         # Determine the text to classify
         classify_text = text
@@ -367,26 +347,15 @@ async def api_create_todo(
                 _blocked = False
                 try:
                     ip = ipaddress.ip_address(hostname)
-                    if (
-                        ip.is_private
-                        or ip.is_loopback
-                        or ip.is_reserved
-                        or ip.is_link_local
-                    ):
+                    if ip.is_private or ip.is_loopback or ip.is_reserved or ip.is_link_local:
                         _blocked = True
                 except ValueError:
                     # hostname is not an IP — block common internal names
-                    if (
-                        hostname in ("localhost",)
-                        or hostname.endswith(".local")
-                        or hostname.endswith(".internal")
-                    ):
+                    if hostname in ("localhost",) or hostname.endswith(".local") or hostname.endswith(".internal"):
                         _blocked = True
 
                 if _blocked:
-                    logger.warning(
-                        f"Blocked URL fetch to private/internal host: {hostname}"
-                    )
+                    logger.warning(f"Blocked URL fetch to private/internal host: {hostname}")
                 else:
                     req_headers = {
                         "User-Agent": (
@@ -417,11 +386,7 @@ async def api_create_todo(
         if not body.get("created_offline", False) and not body.get("category"):
             try:
                 # Get categories (this automatically ensures "General" exists)
-                categories_list = (
-                    await get_categories(body.get("space_id"))
-                    if body.get("space_id")
-                    else []
-                )
+                categories_list = await get_categories(body.get("space_id")) if body.get("space_id") else []
 
                 classification = await classify_task(
                     classify_text,
@@ -481,13 +446,9 @@ async def api_create_todo(
                     # For subtasks, include parent context
                     from bson import ObjectId as _ObjId
 
-                    parent_doc = await todos_collection.find_one(
-                        {"_id": _ObjId(body["parent_id"])}
-                    )
+                    parent_doc = await todos_collection.find_one({"_id": _ObjId(body["parent_id"])})
                     parent_text = parent_doc.get("text", "") if parent_doc else ""
-                    initial_msg = (
-                        f"Subtask of: \"{parent_text}\"\n\nTask: {todo_dict['text']}"
-                    )
+                    initial_msg = f"Subtask of: \"{parent_text}\"\n\nTask: {todo_dict['text']}"
                     if details:
                         initial_msg += "\n" + "\n".join(details)
                 else:
@@ -508,9 +469,7 @@ async def api_create_todo(
 
                 # For subtasks, inherit agent_id from parent session if not set
                 if is_subtask and not auto_agent_id and parent_doc:
-                    parent_session = await find_session_by_todo(
-                        current_user["user_id"], body["parent_id"]
-                    )
+                    parent_session = await find_session_by_todo(current_user["user_id"], body["parent_id"])
                     if parent_session and parent_session.get("agent_id"):
                         auto_agent_id = parent_session["agent_id"]
 
@@ -521,9 +480,7 @@ async def api_create_todo(
                     todo_id=todo_id,
                     agent_id=auto_agent_id,
                 )
-                await append_message(
-                    session_id, current_user["user_id"], role, initial_msg
-                )
+                await append_message(session_id, current_user["user_id"], role, initial_msg)
 
                 # For subtasks with dependencies, make session dormant
                 # (will be activated when all dependencies complete)
@@ -552,9 +509,7 @@ async def api_create_todo(
 
 
 @app.put("/todos/reorder")
-async def api_reorder_todos(
-    request: Request, current_user: dict = Depends(get_current_user)
-):
+async def api_reorder_todos(request: Request, current_user: dict = Depends(get_current_user)):
     try:
         body = await request.json()
         todo_ids = body.get("todoIds", [])
@@ -567,29 +522,21 @@ async def api_reorder_todos(
         user_id = current_user["user_id"]
         # Verify the user owns all the todos being reordered
         oid_list = [ObjectId(tid) for tid in todo_ids]
-        owned_count = await todos_collection.count_documents(
-            {"_id": {"$in": oid_list}, "user_id": user_id}
-        )
+        owned_count = await todos_collection.count_documents({"_id": {"$in": oid_list}, "user_id": user_id})
         if owned_count != len(oid_list):
             # Fall back to checking space membership for collaborative todos
-            space_docs = await todos_collection.find(
-                {"_id": {"$in": oid_list}}, {"space_id": 1}
-            ).to_list(length=len(oid_list))
+            space_docs = await todos_collection.find({"_id": {"$in": oid_list}}, {"space_id": 1}).to_list(
+                length=len(oid_list)
+            )
             if len(space_docs) != len(oid_list):
-                raise HTTPException(
-                    status_code=403, detail="Not authorized to reorder these todos"
-                )
+                raise HTTPException(status_code=403, detail="Not authorized to reorder these todos")
             for doc in space_docs:
                 sid = doc.get("space_id")
                 if not sid or not await user_in_space(user_id, sid):
-                    raise HTTPException(
-                        status_code=403, detail="Not authorized to reorder these todos"
-                    )
+                    raise HTTPException(status_code=403, detail="Not authorized to reorder these todos")
 
         for i, todo_id in enumerate(todo_ids):
-            await todos_collection.update_one(
-                {"_id": ObjectId(todo_id)}, {"$set": {"sortOrder": i}}
-            )
+            await todos_collection.update_one({"_id": ObjectId(todo_id)}, {"$set": {"sortOrder": i}})
         return {"ok": True}
     except HTTPException:
         raise
@@ -600,29 +547,19 @@ async def api_reorder_todos(
 
 @app.delete("/todos/{todo_id}")
 async def api_delete_todo(todo_id: str, current_user: dict = Depends(get_current_user)):
-    logger.info(
-        f"Soft-deleting (closing) todo with ID: {todo_id} for user: {current_user['email']}"
-    )
+    logger.info(f"Soft-deleting (closing) todo with ID: {todo_id} for user: {current_user['email']}")
     return await delete_todo(todo_id, current_user["user_id"])
 
 
 @app.delete("/todos/{todo_id}/permanent")
-async def api_permanent_delete_todo(
-    todo_id: str, current_user: dict = Depends(get_current_user)
-):
-    logger.info(
-        f"Permanently deleting todo with ID: {todo_id} for user: {current_user['email']}"
-    )
+async def api_permanent_delete_todo(todo_id: str, current_user: dict = Depends(get_current_user)):
+    logger.info(f"Permanently deleting todo with ID: {todo_id} for user: {current_user['email']}")
     return await permanent_delete_todo(todo_id, current_user["user_id"])
 
 
 @app.put("/todos/{todo_id}/complete")
-async def api_complete_todo(
-    todo_id: str, current_user: dict = Depends(get_current_user)
-):
-    logger.info(
-        f"Marking todo as complete with ID: {todo_id} for user: {current_user['email']}"
-    )
+async def api_complete_todo(todo_id: str, current_user: dict = Depends(get_current_user)):
+    logger.info(f"Marking todo as complete with ID: {todo_id} for user: {current_user['email']}")
     result = await complete_todo(todo_id, current_user["user_id"])
     # Trigger subtask orchestration (activate next subtask, post final results)
     try:
@@ -633,21 +570,15 @@ async def api_complete_todo(
 
 
 @app.put("/todos/{todo_id}", response_model=Todo)
-async def api_update_todo(
-    todo_id: str, request: Request, current_user: dict = Depends(get_current_user)
-):
+async def api_update_todo(todo_id: str, request: Request, current_user: dict = Depends(get_current_user)):
     try:
         body = await request.json()
 
         # Input length validation
         if "text" in body and len(body["text"]) > 2000:
-            raise HTTPException(
-                status_code=400, detail="Task text too long (max 2000 chars)"
-            )
+            raise HTTPException(status_code=400, detail="Task text too long (max 2000 chars)")
         if "notes" in body and body["notes"] and len(body["notes"]) > 10000:
-            raise HTTPException(
-                status_code=400, detail="Notes too long (max 10000 chars)"
-            )
+            raise HTTPException(status_code=400, detail="Notes too long (max 10000 chars)")
         if "category" in body and len(body["category"]) > 100:
             raise HTTPException(status_code=400, detail="Category name too long")
 
@@ -668,12 +599,8 @@ async def api_update_todo(
         if "space_id" in body:
             new_space_id = body["space_id"]
             # Validate user has access to destination space
-            if new_space_id and not await user_in_space(
-                current_user["user_id"], new_space_id
-            ):
-                raise HTTPException(
-                    status_code=403, detail="Not authorized to move to target space"
-                )
+            if new_space_id and not await user_in_space(current_user["user_id"], new_space_id):
+                raise HTTPException(status_code=403, detail="Not authorized to move to target space")
             updates["space_id"] = new_space_id
         if "agent_id" in body:
             updates["agent_id"] = body["agent_id"]
@@ -742,14 +669,10 @@ async def rename_default_spaces_to_personal():
         from spaces import spaces_collection
 
         # Update all spaces with name "Default" to "Personal"
-        result = await spaces_collection.update_many(
-            {"name": "Default"}, {"$set": {"name": "Personal"}}
-        )
+        result = await spaces_collection.update_many({"name": "Default"}, {"$set": {"name": "Personal"}})
 
         if result.modified_count > 0:
-            logger.info(
-                f"Renamed {result.modified_count} 'Default' spaces to 'Personal'"
-            )
+            logger.info(f"Renamed {result.modified_count} 'Default' spaces to 'Personal'")
         else:
             logger.info("No 'Default' spaces found to rename")
 
@@ -759,26 +682,18 @@ async def rename_default_spaces_to_personal():
 
 # Category management endpoints
 @app.get("/categories", response_model=List[str])
-async def api_get_categories(
-    space_id: Optional[str] = None, current_user: dict = Depends(get_current_user)
-):
+async def api_get_categories(space_id: Optional[str] = None, current_user: dict = Depends(get_current_user)):
     """Get categories for a space, or default categories if no space_id provided."""
-    if space_id is not None and not await user_in_space(
-        current_user["user_id"], space_id
-    ):
+    if space_id is not None and not await user_in_space(current_user["user_id"], space_id):
         raise HTTPException(status_code=403, detail="Not in space")
     logger.info("Fetching categories for space %s", space_id or "default")
     return await get_categories(space_id)
 
 
 @app.post("/categories")
-async def api_add_category(
-    category: Category, current_user: dict = Depends(get_current_user)
-):
+async def api_add_category(category: Category, current_user: dict = Depends(get_current_user)):
     """Add a new category to a space."""
-    if category.space_id is not None and not await user_in_space(
-        current_user["user_id"], category.space_id
-    ):
+    if category.space_id is not None and not await user_in_space(current_user["user_id"], category.space_id):
         raise HTTPException(status_code=403, detail="Not in space")
     logger.info(
         "Adding new category %s to space %s",
@@ -796,9 +711,7 @@ async def api_rename_category(
     current_user: dict = Depends(get_current_user),
 ):
     """Rename an existing category within a space."""
-    if space_id is not None and not await user_in_space(
-        current_user["user_id"], space_id
-    ):
+    if space_id is not None and not await user_in_space(current_user["user_id"], space_id):
         raise HTTPException(status_code=403, detail="Not in space")
     logger.info(
         "Renaming category %s to %s in space %s",
@@ -816,9 +729,7 @@ async def api_delete_category(
     current_user: dict = Depends(get_current_user),
 ):
     """Delete a category from a space."""
-    if space_id is not None and not await user_in_space(
-        current_user["user_id"], space_id
-    ):
+    if space_id is not None and not await user_in_space(current_user["user_id"], space_id):
         raise HTTPException(status_code=403, detail="Not in space")
     logger.info("Deleting category %s from space %s", name, space_id or "default")
     return await delete_category(name, space_id)
@@ -844,16 +755,12 @@ async def api_get_spaces(current_user: dict = Depends(get_current_user)):
 
 
 @app.post("/spaces", response_model=Space)
-async def api_create_space_endpoint(
-    req: SpaceCreateRequest, current_user: dict = Depends(get_current_user)
-):
+async def api_create_space_endpoint(req: SpaceCreateRequest, current_user: dict = Depends(get_current_user)):
     return await create_space(req.name, current_user["user_id"])
 
 
 @app.post("/spaces/{space_id}/invite")
-async def api_invite_members(
-    space_id: str, req: InviteRequest, current_user: dict = Depends(get_current_user)
-):
+async def api_invite_members(space_id: str, req: InviteRequest, current_user: dict = Depends(get_current_user)):
     await invite_members(
         space_id,
         current_user["email"],
@@ -864,18 +771,14 @@ async def api_invite_members(
 
 
 @app.get("/spaces/{space_id}/members")
-async def api_list_members(
-    space_id: str, current_user: dict = Depends(get_current_user)
-):
+async def api_list_members(space_id: str, current_user: dict = Depends(get_current_user)):
     if not await user_in_space(current_user["user_id"], space_id):
         raise HTTPException(status_code=403, detail="Not authorized")
     return await list_space_members(space_id, current_user["user_id"])
 
 
 @app.post("/spaces/{space_id}/leave")
-async def api_leave_space(
-    space_id: str, current_user: dict = Depends(get_current_user)
-):
+async def api_leave_space(space_id: str, current_user: dict = Depends(get_current_user)):
     if not await user_in_space(current_user["user_id"], space_id):
         raise HTTPException(status_code=403, detail="Not authorized")
     return await leave_space(space_id, current_user["user_id"])
@@ -887,15 +790,11 @@ async def api_update_space(
     req: SpaceUpdateRequest,
     current_user: dict = Depends(get_current_user),
 ):
-    return await update_space(
-        space_id, current_user["user_id"], req.name, req.collaborative
-    )
+    return await update_space(space_id, current_user["user_id"], req.name, req.collaborative)
 
 
 @app.delete("/spaces/{space_id}")
-async def api_delete_space(
-    space_id: str, current_user: dict = Depends(get_current_user)
-):
+async def api_delete_space(space_id: str, current_user: dict = Depends(get_current_user)):
     return await delete_space(space_id, current_user["user_id"])
 
 
@@ -952,9 +851,7 @@ async def api_update_schedule(
         req.timezone,
         req.email_enabled,
     )
-    await update_user_summary_time(
-        current_user["user_id"], req.email_enabled, req.hour, req.minute, req.timezone
-    )
+    await update_user_summary_time(current_user["user_id"], req.email_enabled, req.hour, req.minute, req.timezone)
 
     if req.email_enabled:
         update_schedule_time(
@@ -980,9 +877,7 @@ async def api_update_instructions(
 ):
     """Update custom summary instructions for the current user."""
     logger.info("Instructions update requested by %s", current_user["email"])
-    return await update_user_email_instructions(
-        current_user["user_id"], req.instructions
-    )
+    return await update_user_email_instructions(current_user["user_id"], req.instructions)
 
 
 @app.post("/email/update-spaces")
@@ -1080,9 +975,7 @@ async def api_trigger_nudges(
 
     prefs = await get_briefing_preferences(current_user["user_id"])
     stale_days = prefs.get("stale_task_days", 3)
-    nudged = await post_stale_task_nudges(
-        current_user["user_id"], stale_days=stale_days
-    )
+    nudged = await post_stale_task_nudges(current_user["user_id"], stale_days=stale_days)
     return {"ok": True, "nudged_sessions": nudged, "count": len(nudged)}
 
 
@@ -1098,9 +991,7 @@ async def api_contact(
     """Send contact message to admin email."""
     try:
         if len(req.message) > 5000:
-            raise HTTPException(
-                status_code=400, detail="Message too long (max 5000 chars)"
-            )
+            raise HTTPException(status_code=400, detail="Message too long (max 5000 chars)")
 
         logger.info("Contact message from %s", current_user["email"])
 
@@ -1132,9 +1023,7 @@ async def get_insights(
         if space_id:
             # Check if user has access to this space
             if not await user_in_space(current_user["user_id"], space_id):
-                raise HTTPException(
-                    status_code=403, detail="Access denied to this space"
-                )
+                raise HTTPException(status_code=403, detail="Access denied to this space")
             todos = await get_todos(current_user["user_id"], space_id)
         else:
             # Get todos from all accessible spaces
@@ -1201,16 +1090,12 @@ async def api_get_journal_entries(
     """Get journal entries. If date is provided, get entry for that specific date. Otherwise get recent entries."""
     try:
         # Check space access if space_id provided
-        if space_id is not None and not await user_in_space(
-            current_user["user_id"], space_id
-        ):
+        if space_id is not None and not await user_in_space(current_user["user_id"], space_id):
             raise HTTPException(status_code=403, detail="Access denied to this space")
 
         if date:
             # Get specific date entry
-            entry = await get_journal_entry_by_date(
-                current_user["user_id"], date, space_id
-            )
+            entry = await get_journal_entry_by_date(current_user["user_id"], date, space_id)
             return entry
         else:
             # Get recent entries
@@ -1225,21 +1110,15 @@ async def api_get_journal_entries(
 
 
 @app.post("/journals", response_model=JournalEntry)
-async def api_create_journal_entry(
-    request: JournalCreateRequest, current_user: dict = Depends(get_current_user)
-):
+async def api_create_journal_entry(request: JournalCreateRequest, current_user: dict = Depends(get_current_user)):
     """Create or update a journal entry."""
     try:
         # Input length validation
         if len(request.text) > 50000:
-            raise HTTPException(
-                status_code=400, detail="Journal text too long (max 50000 chars)"
-            )
+            raise HTTPException(status_code=400, detail="Journal text too long (max 50000 chars)")
 
         # Check space access if space_id provided
-        if request.space_id is not None and not await user_in_space(
-            current_user["user_id"], request.space_id
-        ):
+        if request.space_id is not None and not await user_in_space(current_user["user_id"], request.space_id):
             raise HTTPException(status_code=403, detail="Access denied to this space")
 
         # Create journal entry
@@ -1251,9 +1130,7 @@ async def api_create_journal_entry(
         )
 
         result = await create_journal_entry(entry, current_user.get("timezone", "UTC"))
-        logger.info(
-            f"Journal entry created/updated for user {current_user['email']}, date {request.date}"
-        )
+        logger.info(f"Journal entry created/updated for user {current_user['email']}, date {request.date}")
         return result
 
     except HTTPException:
@@ -1264,16 +1141,12 @@ async def api_create_journal_entry(
 
 
 @app.delete("/journals/{entry_id}")
-async def api_delete_journal_entry(
-    entry_id: str, current_user: dict = Depends(get_current_user)
-):
+async def api_delete_journal_entry(entry_id: str, current_user: dict = Depends(get_current_user)):
     """Delete a journal entry."""
     try:
         success = await delete_journal_entry(entry_id, current_user["user_id"])
         if success:
-            logger.info(
-                f"Journal entry {entry_id} deleted by user {current_user['email']}"
-            )
+            logger.info(f"Journal entry {entry_id} deleted by user {current_user['email']}")
             return {"message": "Journal entry deleted successfully"}
         else:
             raise HTTPException(status_code=404, detail="Journal entry not found")
@@ -1375,9 +1248,7 @@ async def export_data(
         raise HTTPException(status_code=400, detail="Invalid data type")
 
     if not await user_in_space(current_user["user_id"], space_id):
-        raise HTTPException(
-            status_code=403, detail="Not a member of the specified space"
-        )
+        raise HTTPException(status_code=403, detail="Not a member of the specified space")
 
     collection = valid_types[data]
     query = {"user_id": current_user["user_id"], "space_id": space_id}
@@ -1451,9 +1322,7 @@ class PostMessageRequest(BaseModel):
 
 
 @app.post("/agent/sessions")
-async def api_create_agent_session(
-    req: CreateSessionRequest, current_user: dict = Depends(get_current_user)
-):
+async def api_create_agent_session(req: CreateSessionRequest, current_user: dict = Depends(get_current_user)):
     """Create a new messaging session, optionally linked to a todo."""
     rate_limit_by_user(current_user["user_id"], max_requests=10, window_seconds=60, endpoint="create_session")
     user_id = current_user["user_id"]
@@ -1465,9 +1334,7 @@ async def api_create_agent_session(
             return existing
 
     title = req.title or req.initial_message or "New session"
-    session_id = await create_chat_session(
-        user_id, req.space_id, title, todo_id=req.todo_id, agent_id=req.agent_id
-    )
+    session_id = await create_chat_session(user_id, req.space_id, title, todo_id=req.todo_id, agent_id=req.agent_id)
 
     # Post initial message if provided
     if req.initial_message:
@@ -1542,9 +1409,7 @@ async def api_get_single_todo(
         raise HTTPException(status_code=404, detail="Todo not found")
     # Check ownership: user must own the todo or be in the same space
     is_owner = doc.get("user_id") == current_user["user_id"]
-    is_space_member = doc.get("space_id") and await user_in_space(
-        current_user["user_id"], doc["space_id"]
-    )
+    is_space_member = doc.get("space_id") and await user_in_space(current_user["user_id"], doc["space_id"])
     if not is_owner and not is_space_member:
         raise HTTPException(status_code=403, detail="Not authorized")
     doc["_id"] = str(doc["_id"])
@@ -1568,9 +1433,7 @@ async def api_get_memory_logs(
 ):
     """Return recent daily memory logs for the current user."""
     sid = space_id or current_user.get("active_space_id", "")
-    logs = await get_recent_memory_logs(
-        current_user["user_id"], sid, limit=min(limit, 30)
-    )
+    logs = await get_recent_memory_logs(current_user["user_id"], sid, limit=min(limit, 30))
     result = []
     for log in logs:
         result.append(
