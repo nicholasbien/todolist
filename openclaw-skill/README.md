@@ -23,11 +23,11 @@ chmod +x scripts/login.sh
 2. **Set environment variables** in your OpenClaw config or shell:
 
 ```bash
-export TODOLIST_API_URL="https://app.todolist.nyc"
+export TODOLIST_API_URL="http://localhost:8141"
 export TODOLIST_AUTH_TOKEN="your_token_here"
 ```
 
-For the test account, use `test@example.com` with code `000000`.
+For the test account, set `ALLOW_TEST_ACCOUNT=true`, `TEST_EMAIL=test@example.com`, `TEST_CODE=000000` in your backend `.env`, then use `test@example.com` with code `000000`.
 
 ## Usage
 

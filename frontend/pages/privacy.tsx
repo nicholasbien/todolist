@@ -5,7 +5,7 @@ export default function PrivacyPage() {
   return (
     <>
       <Head>
-        <title>Privacy Policy - todolist.nyc</title>
+        <title>Privacy Policy - todolist</title>
       </Head>
 
       <div className="min-h-screen min-h-[100dvh] bg-zinc-950">
@@ -21,7 +21,7 @@ export default function PrivacyPage() {
 
           <div className="prose prose-invert max-w-none">
             <p className="text-lg mb-6 text-gray-300">
-              todolist.nyc (&quot;the app&quot;) helps you manage tasks, journals, and AI-powered features. This Privacy Policy explains what information we collect and how it is used.
+              todolist (&quot;the app&quot;) helps you manage tasks, journals, and AI-powered features. This Privacy Policy explains what information we collect and how it is used.
             </p>
 
             <h2 className="text-2xl font-bold mt-8 mb-4 text-gray-100">1. Information We Collect</h2>
@@ -93,7 +93,7 @@ export default function PrivacyPage() {
               {' • '}
               <a href="mailto:todolist.notifications@gmail.com" className="hover:text-accent transition-colors">Contact</a>
             </div>
-            <p className="text-gray-500 text-sm">&copy; 2026 todolist.nyc</p>
+            <p className="text-gray-500 text-sm">&copy; 2026 todolist</p>
           </footer>
         </div>
       </div>

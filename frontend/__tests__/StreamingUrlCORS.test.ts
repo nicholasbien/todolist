@@ -6,7 +6,7 @@
  * the backend explicitly allows the frontend origin via CORS.
  *
  * Previous bug: getStreamingBackendUrl() always returned NEXT_PUBLIC_BACKEND_URL
- * (e.g. https://backend-openclaw.up.railway.app), making EventSource hit a
+ * (e.g. https://backend.your-domain.com), making EventSource hit a
  * different origin and triggering a CORS error in production.
  *
  * Fix: On web, return '' (same-origin relative URL) and rely on a Next.js
@@ -45,7 +45,7 @@ describe('Streaming URL CORS regression', () => {
 
   test('web: returns empty string (same-origin) to avoid CORS', async () => {
     mockIsNative = false;
-    process.env.NEXT_PUBLIC_BACKEND_URL = 'https://backend-openclaw.up.railway.app';
+    process.env.NEXT_PUBLIC_BACKEND_URL = 'https://backend.your-domain.com';
     const getStreamingBackendUrl = await importGetStreamingBackendUrl();
 
     const url = getStreamingBackendUrl();
@@ -54,7 +54,7 @@ describe('Streaming URL CORS regression', () => {
 
   test('web: streaming URL for /agent/stream is relative (same-origin)', async () => {
     mockIsNative = false;
-    process.env.NEXT_PUBLIC_BACKEND_URL = 'https://backend-openclaw.up.railway.app';
+    process.env.NEXT_PUBLIC_BACKEND_URL = 'https://backend.your-domain.com';
     const getStreamingBackendUrl = await importGetStreamingBackendUrl();
 
     const backendUrl = getStreamingBackendUrl();
@@ -67,23 +67,23 @@ describe('Streaming URL CORS regression', () => {
 
   test('web: streaming URL never contains a different origin', async () => {
     mockIsNative = false;
-    process.env.NEXT_PUBLIC_BACKEND_URL = 'https://backend-openclaw.up.railway.app';
+    process.env.NEXT_PUBLIC_BACKEND_URL = 'https://backend.your-domain.com';
     const getStreamingBackendUrl = await importGetStreamingBackendUrl();
 
     const backendUrl = getStreamingBackendUrl();
     const agentUrl = `${backendUrl}/agent/stream?q=test&space_id=abc&token=xyz`;
 
-    expect(agentUrl).not.toContain('backend-openclaw');
-    expect(agentUrl).not.toContain('railway.app');
+    expect(agentUrl).not.toContain('backend.your-domain');
+    expect(agentUrl).not.toContain('your-domain.com');
   });
 
   test('Capacitor: returns absolute backend URL (file:// origin needs it)', async () => {
     mockIsNative = true;
-    process.env.NEXT_PUBLIC_BACKEND_URL = 'https://backend-openclaw.up.railway.app';
+    process.env.NEXT_PUBLIC_BACKEND_URL = 'https://backend.your-domain.com';
     const getStreamingBackendUrl = await importGetStreamingBackendUrl();
 
     const url = getStreamingBackendUrl();
-    expect(url).toBe('https://backend-openclaw.up.railway.app');
+    expect(url).toBe('https://backend.your-domain.com');
   });
 
   test('Capacitor: falls back to localhost when env var is unset', async () => {

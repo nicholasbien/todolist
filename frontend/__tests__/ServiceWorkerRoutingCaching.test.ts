@@ -100,16 +100,16 @@ describe('buildBackendRequest', () => {
 
     // Override self.location after require — getBackendUrl reads it at call time
     Object.defineProperty((global as any).self, 'location', {
-      value: { hostname: 'todolist.nyc', protocol: 'https:', origin: 'https://todolist.nyc' },
+      value: { hostname: 'your-domain.com', protocol: 'https:', origin: 'https://your-domain.com' },
       configurable: true,
       writable: true,
     });
 
-    const request = mockRequest('https://todolist.nyc/todos?space_id=abc');
-    const url = new URL('https://todolist.nyc/todos?space_id=abc');
+    const request = mockRequest('https://your-domain.com/todos?space_id=abc');
+    const url = new URL('https://your-domain.com/todos?space_id=abc');
     const { targetUrl } = await sw.buildBackendRequest(request, url);
 
-    expect(targetUrl).toBe('https://todolist.nyc/api/todos?space_id=abc');
+    expect(targetUrl).toBe('https://your-domain.com/api/todos?space_id=abc');
   });
 
   test('builds correct URL for local development', async () => {

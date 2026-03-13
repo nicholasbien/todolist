@@ -2,7 +2,7 @@
 # Login to todolist app and get an auth token
 # Usage: ./login.sh [API_URL]
 
-API_URL="${1:-${TODOLIST_API_URL:-https://app.todolist.nyc}}"
+API_URL="${1:-${TODOLIST_API_URL:-http://localhost:8141}}"
 
 echo "=== todolist Login ==="
 echo "API: $API_URL"
@@ -27,7 +27,7 @@ if [ "$HTTP_CODE" != "200" ] && [ "$HTTP_CODE" != "201" ]; then
 fi
 
 echo "Check your email for a verification code."
-echo "(Test account: test@example.com / code: 000000)"
+echo "(Test account: set ALLOW_TEST_ACCOUNT=true in backend .env, then use test@example.com / 000000)"
 echo ""
 read -r -p "Verification code: " CODE
 

@@ -30,7 +30,7 @@ allow_origins=["*"], allow_credentials=True
 `allow_origins=["*"]` combined with `allow_credentials=True` allows any website to make authenticated requests to the API on behalf of users.
 
 **Remediation**:
-- Restrict to actual domains: `allow_origins=["https://todolist.nyc", "http://localhost:3141"]`
+- Restrict to actual domains via `CORS_ORIGINS` env var (defaults to localhost + capacitor)
 - Use environment-based CORS configuration
 
 ---
@@ -40,14 +40,9 @@ allow_origins=["*"], allow_credentials=True
 **Severity**: Critical
 **File**: `backend/auth.py` (~line 279)
 
-`test@example.com` / `000000` bypasses all authentication in **any environment**, including production. Any attacker can log in as the test user and access application data.
+`test@example.com` / `000000` previously bypassed all authentication in **any environment**, including production.
 
-**Remediation**:
-- Gate behind an environment check:
-  ```python
-  if os.getenv("ENVIRONMENT") == "development" and email == "test@example.com" and code == "000000":
-  ```
-- Or remove entirely and use proper test fixtures
+**Status**: FIXED. Hardcoded bypass removed. Test account now gated behind `ALLOW_TEST_ACCOUNT` env var with `TEST_EMAIL`/`TEST_CODE` config.
 
 ---
 
