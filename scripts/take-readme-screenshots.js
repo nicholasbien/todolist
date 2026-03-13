@@ -268,6 +268,11 @@ function dayName(days) {
         role: 'user',
         content: 'Perfect, that\'s exactly what we need. Yes please on the rollback plan. I\'ll implement the fix now and push to staging.',
       },
+      {
+        role: 'assistant',
+        content: 'Great, here\'s the rollback plan:\n\n**Rollback Steps:**\n1. Revert the Redis CAS change: `git revert <commit-hash>`\n2. Temporarily increase the session TTL back to 24h: update `SESSION_TTL` in config\n3. Flush affected sessions: `redis-cli KEYS "session:*" | xargs redis-cli DEL`\n4. Monitor error rates on the `/auth/refresh` endpoint for 15 minutes\n\n**Monitoring:**\n- Watch the `session_refresh_race` metric in Grafana\n- Check Sentry for any new `TokenExpired` errors\n- If error rate stays below 0.1% for 15 min, the fix is stable\n\nThe key insight is that the CAS pattern is backward-compatible — if we revert, the worst case is we go back to the original race condition behavior, which only affected ~5% of users. No data loss risk.',
+        agent_id: 'claude',
+      },
     ];
 
     for (const msg of chatMessages) {
@@ -354,9 +359,9 @@ function dayName(days) {
   await page.reload();
   await page.waitForTimeout(4000);
 
-  // Verify logged in
+  // Verify logged in — look for task list content or tab navigation
   try {
-    await page.waitForSelector('button[title="Settings"]', { timeout: 15000 });
+    await page.getByRole('button', { name: 'Tasks' }).first().waitFor({ timeout: 15000 });
     console.log('   Logged in!');
   } catch {
     await page.screenshot({ path: path.join(DIR, 'debug-state.png') });
@@ -395,25 +400,30 @@ function dayName(days) {
   await page.waitForTimeout(2000);
   await ss('task-list.png');
 
-  // Assistant view — navigate to the chat session so it shows the conversation
-  await goTab('Assistant');
-  await page.waitForTimeout(2000);
-
-  // Try to click into the hotfix chat session to show the conversation
+  // Navigate to chat via the task's chat icon button (on the Tasks tab)
+  // The "Deploy hotfix" task has a chat icon with a notification dot
   try {
-    const sessionLink = page.getByText('Deploy hotfix', { exact: false }).first();
-    await sessionLink.click();
+    // Find the chat icon button on the "Deploy hotfix" task card
+    // The task cards have chat buttons with aria-label or SVG icons
+    const hotfixCard = page.locator('text=Deploy hotfix for login timeout').first();
+    // The chat button is a sibling in the task card's action buttons
+    const taskContainer = hotfixCard.locator('..').locator('..');
+    const chatButton = taskContainer.locator('button').first();
+    await chatButton.click({ force: true, timeout: 5000 });
+    await page.waitForTimeout(4000);
+    console.log('   Navigated to chat via task chat button');
+  } catch (err) {
+    // Fall back to just clicking the Assistant tab
+    console.log('   Note: Could not navigate via task chat button:', err.message);
+    await goTab('Assistant');
     await page.waitForTimeout(2000);
-  } catch {
-    // If we can't find the session link, just screenshot the list
-    console.log('   Note: Could not navigate to specific chat session');
   }
   await ss('assistant.png');
 
-  // Journal view
-  await goTab('Journal');
+  // Activity view
+  await goTab('Activity');
   await page.waitForTimeout(2000);
-  await ss('journal.png');
+  await ss('activity.png');
 
   console.log('\nDone! Screenshots saved to docs/screenshots/');
   await browser.close();

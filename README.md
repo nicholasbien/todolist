@@ -47,9 +47,9 @@ Key capabilities:
 
 ## Screenshots
 
-| Task List | Journal | Assistant |
-|-----------|---------|-----------|
-| ![Task List](docs/screenshots/task-list.png) | ![Journal](docs/screenshots/journal.png) | ![Assistant](docs/screenshots/assistant.png) |
+| Task List | Assistant | Activity |
+|-----------|-----------|----------|
+| ![Task List](docs/screenshots/task-list.png) | ![Assistant](docs/screenshots/assistant.png) | ![Activity](docs/screenshots/activity.png) |
 
 ## Agent Integration
 
