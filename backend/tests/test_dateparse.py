@@ -13,20 +13,28 @@ class TestRelativeDates:
         assert "milk" in cleaned.lower()
 
     def test_tomorrow(self):
-        due, cleaned = manual_parse_due_date("Call dentist tomorrow", "2026-03-12T10:00:00")
+        due, cleaned = manual_parse_due_date(
+            "Call dentist tomorrow", "2026-03-12T10:00:00"
+        )
         assert due == "2026-03-13"
         assert "tomorrow" not in cleaned.lower()
 
     def test_in_3_days(self):
-        due, cleaned = manual_parse_due_date("Submit report in 3 days", "2026-03-12T10:00:00")
+        due, cleaned = manual_parse_due_date(
+            "Submit report in 3 days", "2026-03-12T10:00:00"
+        )
         assert due == "2026-03-15"
 
     def test_in_two_weeks(self):
-        due, cleaned = manual_parse_due_date("Plan trip in two weeks", "2026-03-12T10:00:00")
+        due, cleaned = manual_parse_due_date(
+            "Plan trip in two weeks", "2026-03-12T10:00:00"
+        )
         assert due == "2026-03-26"
 
     def test_in_1_week(self):
-        due, cleaned = manual_parse_due_date("Review PR in 1 week", "2026-03-12T10:00:00")
+        due, cleaned = manual_parse_due_date(
+            "Review PR in 1 week", "2026-03-12T10:00:00"
+        )
         assert due == "2026-03-19"
 
 
@@ -35,15 +43,21 @@ class TestWeekdayParsing:
 
     def test_next_monday_from_thursday(self):
         # 2026-03-12 is Thursday
-        due, cleaned = manual_parse_due_date("Meeting next monday", "2026-03-12T10:00:00")
+        due, cleaned = manual_parse_due_date(
+            "Meeting next monday", "2026-03-12T10:00:00"
+        )
         assert due == "2026-03-16"  # Monday after Thursday
 
     def test_on_friday(self):
-        due, cleaned = manual_parse_due_date("Finish report on friday", "2026-03-12T10:00:00")
+        due, cleaned = manual_parse_due_date(
+            "Finish report on friday", "2026-03-12T10:00:00"
+        )
         assert due == "2026-03-13"  # Friday is tomorrow from Thursday
 
     def test_trailing_weekday(self):
-        due, cleaned = manual_parse_due_date("Finish report Friday", "2026-03-12T10:00:00")
+        due, cleaned = manual_parse_due_date(
+            "Finish report Friday", "2026-03-12T10:00:00"
+        )
         assert due == "2026-03-13"
 
 
@@ -51,7 +65,9 @@ class TestExplicitDates:
     """Tests for explicit date formats."""
 
     def test_iso_format(self):
-        due, cleaned = manual_parse_due_date("Submit by 2026-04-15", "2026-03-12T10:00:00")
+        due, cleaned = manual_parse_due_date(
+            "Submit by 2026-04-15", "2026-03-12T10:00:00"
+        )
         assert due == "2026-04-15"
 
     def test_us_date_format(self):
@@ -73,7 +89,9 @@ class TestExplicitDates:
         assert due == "2027-01-05"
 
     def test_month_name_with_year(self):
-        due, cleaned = manual_parse_due_date("Due August 16 2026", "2026-03-12T10:00:00")
+        due, cleaned = manual_parse_due_date(
+            "Due August 16 2026", "2026-03-12T10:00:00"
+        )
         assert due == "2026-08-16"
 
 
@@ -98,10 +116,14 @@ class TestTextCleaning:
         assert cleaned.strip() == "Buy milk"
 
     def test_iso_date_removed(self):
-        _, cleaned = manual_parse_due_date("Submit by 2026-04-15", "2026-03-12T10:00:00")
+        _, cleaned = manual_parse_due_date(
+            "Submit by 2026-04-15", "2026-03-12T10:00:00"
+        )
         assert "2026-04-15" not in cleaned
 
     def test_keyword_and_date_removed(self):
-        _, cleaned = manual_parse_due_date("Finish report due tomorrow", "2026-03-12T10:00:00")
+        _, cleaned = manual_parse_due_date(
+            "Finish report due tomorrow", "2026-03-12T10:00:00"
+        )
         assert "due" not in cleaned.lower()
         assert "tomorrow" not in cleaned.lower()
