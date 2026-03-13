@@ -99,46 +99,94 @@ function getBackendPath(pathname) {
 
   const spaceId = updatedUser.email_spaces[0];
 
-  // ── 2. Populate demo data ────────────────────────────────────
-  console.log('2. Adding demo tasks...');
+  // ── 2. Create categories ──────────────────────────────────────
+  console.log('2. Creating categories...');
+  const categories = ['Work', 'Personal', 'Health', 'Learning', 'Errands'];
+  for (const name of categories) {
+    await api('POST', '/categories', token, { name, space_id: spaceId });
+  }
+  console.log(`   Created ${categories.length} categories`);
+
+  // ── 3. Populate demo tasks ──────────────────────────────────
+  console.log('3. Adding demo tasks...');
+
+  // Helper to generate ISO date strings relative to today
+  const today = new Date();
+  const dayOffset = (days) => {
+    const d = new Date(today);
+    d.setDate(d.getDate() + days);
+    return d.toISOString().slice(0, 10);
+  };
+
   const todos = [
-    { text: 'Review Q4 project proposals', completed: false, category: 'Work' },
-    { text: 'Prepare slides for Monday team meeting', completed: false, category: 'Work' },
-    { text: 'Update project documentation', completed: true, category: 'Work' },
-    { text: 'Fix bug in authentication system', completed: true, category: 'Work' },
-    { text: 'Optimize database queries', completed: false, category: 'Work' },
-    { text: 'Schedule 1:1 with team members', completed: false, category: 'Work' },
-    { text: 'Book dentist appointment', completed: false, category: 'Personal' },
-    { text: 'Plan weekend hiking trip', completed: false, category: 'Personal' },
-    { text: 'Call mom for her birthday', completed: true, category: 'Personal' },
-    { text: 'Review monthly budget', completed: false, category: 'Personal' },
-    { text: 'Morning yoga session', completed: true, category: 'Health' },
-    { text: 'Meal prep for the week', completed: false, category: 'Health' },
-    { text: 'Schedule annual checkup', completed: false, category: 'Health' },
-    { text: 'Complete Python course module', completed: false, category: 'Learning' },
-    { text: 'Read Atomic Habits chapter 3', completed: true, category: 'Learning' },
-    { text: 'Practice Spanish on Duolingo', completed: false, category: 'Learning' },
-    { text: 'Buy groceries for dinner party', completed: false, category: 'Shopping' },
-    { text: 'Order new running shoes', completed: true, category: 'Shopping' },
+    // Work tasks — mix of active, completed, with due dates
+    { text: 'Review Q1 roadmap and update milestones', completed: false, category: 'Work', priority: 'High', dueDate: dayOffset(2) },
+    { text: 'Prepare slides for Monday standup', completed: false, category: 'Work', priority: 'High', dueDate: dayOffset(1) },
+    { text: 'Deploy v2.4 hotfix to production', completed: true, category: 'Work', priority: 'High' },
+    { text: 'Write integration tests for payments API', completed: false, category: 'Work', priority: 'Medium', dueDate: dayOffset(5) },
+    { text: 'Refactor auth middleware to support OAuth', completed: false, category: 'Work', priority: 'Medium', dueDate: dayOffset(7) },
+    { text: 'Code review: PR #218 search optimization', completed: true, category: 'Work', priority: 'Medium' },
+    { text: 'Update CI pipeline for Node 22', completed: true, category: 'Work', priority: 'Low' },
+
+    // Personal tasks
+    { text: 'Plan weekend trip to the mountains', completed: false, category: 'Personal', priority: 'Medium', dueDate: dayOffset(4) },
+    { text: 'Call insurance about renewal', completed: false, category: 'Personal', priority: 'High', dueDate: dayOffset(1) },
+    { text: 'Send birthday gift to Sarah', completed: true, category: 'Personal', priority: 'High' },
+    { text: 'Organize closet and donate old clothes', completed: false, category: 'Personal', priority: 'Low' },
+
+    // Health tasks
+    { text: 'Schedule annual physical', completed: false, category: 'Health', priority: 'Medium', dueDate: dayOffset(10) },
+    { text: 'Meal prep: chicken + veggie bowls', completed: false, category: 'Health', priority: 'Medium', dueDate: dayOffset(0) },
+    { text: 'Morning run — 5K', completed: true, category: 'Health', priority: 'Low' },
+    { text: 'Refill prescriptions at pharmacy', completed: false, category: 'Health', priority: 'High', dueDate: dayOffset(2) },
+
+    // Learning tasks
+    { text: 'Finish Rust ownership chapter', completed: false, category: 'Learning', priority: 'Medium', dueDate: dayOffset(3) },
+    { text: 'Watch MIT distributed systems lecture 6', completed: false, category: 'Learning', priority: 'Low' },
+    { text: 'Complete LeetCode daily challenge', completed: true, category: 'Learning', priority: 'Medium' },
+
+    // Errands
+    { text: 'Pick up dry cleaning', completed: false, category: 'Errands', priority: 'Low', dueDate: dayOffset(1) },
+    { text: 'Return Amazon package at UPS', completed: false, category: 'Errands', priority: 'Medium', dueDate: dayOffset(0) },
+    { text: 'Get car oil change', completed: true, category: 'Errands', priority: 'Medium' },
   ];
+
+  const createdTodos = [];
   for (const todo of todos) {
-    await api('POST', '/todos', token, { ...todo, space_id: spaceId });
+    const result = await api('POST', '/todos', token, { ...todo, space_id: spaceId });
+    createdTodos.push(result);
   }
   console.log(`   Added ${todos.length} tasks`);
 
-  console.log('3. Adding journal entries...');
+  // ── 4. Add subtasks to a parent task ─────────────────────────
+  console.log('4. Adding subtasks...');
+  // Find the "Review Q1 roadmap" task to add subtasks to
+  const parentTodo = createdTodos[0]; // "Review Q1 roadmap and update milestones"
+  const subtasks = [
+    { text: 'Collect team status updates', completed: true, category: 'Work', priority: 'Medium' },
+    { text: 'Draft milestone timeline', completed: true, category: 'Work', priority: 'Medium' },
+    { text: 'Review with engineering leads', completed: false, category: 'Work', priority: 'High' },
+    { text: 'Finalize and share with stakeholders', completed: false, category: 'Work', priority: 'High' },
+  ];
+  for (const sub of subtasks) {
+    await api('POST', '/todos', token, { ...sub, space_id: spaceId, parent_id: parentTodo._id });
+  }
+  console.log(`   Added ${subtasks.length} subtasks`);
+
+  // ── 5. Add journal entries ───────────────────────────────────
+  console.log('5. Adding journal entries...');
   const journals = [
-    { date: '2026-03-13', text: 'Great day today! Completed several important tasks and feeling productive.\n\nMade progress on the project and had good meetings with the team. Everyone is aligned and motivated.\n\nTook time for a walk this afternoon which helped clear my mind. Sometimes stepping away brings the best solutions.\n\nLooking forward to tomorrow\'s challenges and opportunities.' },
-    { date: '2026-03-12', text: 'Solid progress today despite some unexpected challenges.\n\nDebugged a tricky issue that took longer than expected, but learned a lot in the process.\n\nHad an excellent brainstorming session with the team. New ideas are flowing.\n\nEvening was relaxing - caught up on reading and planned tomorrow\'s priorities.' },
-    { date: '2026-03-11', text: 'Wrapped up the week strong and feeling accomplished.\n\nCompleted all planned tasks and tackled items from the backlog.\n\nTeam sync was productive - everyone\'s excited about what we\'re building.' },
+    { date: dayOffset(0), text: 'Productive morning — knocked out the hotfix deploy before standup. The payments API tests are coming along; should finish integration coverage by end of week.\n\nHad a great 1:1 with Jamie about the OAuth refactor. We agreed on the middleware pattern and she\'ll pair with me Thursday.\n\nAfternoon: reviewed the search optimization PR. Clean implementation, left a few comments on edge cases. Approved after the fixes.\n\nEvening run felt good — 5K in 24:30. Slowly getting faster.' },
+    { date: dayOffset(-1), text: 'Deep work day. Spent most of the morning on the Rust ownership chapter — the borrow checker is finally clicking.\n\nLunch break: watched half of the MIT distributed systems lecture. Raft consensus is elegant.\n\nAfternoon was errands and life admin. Got the car serviced, picked up prescriptions.\n\nPlanning the mountain trip this weekend. Found a cabin with good reviews near the trailhead.' },
+    { date: dayOffset(-2), text: 'Monday standup went well — team is aligned on Q1 priorities.\n\nSpent the day on CI pipeline migration to Node 22. A few package compatibility issues but nothing major. Tests all passing now.\n\nSarah loved the birthday gift! The personalized notebook was a good call.\n\nWinding down with some LeetCode — the daily challenge was a fun graph problem.' },
   ];
   for (const j of journals) {
     await api('POST', '/journals', token, { ...j, space_id: spaceId });
   }
   console.log('   Added 3 journal entries');
 
-  // ── 3. Launch browser with route interception ────────────────
-  console.log('\n4. Launching browser...');
+  // ── 6. Launch browser with route interception ────────────────
+  console.log('\n6. Launching browser...');
   const browser = await chromium.launch({ headless: true });
 
   // Disable service worker so we control all routing
@@ -248,10 +296,20 @@ function getBackendPath(pathname) {
     await page.waitForTimeout(2000);
   };
 
-  // ── Task List ──────────────────────────────────────────────────
-  console.log('\n5. Taking screenshots...');
+  // ── Task List (Active tab) ──────────────────────────────────────
+  console.log('\n7. Taking screenshots...');
   await goTab('Tasks');
   await page.waitForTimeout(2000);
+
+  // Try to expand subtasks on the first task if there's a toggle button
+  try {
+    const subtaskToggle = await page.$('button[title*="subtask" i], button[aria-label*="subtask" i], [data-testid="subtask-toggle"]');
+    if (subtaskToggle) {
+      await subtaskToggle.click();
+      await page.waitForTimeout(1000);
+    }
+  } catch {}
+
   await ss('task-list.png');
 
   // ── Journal ────────────────────────────────────────────────────
