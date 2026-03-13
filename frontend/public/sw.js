@@ -1,10 +1,10 @@
 // IMPORTANT: Always increment these versions when modifying this service worker file
 // This forces browsers to download and use the updated service worker
-const STATIC_CACHE = 'todo-static-v129';
+const STATIC_CACHE = 'todo-static-v130';
 
 const GLOBAL_DB_NAME = 'TodoGlobalDB';
 const USER_DB_PREFIX = 'TodoUserDB_';
-const DB_VERSION = 13;
+const DB_VERSION = 14;
 
 // Configuration
 const CONFIG = {
@@ -18,6 +18,8 @@ const QUEUE = 'queue';
 const AUTH = 'auth';
 const JOURNALS = 'journals';
 const ID_MAP = 'idmap';
+const CHAT_SESSIONS = 'chat_sessions';
+const CHAT_MESSAGES = 'chat_messages';
 
 const DEFAULT_CATEGORIES = ['General'];
 
@@ -130,6 +132,12 @@ function openUserDB(userId) {
       }
       if (!db.objectStoreNames.contains(ID_MAP)) {
         db.createObjectStore(ID_MAP, { keyPath: 'key' });
+      }
+      if (!db.objectStoreNames.contains(CHAT_SESSIONS)) {
+        db.createObjectStore(CHAT_SESSIONS, { keyPath: '_id' });
+      }
+      if (!db.objectStoreNames.contains(CHAT_MESSAGES)) {
+        db.createObjectStore(CHAT_MESSAGES, { keyPath: 'session_id' });
       }
       // v13: Clear potentially corrupted data from pre-fix versions.
       // syncServerDataToLocal() repopulates from server on activate.
@@ -378,6 +386,37 @@ const clearIdMap = async (userId) => {
   }
 };
 
+
+// Chat session operations
+const getChatSessions = async (userId) => {
+  const authData = userId ? null : await getAuth();
+  const effectiveUserId = userId || (authData ? authData.userId : null);
+  return userDbTx(effectiveUserId, CHAT_SESSIONS, 'readonly', (s) => s.getAll());
+};
+
+const getChatSession = async (sessionId, userId) => {
+  const authData = userId ? null : await getAuth();
+  const effectiveUserId = userId || (authData ? authData.userId : null);
+  return userDbTx(effectiveUserId, CHAT_SESSIONS, 'readonly', (s) => s.get(sessionId));
+};
+
+const putChatSession = async (session, userId) => {
+  const authData = userId ? null : await getAuth();
+  const effectiveUserId = userId || (authData ? authData.userId : null);
+  return userDbTx(effectiveUserId, CHAT_SESSIONS, 'readwrite', (s) => s.put(session));
+};
+
+const getChatMessages = async (sessionId, userId) => {
+  const authData = userId ? null : await getAuth();
+  const effectiveUserId = userId || (authData ? authData.userId : null);
+  return userDbTx(effectiveUserId, CHAT_MESSAGES, 'readonly', (s) => s.get(sessionId));
+};
+
+const putChatMessages = async (messageRecord, userId) => {
+  const authData = userId ? null : await getAuth();
+  const effectiveUserId = userId || (authData ? authData.userId : null);
+  return userDbTx(effectiveUserId, CHAT_MESSAGES, 'readwrite', (s) => s.put(messageRecord));
+};
 
 // Function to get authenticated headers
 async function getAuthHeaders() {
@@ -833,11 +872,66 @@ async function cacheGetSpaces(url, response, authData) {
   return 'cached';
 }
 
+async function cacheGetChatSessions(url, response, authData) {
+  const sessions = await response.json();
+  await Promise.all(sessions.filter(s => s && s._id).map(s => putChatSession({
+    _id: s._id,
+    title: s.title,
+    space_id: s.space_id,
+    todo_id: s.todo_id,
+    agent_id: s.agent_id,
+    created_at: s.created_at,
+    updated_at: s.updated_at,
+    cached_at: new Date().toISOString(),
+  }, authData.userId)));
+
+  // Remove stale local sessions not in server response
+  const serverIdSet = new Set(sessions.filter(s => s && s._id).map(s => s._id));
+  const localSessions = await getChatSessions(authData.userId);
+  const stale = localSessions.filter(l => !serverIdSet.has(l._id));
+  await Promise.all(stale.map(l =>
+    userDbTx(authData.userId, CHAT_SESSIONS, 'readwrite', (s) => s.delete(l._id))
+  ));
+
+  console.log(`💬 Cached ${sessions.length} chat sessions to IndexedDB (removed ${stale.length} stale)`);
+  return 'cached';
+}
+
+async function cacheGetChatSession(url, response, authData) {
+  const session = await response.json();
+  if (!session || !session._id) return 'skipped';
+
+  // Cache session metadata
+  await putChatSession({
+    _id: session._id,
+    title: session.title,
+    space_id: session.space_id,
+    todo_id: session.todo_id,
+    agent_id: session.agent_id,
+    created_at: session.created_at,
+    updated_at: session.updated_at,
+    cached_at: new Date().toISOString(),
+  }, authData.userId);
+
+  // Cache display_messages
+  if (session.display_messages) {
+    await putChatMessages({
+      session_id: session._id,
+      display_messages: session.display_messages,
+      cached_at: new Date().toISOString(),
+    }, authData.userId);
+  }
+
+  console.log(`💬 Cached chat session ${session._id} with ${(session.display_messages || []).length} messages to IndexedDB`);
+  return 'cached';
+}
+
 const GET_CACHE_HANDLERS = {
   '/todos': cacheGetTodos,
   '/journals': cacheGetJournals,
   '/categories': cacheGetCategories,
   '/spaces': cacheGetSpaces,
+  '/agent/sessions': cacheGetChatSessions,
 };
 
 // ── Backend request construction ──────────────────────────────
@@ -879,7 +973,9 @@ async function handleApiRequest(request) {
       if (request.method === 'GET' && response.ok && !url.pathname.startsWith('/auth')) {
         const authData = await getAuth();
         if (authData && authData.userId) {
-          const handler = GET_CACHE_HANDLERS[url.pathname];
+          // Check for dynamic route handlers (e.g. /agent/sessions/{id})
+          const agentSessionMatch = url.pathname.match(/^\/agent\/sessions\/([a-f0-9]{24})$/);
+          const handler = GET_CACHE_HANDLERS[url.pathname] || (agentSessionMatch ? cacheGetChatSession : null);
           if (handler) {
             // For /todos: check pending ops first to decide what to return to the UI.
             // This must happen synchronously (before returning) so offline-created todos
@@ -1008,6 +1104,42 @@ async function handleOfflineRequest(request, url) {
       const insights = generateInsights(todos);
 
       return new Response(JSON.stringify(insights), {
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
+    // Chat sessions list
+    if (apiPath === '/agent/sessions') {
+      const sessions = await getChatSessions(authData.userId);
+      const spaceId = url.searchParams.get('space_id');
+      const filteredSessions = spaceId ? sessions.filter(s => s.space_id === spaceId) : sessions;
+      // Sort by updated_at descending (newest first)
+      filteredSessions.sort((a, b) => (b.updated_at || '').localeCompare(a.updated_at || ''));
+
+      console.log(`📱 Offline GET /agent/sessions - Found ${filteredSessions.length} cached sessions`);
+      return new Response(JSON.stringify(filteredSessions), {
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
+    // Individual chat session with messages
+    const chatSessionMatch = apiPath.match(/^\/agent\/sessions\/([a-f0-9]{24})$/);
+    if (chatSessionMatch) {
+      const sessionId = chatSessionMatch[1];
+      const session = await getChatSession(sessionId, authData.userId);
+      if (session) {
+        const messageRecord = await getChatMessages(sessionId, authData.userId);
+        const result = {
+          ...session,
+          display_messages: messageRecord ? messageRecord.display_messages : [],
+        };
+        console.log(`📱 Offline GET /agent/sessions/${sessionId} - Found cached session with ${result.display_messages.length} messages`);
+        return new Response(JSON.stringify(result), {
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+      return new Response(JSON.stringify({ error: 'Session not found' }), {
+        status: 404,
         headers: { 'Content-Type': 'application/json' }
       });
     }
@@ -1923,6 +2055,13 @@ if (typeof module !== 'undefined') {
     cacheGetJournals,
     cacheGetCategories,
     cacheGetSpaces,
+    cacheGetChatSessions,
+    cacheGetChatSession,
+    getChatSessions,
+    getChatSession,
+    putChatSession,
+    getChatMessages,
+    putChatMessages,
     generateInsights,
     _resetDbCache,
   };
