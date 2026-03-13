@@ -209,7 +209,7 @@ local_setup() {
     echo "  Frontend: cd frontend && npm run dev"
     echo ""
     echo "Access the app at http://localhost:3141"
-    echo "Test account: test@example.com / 000000"
+    echo "Test account: test@example.com / 000000 (requires ALLOW_TEST_ACCOUNT=true in .env)"
     echo ""
 
     if ! grep -q "OPENAI_API_KEY=." "$SCRIPT_DIR/.env" 2>/dev/null && \

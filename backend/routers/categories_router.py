@@ -5,14 +5,7 @@ from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from categories import (
-    Category,
-    CategoryRename,
-    add_category,
-    delete_category,
-    get_categories,
-    rename_category,
-)
+from categories import Category, CategoryRename, add_category, delete_category, get_categories, rename_category
 from spaces import user_in_space
 
 from .dependencies import get_current_user

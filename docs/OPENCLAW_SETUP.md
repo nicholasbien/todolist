@@ -6,7 +6,7 @@ Connect your todolist app to [OpenClaw](https://openclaw.ai/) so an AI agent can
 
 - [OpenClaw](https://openclaw.ai/) installed and running (v2.4+ for autonomous mode)
 - `curl` and `jq` available on your system
-- A todolist account at [app.todolist.nyc](https://app.todolist.nyc)
+- A todolist account at [your-domain.com](https://your-domain.com)
 
 ## Step 1: Install the Skill
 
@@ -39,14 +39,14 @@ This will:
 2. Send a verification code
 3. Return a JWT token on success
 
-For testing, use `test@example.com` with code `000000`.
+For testing, set `ALLOW_TEST_ACCOUNT=true` in your backend `.env`, then use `test@example.com` with code `000000`.
 
 ## Step 3: Set Environment Variables
 
 Add these to your OpenClaw environment config (e.g., `~/.openclaw/env` or your shell profile):
 
 ```bash
-export TODOLIST_API_URL="https://app.todolist.nyc"
+export TODOLIST_API_URL="https://your-domain.com"
 export TODOLIST_AUTH_TOKEN="<token from step 2>"
 ```
 
@@ -157,7 +157,7 @@ openclaw cron runs todolist-watcher
 ## Architecture
 
 ```
-todolist App (app.todolist.nyc)
+todolist App
     │
     │  REST API (curl + Bearer token)
     │

@@ -73,7 +73,7 @@ Later, a **managed/hosted tier** can be offered for users who do not want to man
 | MCP Server | Node.js, `@modelcontextprotocol/sdk` | `TODOLIST_API_URL`, `TODOLIST_AUTH_TOKEN` |
 | Service Worker | Offline-first, routes all API calls through proxy | Routes via `self.location.origin` + proxy path |
 | Deployment | Railway (Nixpacks), `railway.json` per service | Currently no Dockerfiles |
-| CORS | `CORS_ORIGINS` env var, defaults: `localhost:3141, app.todolist.nyc, capacitor://localhost` | Must include self-hosted frontend origin |
+| CORS | `CORS_ORIGINS` env var, defaults: `localhost:3141, capacitor://localhost` | Must include self-hosted frontend origin |
 
 ---
 

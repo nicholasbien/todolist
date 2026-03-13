@@ -28,7 +28,7 @@ The backend already binds to `0.0.0.0` by default (see `backend/app.py`), so it 
 Add your Tailscale origin to the CORS allowed list. Set the `CORS_ORIGINS` environment variable before starting the backend:
 
 ```bash
-export CORS_ORIGINS="http://localhost:3141,http://100.64.1.42:3141,https://app.todolist.nyc,capacitor://localhost,ionic://localhost"
+export CORS_ORIGINS="http://localhost:3141,http://100.64.1.42:3141,capacitor://localhost,ionic://localhost"
 ```
 
 Replace `100.64.1.42` with your actual Tailscale IP.

@@ -5,7 +5,7 @@ export default function TermsPage() {
   return (
     <>
       <Head>
-        <title>Terms of Service - todolist.nyc</title>
+        <title>Terms of Service - todolist</title>
       </Head>
 
       <div className="min-h-screen min-h-[100dvh] bg-zinc-950">
@@ -21,7 +21,7 @@ export default function TermsPage() {
 
           <div className="prose prose-invert max-w-none">
             <p className="text-lg mb-6 text-gray-300">
-              By using todolist.nyc (&quot;the service&quot;), you agree to these Terms.
+              By using todolist (&quot;the service&quot;), you agree to these Terms.
             </p>
 
             <h2 className="text-2xl font-bold mt-8 mb-4 text-gray-100">1. Using the Service</h2>
@@ -91,7 +91,7 @@ export default function TermsPage() {
               {' • '}
               <a href="mailto:todolist.notifications@gmail.com" className="hover:text-accent transition-colors">Contact</a>
             </div>
-            <p className="text-gray-500 text-sm">&copy; 2026 todolist.nyc</p>
+            <p className="text-gray-500 text-sm">&copy; 2026 todolist</p>
           </footer>
         </div>
       </div>

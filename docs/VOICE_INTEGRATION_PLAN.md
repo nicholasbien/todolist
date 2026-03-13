@@ -4,17 +4,17 @@
 
 ### 1. Agent Implementation Structure
 - **Backend Agent**: Located in `/backend/agent/`
-  - `agent.py`: Main streaming SSE endpoint at `/agent/stream` 
+  - `agent.py`: Main streaming SSE endpoint at `/agent/stream`
   - `tools.py`: 11 direct tool functions (weather, tasks, journals, search, etc.)
   - `schemas.py`: Pydantic schemas for OpenAI function calling
   - Uses GPT-4.1 with function calling for intelligent responses
-  
+
 - **Frontend Agent**: `/frontend/components/AgentChatbot.tsx`
   - Text-based chat interface using Server-Sent Events
   - Real-time streaming responses with tool call visualization
   - Space-aware conversations with session storage
   - Displays tool inputs/outputs in user-friendly format
-  
+
 - **Service Worker**: Routes `/agent` endpoints correctly to backend
 - **No existing audio/voice code** found in codebase
 
@@ -22,7 +22,7 @@
 1. User types query → Frontend sends to `/agent/stream`
 2. Backend streams OpenAI responses via SSE events:
    - `ready`: Initial setup with available tools
-   - `tool_result`: Results from tool executions  
+   - `tool_result`: Results from tool executions
    - `token`: Streaming response tokens
    - `done`: Completion signal
 3. Frontend accumulates tokens and displays formatted responses
@@ -118,26 +118,26 @@ async def text_to_speech(
 ```tsx
 // Key additions to AgentChatbot.tsx
 const AgentChatbot = () => {
-  const { 
-    isListening, 
-    transcript, 
-    startListening, 
-    stopListening 
+  const {
+    isListening,
+    transcript,
+    startListening,
+    stopListening
   } = useVoiceInput();
-  
-  const { 
-    speak, 
-    stop: stopSpeaking, 
-    isSpeaking 
+
+  const {
+    speak,
+    stop: stopSpeaking,
+    isSpeaking
   } = useTextToSpeech();
-  
+
   // Auto-submit voice transcript
   useEffect(() => {
     if (transcript && !isListening) {
       handleSendMessage(transcript);
     }
   }, [transcript, isListening]);
-  
+
   // Stream TTS for agent responses
   useEffect(() => {
     if (streamingMessage && !isListening) {
@@ -161,7 +161,7 @@ import { SpeechRecognition } from '@capacitor-community/speech-recognition';
 export const initializeCapacitorVoice = async () => {
   // Request permissions
   await SpeechRecognition.requestPermissions();
-  
+
   // Native speech recognition for better accuracy
   const { matches } = await SpeechRecognition.start({
     language: 'en-US',
@@ -170,7 +170,7 @@ export const initializeCapacitorVoice = async () => {
     partialResults: true,
     popup: false,
   });
-  
+
   return matches[0];
 };
 ```
@@ -179,7 +179,7 @@ export const initializeCapacitorVoice = async () => {
 
 #### 4.1 Voice Commands & Shortcuts
 - **Wake word detection**: "Hey AI" / "Hey Todo"
-- **Direct commands**: 
+- **Direct commands**:
   - "Add task: [description]"
   - "What's the weather?"
   - "Show my tasks"
@@ -258,7 +258,7 @@ export const VOICE_CONFIG = {
     language: 'en-US',
     silenceTimeout: 2000, // ms
   },
-  
+
   // Text-to-Speech
   synthesis: {
     voice: 'Google US English', // or user preference
@@ -267,7 +267,7 @@ export const VOICE_CONFIG = {
     volume: 1.0,
     sentenceDelimiter: /[.!?]+/,
   },
-  
+
   // UI/UX
   ui: {
     autoSubmitOnSilence: true,
@@ -275,7 +275,7 @@ export const VOICE_CONFIG = {
     showConfidence: false,
     enableWakeWord: false,
   },
-  
+
   // Backend (optional)
   backend: {
     useOpenAITranscription: false,

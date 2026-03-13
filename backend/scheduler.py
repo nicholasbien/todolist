@@ -30,11 +30,7 @@ async def daily_summary_job(user_id: str, email: str, first_name: str = ""):
 async def briefing_job(user_id: str):
     """Run morning briefing + stale task nudges for a user."""
     try:
-        from briefings import (
-            get_briefing_preferences,
-            post_morning_briefing,
-            post_stale_task_nudges,
-        )
+        from briefings import get_briefing_preferences, post_morning_briefing, post_stale_task_nudges
 
         prefs = await get_briefing_preferences(user_id)
 

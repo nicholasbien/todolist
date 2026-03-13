@@ -25,7 +25,7 @@ See the [README](README.md) for full setup instructions.
 
 ### Test Account
 
-Use `test@example.com` with code `000000` for local development (no email required).
+Set `ALLOW_TEST_ACCOUNT=true`, `TEST_EMAIL=test@example.com`, and `TEST_CODE=000000` in your backend `.env`, then use `test@example.com` with code `000000` for local development (no email required).
 
 ## Making Changes
 

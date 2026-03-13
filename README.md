@@ -13,7 +13,7 @@ cp .env.example .env   # edit .env to add your OPENAI_API_KEY (optional)
 docker compose up
 ```
 
-App runs at **http://localhost:3141**. Log in with `test@example.com` / `000000`.
+App runs at **http://localhost:3141**. Log in with `test@example.com` / `000000` (requires `ALLOW_TEST_ACCOUNT=true` in `.env`).
 
 ### Local Development
 

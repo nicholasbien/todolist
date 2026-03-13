@@ -28,13 +28,6 @@
 		<true/>
 		<key>NSExceptionDomains</key>
 		<dict>
-			<key>backend-production-e920.up.railway.app</key>
-			<dict>
-				<key>NSExceptionAllowsInsecureHTTPLoads</key>
-				<false/>
-				<key>NSExceptionMinimumTLSVersion</key>
-				<string>TLSv1.2</string>
-			</dict>
 		</dict>
 	</dict>
 	<key>UILaunchStoryboardName</key>
@@ -64,9 +57,6 @@
 	<false/>
 	<key>WKAppBoundDomains</key>
 	<array>
-		<string>todolist.nyc</string>
-		<string>app.todolist.nyc</string>
-		<string>backend-production-e920.up.railway.app</string>
 		<string>localhost</string>
 	</array>
 </dict>

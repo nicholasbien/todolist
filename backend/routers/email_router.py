@@ -6,11 +6,7 @@ from typing import List
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from auth import (
-    update_user_email_instructions,
-    update_user_email_spaces,
-    update_user_summary_time,
-)
+from auth import update_user_email_instructions, update_user_email_spaces, update_user_summary_time
 from email_summary import send_daily_summary
 from scheduler import get_scheduler_status, update_schedule_time
 
