@@ -57,13 +57,13 @@ def test_smtp_connection():
             msg["To"] = test_email
             msg["Subject"] = "Test Email from Todo App"
 
-            body = """
-This is a test email from your Todo App SMTP configuration.
+            import datetime
 
-If you received this, your email setup is working correctly!
-
-Time: """ + str(
-                __import__("datetime").datetime.now()
+            now = str(datetime.datetime.now())
+            body = (
+                "This is a test email from your Todo App SMTP configuration.\n\n"
+                "If you received this, your email setup is working correctly!\n\n"
+                f"Time: {now}"
             )
 
             msg.attach(MIMEText(body, "plain"))
