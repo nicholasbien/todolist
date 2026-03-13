@@ -1,6 +1,6 @@
 # todolist
 
-A developer tool for working with AI agents from anywhere. Dispatch tasks, store conversations, orchestrate parallel agents — online or offline.
+A todo list app with AI agent integration. Manage tasks, journals, and chat sessions through a web UI or programmatically via an MCP server. Works offline.
 
 ## Quick Start
 
@@ -31,31 +31,25 @@ cd frontend && npm run dev
 
 > **Note:** MongoDB must be running locally (or use `./setup.sh --docker` to start everything with Docker).
 
-## Why todolist?
+## What It Does
 
-This is not another todo app. It is an **AI agent orchestration layer** with a task management UI.
+A task management app that also exposes an MCP server, so AI agents (Claude Code, custom agents, etc.) can create and manage tasks, post to chat sessions, and read journals programmatically.
 
-| Feature | What It Does |
-|---------|-------------|
-| **MCP Server (20+ tools)** | Any MCP-compatible agent (Claude Code, custom agents) can manage tasks, journals, and sessions |
-| **Multi-agent routing** | `agent_id` claims prevent conflicts — each agent sees only its own sessions + unclaimed ones |
-| **Parallel subtask dispatch** | Complex tasks auto-decompose into subtasks dispatched to parallel agent workers |
-| **Offline-first PWA** | Works without network via service worker + IndexedDB; installable on iOS/Android |
-| **Session-based messaging** | Post-and-poll sessions with SSE streaming — agents and humans share persistent threads |
-| **Self-hostable** | Docker Compose up and you own your data — MongoDB, no vendor lock-in |
+Key capabilities:
 
-## How Agent Integration Works
+- **MCP server** with 20+ tools for programmatic access to todos, sessions, journals, and spaces
+- **Agent routing** -- sessions track an `agent_id` so multiple agents can work in parallel without conflicts
+- **Subtasks** -- tasks can be broken into subtasks with progress tracking
+- **Offline-first PWA** -- service worker + IndexedDB for offline use; installable on mobile
+- **AI classification** -- optional OpenAI integration for auto-categorizing tasks (works fine without it)
+- **Journals** -- daily entries with auto-save
+- **Spaces** -- multi-user workspaces with invite-by-email
 
-```
-1. You create a task in the app (or via MCP)
-2. An AI agent polls for pending sessions
-3. The agent claims the session, reads the task, and starts working
-4. The agent posts progress updates and results back to the session
-5. For complex tasks, the agent creates subtasks that run in parallel
-6. You review results from your phone, laptop, or any browser
-```
+## Agent Integration
 
-### Claude Code Integration
+Agents interact with the app through the MCP server or the REST API.
+
+### MCP Setup (Claude Code)
 
 Add to your `.mcp.json`:
 
@@ -74,19 +68,16 @@ Add to your `.mcp.json`:
 }
 ```
 
-Available MCP tools: `add_todo`, `list_todos`, `complete_todo`, `create_session`, `post_to_session`, `get_pending_sessions`, `write_journal`, `get_insights`, `search_sessions`, and more.
+Available tools include `add_todo`, `list_todos`, `complete_todo`, `create_session`, `post_to_session`, `get_pending_sessions`, `write_journal`, `get_insights`, `search_sessions`, and others. See [AGENTS.md](AGENTS.md) for the full list.
 
-## Features
+### Agent Workflow
 
-- **AI task classification** — automatic category, priority, and due date detection via OpenAI (optional — works without API key)
-- **AI assistant** — chat with tool calling for task management, journaling, web search
-- **Subtasks** — break tasks into subtasks with progress tracking
-- **Journals** — daily journal entries with auto-save and offline support
-- **Spaces** — multi-user collaboration with invite-by-email
-- **Dark mode** — system-aware with manual toggle
-- **Link tasks** — paste a URL, page title is fetched automatically
-- **Drag-and-drop** — reorder tasks by dragging
-- **Email summaries** — daily AI-generated productivity insights (optional)
+1. Agent calls `get_pending_sessions` to find work
+2. Agent reads the session and task details
+3. Agent does the work (creates/updates todos, writes code, etc.)
+4. Agent posts results back to the session via `post_to_session`
+
+Sessions use `agent_id` to route follow-up messages to the correct agent.
 
 ## Tech Stack
 
@@ -95,7 +86,7 @@ Available MCP tools: `add_todo`, `list_todos`, `complete_todo`, `create_session`
 | Frontend | Next.js 14, React 18, TypeScript, Tailwind CSS |
 | Backend | FastAPI, Python 3.11+, async MongoDB (Motor) |
 | Database | MongoDB 7 |
-| AI | OpenAI (optional — app works fully without it) |
+| AI | OpenAI (optional) |
 | MCP Server | TypeScript, Model Context Protocol SDK |
 | Auth | JWT with email verification codes |
 
@@ -116,7 +107,7 @@ todolist/
 │   └── tests/         # pytest suite
 ├── mcp-server/        # Model Context Protocol server (20+ tools)
 ├── docs/              # Architecture and planning docs
-└── docker-compose.yml # One-command self-hosting
+└── docker-compose.yml
 ```
 
 ## Configuration
@@ -128,7 +119,7 @@ All configuration is via environment variables. See [`.env.example`](.env.exampl
 | `JWT_SECRET` | Yes | Session signing key (auto-generated by `setup.sh`) |
 | `MONGODB_URL` | Yes | MongoDB connection string |
 | `OPENAI_API_KEY` | No | Enables AI classification and assistant |
-| `FROM_EMAIL` / `SMTP_PASSWORD` | No | Email verification (falls back to console) |
+| `FROM_EMAIL` / `SMTP_PASSWORD` | No | Email verification (falls back to console output) |
 | `BRAVE_API_KEY` | No | Web search in AI assistant |
 
 ## Testing
@@ -147,7 +138,7 @@ cd frontend && npm run lint
 
 ## Self-Hosting
 
-### Docker Compose (Production)
+### Docker Compose
 
 ```bash
 cp .env.example .env
@@ -159,13 +150,13 @@ MongoDB data persists in a named Docker volume. The app is accessible at `http:/
 
 ### Railway / Other Platforms
 
-The app includes `railway.json` configuration for one-click Railway deployment. Set the environment variables listed above in your platform's dashboard.
+The repo includes `railway.json` for Railway deployment. Set the environment variables listed above in your platform's dashboard.
 
 ## Contributing
 
-Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, code style, and PR guidelines.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, code style, and PR guidelines.
 
-For the full developer guide (useful for both human contributors and AI agents), see [AGENTS.md](AGENTS.md).
+For the full developer guide (covers architecture, API endpoints, agent integration, and testing), see [AGENTS.md](AGENTS.md).
 
 ## License
 
