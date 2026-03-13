@@ -290,15 +290,9 @@ async def send_email(to_email: str, subject: str, body_text: str, body_html: str
     Send an email using SMTP.
     """
     try:
-        # Block test emails from being sent
-        test_emails = [
-            "pytest@example.com",
-            "test@example.com",
-            "pytest2@example.com",
-            "pytest3@example.com",
-        ]
-        if to_email.lower() in [email.lower() for email in test_emails]:
-            logger.info(f"Blocked email send to test address: {to_email}")
+        # Block all @example.com emails (test, demo, and script-generated accounts)
+        if to_email.lower().endswith("@example.com"):
+            logger.info(f"Blocked email send to example.com address: {to_email}")
             return True  # Return True to avoid breaking tests
 
         if not SMTP_USERNAME or not SMTP_PASSWORD or not FROM_EMAIL:

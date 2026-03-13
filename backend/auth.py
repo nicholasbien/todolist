@@ -168,6 +168,12 @@ def generate_session_token() -> str:
 async def send_verification_email(email: str, code: str) -> bool:
     """Send verification code via email."""
     try:
+        # Skip sending emails to @example.com addresses (test/demo accounts)
+        if email.lower().endswith("@example.com"):
+            logger.info(f"Skipped verification email to example.com address: {email}")
+            print(f"VERIFICATION CODE for {email}: {code}")
+            return True
+
         # In test environment, just print and return
         if os.getenv("USE_MOCK_DB"):
             print(f"VERIFICATION CODE for {email}: {code}")
@@ -231,8 +237,8 @@ Nicholas"""
 async def signup_user(email: str) -> dict:
     """Create or update user with new verification code."""
     try:
-        # Special handling for test account - no email needed
-        if email == "test@example.com":
+        # Special handling for @example.com accounts - no email needed
+        if email.lower().endswith("@example.com"):
             return {"message": "Test account ready - use code 000000 to login"}
 
         # Generate verification code
@@ -295,7 +301,7 @@ async def login_user(email: str, code: str) -> dict:
         test_email = os.getenv("TEST_EMAIL")
         test_code = os.getenv("TEST_CODE")
         if (test_email and test_code and email == test_email and code == test_code) or (
-            email == "test@example.com" and code == "000000"
+            email.lower().endswith("@example.com") and code == "000000"
         ):
             # Find or create test user
             user = await users_collection.find_one({"email": email})
