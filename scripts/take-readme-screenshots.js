@@ -3,8 +3,9 @@
  *
  * Captures high-quality feature screenshots for the README.
  * Creates a demo user via backend API, populates realistic demo data
- * with categories, priorities, due dates, and subtasks, then takes
- * screenshots of the Tasks, Assistant, and Activity views.
+ * with categories, priorities, due dates, subtasks, journal entries,
+ * and assistant chat sessions, then takes screenshots of the
+ * Tasks, Assistant, and Journal views.
  *
  * Requires:
  *   - Backend running on port 8141
@@ -90,6 +91,15 @@ function dateOffset(days) {
   return d.toISOString().split('T')[0]; // YYYY-MM-DD
 }
 
+// Helper to get a human-friendly day name for relative dates
+function dayName(days) {
+  if (days === 0) return 'today';
+  if (days === 1) return 'tomorrow';
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  return d.toLocaleDateString('en-US', { weekday: 'long' });
+}
+
 (async () => {
   // ── 1. Create user via backend API ───────────────────────────
   console.log('1. Creating user via backend API...');
@@ -105,24 +115,26 @@ function dateOffset(days) {
 
   const spaceId = updatedUser.email_spaces[0];
 
-  // ── 2. Create categories ─────────────────────────────────────
-  console.log('2. Creating categories...');
-  const categoryNames = ['Work', 'Personal', 'Health', 'Learning', 'Shopping'];
+  // ── 2. Create categories via API ──────────────────────────────
+  console.log('2. Creating categories via /categories API...');
+  const categoryNames = ['Work', 'Personal', 'Health', 'Learning', 'Errands'];
   for (const name of categoryNames) {
     await api('POST', '/categories', token, { name, space_id: spaceId });
   }
-  console.log(`   Created ${categoryNames.length} categories (+ default General)`);
+  console.log(`   Created ${categoryNames.length} categories: ${categoryNames.join(', ')} (+ default General)`);
 
-  // ── 3. Populate demo tasks ───────────────────────────────────
+  // ── 3. Populate demo tasks (developer-oriented) ───────────────
   console.log('3. Adding demo tasks...');
   const todos = [
-    // Work tasks - various priorities and due dates
-    { text: 'Prepare slides for Monday standup', completed: false, category: 'Work', priority: 'High', dueDate: dateOffset(3) },
-    { text: 'Review Q1 project proposals', completed: false, category: 'Work', priority: 'High', dueDate: dateOffset(1) },
-    { text: 'Update API documentation for v2 release', completed: false, category: 'Work', priority: 'Medium', dueDate: dateOffset(5) },
-    { text: 'Schedule 1:1 with team leads', completed: false, category: 'Work', priority: 'Medium', dueDate: dateOffset(2) },
-    { text: 'Fix authentication bug in staging', completed: true, category: 'Work', priority: 'High' },
-    { text: 'Deploy database migration script', completed: true, category: 'Work', priority: 'Medium' },
+    // Work tasks - developer-oriented with due dates
+    { text: 'Deploy hotfix for login timeout on production', completed: false, category: 'Work', priority: 'High', dueDate: dateOffset(0) },
+    { text: 'Review Q1 roadmap', completed: false, category: 'Work', priority: 'High', dueDate: dateOffset(1) },
+    { text: 'Write integration tests for payment flow', completed: false, category: 'Work', priority: 'High', dueDate: dateOffset(2) },
+    { text: 'Refactor auth middleware to support OAuth2', completed: false, category: 'Work', priority: 'Medium', dueDate: dateOffset(3) },
+    { text: 'Code review PRs from backend team', completed: false, category: 'Work', priority: 'Medium', dueDate: dateOffset(1) },
+    { text: 'Update CI pipeline to run E2E tests on staging', completed: false, category: 'Work', priority: 'Medium', dueDate: dateOffset(5) },
+    { text: 'Migrate user sessions to Redis', completed: true, category: 'Work', priority: 'High' },
+    { text: 'Fix N+1 query in dashboard endpoint', completed: true, category: 'Work', priority: 'Medium' },
 
     // Personal tasks
     { text: 'Plan weekend hiking trip to Bear Mountain', completed: false, category: 'Personal', priority: 'Low', dueDate: dateOffset(4) },
@@ -132,16 +144,17 @@ function dateOffset(days) {
     // Health tasks
     { text: 'Meal prep for the week', completed: false, category: 'Health', priority: 'Medium', dueDate: dateOffset(0) },
     { text: 'Schedule annual physical exam', completed: false, category: 'Health', priority: 'Low', dueDate: dateOffset(14) },
-    { text: 'Morning yoga session', completed: true, category: 'Health', priority: 'Low' },
+    { text: '30-min morning run', completed: true, category: 'Health', priority: 'Low' },
 
     // Learning tasks
     { text: 'Complete TypeScript advanced patterns course', completed: false, category: 'Learning', priority: 'Medium', dueDate: dateOffset(10) },
-    { text: 'Read "Designing Data-Intensive Applications" Ch.5', completed: false, category: 'Learning', priority: 'Low' },
-    { text: 'Practice Spanish on Duolingo', completed: true, category: 'Learning', priority: 'Low' },
+    { text: 'Read "Designing Data-Intensive Applications" Ch.6', completed: false, category: 'Learning', priority: 'Low', dueDate: dateOffset(6) },
+    { text: 'Watch talk on event-driven architecture', completed: true, category: 'Learning', priority: 'Low' },
 
-    // Shopping
-    { text: 'Buy groceries for dinner party Saturday', completed: false, category: 'Shopping', priority: 'Medium', dueDate: dateOffset(2) },
-    { text: 'Order new running shoes', completed: true, category: 'Shopping', priority: 'Low' },
+    // Errands
+    { text: 'Pick up dry cleaning before Saturday', completed: false, category: 'Errands', priority: 'Medium', dueDate: dateOffset(2) },
+    { text: 'Return Amazon package at UPS store', completed: false, category: 'Errands', priority: 'Low', dueDate: dateOffset(3) },
+    { text: 'Buy groceries for dinner party', completed: true, category: 'Errands', priority: 'Medium' },
   ];
 
   const createdTodos = [];
@@ -155,20 +168,49 @@ function dateOffset(days) {
   }
   console.log(`   Added ${todos.length} tasks across ${categoryNames.length + 1} categories`);
 
-  // ── 4. Add journal entries ────────────────────────────────────
+  // ── 3b. Add subtasks to "Review Q1 roadmap" ───────────────────
+  console.log('   Adding subtasks to "Review Q1 roadmap"...');
+  const roadmapTodo = createdTodos.find(t => t.text === 'Review Q1 roadmap');
+  const roadmapId = roadmapTodo._id || roadmapTodo.id;
+
+  const subtasks = [
+    { text: 'Review backend API milestones', completed: true },
+    { text: 'Review frontend feature priorities', completed: true },
+    { text: 'Draft resource allocation plan', completed: false },
+    { text: 'Schedule roadmap review meeting with stakeholders', completed: false },
+  ];
+
+  for (const sub of subtasks) {
+    const result = await api('POST', '/todos', token, {
+      text: sub.text,
+      completed: sub.completed,
+      category: 'Work',
+      priority: 'Medium',
+      parent_id: roadmapId,
+      space_id: spaceId,
+      dateAdded: new Date().toISOString(),
+    });
+    // Mark completed subtasks
+    if (sub.completed && result._id) {
+      await api('PUT', `/todos/${result._id}/complete`, token);
+    }
+  }
+  console.log(`   Added ${subtasks.length} subtasks (${subtasks.filter(s => s.completed).length} completed, ${subtasks.filter(s => !s.completed).length} pending)`);
+
+  // ── 4. Add journal entries (developer daily log) ──────────────
   console.log('4. Adding journal entries...');
   const journals = [
     {
       date: dateOffset(0),
-      text: 'Productive day! Wrapped up the API documentation draft and had a great brainstorming session with the team about the v2 architecture.\n\nThe new category system is working well - it\'s much easier to stay organized now. Knocked out my morning yoga and meal prep before diving into work.\n\nLooking forward to the hiking trip this weekend. Need to remember to grab supplies.',
+      text: `Good progress today. Deployed the hotfix for the login timeout issue — turned out to be a race condition in the session refresh logic. Production looks stable now.\n\nSpent the afternoon writing integration tests for the payment flow. Got the happy path covered and most edge cases. Still need to add tests for the webhook retry scenario.\n\nStarted looking at the Q1 roadmap review. Finished reviewing the backend milestones and frontend priorities — need to draft the resource plan ${dayName(1)}.\n\nDid my meal prep and a morning run before work. Feeling good about the week ahead.`,
     },
     {
       date: dateOffset(-1),
-      text: 'Spent most of the day debugging the authentication issue in staging. Finally tracked it down to a token refresh race condition. Pushed the fix and it\'s looking solid.\n\nHad a good 1:1 with Sarah about the Q1 proposals. She had some excellent insights about the timeline.\n\nFinished another chapter of the data systems book - the replication patterns are fascinating.',
+      text: `Deep work day. Finally fixed that N+1 query in the dashboard endpoint — response time dropped from 1.2s to 80ms. The trick was batching the user lookups with a single aggregation pipeline.\n\nReviewed 3 PRs from the backend team. Left feedback on the caching strategy in Jake's PR — we should use Redis invalidation instead of TTL-based expiry.\n\nFinished migrating user sessions to Redis. Ran load tests and everything looks solid. Merged and deployed to staging.\n\nCalled mom for her birthday in the evening. She loved the gift.`,
     },
     {
       date: dateOffset(-2),
-      text: 'Monday kickoff went well. Got alignment on priorities for the week.\n\nStarted the TypeScript course - the advanced generics section is challenging but rewarding.\n\nReminder to self: need to book that dentist appointment before the end of the month.',
+      text: `Monday standup went well. Aligned on sprint priorities: the auth middleware refactor is the big one this week.\n\nStarted sketching out the OAuth2 integration for the auth middleware. The existing session-based flow needs to coexist with token-based auth, so it's trickier than expected. Drafted the migration plan.\n\nWatched a great talk on event-driven architecture — some useful patterns we could apply to our notification system.\n\nReminder: need to pick up dry cleaning before the weekend.`,
     },
   ];
   for (const j of journals) {
@@ -176,8 +218,72 @@ function dateOffset(days) {
   }
   console.log('   Added 3 journal entries');
 
-  // ── 5. Launch browser with route interception ────────────────
-  console.log('\n5. Launching browser...');
+  // ── 5. Create a realistic assistant chat session ──────────────
+  console.log('5. Creating assistant chat session...');
+
+  // Find the hotfix task to link the chat to
+  const hotfixTodo = createdTodos.find(t => t.text && t.text.includes('Deploy hotfix'));
+  const hotfixId = hotfixTodo ? (hotfixTodo._id || hotfixTodo.id) : null;
+
+  // Find the session that was auto-created for the hotfix task
+  let sessionId = null;
+  if (hotfixId) {
+    const sessionResult = await api('GET', `/agent/sessions/by-todo/${hotfixId}`, token);
+    if (sessionResult && sessionResult._id) {
+      sessionId = sessionResult._id;
+    }
+  }
+
+  // If no auto-created session, create one manually
+  if (!sessionId) {
+    const sessionResult = await api('POST', '/agent/sessions', token, {
+      space_id: spaceId,
+      title: 'Deploy hotfix for login timeout',
+      todo_id: hotfixId,
+      initial_message: 'The login timeout issue is affecting about 5% of users on production. Session tokens are expiring mid-request during the refresh window. Can you help me debug and deploy a fix?',
+      initial_role: 'user',
+      agent_id: 'claude',
+    });
+    sessionId = sessionResult._id || sessionResult.id;
+  }
+
+  if (sessionId) {
+    // Add a realistic back-and-forth conversation
+    const chatMessages = [
+      {
+        role: 'assistant',
+        content: 'I can help with that. Based on your description, this sounds like a race condition in the token refresh flow. A few questions:\n\n1. Are you using sliding window expiration or fixed TTL for sessions?\n2. Is the refresh happening client-side or via middleware?\n3. When did this start — after a recent deploy?\n\nIn the meantime, I\'d suggest checking the session middleware for any async gaps between token validation and refresh. A common pattern is:\n\n```javascript\n// Check if token expires within the refresh window\nif (token.expiresAt - Date.now() < REFRESH_WINDOW) {\n  await refreshToken(token); // Gap here!\n}\n```\n\nThe gap between the check and the refresh can cause concurrent requests to race.',
+        agent_id: 'claude',
+      },
+      {
+        role: 'user',
+        content: 'Good call — we\'re using sliding window with a 5-minute refresh threshold. The middleware does the refresh server-side. It started after we bumped the session TTL from 24h to 1h last Tuesday for the security audit.',
+      },
+      {
+        role: 'assistant',
+        content: 'That confirms it. With a 1-hour TTL and 5-minute refresh window, users hit the refresh path much more frequently than before. Here\'s a fix using an atomic compare-and-swap pattern:\n\n```javascript\nasync function refreshSession(sessionId) {\n  const result = await redis.eval(`\n    local current = redis.call(\'get\', KEYS[1])\n    if current == ARGV[1] then\n      redis.call(\'setex\', KEYS[1], ARGV[2], ARGV[3])\n      return 1\n    end\n    return 0\n  `, 1, `session:${sessionId}`, oldToken, TTL, newToken);\n  return result === 1;\n}\n```\n\nThis ensures only one request wins the refresh race. All other concurrent requests will see the already-refreshed token and continue normally.\n\nShould I also draft a rollback plan in case we need to revert quickly?',
+        agent_id: 'claude',
+      },
+      {
+        role: 'user',
+        content: 'Perfect, that\'s exactly what we need. Yes please on the rollback plan. I\'ll implement the fix now and push to staging.',
+      },
+    ];
+
+    for (const msg of chatMessages) {
+      await api('POST', `/agent/sessions/${sessionId}/messages`, token, {
+        role: msg.role,
+        content: msg.content,
+        agent_id: msg.agent_id || undefined,
+      });
+    }
+    console.log(`   Created chat session with ${chatMessages.length + 1} messages`);
+  } else {
+    console.log('   Warning: Could not create chat session');
+  }
+
+  // ── 6. Launch browser with route interception ────────────────
+  console.log('\n6. Launching browser...');
   const browser = await chromium.launch({ headless: true });
 
   const context = await browser.newContext({
@@ -282,17 +388,26 @@ function dateOffset(days) {
 
   // ── Screenshots ────────────────────────────────────────────────
 
-  console.log('\n6. Taking screenshots...');
+  console.log('\n7. Taking screenshots...');
 
   // Task List (Active tab)
   await goTab('Tasks');
   await page.waitForTimeout(2000);
-
   await ss('task-list.png');
 
-  // Assistant view
+  // Assistant view — navigate to the chat session so it shows the conversation
   await goTab('Assistant');
   await page.waitForTimeout(2000);
+
+  // Try to click into the hotfix chat session to show the conversation
+  try {
+    const sessionLink = page.getByText('Deploy hotfix', { exact: false }).first();
+    await sessionLink.click();
+    await page.waitForTimeout(2000);
+  } catch {
+    // If we can't find the session link, just screenshot the list
+    console.log('   Note: Could not navigate to specific chat session');
+  }
   await ss('assistant.png');
 
   // Journal view
