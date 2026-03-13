@@ -36,8 +36,8 @@ const mockServiceWorker = {
 
 // Mock CONFIG object
 const CONFIG = {
-  PRODUCTION_BACKEND: process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000',
-  LOCAL_BACKEND: 'http://localhost:8000',
+  PRODUCTION_BACKEND: process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8141',
+  LOCAL_BACKEND: 'http://localhost:8141',
   PRODUCTION_DOMAIN: 'todolist.nyc'
 };
 
@@ -153,7 +153,7 @@ describe('Offline Journal Sync', () => {
     const isProdHost = mockServiceWorker.location.hostname.endsWith('todolist.nyc');
     const expectedSyncUrl = `${isCapacitor ? CONFIG.PRODUCTION_BACKEND : (isProdHost ? CONFIG.PRODUCTION_BACKEND : CONFIG.LOCAL_BACKEND)}/journals`;
 
-    expect(expectedSyncUrl).toBe('http://localhost:8000/journals'); // Local dev environment
+    expect(expectedSyncUrl).toBe('http://localhost:8141/journals'); // Local dev environment
 
     // Mock successful sync response
     const mockSyncResponse = {
@@ -222,7 +222,7 @@ describe('Offline Journal Sync', () => {
       {
         protocol: 'http:',
         hostname: 'localhost',
-        expected: 'http://localhost:8000/journals'
+        expected: 'http://localhost:8141/journals'
       },
       // Production web
       {

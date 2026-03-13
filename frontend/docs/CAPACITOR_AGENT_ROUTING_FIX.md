@@ -61,7 +61,7 @@ Capacitor.isNativePlatform()
 ```
 
 ### URL Resolution
-- **Web**: `/api/agent/stream` → `http://localhost:3000/api/agent/stream` (dev) or `https://app.todolist.nyc/api/agent/stream` (prod)
+- **Web**: `/api/agent/stream` → `http://localhost:3141/api/agent/stream` (dev) or `https://app.todolist.nyc/api/agent/stream` (prod)
 - **Capacitor**: `https://app.todolist.nyc/api/agent/stream` → Direct to production frontend server
 
 ### Service Worker Behavior
@@ -115,7 +115,7 @@ backend-production-e920.up.railway.app (Backend - FastAPI)
 ### Web Browser
 ```bash
 # Local development
-curl http://localhost:3000/api/agent/stream?q=weather
+curl http://localhost:3141/api/agent/stream?q=weather
 
 # Production
 curl https://app.todolist.nyc/api/agent/stream?q=weather

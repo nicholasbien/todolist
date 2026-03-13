@@ -28,7 +28,7 @@ function getApiBaseUrl(forceBackend = false): string {
  */
 export function getStreamingBackendUrl(): string {
   if (Capacitor.isNativePlatform()) {
-    return process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000';
+    return process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8141';
   }
   // Web: use same-origin relative URL — Next.js rewrite proxies to backend
   return '';

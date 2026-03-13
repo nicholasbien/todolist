@@ -120,7 +120,7 @@ describe('Offline Auth Persistence', () => {
     );
 
     // Simulate offline GET /todos request (no auth provided in request)
-    const request = new Request('http://localhost:3000/todos?space_id=space1', {
+    const request = new Request('http://localhost:3141/todos?space_id=space1', {
       method: 'GET'
     });
 

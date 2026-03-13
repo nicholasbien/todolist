@@ -16,7 +16,7 @@ global.structuredClone = (obj) => JSON.parse(JSON.stringify(obj));
 
 // Mock self for service worker environment
 global.self = {
-  location: { origin: 'http://localhost:3000' },
+  location: { origin: 'http://localhost:3141' },
   navigator: { onLine: true },
   addEventListener: jest.fn(),
   skipWaiting: jest.fn(),
@@ -613,7 +613,7 @@ describe('Service Worker Regression Tests', () => {
       const fakeResponse = new Response(JSON.stringify([serverTodo]), {
         headers: { 'Content-Type': 'application/json' },
       });
-      const fakeUrl = new URL(`http://localhost:3000/todos?space_id=${testSpaceId}`);
+      const fakeUrl = new URL(`http://localhost:3141/todos?space_id=${testSpaceId}`);
       const authData = { userId: testUserId, token: 'tok' };
 
       await cacheGetTodos(fakeUrl, fakeResponse, authData);
@@ -647,7 +647,7 @@ describe('Service Worker Regression Tests', () => {
       const fakeResponse = new Response(JSON.stringify([]), {
         headers: { 'Content-Type': 'application/json' },
       });
-      const fakeUrl = new URL(`http://localhost:3000/todos?space_id=${testSpaceId}`);
+      const fakeUrl = new URL(`http://localhost:3141/todos?space_id=${testSpaceId}`);
       const authData = { userId: testUserId, token: 'tok' };
 
       await cacheGetTodos(fakeUrl, fakeResponse, authData);
@@ -682,7 +682,7 @@ describe('Service Worker Regression Tests', () => {
       const fakeResponse = new Response(JSON.stringify([currentTodo]), {
         headers: { 'Content-Type': 'application/json' },
       });
-      const fakeUrl = new URL(`http://localhost:3000/todos?space_id=${testSpaceId}`);
+      const fakeUrl = new URL(`http://localhost:3141/todos?space_id=${testSpaceId}`);
       const authData = { userId: testUserId, token: 'tok' };
 
       await cacheGetTodos(fakeUrl, fakeResponse, authData);
@@ -726,7 +726,7 @@ describe('Service Worker Regression Tests', () => {
       const fakeResponse = new Response(JSON.stringify([serverJournal]), {
         headers: { 'Content-Type': 'application/json' },
       });
-      const fakeUrl = new URL(`http://localhost:3000/journals?space_id=${testSpaceId}`);
+      const fakeUrl = new URL(`http://localhost:3141/journals?space_id=${testSpaceId}`);
       const authData = { userId: testUserId, token: 'tok' };
 
       await cacheGetJournals(fakeUrl, fakeResponse, authData);
@@ -756,7 +756,7 @@ describe('Service Worker Regression Tests', () => {
       const fakeResponse = new Response(JSON.stringify([]), {
         headers: { 'Content-Type': 'application/json' },
       });
-      const fakeUrl = new URL(`http://localhost:3000/journals?space_id=${testSpaceId}`);
+      const fakeUrl = new URL(`http://localhost:3141/journals?space_id=${testSpaceId}`);
       const authData = { userId: testUserId, token: 'tok' };
 
       await cacheGetJournals(fakeUrl, fakeResponse, authData);
@@ -797,7 +797,7 @@ describe('Service Worker Regression Tests', () => {
       const fakeResponse = new Response(JSON.stringify([serverSpace]), {
         headers: { 'Content-Type': 'application/json' },
       });
-      const fakeUrl = new URL('http://localhost:3000/spaces');
+      const fakeUrl = new URL('http://localhost:3141/spaces');
       const authData = { userId: testUserId, token: 'tok' };
 
       await cacheGetSpaces(fakeUrl, fakeResponse, authData);
@@ -826,7 +826,7 @@ describe('Service Worker Regression Tests', () => {
       const fakeResponse = new Response(JSON.stringify([]), {
         headers: { 'Content-Type': 'application/json' },
       });
-      const fakeUrl = new URL('http://localhost:3000/spaces');
+      const fakeUrl = new URL('http://localhost:3141/spaces');
       const authData = { userId: testUserId, token: 'tok' };
 
       await cacheGetSpaces(fakeUrl, fakeResponse, authData);
@@ -856,7 +856,7 @@ describe('Service Worker Regression Tests', () => {
       const fakeResponse = new Response(JSON.stringify([currentSpace]), {
         headers: { 'Content-Type': 'application/json' },
       });
-      const fakeUrl = new URL('http://localhost:3000/spaces');
+      const fakeUrl = new URL('http://localhost:3141/spaces');
       const authData = { userId: testUserId, token: 'tok' };
 
       await cacheGetSpaces(fakeUrl, fakeResponse, authData);
@@ -885,7 +885,7 @@ describe('Service Worker Regression Tests', () => {
       const fakeResponse = new Response(JSON.stringify(['Work', 'Personal']), {
         headers: { 'Content-Type': 'application/json' },
       });
-      const fakeUrl = new URL(`http://localhost:3000/categories?space_id=${testSpaceId}`);
+      const fakeUrl = new URL(`http://localhost:3141/categories?space_id=${testSpaceId}`);
       const authData = { userId: testUserId, token: 'tok' };
 
       await cacheGetCategories(fakeUrl, fakeResponse, authData);
@@ -907,7 +907,7 @@ describe('Service Worker Regression Tests', () => {
       const fakeResponse = new Response(JSON.stringify(['Existing']), {
         headers: { 'Content-Type': 'application/json' },
       });
-      const fakeUrl = new URL(`http://localhost:3000/categories?space_id=${testSpaceId}`);
+      const fakeUrl = new URL(`http://localhost:3141/categories?space_id=${testSpaceId}`);
       const authData = { userId: testUserId, token: 'tok' };
 
       await cacheGetCategories(fakeUrl, fakeResponse, authData);

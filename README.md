@@ -147,7 +147,7 @@ BRAVE_API_KEY=your_key
 
 **Frontend** (`frontend/.env.local`):
 ```bash
-BACKEND_URL=http://localhost:8000
+BACKEND_URL=http://localhost:8141
 ```
 
 ### Running
@@ -155,11 +155,11 @@ BACKEND_URL=http://localhost:8000
 ```bash
 # Terminal 1 -- Backend
 cd backend && source venv/bin/activate && python app.py
-# Runs on http://localhost:8000
+# Runs on http://localhost:8141
 
 # Terminal 2 -- Frontend
 cd frontend && npm run dev
-# Runs on http://localhost:3000
+# Runs on http://localhost:3141
 ```
 
 ### Test Account
@@ -167,6 +167,10 @@ cd frontend && npm run dev
 For local development, use the built-in test account (no email required):
 - **Email:** `test@example.com`
 - **Code:** `000000`
+
+## Mobile Access (Tailscale)
+
+Want to access the app from your phone while running it locally? See [docs/MOBILE_ACCESS.md](docs/MOBILE_ACCESS.md) for a guide on using Tailscale to reach your dev server from any device on your network.
 
 ## MCP Server
 
@@ -182,7 +186,7 @@ Quick example with Claude Code:
       "command": "node",
       "args": ["./mcp-server/dist/index.js"],
       "env": {
-        "TODOLIST_API_URL": "http://localhost:8000",
+        "TODOLIST_API_URL": "http://localhost:8141",
         "TODOLIST_AUTH_TOKEN": "your_token"
       }
     }

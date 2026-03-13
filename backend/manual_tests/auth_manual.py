@@ -6,7 +6,7 @@ Run this after starting the FastAPI server.
 
 import requests
 
-BASE_URL = "http://localhost:8000"
+BASE_URL = "http://localhost:8141"
 
 
 def test_signup(email):

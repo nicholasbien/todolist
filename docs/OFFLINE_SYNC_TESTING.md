@@ -16,7 +16,7 @@ Prerequisites:
 
 ```bash
 # Terminal 1 — backend
-cd backend && source venv/bin/activate && uvicorn app:app --host 0.0.0.0 --port 8000 --reload
+cd backend && source venv/bin/activate && uvicorn app:app --host 0.0.0.0 --port 8141 --reload
 
 # Terminal 2 — frontend
 cd frontend && npm run dev
@@ -26,7 +26,7 @@ The script launches a real Chromium browser (`headless: false`), logs in as `tes
 
 ```
 🔌 Offline/Online Sync — E2E Tests
-   App:     http://localhost:3000
+   App:     http://localhost:3141
    Account: test@example.com / 000000
 
 📋 Test 1: Create task offline → sync online

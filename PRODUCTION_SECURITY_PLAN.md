@@ -66,7 +66,7 @@ app.add_middleware(
     allow_origins=[
         "https://app.todolist.nyc",  # Production frontend
         "https://your-frontend-domain.railway.app",  # Railway frontend
-        "http://localhost:3000",  # Development only
+        "http://localhost:3141",  # Development only
     ] if os.getenv("ENV") != "development" else ["*"],
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
@@ -680,7 +680,7 @@ USER appuser
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
-  CMD python -c "import requests; requests.get('http://localhost:8000/health/live')" || exit 1
+  CMD python -c "import requests; requests.get('http://localhost:8141/health/live')" || exit 1
 
 # Run application
 EXPOSE 8000

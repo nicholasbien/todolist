@@ -92,7 +92,7 @@ describe('Streaming URL CORS regression', () => {
     const getStreamingBackendUrl = await importGetStreamingBackendUrl();
 
     const url = getStreamingBackendUrl();
-    expect(url).toBe('http://localhost:8000');
+    expect(url).toBe('http://localhost:8141');
   });
 
   test('next.config.js has rewrite for /agent/stream', async () => {

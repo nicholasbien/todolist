@@ -123,7 +123,7 @@ const agentUrl = `/agent/stream?${params.toString()}`;
 2. **Service worker routing**: SW detects environment and routes correctly:
    - `protocol === 'file:'` → Capacitor → Route to production backend
    - `hostname.endsWith('todolist.nyc')` → Production → Route to production backend
-   - Otherwise → Development → Route to localhost:8000
+   - Otherwise → Development → Route to localhost:8141
 
 ### Fallback Safety
 - If service worker fails to load, requests still go to backend (online only)

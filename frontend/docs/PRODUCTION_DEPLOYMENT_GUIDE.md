@@ -51,7 +51,7 @@ JWT_ALGORITHM=HS256
 JWT_ACCESS_TOKEN_EXPIRE_MINUTES=30
 
 # CORS Configuration
-ALLOWED_ORIGINS=https://your-frontend-domain.com,http://localhost:3000
+ALLOWED_ORIGINS=https://your-frontend-domain.com,http://localhost:3141
 
 # Email Configuration (optional)
 SMTP_HOST=your-smtp-host
@@ -213,7 +213,7 @@ server {
 
     # Frontend (Next.js)
     location / {
-        proxy_pass http://127.0.0.1:3000;
+        proxy_pass http://127.0.0.1:3141;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection 'upgrade';
@@ -226,7 +226,7 @@ server {
 
     # Backend API
     location /api/ {
-        proxy_pass http://127.0.0.1:8000/;
+        proxy_pass http://127.0.0.1:8141/;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection 'upgrade';
@@ -335,7 +335,7 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
     ports:
-      - "3000:3000"
+      - "3141:3141"
     environment:
       - NODE_ENV=production
     depends_on:
@@ -347,7 +347,7 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     ports:
-      - "8000:8000"
+      - "8141:8141"
     environment:
       - MONGODB_URL=${MONGODB_URL}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
@@ -623,13 +623,13 @@ pm2 set pm2-logrotate:compress true
 ### Health Checks
 ```bash
 # Frontend health
-curl -I http://localhost:3000
+curl -I http://localhost:3141
 
 # Backend health
-curl http://localhost:8000/health
+curl http://localhost:8141/health
 
 # MCP tool test
-curl -s "http://localhost:3000/api/agent/stream?q=test" | head -5
+curl -s "http://localhost:3141/api/agent/stream?q=test" | head -5
 
 # Database connectivity
 mongo --eval "db.adminCommand('ismaster')"

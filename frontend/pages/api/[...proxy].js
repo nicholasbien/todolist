@@ -17,7 +17,7 @@
  *
  * Do NOT remove this proxy - it ensures the app works even when the service worker fails.
  */
-const BACKEND_URL = (process.env.BACKEND_URL || 'http://localhost:8000').replace(/\/$/, '');
+const BACKEND_URL = (process.env.BACKEND_URL || 'http://localhost:8141').replace(/\/$/, '');
 
 export default async function handler(req, res) {
   const { proxy, ...queryParams } = req.query;

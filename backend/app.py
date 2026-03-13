@@ -170,7 +170,7 @@ app.add_middleware(SecurityHeadersMiddleware)
 # Enable CORS - specifically for the Next.js frontend
 _allowed_origins = os.getenv(
     "CORS_ORIGINS",
-    "http://localhost:3000,https://app.todolist.nyc,capacitor://localhost,ionic://localhost",
+    "http://localhost:3141,https://app.todolist.nyc,capacitor://localhost,ionic://localhost",
 ).split(",")
 app.add_middleware(
     CORSMiddleware,
@@ -189,7 +189,7 @@ async def root():
 if __name__ == "__main__":
     import uvicorn
 
-    port = int(os.environ.get("PORT", 8000))
+    port = int(os.environ.get("PORT", 8141))
     # Only enable hot reload in development
     is_dev = os.environ.get("ENV", "development") == "development"
     uvicorn.run(app, host="0.0.0.0", port=port, reload=is_dev)

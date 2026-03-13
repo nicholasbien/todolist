@@ -6,7 +6,7 @@
  * still held the stale offline_ ID.
  *
  * Requires both backend and frontend servers to be running:
- *   cd backend && source venv/bin/activate && uvicorn app:app --host 0.0.0.0 --port 8000 --reload
+ *   cd backend && source venv/bin/activate && uvicorn app:app --host 0.0.0.0 --port 8141 --reload
  *   cd frontend && npm run dev
  *
  * Run:
@@ -16,8 +16,8 @@
 const path = require('path');
 const { chromium } = require('playwright');
 
-const APP_URL = process.env.APP_URL || 'http://localhost:3000';
-const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:8000';
+const APP_URL = process.env.APP_URL || 'http://localhost:3141';
+const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:8141';
 const EMAIL = process.env.TEST_EMAIL || 'test@example.com';
 const CODE = process.env.TEST_CODE || '000000';
 const UNIQUE_TAG = `del-sync-${Date.now()}`;

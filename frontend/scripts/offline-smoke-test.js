@@ -2,15 +2,15 @@
  * Playwright E2E smoke test for offline sync functionality.
  *
  * Requires both backend and frontend servers to be running:
- *   cd backend && source venv/bin/activate && uvicorn app:app --host 0.0.0.0 --port 8000 --reload
+ *   cd backend && source venv/bin/activate && uvicorn app:app --host 0.0.0.0 --port 8141 --reload
  *   cd frontend && npm run dev
  *
  * Run:
  *   node scripts/offline-smoke-test.js
  *
  * Environment variables:
- *   APP_URL     – frontend URL  (default: http://localhost:3000)
- *   BACKEND_URL – backend URL   (default: http://localhost:8000)
+ *   APP_URL     – frontend URL  (default: http://localhost:3141)
+ *   BACKEND_URL – backend URL   (default: http://localhost:8141)
  *   TEST_EMAIL  – test account  (default: test@example.com)
  *   TEST_CODE   – verify code   (default: 000000)
  */
@@ -18,8 +18,8 @@
 const path = require('path');
 const { chromium } = require('playwright');
 
-const APP_URL = process.env.APP_URL || 'http://localhost:3000';
-const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:8000';
+const APP_URL = process.env.APP_URL || 'http://localhost:3141';
+const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:8141';
 const EMAIL = process.env.TEST_EMAIL || 'test@example.com';
 const CODE = process.env.TEST_CODE || '000000';
 const UNIQUE_TAG = `smoke-${Date.now()}`;

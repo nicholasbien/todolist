@@ -73,7 +73,7 @@ Later, a **managed/hosted tier** can be offered for users who do not want to man
 | MCP Server | Node.js, `@modelcontextprotocol/sdk` | `TODOLIST_API_URL`, `TODOLIST_AUTH_TOKEN` |
 | Service Worker | Offline-first, routes all API calls through proxy | Routes via `self.location.origin` + proxy path |
 | Deployment | Railway (Nixpacks), `railway.json` per service | Currently no Dockerfiles |
-| CORS | `CORS_ORIGINS` env var, defaults: `localhost:3000, app.todolist.nyc, capacitor://localhost` | Must include self-hosted frontend origin |
+| CORS | `CORS_ORIGINS` env var, defaults: `localhost:3141, app.todolist.nyc, capacitor://localhost` | Must include self-hosted frontend origin |
 
 ---
 
@@ -106,9 +106,9 @@ services:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - FROM_EMAIL=${FROM_EMAIL:-}
       - SMTP_PASSWORD=${SMTP_PASSWORD:-}
-      - CORS_ORIGINS=http://localhost:3000
+      - CORS_ORIGINS=http://localhost:3141
     ports:
-      - "8000:8000"
+      - "8141:8141"
     depends_on:
       - mongodb
     restart: unless-stopped
@@ -118,10 +118,10 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
     environment:
-      - BACKEND_URL=http://backend:8000
-      - NEXT_PUBLIC_BACKEND_URL=http://localhost:8000
+      - BACKEND_URL=http://backend:8141
+      - NEXT_PUBLIC_BACKEND_URL=http://localhost:8141
     ports:
-      - "3000:3000"
+      - "3141:3141"
     depends_on:
       - backend
     restart: unless-stopped
@@ -136,7 +136,7 @@ git clone https://github.com/yourorg/todolist.git
 cd todolist
 cp .env.example .env   # fill in JWT_SECRET, OPENAI_API_KEY
 docker compose up -d
-# Open http://localhost:3000
+# Open http://localhost:3141
 ```
 
 ### 3b. Railway Template (One-Click Cloud Self-Hosting)
@@ -216,11 +216,11 @@ Same as Docker Compose, but deployed on a cloud VM (DigitalOcean, Hetzner, AWS E
 ```
 # Example Caddyfile
 todolist.example.com {
-    reverse_proxy localhost:3000
+    reverse_proxy localhost:3141
 }
 
 api.todolist.example.com {
-    reverse_proxy localhost:8000
+    reverse_proxy localhost:8141
 }
 ```
 
@@ -253,7 +253,7 @@ COPY . .
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
-  CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"
+  CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8141/health')"
 
 EXPOSE 8000
 
@@ -305,7 +305,7 @@ CMD ["node", "server.js"]
 | `MONGODB_URL` | Yes | `mongodb://localhost:27017` | MongoDB connection string |
 | `JWT_SECRET` | Yes | — | Secret for signing JWT tokens. Generate with `openssl rand -base64 32` |
 | `OPENAI_API_KEY` | Yes | — | OpenAI API key for AI/agent features |
-| `CORS_ORIGINS` | No | `http://localhost:3000,...` | Comma-separated allowed origins |
+| `CORS_ORIGINS` | No | `http://localhost:3141,...` | Comma-separated allowed origins |
 | `FROM_EMAIL` | No | — | Email address for sending notifications |
 | `SMTP_PASSWORD` | No | — | SMTP app password |
 | `SMTP_SERVER` | No | `smtp.gmail.com` | SMTP server |
@@ -317,14 +317,14 @@ CMD ["node", "server.js"]
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `BACKEND_URL` | Yes | `http://localhost:8000` | Backend URL for server-side proxy |
-| `NEXT_PUBLIC_BACKEND_URL` | Yes | `http://localhost:8000` | Backend URL for client-side SSE |
+| `BACKEND_URL` | Yes | `http://localhost:8141` | Backend URL for server-side proxy |
+| `NEXT_PUBLIC_BACKEND_URL` | Yes | `http://localhost:8141` | Backend URL for client-side SSE |
 
 ### MCP Server
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `TODOLIST_API_URL` | Yes | `http://localhost:8000` | Backend API URL |
+| `TODOLIST_API_URL` | Yes | `http://localhost:8141` | Backend API URL |
 | `TODOLIST_AUTH_TOKEN` | Yes | — | JWT token for API authentication |
 
 ---
@@ -379,8 +379,8 @@ The architecture is fully VPN-compatible because:
 **Pattern A: Local Docker + VPN (most private)**
 ```
 User's Device → VPN Tunnel → Home Server (Docker Compose)
-                               ├── Frontend :3000
-                               ├── Backend :8000
+                               ├── Frontend :3141
+                               ├── Backend :8141
                                └── MongoDB :27017
 ```
 - All traffic stays on VPN
@@ -390,8 +390,8 @@ User's Device → VPN Tunnel → Home Server (Docker Compose)
 **Pattern B: Cloud + VPN (Tailscale/WireGuard)**
 ```
 User's Device → Tailscale → Cloud VM
-                              ├── Frontend :3000 (Tailscale IP only)
-                              ├── Backend :8000 (Tailscale IP only)
+                              ├── Frontend :3141 (Tailscale IP only)
+                              ├── Backend :8141 (Tailscale IP only)
                               └── MongoDB :27017 (localhost only)
 ```
 - Services only accessible via Tailscale network
@@ -440,14 +440,14 @@ For self-hosted instances, the MCP server just needs to point to the correct bac
 **For VPN setups:**
 ```json
 {
-  "TODOLIST_API_URL": "http://10.0.0.5:8000"
+  "TODOLIST_API_URL": "http://10.0.0.5:8141"
 }
 ```
 
 **For local Docker:**
 ```json
 {
-  "TODOLIST_API_URL": "http://localhost:8000"
+  "TODOLIST_API_URL": "http://localhost:8141"
 }
 ```
 

@@ -27,7 +27,7 @@ describe('API Proxy Fallback Tests', () => {
   });
 
   test('proxy URL building works correctly', () => {
-    const BACKEND_URL = 'http://localhost:8000';
+    const BACKEND_URL = 'http://localhost:8141';
     const testCases = [
       { path: 'todos', query: {}, expected: `${BACKEND_URL}/todos` },
       {
@@ -87,13 +87,13 @@ describe('API Proxy Fallback Tests', () => {
 
     // Test with BACKEND_URL set
     process.env.BACKEND_URL = 'https://my-backend.example.com';
-    const configuredUrl = (process.env.BACKEND_URL || 'http://localhost:8000').replace(/\/$/, '');
+    const configuredUrl = (process.env.BACKEND_URL || 'http://localhost:8141').replace(/\/$/, '');
     expect(configuredUrl).toBe('https://my-backend.example.com');
 
     // Test without BACKEND_URL (falls back to localhost)
     delete process.env.BACKEND_URL;
-    const fallbackUrl = (process.env.BACKEND_URL || 'http://localhost:8000').replace(/\/$/, '');
-    expect(fallbackUrl).toBe('http://localhost:8000');
+    const fallbackUrl = (process.env.BACKEND_URL || 'http://localhost:8141').replace(/\/$/, '');
+    expect(fallbackUrl).toBe('http://localhost:8141');
 
     // Restore original environment
     if (originalBackendUrl !== undefined) {

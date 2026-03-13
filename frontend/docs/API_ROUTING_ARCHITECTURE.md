@@ -120,7 +120,7 @@ When a new backend endpoint is added but not included in the service worker's ro
 5. Returns 404 error
 
 ### **Symptoms**
-- `POST http://localhost:3000/endpoint-name 404 (Not Found)` in browser console
+- `POST http://localhost:3141/endpoint-name 404 (Not Found)` in browser console
 - Endpoint works when tested directly against backend
 - Works in production if service worker cache is cleared
 
@@ -166,10 +166,10 @@ const API_CACHE = 'todo-api-v100';       // INCREMENT
 **Step 4: Test Both Routes**
 ```bash
 # Test service worker route (when SW active)
-curl http://localhost:3000/new-feature
+curl http://localhost:3141/new-feature
 
 # Test proxy fallback (when SW inactive/disabled)
-curl http://localhost:3000/api/new-feature
+curl http://localhost:3141/api/new-feature
 ```
 
 ### ✅ Service Worker Update Checklist
@@ -189,7 +189,7 @@ curl http://localhost:3000/api/new-feature
 ```bash
 # 1. Start dev servers
 npm run dev                    # Frontend (port 3002)
-cd backend && python app.py   # Backend (port 8000)
+cd backend && python app.py   # Backend (port 8141)
 
 # 2. Test service worker route (primary)
 curl http://localhost:3002/endpoint-name
