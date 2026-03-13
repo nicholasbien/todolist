@@ -203,7 +203,7 @@ This code will expire in 10 minutes.
 If you didn't request this code, please ignore this email.
 
 Best regards,
-The TodoList Team"""
+todolist"""
 
             msg.attach(MIMEText(body, "plain"))
 
