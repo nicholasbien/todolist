@@ -126,17 +126,12 @@ describe('CRITICAL: Offline Journal Sync Regression Protection', () => {
       data: offlineEdit
     });
 
-    console.log('🧪 TEST SETUP: Offline edit created and queued for sync');
-
     // SIMULATE: User comes back online, GET /journals request comes in
     // This is the CRITICAL MOMENT where the bug would occur
 
     const authData = await mockSWFunctions.getAuth();
     const queue = await mockSWFunctions.readQueue();
     const spaceId = 'test-space-critical';
-
-    console.log(`🧪 CHECKING QUEUE: Found ${queue.length} operations`);
-    queue.forEach(op => console.log(`  - ${op.type}: ${op.data.date}`));
 
     // This is the exact logic from the service worker that must work
     const hasPendingJournals = queue.some(op =>
@@ -152,8 +147,6 @@ describe('CRITICAL: Offline Journal Sync Regression Protection', () => {
     expect(queue).toHaveLength(1);
     expect(queue[0].data.text).toBe('CRITICAL: This offline edit must NOT be lost!');
 
-    console.log('✅ REGRESSION CHECK PASSED: Server data caching properly blocked');
-
     // SIMULATE: Server data that would overwrite offline changes (the bad scenario)
     const dangerousServerData = {
       _id: 'server-journal-456',
@@ -165,7 +158,7 @@ describe('CRITICAL: Offline Journal Sync Regression Protection', () => {
 
     // CRITICAL: This should NOT happen due to blocking
     if (shouldBlockCaching) {
-      console.log('✅ CORRECTLY BLOCKED: Server data was not cached, offline changes preserved');
+      // Server data was not cached, offline changes preserved
     } else {
       // If this happens, we've regressed!
       await mockSWFunctions.putJournal(dangerousServerData);
@@ -180,7 +173,6 @@ describe('CRITICAL: Offline Journal Sync Regression Protection', () => {
     expect(offlineJournal?.text).toBe('CRITICAL: This offline edit must NOT be lost!');
     expect(offlineJournal?.updated_offline).toBe(true);
 
-    console.log('✅ OFFLINE DATA INTEGRITY: Offline edit preserved correctly');
   });
 
   /**
@@ -222,8 +214,6 @@ describe('CRITICAL: Offline Journal Sync Regression Protection', () => {
       const isProdHost = hostname.endsWith('your-domain.com');
       const syncUrl = `${isCapacitor ? CONFIG.PRODUCTION_BACKEND : (isProdHost ? CONFIG.PRODUCTION_BACKEND : CONFIG.LOCAL_BACKEND)}/journals`;
 
-      console.log(`🧪 ${name}: ${syncUrl}`);
-
       // CRITICAL: Must not be '/journals' (which caused 404s)
       expect(syncUrl).not.toBe('/journals');
       expect(syncUrl).toBe(expectedUrl);
@@ -237,7 +227,6 @@ describe('CRITICAL: Offline Journal Sync Regression Protection', () => {
       }
     });
 
-    console.log('✅ API ROUTING PROTECTION: All environments route correctly to backend');
   });
 
   /**
@@ -254,8 +243,6 @@ describe('CRITICAL: Offline Journal Sync Regression Protection', () => {
       { text: 'First draft of my journal entry - added more thoughts and reflections' },
       { text: 'Final journal entry with all my thoughts and reflections for today' }
     ];
-
-    console.log('🧪 SIMULATING: Rapid offline edits (user typing)');
 
     // Each edit should replace the previous one in the queue
     for (const edit of edits) {
@@ -275,7 +262,6 @@ describe('CRITICAL: Offline Journal Sync Regression Protection', () => {
     expect(queue).toHaveLength(1);
     expect(queue[0].data.text).toBe('Final journal entry with all my thoughts and reflections for today');
 
-    console.log('✅ QUEUE OPTIMIZATION: Final user edit preserved, no duplicate operations');
   });
 
   /**
@@ -327,15 +313,12 @@ describe('CRITICAL: Offline Journal Sync Regression Protection', () => {
       }
     });
 
-    console.log('✅ SPACE ISOLATION: Operations correctly filtered by space');
   });
 
   /**
    * CRITICAL TEST: The exact race condition scenario that was fixed
    */
   it('REGRESSION PROTECTION: Original race condition scenario must not regress', async () => {
-    console.log('🧪 SIMULATING EXACT RACE CONDITION SCENARIO THAT WAS BROKEN');
-
     // Step 1: User goes offline and makes journal edit
     const offlineJournal = {
       _id: 'offline_journal_race_condition_test',
@@ -353,15 +336,11 @@ describe('CRITICAL: Offline Journal Sync Regression Protection', () => {
       data: offlineJournal
     });
 
-    console.log('✅ Step 1: User made offline edit');
-
     // Step 2: User comes back online - this is where the race condition occurred
     // Multiple things happen quickly:
     // - App loads and makes GET /journals request
     // - Service worker needs to decide whether to cache server data
     // - Sync queue needs to be processed
-
-    console.log('🧪 Step 2: User comes back online - CRITICAL MOMENT');
 
     // This is the exact check that prevents the bug
     const authData = await mockSWFunctions.getAuth();
@@ -377,8 +356,6 @@ describe('CRITICAL: Offline Journal Sync Regression Protection', () => {
     expect(hasPendingJournals).toBe(true);
     expect(queue).toHaveLength(1);
 
-    console.log('✅ Step 2: Pending operations detected correctly');
-
     // Step 3: Server data arrives (this would have overwritten offline data in the bug)
     const serverData = {
       _id: 'server-journal-dangerous',
@@ -392,7 +369,6 @@ describe('CRITICAL: Offline Journal Sync Regression Protection', () => {
     const shouldBlockCaching = mockServiceWorkerGlobal.syncInProgress || hasPendingJournals;
 
     if (shouldBlockCaching) {
-      console.log('✅ Step 3: Server data caching correctly blocked');
       // Don't cache the server data
     } else {
       // This would be the bug - server data overwrites offline changes
@@ -419,11 +395,6 @@ describe('CRITICAL: Offline Journal Sync Regression Protection', () => {
     const isProdHost = mockServiceWorkerGlobal.location.hostname.endsWith('your-domain.com');
     const syncUrl = `${isCapacitor ? CONFIG.PRODUCTION_BACKEND : (isProdHost ? CONFIG.PRODUCTION_BACKEND : CONFIG.LOCAL_BACKEND)}/journals`;
 
-    // Check the actual environment and assert accordingly
-    console.log(`🔍 Test environment: protocol=${mockServiceWorkerGlobal.location.protocol}, hostname=${mockServiceWorkerGlobal.location.hostname}`);
-    console.log(`🔍 Environment flags: isCapacitor=${isCapacitor}, isProdHost=${isProdHost}`);
-    console.log(`🔍 Resolved URL: ${syncUrl}`);
-
     // In test environment with hostname 'localhost', should route to local backend
     if (mockServiceWorkerGlobal.location.hostname === 'localhost') {
       expect(syncUrl).toBe('http://localhost:8141/journals');
@@ -432,8 +403,6 @@ describe('CRITICAL: Offline Journal Sync Regression Protection', () => {
       expect(syncUrl).toBe(`${mockServiceWorkerGlobal.CONFIG.PRODUCTION_BACKEND}/journals`);
     }
     expect(syncUrl).not.toBe('/journals'); // Not the buggy frontend URL
-
-    console.log('✅ Step 4: Sync URL routing is correct');
 
     // Final verification: Offline changes must be preserved
     const finalJournals = await mockSWFunctions.getJournals();
@@ -444,7 +413,5 @@ describe('CRITICAL: Offline Journal Sync Regression Protection', () => {
     expect(preservedJournal).toBeDefined();
     expect(preservedJournal?.text).toBe('This edit was made offline and MUST survive coming back online!');
 
-    console.log('🎉 RACE CONDITION PROTECTION: Offline edit successfully preserved!');
-    console.log('✅ ALL REGRESSION CHECKS PASSED - The fix is still working!');
   });
 });

@@ -9,6 +9,7 @@ frontend/.env.production
 
 # Python
 backend/venv/
+backend/.venv/
 **/__pycache__/
 
 # Node / Frontend
@@ -28,6 +29,9 @@ mcp-server/node_modules/
 .claude/scheduled_tasks.lock
 frontend/.claude/
 .mcp.json
+
+# Internal docs (deployment notes, setup guides)
+docs/internal/
 
 # Playwright / testing artifacts
 .pw-offline-profile/

@@ -560,7 +560,6 @@ describe('Integration Tests', () => {
 
     // Simulate the online event handler from AIToDoListApp
     const handleOnline = () => {
-      console.log('Browser came back online');
       mockFetchTodos();
     };
 

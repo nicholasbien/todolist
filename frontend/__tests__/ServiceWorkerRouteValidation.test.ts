@@ -65,9 +65,6 @@ describe('Service Worker Route Synchronization', () => {
       }
     });
 
-    console.log('Required prefixes from backend:', Array.from(requiredPrefixes).sort());
-    console.log('Service worker routes:', serviceWorkerRoutes.sort());
-
     // Check that all required prefixes are in service worker routes
     const missingRoutes: string[] = [];
     requiredPrefixes.forEach(prefix => {
@@ -94,8 +91,6 @@ describe('Service Worker Route Synchronization', () => {
     const apiRoutes = extractRoutesFromSection(serviceWorkerContent, 'isApi');
 
     // With isApiPath(), there are no inline startsWith calls in these sections
-    console.log('Inline capacitor routes (should be empty):', capacitorRoutes);
-    console.log('Inline API routes (should be empty):', apiRoutes);
     expect(capacitorRoutes).toHaveLength(0);
     expect(apiRoutes).toHaveLength(0);
   });
@@ -103,7 +98,6 @@ describe('Service Worker Route Synchronization', () => {
   test('API_ROUTES array is the single source of truth', () => {
     const apiRoutesArray = extractApiRoutesArray(serviceWorkerContent);
     expect(apiRoutesArray.length).toBeGreaterThan(0);
-    console.log('API_ROUTES:', apiRoutesArray.sort());
 
     // Verify critical routes are in the array
     const criticalPrefixes = ['todos', 'categories', 'spaces', 'journals', 'auth', 'agent'];
