@@ -30,7 +30,7 @@ allow_origins=["*"], allow_credentials=True
 `allow_origins=["*"]` combined with `allow_credentials=True` allows any website to make authenticated requests to the API on behalf of users.
 
 **Remediation**:
-- Restrict to actual domains: `allow_origins=["https://todolist.nyc", "http://localhost:3000"]`
+- Restrict to actual domains: `allow_origins=["https://todolist.nyc", "http://localhost:3141"]`
 - Use environment-based CORS configuration
 
 ---

@@ -5,7 +5,7 @@
  * screenshots/{branch-name}/ so each PR gets its own directory.
  *
  * Prerequisites:
- *   - Backend running:  cd backend && source venv/bin/activate && uvicorn app:app --host 0.0.0.0 --port 8000 --reload
+ *   - Backend running:  cd backend && source venv/bin/activate && uvicorn app:app --host 0.0.0.0 --port 8141 --reload
  *   - Frontend running: cd frontend && npm run dev
  *   - At least one non-Personal space must exist (for Edit Space modal).
  *     Create one via the space dropdown → New Space if needed.
@@ -45,7 +45,7 @@ function getOutputDir() {
 
 const DIR_NAME = getOutputDir();
 const DIR = path.join(__dirname, '..', 'screenshots', DIR_NAME);
-const URL = 'http://localhost:3000';
+const URL = 'http://localhost:3141';
 
 fs.mkdirSync(DIR, { recursive: true });
 console.log(`📸 Saving screenshots to screenshots/${DIR_NAME}/`);

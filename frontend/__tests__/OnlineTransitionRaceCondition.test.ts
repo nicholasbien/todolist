@@ -108,7 +108,7 @@ describe('Online Transition Race Condition', () => {
     global.fetch = jest.fn().mockResolvedValue(mockResponse);
 
     // Simulate the service worker handling GET /todos
-    const request = new Request(`http://localhost:3000/todos?space_id=${spaceId}`, {
+    const request = new Request(`http://localhost:3141/todos?space_id=${spaceId}`, {
       method: 'GET',
       headers: { 'Authorization': 'Bearer token123' }
     });
@@ -162,7 +162,7 @@ describe('Online Transition Race Condition', () => {
     global.fetch = jest.fn().mockResolvedValue(mockResponse);
 
     // Simulate the service worker handling GET /todos
-    const request = new Request(`http://localhost:3000/todos?space_id=${spaceId}`, {
+    const request = new Request(`http://localhost:3141/todos?space_id=${spaceId}`, {
       method: 'GET',
       headers: { 'Authorization': 'Bearer token456' }
     });
@@ -225,7 +225,7 @@ describe('Online Transition Race Condition', () => {
       json: jest.fn().mockResolvedValue(serverTodos)
     });
 
-    const request = new Request(`http://localhost:3000/todos?space_id=${spaceId}`, {
+    const request = new Request(`http://localhost:3141/todos?space_id=${spaceId}`, {
       method: 'GET',
       headers: { 'Authorization': 'Bearer token789' }
     });
@@ -284,7 +284,7 @@ describe('Online Transition Race Condition', () => {
     global.fetch = jest.fn().mockResolvedValue(mockResponse);
 
     // Simulate GET /todos during sync
-    const request = new Request(`http://localhost:3000/todos?space_id=${spaceId}`, {
+    const request = new Request(`http://localhost:3141/todos?space_id=${spaceId}`, {
       method: 'GET',
       headers: { 'Authorization': 'Bearer token888' }
     });
@@ -339,7 +339,7 @@ describe('Online Transition Race Condition', () => {
     };
     global.fetch = jest.fn().mockResolvedValue(mockResponse);
 
-    const request = new Request(`http://localhost:3000/todos?space_id=${spaceB}`, {
+    const request = new Request(`http://localhost:3141/todos?space_id=${spaceB}`, {
       method: 'GET',
       headers: { 'Authorization': 'Bearer token999' }
     });

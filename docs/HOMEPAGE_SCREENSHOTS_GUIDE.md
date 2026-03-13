@@ -12,7 +12,7 @@ The homepage displays three feature screenshots in a responsive grid layout:
 ## Prerequisites
 
 - Playwright MCP server configured in Claude Code
-- Development server running on `http://localhost:3000`
+- Development server running on `http://localhost:3141`
 - Test account credentials: `test@example.com` with code `000000`
 
 ## Taking Screenshots with Playwright MCP
@@ -21,7 +21,7 @@ The homepage displays three feature screenshots in a responsive grid layout:
 
 ```javascript
 // Navigate to localhost
-await browser_navigate({ url: "http://localhost:3000" });
+await browser_navigate({ url: "http://localhost:3141" });
 ```
 
 ### 2. Log In with Test Account

@@ -33,7 +33,7 @@ node scripts/take-screenshots.js my-feature-name
 
 ```bash
 # Terminal 1 — backend
-cd backend && source venv/bin/activate && uvicorn app:app --host 0.0.0.0 --port 8000 --reload
+cd backend && source venv/bin/activate && uvicorn app:app --host 0.0.0.0 --port 8141 --reload
 
 # Terminal 2 — frontend
 cd frontend && npm run dev
@@ -59,7 +59,7 @@ const { chromium } = require('playwright');
 const path = require('path');
 
 const DIR = path.join(__dirname, '..', 'screenshots');
-const URL = 'http://localhost:3000';
+const URL = 'http://localhost:3141';
 
 (async () => {
   const browser = await chromium.launch({ headless: false });

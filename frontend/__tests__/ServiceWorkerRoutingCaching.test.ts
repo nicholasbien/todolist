@@ -119,28 +119,28 @@ describe('buildBackendRequest', () => {
     // Use Object.defineProperty to reliably override self.location (plain assignment
     // doesn't work on the service-worker-mock env object)
     Object.defineProperty((global as any).self, 'location', {
-      value: { hostname: 'localhost', protocol: 'http:', origin: 'http://localhost:3000' },
+      value: { hostname: 'localhost', protocol: 'http:', origin: 'http://localhost:3141' },
       configurable: true,
       writable: true,
     });
 
-    const request = mockRequest('http://localhost:3000/categories?space_id=abc');
-    const url = new URL('http://localhost:3000/categories?space_id=abc');
+    const request = mockRequest('http://localhost:3141/categories?space_id=abc');
+    const url = new URL('http://localhost:3141/categories?space_id=abc');
     const { targetUrl } = await sw.buildBackendRequest(request, url);
 
-    expect(targetUrl).toBe('http://localhost:3000/api/categories?space_id=abc');
+    expect(targetUrl).toBe('http://localhost:3141/api/categories?space_id=abc');
   });
 
   test('does not include auth headers for login/signup', async () => {
-    (global as any).self.location = { hostname: 'localhost', protocol: 'http:', origin: 'http://localhost:3000' };
+    (global as any).self.location = { hostname: 'localhost', protocol: 'http:', origin: 'http://localhost:3141' };
     const sw = require('../public/sw.js');
     await sw.putAuth('token123', 'user1');
 
-    const request = mockRequest('http://localhost:3000/auth/login', {
+    const request = mockRequest('http://localhost:3141/auth/login', {
       method: 'POST',
       body: JSON.stringify({ email: 'test@test.com' })
     });
-    const url = new URL('http://localhost:3000/auth/login');
+    const url = new URL('http://localhost:3141/auth/login');
     const { proxyRequest } = await sw.buildBackendRequest(request, url);
 
     // Should not have Authorization header
@@ -149,12 +149,12 @@ describe('buildBackendRequest', () => {
   });
 
   test('includes auth headers for authenticated endpoints', async () => {
-    (global as any).self.location = { hostname: 'localhost', protocol: 'http:', origin: 'http://localhost:3000' };
+    (global as any).self.location = { hostname: 'localhost', protocol: 'http:', origin: 'http://localhost:3141' };
     const sw = require('../public/sw.js');
     await sw.putAuth('mytoken', 'user1');
 
-    const request = mockRequest('http://localhost:3000/todos');
-    const url = new URL('http://localhost:3000/todos');
+    const request = mockRequest('http://localhost:3141/todos');
+    const url = new URL('http://localhost:3141/todos');
     const { proxyRequest } = await sw.buildBackendRequest(request, url);
 
     expect(proxyRequest.headers.get('Authorization')).toBe('Bearer mytoken');

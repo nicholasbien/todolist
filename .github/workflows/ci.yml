@@ -59,7 +59,7 @@ jobs:
         working-directory: frontend
     env:
       NEXT_TELEMETRY_DISABLED: "1"
-      BACKEND_URL: http://localhost:8000
+      BACKEND_URL: http://localhost:8141
       CI: "true"
 
     steps:

@@ -26,17 +26,17 @@ All pages are now in your Next.js app (`frontend/pages/`):
 
 ## Test Locally
 
-Your server should already be running at `localhost:3000`. Test these routes:
+Your server should already be running at `localhost:3141`. Test these routes:
 
 ```bash
 # Todo app (current functionality)
-http://localhost:3000/
+http://localhost:3141/
 
 # New pages
-http://localhost:3000/home          # Landing page
-http://localhost:3000/privacy       # Privacy policy
-http://localhost:3000/terms         # Terms of service
-http://localhost:3000/support       # Support page
+http://localhost:3141/home          # Landing page
+http://localhost:3141/privacy       # Privacy policy
+http://localhost:3141/terms         # Terms of service
+http://localhost:3141/support       # Support page
 ```
 
 ## App Store Requirements ✅
@@ -100,7 +100,7 @@ All pages use **your app's colors**:
 ## Next Steps
 
 ### 1. Test All Pages (NOW)
-Visit localhost:3000 and check:
+Visit localhost:3141 and check:
 - [ ] Landing page looks good
 - [ ] Privacy policy is complete
 - [ ] Terms of service is complete

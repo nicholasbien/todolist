@@ -380,8 +380,7 @@ async def search_sessions(
         results.extend(text_results)
     except Exception as e:
         logger.error(
-            "Text-index search failed for query %r: %s. "
-            "Falling back to regex-only search.",
+            "Text-index search failed for query %r: %s. " "Falling back to regex-only search.",
             query,
             e,
         )
@@ -391,9 +390,7 @@ async def search_sessions(
     remaining = limit - len(results)
     if remaining > 0:
         try:
-            regex_results = await _regex_substring_search(
-                user_id, query, space_id, remaining, seen_session_ids
-            )
+            regex_results = await _regex_substring_search(user_id, query, space_id, remaining, seen_session_ids)
             results.extend(regex_results)
         except Exception as e:
             logger.error("Regex substring search failed for query %r: %s", query, e)
@@ -630,12 +627,8 @@ async def _regex_substring_search(
         content_sids = [t["session_id"] for t in new_content_hits]
         content_session_ids = [ObjectId(sid) for sid in content_sids]
         session_cursor = sessions_collection.find({"_id": {"$in": content_session_ids}})
-        session_docs_list = await session_cursor.to_list(
-            length=len(content_session_ids)
-        )
-        session_docs_map: Dict[str, Dict[str, Any]] = {
-            str(doc["_id"]): doc for doc in session_docs_list
-        }
+        session_docs_list = await session_cursor.to_list(length=len(content_session_ids))
+        session_docs_map: Dict[str, Dict[str, Any]] = {str(doc["_id"]): doc for doc in session_docs_list}
 
         query_lower = query.lower()
         for traj in new_content_hits:

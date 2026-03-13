@@ -40,15 +40,15 @@ pytest -v
 
 ```bash
 # Test weather functionality
-curl "http://localhost:8000/agent/stream?q=weather%20in%20tokyo" \
+curl "http://localhost:8141/agent/stream?q=weather%20in%20tokyo" \
   -H "Authorization: Bearer YOUR_JWT_TOKEN"
 
 # Test task operations
-curl "http://localhost:8000/agent/stream?q=add%20task%20test%20item" \
+curl "http://localhost:8141/agent/stream?q=add%20task%20test%20item" \
   -H "Authorization: Bearer YOUR_JWT_TOKEN"
 
 # Test journal functionality
-curl "http://localhost:8000/agent/stream?q=add%20journal%20entry%20test" \
+curl "http://localhost:8141/agent/stream?q=add%20journal%20entry%20test" \
   -H "Authorization: Bearer YOUR_JWT_TOKEN"
 ```
 
@@ -57,7 +57,7 @@ curl "http://localhost:8000/agent/stream?q=add%20journal%20entry%20test" \
 ```bash
 # Start both servers
 npm run dev          # Frontend on http://localhost:3001
-cd ../backend && python app.py  # Backend on http://localhost:8000
+cd ../backend && python app.py  # Backend on http://localhost:8141
 
 # Test via service worker (web browser)
 curl "http://localhost:3001/agent/stream?q=hello" \
@@ -82,7 +82,7 @@ curl "http://localhost:3001/agent/stream?q=hello" \
 
 ```bash
 # Load testing (requires authorization)
-ab -n 100 -c 10 "http://localhost:8000/agent/stream?q=test" \
+ab -n 100 -c 10 "http://localhost:8141/agent/stream?q=test" \
   -H "Authorization: Bearer YOUR_JWT_TOKEN"
 ```
 

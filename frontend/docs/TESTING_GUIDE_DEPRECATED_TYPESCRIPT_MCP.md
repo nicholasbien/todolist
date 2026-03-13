@@ -296,14 +296,14 @@ describe('Agent Integration', () => {
 **Setup Prerequisites:**
 ```bash
 # Start backend server
-cd backend && source venv/bin/activate && uvicorn app:app --port 8000
+cd backend && source venv/bin/activate && uvicorn app:app --port 8141
 
 # Start frontend server
 cd frontend && PORT=3000 npm run dev
 
 # Verify environment
-curl http://localhost:8000/health
-curl http://localhost:3000/api/agent/stream?q=hello
+curl http://localhost:8141/health
+curl http://localhost:3141/api/agent/stream?q=hello
 ```
 
 ### 2. MCP Tool Testing
@@ -313,16 +313,16 @@ curl http://localhost:3000/api/agent/stream?q=hello
 **Test Cases:**
 ```bash
 # Test current weather (known city)
-curl -s "http://localhost:3000/api/agent/stream?q=what%27s%20the%20weather%20in%20tokyo" | grep -E "event:|data:"
+curl -s "http://localhost:3141/api/agent/stream?q=what%27s%20the%20weather%20in%20tokyo" | grep -E "event:|data:"
 
 # Test current weather (unknown city)
-curl -s "http://localhost:3000/api/agent/stream?q=weather%20in%20atlantis" | grep -E "event:|data:"
+curl -s "http://localhost:3141/api/agent/stream?q=weather%20in%20atlantis" | grep -E "event:|data:"
 
 # Test weather forecast
-curl -s "http://localhost:3000/api/agent/stream?q=weather%20forecast%20for%20london%20for%203%20days" | grep -E "event:|data:"
+curl -s "http://localhost:3141/api/agent/stream?q=weather%20forecast%20for%20london%20for%203%20days" | grep -E "event:|data:"
 
 # Test weather alerts
-curl -s "http://localhost:3000/api/agent/stream?q=any%20weather%20alerts%20for%20new%20york" | grep -E "event:|data:"
+curl -s "http://localhost:3141/api/agent/stream?q=any%20weather%20alerts%20for%20new%20york" | grep -E "event:|data:"
 ```
 
 **Expected Results:**
@@ -336,19 +336,19 @@ curl -s "http://localhost:3000/api/agent/stream?q=any%20weather%20alerts%20for%2
 **Test Cases:**
 ```bash
 # Test task creation
-curl -s "http://localhost:3000/api/agent/stream?q=add%20task%20buy%20groceries%20with%20high%20priority" | grep -E "event:|data:"
+curl -s "http://localhost:3141/api/agent/stream?q=add%20task%20buy%20groceries%20with%20high%20priority" | grep -E "event:|data:"
 
 # Test task listing
-curl -s "http://localhost:3000/api/agent/stream?q=show%20me%20my%20tasks" | grep -E "event:|data:"
+curl -s "http://localhost:3141/api/agent/stream?q=show%20me%20my%20tasks" | grep -E "event:|data:"
 
 # Test task completion
-curl -s "http://localhost:3000/api/agent/stream?q=mark%20task%20X%20as%20completed" | grep -E "event:|data:"
+curl -s "http://localhost:3141/api/agent/stream?q=mark%20task%20X%20as%20completed" | grep -E "event:|data:"
 
 # Test journal entry
-curl -s "http://localhost:3000/api/agent/stream?q=add%20journal%20entry%20today%20was%20productive" | grep -E "event:|data:"
+curl -s "http://localhost:3141/api/agent/stream?q=add%20journal%20entry%20today%20was%20productive" | grep -E "event:|data:"
 
 # Test search
-curl -s "http://localhost:3000/api/agent/stream?q=search%20for%20grocery%20tasks" | grep -E "event:|data:"
+curl -s "http://localhost:3141/api/agent/stream?q=search%20for%20grocery%20tasks" | grep -E "event:|data:"
 ```
 
 **Expected Results:**
@@ -364,7 +364,7 @@ curl -s "http://localhost:3000/api/agent/stream?q=search%20for%20grocery%20tasks
 **Manual Test Procedures:**
 
 1. **Chat Interface Testing:**
-   - Open browser to `http://localhost:3000`
+   - Open browser to `http://localhost:3141`
    - Test chat input and submission
    - Verify streaming responses appear correctly
    - Test tool call result display
@@ -439,7 +439,7 @@ curl -s "http://localhost:3000/api/agent/stream?q=search%20for%20grocery%20tasks
    # Create load test configuration
    cat > load-test.yml << EOF
    config:
-     target: 'http://localhost:3000'
+     target: 'http://localhost:3141'
      phases:
        - duration: 60
          arrivalRate: 5

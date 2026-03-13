@@ -37,8 +37,8 @@ const mockServiceWorkerGlobal = {
     hostname: 'localhost'
   },
   CONFIG: {
-    PRODUCTION_BACKEND: process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000',
-    LOCAL_BACKEND: 'http://localhost:8000',
+    PRODUCTION_BACKEND: process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8141',
+    LOCAL_BACKEND: 'http://localhost:8141',
     PRODUCTION_DOMAIN: 'todolist.nyc'
   },
   console: {
@@ -193,7 +193,7 @@ describe('CRITICAL: Offline Journal Sync Regression Protection', () => {
         name: 'Local Development',
         protocol: 'http:',
         hostname: 'localhost',
-        expectedUrl: 'http://localhost:8000/journals',
+        expectedUrl: 'http://localhost:8141/journals',
         description: 'Must route to local backend, not Next.js frontend'
       },
       {
@@ -231,7 +231,7 @@ describe('CRITICAL: Offline Journal Sync Regression Protection', () => {
 
       // Additional safety checks
       if (syncUrl.includes('localhost')) {
-        expect(syncUrl).toBe('http://localhost:8000/journals');
+        expect(syncUrl).toBe('http://localhost:8141/journals');
       } else {
         expect(syncUrl).toBe(`${mockServiceWorkerGlobal.CONFIG.PRODUCTION_BACKEND}/journals`);
       }
@@ -426,7 +426,7 @@ describe('CRITICAL: Offline Journal Sync Regression Protection', () => {
 
     // In test environment with hostname 'localhost', should route to local backend
     if (mockServiceWorkerGlobal.location.hostname === 'localhost') {
-      expect(syncUrl).toBe('http://localhost:8000/journals');
+      expect(syncUrl).toBe('http://localhost:8141/journals');
     } else {
       // Otherwise should route to production (which is what we got)
       expect(syncUrl).toBe(`${mockServiceWorkerGlobal.CONFIG.PRODUCTION_BACKEND}/journals`);

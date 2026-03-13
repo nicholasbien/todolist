@@ -32,7 +32,7 @@ jest.mock('remark-gfm', () => ({
 global.Request = class Request {
   constructor(url, options = {}) {
     // Convert relative URLs to absolute for testing
-    this.url = url.startsWith('/') ? `http://localhost:3000${url}` : url;
+    this.url = url.startsWith('/') ? `http://localhost:3141${url}` : url;
     this.method = options.method || 'GET';
     this.headers = new Map(Object.entries(options.headers || {}));
     this.body = options.body;
@@ -93,7 +93,7 @@ if (!navigator.serviceWorker) {
 
 // Mock global self for service worker testing
 global.self = global.self || {
-  location: { origin: 'http://localhost:3000' },
+  location: { origin: 'http://localhost:3141' },
   navigator: { onLine: false }, // Default to offline for testing
 };
 

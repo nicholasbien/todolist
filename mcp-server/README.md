@@ -25,16 +25,16 @@ npm install
    ```bash
    cd backend
    source venv/bin/activate
-   uvicorn app:app --host 0.0.0.0 --port 8000 --reload
+   uvicorn app:app --host 0.0.0.0 --port 8141 --reload
    ```
 
 2. Login to get your auth token (you can use curl or the web interface):
    ```bash
    # Sign up (if needed)
-   curl -H "Content-Type: application/json" -d '{"email": "your@email.com"}' http://localhost:8000/auth/signup
+   curl -H "Content-Type: application/json" -d '{"email": "your@email.com"}' http://localhost:8141/auth/signup
 
    # Login with verification code from email/console
-   curl -H "Content-Type: application/json" -d '{"email": "your@email.com", "code": "123456"}' http://localhost:8000/auth/login
+   curl -H "Content-Type: application/json" -d '{"email": "your@email.com", "code": "123456"}' http://localhost:8141/auth/login
    ```
 
 3. Copy the `token` from the login response.
@@ -43,7 +43,7 @@ npm install
 
 ```bash
 # List your spaces (using the token from step 2)
-curl -H "Authorization: Bearer YOUR_TOKEN" http://localhost:8000/spaces
+curl -H "Authorization: Bearer YOUR_TOKEN" http://localhost:8141/spaces
 ```
 
 Copy the `_id` of your default/personal space.
@@ -56,7 +56,7 @@ cp .env.example .env
 
 Edit `.env` with your values:
 ```env
-TODOLIST_API_URL=http://localhost:8000
+TODOLIST_API_URL=http://localhost:8141
 TODOLIST_AUTH_TOKEN=your_jwt_token_here
 DEFAULT_SPACE_ID=your_default_space_id_here
 ```
@@ -97,7 +97,7 @@ Add this JSON configuration to the file:
       "command": "node",
       "args": ["/path/to/your/todolist/mcp-server/dist/index.js"],
       "env": {
-        "TODOLIST_API_URL": "http://localhost:8000",
+        "TODOLIST_API_URL": "http://localhost:8141",
         "TODOLIST_AUTH_TOKEN": "your_jwt_token_here",
         "DEFAULT_SPACE_ID": "your_default_space_id_here"
       }

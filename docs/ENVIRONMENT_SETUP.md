@@ -78,7 +78,7 @@ SMTP_PORT=587               # Default
 OPENAI_API_KEY=sk-proj-xxxxx
 
 # Backend URL (for Next.js server-side)
-NEXT_PUBLIC_BACKEND_URL=http://localhost:8000  # Local
+NEXT_PUBLIC_BACKEND_URL=http://localhost:8141  # Local
 # OR
 NEXT_PUBLIC_BACKEND_URL=https://your-backend.railway.app  # Production
 ```
@@ -105,7 +105,7 @@ EOF
 # Frontend .env.local
 cat > frontend/.env.local << EOF
 OPENAI_API_KEY=your-key-here
-NEXT_PUBLIC_BACKEND_URL=http://localhost:8000
+NEXT_PUBLIC_BACKEND_URL=http://localhost:8141
 EOF
 
 echo "Environment files created. Please update with your actual API keys."

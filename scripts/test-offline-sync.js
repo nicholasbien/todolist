@@ -6,7 +6,7 @@
  * browser comes back online, and that online data remains accessible offline.
  *
  * Prerequisites:
- *   Backend:  cd backend && source venv/bin/activate && uvicorn app:app --host 0.0.0.0 --port 8000 --reload
+ *   Backend:  cd backend && source venv/bin/activate && uvicorn app:app --host 0.0.0.0 --port 8141 --reload
  *   Frontend: cd frontend && npm run dev
  *   Playwright: npm install playwright (then npx playwright install chromium)
  *
@@ -32,7 +32,7 @@ const { chromium } = require(
   require.resolve('playwright', { paths: [require('path').join(__dirname, '..', 'frontend')] })
 );
 
-const APP_URL = 'http://localhost:3000';
+const APP_URL = 'http://localhost:3141';
 
 // ── Result tracking ──────────────────────────────────────────────────────────
 let passed = 0;
@@ -174,7 +174,7 @@ async function isVisible(page, text) {
 
 (async () => {
   console.log('🔌 Offline/Online Sync — E2E Tests');
-  console.log('   App:     http://localhost:3000');
+  console.log('   App:     http://localhost:3141');
   console.log('   Account: test@example.com / 000000\n');
 
   const browser = await chromium.launch({ headless: false, slowMo: 30 });

@@ -6,7 +6,7 @@ import axios from 'axios';
 import { config } from 'dotenv';
 // Load environment variables
 config();
-const API_URL = process.env.TODOLIST_API_URL || 'http://localhost:8000';
+const API_URL = process.env.TODOLIST_API_URL || 'http://localhost:8141';
 const AUTH_TOKEN = process.env.TODOLIST_AUTH_TOKEN;
 if (!AUTH_TOKEN) {
     console.error('TODOLIST_AUTH_TOKEN environment variable is required');

@@ -57,7 +57,7 @@ const forceBackend = isAuthEndpoint && isOnline;
 // Detect environment and force appropriate routing
 const backendUrl = baseUrl || (window.location.hostname.includes('todolist.nyc')
   ? CONFIG.PRODUCTION_BACKEND
-  : 'http://localhost:8000');
+  : 'http://localhost:8141');
 ```
 
 **Result**: Fixed URL construction but added complexity

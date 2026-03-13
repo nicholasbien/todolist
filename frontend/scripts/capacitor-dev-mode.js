@@ -17,11 +17,11 @@ function updateConfig(mode) {
     // Switch to development mode (local dev server)
     const updatedContent = configContent
       .replace(/url: 'https:\/\/todolist\.nyc',/, '// url: \'https://todolist.nyc\',')
-      .replace(/\/\/ url: 'http:\/\/localhost:3000',/, 'url: \'http://localhost:3000\',');
+      .replace(/\/\/ url: 'http:\/\/localhost:3141',/, 'url: \'http://localhost:3141\',');
 
     fs.writeFileSync(configPath, updatedContent);
     console.log('✅ Switched to DEVELOPMENT mode');
-    console.log('   - Loading from http://localhost:3000');
+    console.log('   - Loading from http://localhost:3141');
     console.log('   - Make sure your dev server is running!');
     console.log('   - Service worker will work from localhost');
 
@@ -29,7 +29,7 @@ function updateConfig(mode) {
     // Switch to production mode (live site)
     const updatedContent = configContent
       .replace(/\/\/ url: 'https:\/\/todolist\.nyc',/, 'url: \'https://todolist.nyc\',')
-      .replace(/url: 'http:\/\/localhost:3000',/, '// url: \'http://localhost:3000\',');
+      .replace(/url: 'http:\/\/localhost:3141',/, '// url: \'http://localhost:3141\',');
 
     fs.writeFileSync(configPath, updatedContent);
     console.log('✅ Switched to PRODUCTION mode');
@@ -39,7 +39,7 @@ function updateConfig(mode) {
   } else {
     console.log('Usage: node scripts/capacitor-dev-mode.js [dev|prod]');
     console.log('');
-    console.log('dev  - Load from http://localhost:3000 (for development)');
+    console.log('dev  - Load from http://localhost:3141 (for development)');
     console.log('prod - Load from https://todolist.nyc (for production)');
     process.exit(1);
   }

@@ -7,13 +7,13 @@ Reference for Playwright-based UI validation workflows. Documents how to reach e
 Both servers must be running:
 ```bash
 # Terminal 1
-cd backend && source venv/bin/activate && uvicorn app:app --host 0.0.0.0 --port 8000 --reload
+cd backend && source venv/bin/activate && uvicorn app:app --host 0.0.0.0 --port 8141 --reload
 
 # Terminal 2
 cd frontend && npm run dev
 ```
 
-Navigate to `http://localhost:3000`. The app auto-logs in via stored session token.
+Navigate to `http://localhost:3141`. The app auto-logs in via stored session token.
 
 **Test account**: email `test@example.com`, code `000000` — bypasses email sending, works on any server.
 
@@ -23,11 +23,11 @@ Navigate to `http://localhost:3000`. The app auto-logs in via stored session tok
 
 | Page | URL | Notes |
 |------|-----|-------|
-| **App** (logged in) | `http://localhost:3000` | Auto-redirects from login if session is valid |
-| **Auth flow** (logged out) | `http://localhost:3000` | Clear localStorage/cookies to force logged-out state |
-| **Home / Marketing** | `http://localhost:3000/home` | Public landing page with features + screenshots section |
-| **Privacy Policy** | `http://localhost:3000/privacy` | Static page |
-| **Terms of Service** | `http://localhost:3000/terms` | Static page |
+| **App** (logged in) | `http://localhost:3141` | Auto-redirects from login if session is valid |
+| **Auth flow** (logged out) | `http://localhost:3141` | Clear localStorage/cookies to force logged-out state |
+| **Home / Marketing** | `http://localhost:3141/home` | Public landing page with features + screenshots section |
+| **Privacy Policy** | `http://localhost:3141/privacy` | Static page |
+| **Terms of Service** | `http://localhost:3141/terms` | Static page |
 
 ---
 
@@ -37,7 +37,7 @@ Trigger by logging out via Settings → Logout, or clearing session storage.
 
 | Step | Screen | How to reach |
 |------|--------|-------------|
-| 1 | **Email entry** | Navigate to `http://localhost:3000` with no session |
+| 1 | **Email entry** | Navigate to `http://localhost:3141` with no session |
 | 2 | **Code entry** | Submit a valid email on step 1 |
 | 3 | **Name entry** | Submit a valid code for a brand-new user only |
 

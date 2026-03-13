@@ -19,7 +19,7 @@ The MCP server lets AI agents (like Claude Code) manage todos, sessions, journal
 ```bash
 RESPONSE=$(curl -s -H "Content-Type: application/json" \
   -d '{"email": "test@example.com", "code": "000000"}' \
-  http://localhost:8000/auth/login)
+  http://localhost:8141/auth/login)
 echo $RESPONSE | grep -o '"token":"[^"]*' | cut -d'"' -f4
 ```
 
@@ -31,7 +31,7 @@ echo $RESPONSE | grep -o '"token":"[^"]*' | cut -d'"' -f4
       "command": "node",
       "args": ["/path/to/todolist/mcp-server/dist/index.js"],
       "env": {
-        "TODOLIST_API_URL": "http://localhost:8000",
+        "TODOLIST_API_URL": "http://localhost:8141",
         "TODOLIST_AUTH_TOKEN": "your_token_here"
       }
     }
@@ -188,11 +188,11 @@ cd frontend && npm install
 
 ## Running the App
 
-**Backend:** `cd backend && source venv/bin/activate && uvicorn app:app --host 0.0.0.0 --port 8000 --reload`
+**Backend:** `cd backend && source venv/bin/activate && uvicorn app:app --host 0.0.0.0 --port 8141 --reload`
 
 **Frontend:** `cd frontend && npm run dev`
 
-Frontend: http://localhost:3000 | Backend: http://localhost:8000
+Frontend: http://localhost:3141 | Backend: http://localhost:8141
 
 ---
 
@@ -207,7 +207,7 @@ Frontend: http://localhost:3000 | Backend: http://localhost:8000
 # Get a token
 curl -s -H "Content-Type: application/json" \
   -d '{"email": "test@example.com", "code": "000000"}' \
-  http://localhost:8000/auth/login
+  http://localhost:8141/auth/login
 ```
 
 ### Frontend Tests
@@ -382,7 +382,7 @@ ADMIN_EMAIL=your_email
 
 **Frontend** (`frontend/.env.local`):
 ```
-BACKEND_URL=http://localhost:8000
+BACKEND_URL=http://localhost:8141
 ```
 
 ---

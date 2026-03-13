@@ -53,7 +53,7 @@ res = await fetch(updateJournalUrl, { method: 'POST', ... });
 - ✅ `CREATE_CATEGORY` sync requests
 
 **Environment routing**:
-- **Local dev**: `http://localhost:8000/journals`
+- **Local dev**: `http://localhost:8141/journals`
 - **Production**: `https://backend-production-e920.up.railway.app/journals`
 
 ### Fix 2: Smart Server Data Blocking
@@ -197,7 +197,7 @@ const isCapacitor = self.location.protocol === 'file:';
 const isProdHost = self.location.hostname.endsWith(CONFIG.PRODUCTION_DOMAIN);
 ```
 - **Capacitor**: Direct to production backend
-- **Web dev**: Route to `localhost:8000`
+- **Web dev**: Route to `localhost:8141`
 - **Web prod**: Route to production backend
 
 ## Best Practices Learned
