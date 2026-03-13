@@ -2,11 +2,6 @@
 
 A developer tool for working with AI agents from anywhere. Dispatch tasks, store conversations, orchestrate parallel agents — online or offline.
 
-<p align="center">
-  <img width="397" alt="Tasks view" src="https://github.com/user-attachments/assets/7b249e00-9f72-4b39-a37c-47b784470d9f" />
-  <img width="397" alt="Assistant view" src="https://github.com/user-attachments/assets/9b421d87-df1a-41bb-8e6e-f53947b9e044" />
-</p>
-
 ## Quick Start
 
 ### Docker (recommended)
@@ -18,7 +13,7 @@ cp .env.example .env   # edit .env to add your OPENAI_API_KEY (optional)
 docker compose up
 ```
 
-App runs at **http://localhost:3000**. Log in with `test@example.com` / `000000`.
+App runs at **http://localhost:3141**. Log in with `test@example.com` / `000000`.
 
 ### Local Development
 
@@ -36,7 +31,7 @@ cd frontend && npm run dev
 
 > **Note:** MongoDB must be running locally (or use `./setup.sh --docker` to start everything with Docker).
 
-## Why TodoList?
+## Why todolist?
 
 This is not another todo app. It is an **AI agent orchestration layer** with a task management UI.
 
@@ -71,7 +66,7 @@ Add to your `.mcp.json`:
       "command": "node",
       "args": ["./mcp-server/dist/index.js"],
       "env": {
-        "TODOLIST_API_URL": "http://localhost:8000",
+        "TODOLIST_API_URL": "http://localhost:8141",
         "TODOLIST_AUTH_TOKEN": "your_session_token"
       }
     }
@@ -160,7 +155,7 @@ cp .env.example .env
 docker compose up -d
 ```
 
-MongoDB data persists in a named Docker volume. The app is accessible at `http://localhost:3000`.
+MongoDB data persists in a named Docker volume. The app is accessible at `http://localhost:3141`.
 
 ### Railway / Other Platforms
 

@@ -1,10 +1,10 @@
 #!/bin/bash
-# Login to TodoList app and get an auth token
+# Login to todolist app and get an auth token
 # Usage: ./login.sh [API_URL]
 
 API_URL="${1:-${TODOLIST_API_URL:-https://app.todolist.nyc}}"
 
-echo "=== TodoList Login ==="
+echo "=== todolist Login ==="
 echo "API: $API_URL"
 echo ""
 

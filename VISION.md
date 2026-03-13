@@ -1,4 +1,4 @@
-# Vision: The Full Potential of the TodoList App
+# Vision: The Full Potential of the todolist App
 
 ## 1. The Core Insight: This Isn't a Todo App
 

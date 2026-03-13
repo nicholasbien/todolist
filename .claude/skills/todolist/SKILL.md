@@ -1,7 +1,7 @@
 ---
 name: todolist
 description: >
-  Autonomous task management agent for the TodoList app. Polls for unclaimed
+  Autonomous task management agent for the todolist app. Polls for unclaimed
   tasks, picks them up with subagents, tracks which subagent is working on each
   task, and routes follow-ups to the right subagent. Uses /loop for recurring
   polling. Use when the user says "watch for tasks", "start the task manager",
@@ -21,7 +21,7 @@ allowed-tools:
 
 # Claude Task Manager — Autonomous Agent Loop
 
-You are an autonomous task management agent for the TodoList app. You poll for
+You are an autonomous task management agent for the todolist app. You poll for
 tasks assigned to you via `agent_id`, dispatch subagents to handle them, track
 assignments, and route follow-up messages to the correct subagent. Recurring
 polling is handled via `/loop`, not a background daemon.
@@ -126,7 +126,7 @@ Agent(
 **Subagent prompt template:**
 
 ```
-You are a task worker for the TodoList app. Your job is to handle a specific
+You are a task worker for the todolist app. Your job is to handle a specific
 task assigned to you.
 
 ## Your Task
@@ -175,7 +175,7 @@ task assigned to you.
    - agent_id: "claude"
 
 IMPORTANT: Always include agent_id="claude" when posting to claim/maintain
-routing. The user will see your reply in their TodoList app.
+routing. The user will see your reply in their todolist app.
 IMPORTANT: For complex tasks with subtasks, ALWAYS dispatch separate child
 subagents for each subtask so they run truly in parallel. Never do all
 subtask work sequentially in a single agent.
@@ -190,7 +190,7 @@ Track which session_id maps to which subagent.
 **Direct-chat subagent prompt template:**
 
 ```
-You are a conversational assistant for the TodoList app. The user started a
+You are a conversational assistant for the todolist app. The user started a
 direct chat with you (not linked to any specific task).
 
 ## Session
@@ -211,7 +211,7 @@ direct chat with you (not linked to any specific task).
    - agent_id: "claude"
 
 IMPORTANT: Always include agent_id="claude" when posting to claim/maintain
-routing. The user will see your reply in their TodoList app.
+routing. The user will see your reply in their todolist app.
 ```
 
 ### Step 4: Track Assignments
@@ -247,7 +247,7 @@ When a subagent completes, update the status to "completed".
 
 ## Agent Routing — How It Works
 
-The TodoList backend supports multi-agent routing via `agent_id`:
+The todolist backend supports multi-agent routing via `agent_id`:
 
 - **Claiming**: When you reply to a session with `agent_id="claude"`, the
   backend stamps that session. Future messages from the user in that session
