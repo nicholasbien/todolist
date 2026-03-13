@@ -167,17 +167,17 @@ export default function BriefingSettings({
 
             <div className="flex justify-center space-x-3 pt-2">
               <button
+                onClick={handleCancel}
+                className="border border-gray-600 text-gray-300 hover:bg-gray-800 px-6 py-2 rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+              <button
                 onClick={handleSave}
                 disabled={saving}
                 className="border border-accent text-accent hover:bg-accent/10 disabled:opacity-50 disabled:cursor-not-allowed px-6 py-2 rounded-lg transition-colors"
               >
                 {saving ? "Saving..." : "Save"}
-              </button>
-              <button
-                onClick={handleCancel}
-                className="border border-gray-600 text-gray-300 hover:bg-gray-800 px-6 py-2 rounded-lg transition-colors"
-              >
-                Cancel
               </button>
             </div>
           </>

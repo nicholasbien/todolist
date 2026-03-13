@@ -1785,8 +1785,8 @@ export default function AIToDoListApp({
               autoFocus
             />
             <div className="flex justify-center space-x-3">
-              <button onClick={handleAddSpace} className="border border-accent text-accent hover:bg-accent/10 px-6 py-2 rounded-lg transition-colors">Create</button>
               <button onClick={() => { setShowAddSpaceModal(false); setNewSpaceName(''); }} className="border border-gray-600 text-gray-300 hover:bg-gray-800 px-6 py-2 rounded-lg transition-colors">Cancel</button>
+              <button onClick={handleAddSpace} className="border border-accent text-accent hover:bg-accent/10 px-6 py-2 rounded-lg transition-colors">Create</button>
             </div>
           </div>
         </div>
@@ -1838,21 +1838,21 @@ export default function AIToDoListApp({
                   </div>
                 )}
                 <div className="flex justify-center space-x-3">
-                  <button onClick={handleUpdateSpace} className="border border-accent text-accent hover:bg-accent/10 px-6 py-2 rounded-lg transition-colors">Save</button>
+                  <button onClick={() => setShowEditSpaceModal(false)} className="border border-gray-600 text-gray-300 hover:bg-gray-800 px-6 py-2 rounded-lg transition-colors">Cancel</button>
                   {spaceToEdit && (
                     <button onClick={() => { handleDeleteSpace(spaceToEdit._id); setShowEditSpaceModal(false); }} className="border border-red-500 text-red-400 hover:bg-red-900/20 px-6 py-2 rounded-lg transition-colors">Delete</button>
                   )}
-                  <button onClick={() => setShowEditSpaceModal(false)} className="border border-gray-600 text-gray-300 hover:bg-gray-800 px-6 py-2 rounded-lg transition-colors">Cancel</button>
+                  <button onClick={handleUpdateSpace} className="border border-accent text-accent hover:bg-accent/10 px-6 py-2 rounded-lg transition-colors">Save</button>
                 </div>
               </>
             ) : (
               <>
                 <h3 className="text-gray-100 text-lg font-bold mb-2">Space Options</h3>
                 <div className="flex justify-center space-x-3">
+                  <button onClick={() => setShowEditSpaceModal(false)} className="border border-gray-600 text-gray-300 hover:bg-gray-800 px-6 py-2 rounded-lg transition-colors">Cancel</button>
                   {spaceToEdit && (
                     <button onClick={() => { handleLeaveSpace(spaceToEdit._id); setShowEditSpaceModal(false); }} className="border border-red-500 text-red-400 hover:bg-red-900/20 px-6 py-2 rounded-lg transition-colors">Leave</button>
                   )}
-                  <button onClick={() => setShowEditSpaceModal(false)} className="border border-gray-600 text-gray-300 hover:bg-gray-800 px-6 py-2 rounded-lg transition-colors">Cancel</button>
                 </div>
               </>
             )}
@@ -2168,8 +2168,8 @@ export default function AIToDoListApp({
               </select>
             </div>
             <div className="flex justify-center space-x-3">
-              <button onClick={handleSaveTodoEdit} className="border border-accent text-accent hover:bg-accent/10 px-6 py-2 rounded-lg transition-colors">Save</button>
               <button onClick={() => setShowEditTodoModal(false)} className="border border-gray-600 text-gray-300 hover:bg-gray-800 px-6 py-2 rounded-lg transition-colors">Cancel</button>
+              <button onClick={handleSaveTodoEdit} className="border border-accent text-accent hover:bg-accent/10 px-6 py-2 rounded-lg transition-colors">Save</button>
             </div>
             {/* Permanently Delete */}
             <div className="pt-3 border-t border-gray-800 mt-2">
@@ -2185,16 +2185,16 @@ export default function AIToDoListApp({
                   <p className="text-center text-red-400 text-sm">Are you sure? This cannot be undone.</p>
                   <div className="flex justify-center space-x-3">
                     <button
-                      onClick={() => todoToEdit && handlePermanentDeleteTodo(todoToEdit._id)}
-                      className="border border-red-500 text-red-400 hover:bg-red-900/20 px-6 py-2 rounded-lg transition-colors text-sm"
-                    >
-                      Yes, Delete Forever
-                    </button>
-                    <button
                       onClick={() => setShowPermanentDeleteConfirm(false)}
                       className="border border-gray-600 text-gray-300 hover:bg-gray-800 px-4 py-2 rounded-lg transition-colors text-sm"
                     >
                       No
+                    </button>
+                    <button
+                      onClick={() => todoToEdit && handlePermanentDeleteTodo(todoToEdit._id)}
+                      className="border border-red-500 text-red-400 hover:bg-red-900/20 px-6 py-2 rounded-lg transition-colors text-sm"
+                    >
+                      Yes, Delete Forever
                     </button>
                   </div>
                 </div>
