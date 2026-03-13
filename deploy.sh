@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# Todo List App Deployment Script for Railway
-echo "🚀 Deploying Todo List App to Railway..."
+# todolist Deployment Script for Railway
+echo "🚀 Deploying todolist to Railway..."
 
 # Check if railway CLI is installed
 if ! command -v railway &> /dev/null; then
@@ -30,5 +30,4 @@ echo "Backend:  https://your-backend-service.railway.app"
 echo "Frontend: https://your-frontend-service.railway.app"
 echo ""
 echo "⚠️  Don't forget to set environment variables in Railway dashboard:"
-echo "Backend:  MONGODB_URL, OPENAI_API_KEY, SMTP_*, JWT_SECRET"
-echo "Frontend: OPENAI_API_KEY"
+echo "Backend:  JWT_SECRET, MONGODB_URL, OPENAI_API_KEY (optional), SMTP_*, BRAVE_API_KEY (optional)"
