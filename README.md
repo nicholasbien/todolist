@@ -45,6 +45,12 @@ Key capabilities:
 - **Journals** -- daily entries with auto-save
 - **Spaces** -- multi-user workspaces with invite-by-email
 
+## Screenshots
+
+| Task List | Journal | Assistant |
+|-----------|---------|-----------|
+| ![Task List](docs/screenshots/task-list.png) | ![Journal](docs/screenshots/journal.png) | ![Assistant](docs/screenshots/assistant.png) |
+
 ## Agent Integration
 
 Agents interact with the app through the MCP server or the REST API.
