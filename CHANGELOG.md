@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Task management** with categories, priorities, due dates, and drag-and-drop reordering
 - **Active/Completed tabs** with show-more pagination for task lists
 - **Recurring tasks** supporting daily, weekly, and monthly repeats
-- **Built-in AI assistant** (Claude-powered) with streaming chat, per-agent session persistence, and tool use
+- **Built-in AI assistant** with streaming chat, per-agent session persistence, and tool use
 - **Agent memory system** for persistent per-space context across conversations
 - **Proactive briefings** with morning summaries and stale task nudges
 - **Journal / daily notes** with auto-save and offline support
