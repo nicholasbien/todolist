@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# TodoList App Setup Script
+# todolist App Setup Script
 # Usage:
 #   ./setup.sh          — Local development setup (Python + Node)
 #   ./setup.sh --docker — Start with Docker Compose
@@ -146,7 +146,7 @@ docker_setup() {
 # ─────────────────────────────────────────────
 local_setup() {
     echo ""
-    info "Setting up TodoList App for local development..."
+    info "Setting up todolist App for local development..."
     echo ""
 
     # Check prerequisites
@@ -208,7 +208,7 @@ local_setup() {
     echo "  Backend:  cd backend && source .venv/bin/activate && python app.py"
     echo "  Frontend: cd frontend && npm run dev"
     echo ""
-    echo "Access the app at http://localhost:3000"
+    echo "Access the app at http://localhost:3141"
     echo "Test account: test@example.com / 000000"
     echo ""
 

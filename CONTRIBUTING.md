@@ -1,4 +1,4 @@
-# Contributing to TodoList
+# Contributing to todolist
 
 Thanks for your interest in contributing! This guide covers everything you need to get started.
 

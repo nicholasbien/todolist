@@ -2,7 +2,7 @@
 
 ## ✅ What We've Built
 
-We've successfully integrated the Model Context Protocol (MCP) into your TodoList app, creating a powerful extensible architecture for AI tool discovery and execution.
+We've successfully integrated the Model Context Protocol (MCP) into your todolist app, creating a powerful extensible architecture for AI tool discovery and execution.
 
 ### Key Files Created
 
@@ -169,7 +169,7 @@ elif server_type == "github":
 - Dynamic tool discovery in agent
 - OpenAI schema generation
 - Streaming responses with SSE
-- Integration with existing TodoList features
+- Integration with existing todolist features
 
 ### ⚠️ Known Issues
 - Official MCP servers not on npm yet
@@ -220,7 +220,7 @@ You now have a working MCP integration that:
 
 1. **Provides web scraping capabilities** through a standard MCP server
 2. **Dynamically discovers and uses tools** without hardcoding
-3. **Integrates seamlessly** with your existing TodoList features
+3. **Integrates seamlessly** with your existing todolist features
 4. **Can be extended** with any MCP-compatible server
 
 The architecture is ready for the future of AI tool integration!

@@ -1,8 +1,8 @@
-# Self-Hosting Strategy for TodoList
+# Self-Hosting Strategy for todolist
 
 > **Status:** Planning / RFC
 > **Date:** 2026-03-12
-> **Goal:** Make self-hosting the *primary* way users run TodoList, with an optional hosted tier later.
+> **Goal:** Make self-hosting the *primary* way users run todolist, with an optional hosted tier later.
 
 ---
 
@@ -28,7 +28,7 @@
 
 ## 1. Vision
 
-TodoList should be **self-host-first**. Every user owns their data — either on their local machine or on infrastructure they control (cloud VM, Railway, etc.). The architecture already lends itself to this:
+todolist should be **self-host-first**. Every user owns their data — either on their local machine or on infrastructure they control (cloud VM, Railway, etc.). The architecture already lends itself to this:
 
 - The backend is a stateless FastAPI app that talks to MongoDB.
 - The frontend is a Next.js app that can be built as static files or run as a Node server.
@@ -161,8 +161,8 @@ Railway supports **project templates** that spin up multiple services from a sin
 ```toml
 # railway.toml (to be created)
 [template]
-name = "TodoList Self-Hosted"
-description = "Your own TodoList instance with MongoDB"
+name = "todolist Self-Hosted"
+description = "Your own todolist instance with MongoDB"
 
 [[services]]
 name = "backend"

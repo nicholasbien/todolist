@@ -267,7 +267,7 @@ For production, run MCP server as a systemd service:
 ```ini
 # /etc/systemd/system/mcp-server.service
 [Unit]
-Description=MCP Server for TodoList
+Description=MCP Server for todolist
 After=network.target
 
 [Service]

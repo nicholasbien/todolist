@@ -1,4 +1,4 @@
-# GitHub Launch Plan — TodoList App
+# GitHub Launch Plan — todolist App
 
 > **Date:** 2026-03-13
 > **Goal:** Ship todolist.nyc as an open-source dev tool on GitHub, positioned for developers who work with AI agents.
@@ -9,7 +9,7 @@
 
 ### What It Is
 
-TodoList is a **developer tool for orchestrating AI agents from anywhere**. It combines task management, a journaling system, and a real-time communication bus that lets multiple AI agents — Claude Code, OpenClaw, or custom agents — pick up work, collaborate, and report back.
+todolist is a **developer tool for orchestrating AI agents from anywhere**. It combines task management, a journaling system, and a real-time communication bus that lets multiple AI agents — Claude Code, OpenClaw, or custom agents — pick up work, collaborate, and report back.
 
 Think of it as a **personal operating system for AI-augmented productivity**:
 
@@ -67,7 +67,7 @@ No Docker setup exists today. This is the #1 barrier to adoption for self-hoster
 cp .env.example .env
 # Edit .env with your OPENAI_API_KEY (optional) and JWT_SECRET
 docker compose up
-# App at http://localhost:3000
+# App at http://localhost:3141
 ```
 
 #### 2.3 Root `.env.example`
@@ -97,7 +97,7 @@ BRAVE_API_KEY=
 
 Does not exist today. Create it:
 ```
-BACKEND_URL=http://localhost:8000
+BACKEND_URL=http://localhost:8141
 ```
 
 #### 2.5 Setup Script Improvements
@@ -119,7 +119,7 @@ The current `allow_origins=["*"]` with `allow_credentials=True` is a critical se
 
 **Changes:**
 - Read `ALLOWED_ORIGINS` from env var (comma-separated list)
-- Default to `["http://localhost:3000"]` for development
+- Default to `["http://localhost:3141"]` for development
 - Remove the wildcard
 
 #### 2.7 Secrets Audit — Remove from Git History
@@ -204,7 +204,7 @@ The current README is good but needs reframing for open-source. Key changes:
 1. **Hero section** — Replace "AI-powered collaborative task manager" with something punchier: "A dev tool for working with AI agents from anywhere. Dispatch tasks, store conversations, orchestrate parallel agents — online or offline."
 2. **Quick start** — Lead with Docker Compose (3 commands), then local setup as alternative
 3. **Screenshots section** — Actually add screenshots (currently has TODO placeholders)
-4. **"Why TodoList?" section** — Add a brief section on what makes this different from Todoist/Notion/Linear
+4. **"Why todolist?" section** — Add a brief section on what makes this different from Todoist/Notion/Linear
 5. **Agent integration** — Expand the MCP section with a concrete workflow example (create task -> agent picks it up -> agent posts result)
 6. **Self-hosting section** — New section covering Docker, Railway, and manual deployment
 7. **Remove** internal references (Railway dashboard, specific production URLs)
