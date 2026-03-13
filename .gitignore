@@ -39,6 +39,7 @@ docs/internal/
 
 # Screenshots (dev artifacts, not app assets)
 screenshots/
+!docs/screenshots/
 
 # iOS build artifacts
 frontend/ios/App/.DS_Store
