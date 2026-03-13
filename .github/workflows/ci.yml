@@ -24,6 +24,7 @@ jobs:
       OPENAI_API_KEY: test-openai-key
       JWT_SECRET: test-jwt-secret
       USE_MOCK_DB: "true"
+      ALLOW_TEST_AUTH_BYPASS: "true"
       MONGODB_URL: mongodb://localhost:27017
 
     steps:

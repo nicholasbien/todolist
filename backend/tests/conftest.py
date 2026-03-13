@@ -21,6 +21,7 @@ from app import app  # noqa: E402
 async def client():
     """HTTPX client running against the FastAPI app."""
     os.environ.setdefault("USE_MOCK_DB", "true")
+    os.environ.setdefault("ALLOW_TEST_AUTH_BYPASS", "true")
 
     # Reset database connections to avoid event loop issues between tests
     from mongomock_motor import AsyncMongoMockClient

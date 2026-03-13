@@ -169,7 +169,7 @@ async def send_verification_email(email: str, code: str) -> bool:
     """Send verification code via email."""
     try:
         # In test environment, just print and return
-        if os.getenv("USE_MOCK_DB"):
+        if os.getenv("ALLOW_TEST_AUTH_BYPASS"):
             print(f"VERIFICATION CODE for {email}: {code}")
             return True
 
@@ -218,7 +218,7 @@ Nicholas"""
 
         logger.info(f"Verification email sent to {email}")
         # Only print verification code in test/dev environments
-        if os.getenv("USE_MOCK_DB"):
+        if os.getenv("ALLOW_TEST_AUTH_BYPASS"):
             print(f"VERIFICATION CODE for {email}: {code}")
         return True
 
@@ -288,8 +288,8 @@ async def signup_user(email: str) -> dict:
 async def login_user(email: str, code: str) -> dict:
     """Verify code and create session for user."""
     try:
-        # Test environment bypass - only available when USE_MOCK_DB is set (test/dev only)
-        is_test_env = os.getenv("USE_MOCK_DB")
+        # Test environment bypass - only available when ALLOW_TEST_AUTH_BYPASS is set (test/dev only)
+        is_test_env = os.getenv("ALLOW_TEST_AUTH_BYPASS")
         test_email = os.getenv("TEST_EMAIL") if is_test_env else None
         test_code = os.getenv("TEST_CODE") if is_test_env else None
         if is_test_env and test_email and test_code and email == test_email and code == test_code:
