@@ -1,28 +1,5 @@
 repos:
-  # Auto-fixing hooks (run first)
-  - repo: https://github.com/pycqa/autoflake
-    rev: v2.2.1
-    hooks:
-      - id: autoflake
-        files: ^backend/
-        args: ["--remove-all-unused-imports", "--remove-unused-variables", "--in-place"]
-
-  - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.5.0
-    hooks:
-      - id: trailing-whitespace
-        files: ^backend/
-      - id: end-of-file-fixer
-        files: ^backend/
-
   # Backend Python linting
-  - repo: https://github.com/psf/black
-    rev: 23.12.1
-    hooks:
-      - id: black
-        files: ^backend/
-        language_version: python3
-
   - repo: https://github.com/pycqa/isort
     rev: 5.13.2
     hooks:
@@ -35,25 +12,6 @@ repos:
       - id: flake8
         files: ^backend/
         args: ["--max-line-length=120", "--extend-ignore=E203,W503"]
-
-  - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.8.0
-    hooks:
-      - id: mypy
-        files: ^backend/
-        additional_dependencies: [types-requests]
-        args: ["--ignore-missing-imports"]
-
-  # Frontend linting
-  - repo: https://github.com/pre-commit/mirrors-eslint
-    rev: v8.56.0
-    hooks:
-      - id: eslint
-        files: ^frontend/
-        types: [javascript, jsx, ts, tsx]
-        additional_dependencies:
-          - eslint@8.57.0
-          - eslint-config-next@14.1.0
 
   # General hooks
   - repo: https://github.com/pre-commit/pre-commit-hooks

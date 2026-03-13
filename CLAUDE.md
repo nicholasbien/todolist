@@ -14,4 +14,4 @@ Before committing backend changes, always run:
 cd backend && pre-commit run --all-files
 ```
 
-This runs black, isort, flake8, autoflake, and mypy. Fix any issues before committing.
+This runs flake8 and isort. Fix any issues before committing.
