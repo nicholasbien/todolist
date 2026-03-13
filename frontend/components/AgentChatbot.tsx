@@ -54,6 +54,7 @@ export default function AgentChatbot({
   const [showSessionDropdown, setShowSessionDropdown] = useState(false);
   const [sessionToDelete, setSessionToDelete] = useState<SessionMeta | null>(null);
   const [deleteSessionLoading, setDeleteSessionLoading] = useState(false);
+  const [sessionContentLoading, setSessionContentLoading] = useState(false);
 
   // Search state
   const [searchQuery, setSearchQuery] = useState('');
@@ -177,6 +178,8 @@ export default function AgentChatbot({
 
     const loadTaskSession = async () => {
       setLoading(true);
+      setSessionContentLoading(true);
+      setMessages([]);
       setError('');
       setIsTaskSession(true);
       shouldAutoScrollRef.current = true;
@@ -232,6 +235,7 @@ export default function AgentChatbot({
         setError(err.message || 'Failed to load session');
       } finally {
         setLoading(false);
+        setSessionContentLoading(false);
         onSessionLoaded?.();
       }
     };
@@ -360,6 +364,8 @@ export default function AgentChatbot({
     if (!token) return;
     setShowSessionDropdown(false);
     setLoading(true);
+    setSessionContentLoading(true);
+    setMessages([]);
     setError('');
     shouldAutoScrollRef.current = true;
 
@@ -402,6 +408,7 @@ export default function AgentChatbot({
       setError(err.message || 'Failed to load chat');
     } finally {
       setLoading(false);
+      setSessionContentLoading(false);
     }
   };
 
@@ -1084,6 +1091,12 @@ export default function AgentChatbot({
                 </div>
               </div>
             </div>
+          </div>
+        )}
+
+        {sessionContentLoading && (
+          <div className="flex items-center justify-center min-h-[120px] py-8">
+            <p className="text-gray-400 text-sm">Loading...</p>
           </div>
         )}
 
