@@ -1470,7 +1470,7 @@ export default function AIToDoListApp({
             >
               <option value="" disabled>Settings</option>
               <option value="account">Account</option>
-              <option value="email">Email Settings</option>
+              <option value="email">Emails</option>
               <option value="briefings">Briefings</option>
               <option value="insights">Insights</option>
               <option value="export">Export Data</option>
