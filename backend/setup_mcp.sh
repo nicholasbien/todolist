@@ -1,6 +1,6 @@
 #!/bin/bash
 
-echo "Setting up MCP servers for the TodoList app"
+echo "Setting up MCP servers for the todolist app"
 echo "============================================"
 
 # Check if npm is installed

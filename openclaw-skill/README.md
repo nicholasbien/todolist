@@ -1,6 +1,6 @@
-# TodoList OpenClaw Skill
+# todolist OpenClaw Skill
 
-An [OpenClaw](https://openclaw.ai/) skill that lets your AI agent manage your todos, journal, and chat sessions through the TodoList app.
+An [OpenClaw](https://openclaw.ai/) skill that lets your AI agent manage your todos, journal, and chat sessions through the todolist app.
 
 ## Quick Install
 
@@ -58,7 +58,7 @@ You can tell OpenClaw to automatically watch for tasks you assign in the app:
 
 ### How it works
 
-1. You create a task in the TodoList app and select "OpenClaw" from the agent dropdown (e.g., "Research the best React testing libraries")
+1. You create a task in the todolist app and select "OpenClaw" from the agent dropdown (e.g., "Research the best React testing libraries")
 2. You tap on it to open a chat session and write what you want done
 3. OpenClaw's cron job picks up the pending session (routed via `agent_id=openclaw`), does the work, and replies
 4. You see the reply in the app with a notification
@@ -69,4 +69,4 @@ Each cron cycle runs in an isolated session so it doesn't clutter your main chat
 
 ## How It Works
 
-The skill teaches your OpenClaw agent to call the TodoList REST API via `curl`. The app's backend auto-classifies tasks into categories and priorities using AI, so you just need to describe what you want to do.
+The skill teaches your OpenClaw agent to call the todolist REST API via `curl`. The app's backend auto-classifies tasks into categories and priorities using AI, so you just need to describe what you want to do.

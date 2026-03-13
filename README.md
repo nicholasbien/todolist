@@ -18,7 +18,7 @@ cp .env.example .env   # edit .env to add your OPENAI_API_KEY (optional)
 docker compose up
 ```
 
-App runs at **http://localhost:3000**. Log in with `test@example.com` / `000000`.
+App runs at **http://localhost:3141**. Log in with `test@example.com` / `000000`.
 
 ### Local Development
 
@@ -36,7 +36,7 @@ cd frontend && npm run dev
 
 > **Note:** MongoDB must be running locally (or use `./setup.sh --docker` to start everything with Docker).
 
-## Why TodoList?
+## Why todolist?
 
 This is not another todo app. It is an **AI agent orchestration layer** with a task management UI.
 
@@ -71,7 +71,7 @@ Add to your `.mcp.json`:
       "command": "node",
       "args": ["./mcp-server/dist/index.js"],
       "env": {
-        "TODOLIST_API_URL": "http://localhost:8000",
+        "TODOLIST_API_URL": "http://localhost:8141",
         "TODOLIST_AUTH_TOKEN": "your_session_token"
       }
     }
@@ -160,7 +160,7 @@ cp .env.example .env
 docker compose up -d
 ```
 
-MongoDB data persists in a named Docker volume. The app is accessible at `http://localhost:3000`.
+MongoDB data persists in a named Docker volume. The app is accessible at `http://localhost:3141`.
 
 ### Railway / Other Platforms
 

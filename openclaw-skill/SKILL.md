@@ -1,13 +1,13 @@
 ---
 name: todolist
-description: Manage todos, journal entries, and task-linked chat sessions via the TodoList app API. Use when the user asks about their tasks, todos, journal, or wants to add/update/complete tasks.
+description: Manage todos, journal entries, and task-linked chat sessions via the todolist app API. Use when the user asks about their tasks, todos, journal, or wants to add/update/complete tasks.
 allowed-tools: ["exec", "cron"]
 metadata: {"openclaw": {"requires": {"bins": ["curl", "jq"], "env": ["TODOLIST_AUTH_TOKEN"]}, "primaryEnv": "TODOLIST_AUTH_TOKEN"}}
 ---
 
-# TodoList App Integration
+# todolist App Integration
 
-You are connected to a TodoList app — an AI-powered collaborative todo list with journaling and task-linked chat sessions.
+You are connected to a todolist app — an AI-powered collaborative todo list with journaling and task-linked chat sessions.
 
 ## Setup
 
@@ -349,7 +349,7 @@ openclaw cron add \
   --name "todolist-watcher" \
   --every "5m" \
   --session isolated \
-  --message "Check for pending TodoList sessions and respond to them. Use the todolist skill. Follow the 'Responding to Pending Sessions' workflow: routing source of truth is GET /agent/sessions/pending?agent_id=openclaw. This returns sessions claimed by openclaw plus unclaimed sessions. Skip unclaimed sessions (no agent_id) — the built-in agent handles those. Use is_followup/recent_messages for followups, post an interim ack before work, and always reply with agent_id=openclaw to claim routing. If there are no pending sessions, do nothing."
+  --message "Check for pending todolist sessions and respond to them. Use the todolist skill. Follow the 'Responding to Pending Sessions' workflow: routing source of truth is GET /agent/sessions/pending?agent_id=openclaw. This returns sessions claimed by openclaw plus unclaimed sessions. Skip unclaimed sessions (no agent_id) — the built-in agent handles those. Use is_followup/recent_messages for followups, post an interim ack before work, and always reply with agent_id=openclaw to claim routing. If there are no pending sessions, do nothing."
 ```
 
 This creates an isolated session every 5 minutes that checks for work. Adjust the interval based on user preference.

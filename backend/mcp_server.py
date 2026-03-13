@@ -167,7 +167,7 @@ async def extract_links(url: str, pattern: Optional[str] = None) -> dict:
 
 if __name__ == "__main__":
     print("=" * 60)
-    print("TodoList MCP Server - Web Content Fetching")
+    print("todolist MCP Server - Web Content Fetching")
     print("=" * 60)
     print("\nAvailable tools:")
     print("  • fetch_webpage: Extract content from any webpage")

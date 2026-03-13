@@ -1,4 +1,4 @@
-# MCP Integration Summary for TodoList App
+# MCP Integration Summary for todolist App
 
 ## ✅ What We've Accomplished
 

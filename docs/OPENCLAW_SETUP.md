@@ -1,12 +1,12 @@
 # OpenClaw Integration Setup Guide
 
-Connect your TodoList app to [OpenClaw](https://openclaw.ai/) so an AI agent can manage your tasks, respond to chat sessions, and autonomously execute work you assign in the app.
+Connect your todolist app to [OpenClaw](https://openclaw.ai/) so an AI agent can manage your tasks, respond to chat sessions, and autonomously execute work you assign in the app.
 
 ## Prerequisites
 
 - [OpenClaw](https://openclaw.ai/) installed and running (v2.4+ for autonomous mode)
 - `curl` and `jq` available on your system
-- A TodoList account at [app.todolist.nyc](https://app.todolist.nyc)
+- A todolist account at [app.todolist.nyc](https://app.todolist.nyc)
 
 ## Step 1: Install the Skill
 
@@ -58,7 +58,7 @@ Start a chat with your OpenClaw agent and say:
 
 > "Show me my todos"
 
-The agent should call the TodoList API and list your tasks. If you get a 401 error, re-run the login script — your token may have expired.
+The agent should call the todolist API and list your tasks. If you get a 401 error, re-run the login script — your token may have expired.
 
 ## Usage Modes
 
@@ -95,14 +95,14 @@ openclaw cron add \
   --name "todolist-watcher" \
   --every "5m" \
   --session isolated \
-  --message "Check for pending TodoList sessions and respond to them. Use the todolist skill. Follow the 'Responding to Pending Sessions' workflow: poll pending sessions with agent_id=openclaw. Handle sessions where is_followup is true (check recent_messages for context). Handle new sessions with agent_id=openclaw (pre-routed via dropdown). Skip unclaimed sessions (no agent_id) — the built-in agent handles those. Post an interim ack before starting work. Always reply with agent_id=openclaw to claim sessions. If there are no pending sessions, do nothing."
+  --message "Check for pending todolist sessions and respond to them. Use the todolist skill. Follow the 'Responding to Pending Sessions' workflow: poll pending sessions with agent_id=openclaw. Handle sessions where is_followup is true (check recent_messages for context). Handle new sessions with agent_id=openclaw (pre-routed via dropdown). Skip unclaimed sessions (no agent_id) — the built-in agent handles those. Post an interim ack before starting work. Always reply with agent_id=openclaw to claim sessions. If there are no pending sessions, do nothing."
 ```
 
 #### How it works
 
 ```
 ┌─────────────────────────────────────────────────────┐
-│                  TodoList App                        │
+│                  todolist App                        │
 │                                                      │
 │  1. You create a task: "Research React frameworks"   │
 │     and select "OpenClaw" from the agent dropdown    │
@@ -157,7 +157,7 @@ openclaw cron runs todolist-watcher
 ## Architecture
 
 ```
-TodoList App (app.todolist.nyc)
+todolist App (app.todolist.nyc)
     │
     │  REST API (curl + Bearer token)
     │
