@@ -1,6 +1,6 @@
 // IMPORTANT: Always increment these versions when modifying this service worker file
 // This forces browsers to download and use the updated service worker
-const STATIC_CACHE = 'todo-static-v130';
+const STATIC_CACHE = 'todo-static-v131';
 
 const GLOBAL_DB_NAME = 'TodoGlobalDB';
 const USER_DB_PREFIX = 'TodoUserDB_';
@@ -1156,6 +1156,53 @@ async function handleOfflineRequest(request, url) {
     if (dataText) data = JSON.parse(dataText);
   } catch (e) {}
 
+  // Handle chat message POST requests (offline send)
+  const chatMessageMatch = apiPath.match(/^\/agent\/sessions\/([a-f0-9]{24})\/messages$/);
+  if (request.method === 'POST' && chatMessageMatch) {
+    const sessionId = chatMessageMatch[1];
+    const offlineId = 'offline_msg_' + Date.now();
+    console.log(`💬 Processing offline chat message POST for session ${sessionId}`);
+
+    // Append message to local chat_messages cache
+    const messageRecord = await getChatMessages(sessionId, authData ? authData.userId : null);
+    const displayMessages = messageRecord ? (messageRecord.display_messages || []) : [];
+    const newMessage = {
+      role: data.role || 'user',
+      content: data.content || '',
+      offline_id: offlineId,
+      pending: true,
+      created_at: new Date().toISOString(),
+    };
+    displayMessages.push(newMessage);
+    await putChatMessages({
+      session_id: sessionId,
+      display_messages: displayMessages,
+      cached_at: new Date().toISOString(),
+    }, authData ? authData.userId : null);
+
+    // Enqueue SEND_CHAT_MESSAGE operation
+    await addQueue({
+      type: 'SEND_CHAT_MESSAGE',
+      data: {
+        session_id: sessionId,
+        content: data.content || '',
+        role: data.role || 'user',
+        offline_id: offlineId,
+      },
+    }, authData ? authData.userId : null);
+
+    console.log(`💬 Queued offline chat message ${offlineId} for session ${sessionId}`);
+
+    // Return synthetic 200 response so the UI doesn't error
+    return new Response(JSON.stringify({
+      ...newMessage,
+      session_id: sessionId,
+    }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
   // Handle journal POST requests
   if (request.method === 'POST' && apiPath === '/journals') {
     console.log('📝 Processing offline journal POST:', data);
@@ -1947,6 +1994,27 @@ async function syncQueue() {
               await delSpace(deleteSpaceId, authData.userId);
               success = true;
             }
+          }
+          break;
+        }
+        case 'SEND_CHAT_MESSAGE': {
+          const sessionId = op.data.session_id;
+          res = await fetch(`${backendUrl}/agent/sessions/${sessionId}/messages`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({ role: op.data.role, content: op.data.content }),
+          });
+          if (res && res.ok) {
+            // Remove the offline message marker from cached messages
+            const messageRecord = await getChatMessages(sessionId, authData.userId);
+            if (messageRecord && messageRecord.display_messages) {
+              const updatedMessages = messageRecord.display_messages.map(m =>
+                m.offline_id === op.data.offline_id ? { ...m, offline_id: undefined, pending: undefined } : m
+              );
+              await putChatMessages({ ...messageRecord, display_messages: updatedMessages }, authData.userId);
+            }
+            console.log(`💬 Synced offline chat message for session ${sessionId}`);
+            success = true;
           }
           break;
         }

@@ -1,9 +1,18 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { ChevronDown, ArrowLeft, CheckCircle2, RotateCcw, Search, X, Brain, Plus } from 'lucide-react';
+import { ChevronDown, ArrowLeft, CheckCircle2, RotateCcw, Search, X, Brain, Plus, Clock } from 'lucide-react';
 import { MessageRenderer, PlainTextRenderer } from './MessageRenderer';
 import { getStreamingBackendUrl } from '../utils/api';
 import AgentMemoryViewer from './AgentMemoryViewer';
+
+interface ChatMessage {
+  role: string;
+  content: string;
+  toolData?: any;
+  agent_id?: string;
+  offline_id?: string;
+  pending?: boolean;
+}
 
 interface ChatbotProps {
   activeSpace: any;
@@ -39,7 +48,7 @@ export default function AgentChatbot({
   onNavigateToTasks,
 }: ChatbotProps) {
   const [question, setQuestion] = useState('');
-  const [messages, setMessages] = useState<{ role: string; content: string; toolData?: any; agent_id?: string }[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [thinkingDots, setThinkingDots] = useState(0);
@@ -345,6 +354,24 @@ export default function AgentChatbot({
     return () => clearInterval(poll);
   }, [isWaitingForExternalAgent, needsHumanResponse, currentSessionId, token]);
 
+  // Listen for SYNC_COMPLETE from service worker to clear pending message flags
+  useEffect(() => {
+    const handleSyncComplete = (event: MessageEvent) => {
+      if (event.data?.type === 'SYNC_COMPLETE') {
+        // Clear pending flags on all messages
+        setMessages((prev) => {
+          const hasPending = prev.some(m => m.pending);
+          if (!hasPending) return prev;
+          return prev.map(m => m.pending ? { ...m, pending: undefined } : m);
+        });
+      }
+    };
+    navigator.serviceWorker?.addEventListener('message', handleSyncComplete);
+    return () => {
+      navigator.serviceWorker?.removeEventListener('message', handleSyncComplete);
+    };
+  }, []);
+
   // Lock body scroll when delete modal is open
   useEffect(() => {
     if (sessionToDelete) {
@@ -577,9 +604,11 @@ export default function AgentChatbot({
     }
 
     // If session is owned by an external agent, post via messaging API
-    // so the external agent picks it up (don't stream to built-in agent)
-    if (sessionAgentId && currentSessionId) {
-      setMessages((prev) => [...prev, { role: 'user', content: userMessage }]);
+    // so the external agent picks it up (don't stream to built-in agent).
+    // Also handle offline sending for task-linked sessions.
+    if ((sessionAgentId && currentSessionId) || canSendOffline) {
+      const isPending = !isOnline;
+      setMessages((prev) => [...prev, { role: 'user', content: userMessage, pending: isPending || undefined }]);
       setNeedsHumanResponse(false);
       try {
         await fetch(`/agent/sessions/${currentSessionId}/messages`, {
@@ -588,7 +617,10 @@ export default function AgentChatbot({
           body: JSON.stringify({ role: 'user', content: userMessage }),
         });
       } catch (err: any) {
-        setError(err.message || 'Failed to send message');
+        if (isOnline) {
+          setError(err.message || 'Failed to send message');
+        }
+        // When offline, the SW intercepts and queues — no error needed
       }
       return;
     }
@@ -710,7 +742,7 @@ export default function AgentChatbot({
   };
 
   const handleOfflineClick = () => {
-    if (!isOnline) {
+    if (offlineDisabled) {
       setShowOfflineMessage(true);
       setTimeout(() => {
         setShowOfflineMessage(false);
@@ -731,6 +763,11 @@ export default function AgentChatbot({
 
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   };
+
+  // Whether offline sending is allowed (task-linked or external-agent sessions only)
+  const canSendOffline = !isOnline && currentSessionId && (isTaskSession || !!sessionAgentId);
+  // Whether the input should be disabled due to being offline
+  const offlineDisabled = !isOnline && !canSendOffline;
 
   const isWaiting = loading;
 
@@ -1104,7 +1141,9 @@ export default function AgentChatbot({
           <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
             <div className={`${msg.role === 'assistant' ? 'w-full px-0' : 'max-w-xs lg:max-w-md px-4'} py-2 ${
               msg.role === 'user'
-                ? 'bg-gray-800 text-gray-100 border border-gray-700 rounded-lg'
+                ? msg.pending
+                  ? 'bg-gray-800/70 text-gray-300 border border-amber-700/40 rounded-lg'
+                  : 'bg-gray-800 text-gray-100 border border-gray-700 rounded-lg'
                 : msg.role === 'system'
                 ? 'bg-blue-900/30 text-blue-200 border border-blue-700/50 rounded-lg'
                 : 'text-gray-100'
@@ -1120,6 +1159,12 @@ export default function AgentChatbot({
                 <MessageRenderer content={msg.content} className="text-base" />
               ) : (
                 <PlainTextRenderer content={msg.content} className="text-sm" />
+              )}
+              {msg.pending && (
+                <div className="flex items-center gap-1 mt-1 text-xs text-amber-400/70">
+                  <Clock className="w-3 h-3" />
+                  <span>Queued</span>
+                </div>
               )}
             </div>
           </div>
@@ -1172,8 +1217,8 @@ export default function AgentChatbot({
         <div className="flex-1 relative">
           <textarea
             className={`w-full bg-gray-900 border border-gray-700 text-gray-100 rounded-lg p-3 focus:outline-none focus:border-accent resize-none min-h-[48px] max-h-[140px] overflow-y-auto ${
-              !isOnline ? 'opacity-50 cursor-not-allowed' : ''
-            }`}
+              offlineDisabled ? 'opacity-50 cursor-not-allowed' : ''
+            }${canSendOffline ? ' border-amber-700/50' : ''}`}
             value={question}
             onChange={(e) => {
               setQuestion(e.target.value);
@@ -1190,8 +1235,10 @@ export default function AgentChatbot({
               }
             }}
             placeholder={
-              !isOnline
+              offlineDisabled
                 ? "Assistant requires internet connection"
+                : canSendOffline
+                ? "Message will be queued and sent when online..."
                 : isTaskSession
                 ? "Send a message about this task..."
                 : sessionAgentId
@@ -1200,16 +1247,16 @@ export default function AgentChatbot({
                 ? `Chat with ${AGENTS.find(a => a.id === selectedAgentId)?.label || selectedAgentId}...`
                 : "Ask a question..."
             }
-            disabled={!isOnline}
+            disabled={offlineDisabled}
             rows={1}
-            onMouseEnter={() => !isOnline && setShowOfflineMessage(true)}
+            onMouseEnter={() => offlineDisabled && setShowOfflineMessage(true)}
             onMouseLeave={() => setShowOfflineMessage(false)}
             onClick={handleOfflineClick}
             onFocus={() => setIsQuestionFocused(true)}
             onBlur={() => setIsQuestionFocused(false)}
             aria-label={isTaskSession ? "Send message about task" : "Ask assistant a question"}
           />
-          {showOfflineMessage && !isOnline && (
+          {showOfflineMessage && offlineDisabled && (
             <div className="absolute bottom-full left-0 mb-2 bg-gray-800 border border-gray-700 rounded-lg p-3 shadow-lg z-10 w-full">
               <p className="text-sm text-gray-300">
                 Network connection required to use Assistant mode. The assistant needs to communicate with AI services in real-time.
@@ -1219,16 +1266,16 @@ export default function AgentChatbot({
         </div>
         <button
           onClick={handleSend}
-          disabled={!question.trim() || !isOnline}
+          disabled={!question.trim() || offlineDisabled}
           className={`border px-6 py-3 rounded-lg hover:bg-accent/10 disabled:opacity-50 disabled:cursor-not-allowed transition-colors ${
             isQuestionFocused
               ? 'border-accent text-accent'
               : 'border-gray-700 text-gray-300 hover:text-gray-100'
           }`}
-          onMouseEnter={() => !isOnline && setShowOfflineMessage(true)}
+          onMouseEnter={() => offlineDisabled && setShowOfflineMessage(true)}
           onMouseLeave={() => setShowOfflineMessage(false)}
         >
-          Send
+          {canSendOffline ? 'Queue' : 'Send'}
         </button>
       </div>
     </div>
