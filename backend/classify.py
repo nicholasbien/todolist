@@ -18,16 +18,19 @@ logger = logging.getLogger(__name__)
 # Load environment variables from .env file
 load_dotenv()
 
-# Get API key and validate it exists
+# Get API key — optional; AI classification degrades gracefully without it
 api_key = os.getenv("OPENAI_API_KEY")
+client = None
 if not api_key:
-    logger.error("OPENAI_API_KEY not found in environment variables!")
-    raise ValueError("OPENAI_API_KEY not found in environment variables!")
-
-# Initialize OpenAI client with timeout
-# 4 second timeout - must be less than frontend timeout (5s) to prevent duplicate todos
-# If classification times out, we fall back to default classification (General/Medium)
-client = OpenAI(api_key=api_key, timeout=4.0, max_retries=0)
+    logger.warning(
+        "OPENAI_API_KEY not set — AI classification disabled. "
+        "Tasks will be saved with default category (General) and priority (Medium)."
+    )
+else:
+    # Initialize OpenAI client with timeout
+    # 4 second timeout - must be less than frontend timeout (5s) to prevent duplicate todos
+    # If classification times out, we fall back to default classification (General/Medium)
+    client = OpenAI(api_key=api_key, timeout=4.0, max_retries=0)
 
 # Jinja2 environment for loading prompt templates
 _prompts_dir = os.path.join(os.path.dirname(__file__), "prompts")
@@ -71,6 +74,14 @@ async def classify_task(text: str, categories: List[str], date_added: str) -> Di
     if not text.strip():
         logger.warning("Empty task text provided")
         return default_response
+
+    # If OpenAI client is not configured, return defaults with manual date parsing
+    if client is None:
+        logger.info("Skipping AI classification — OPENAI_API_KEY not configured")
+        fallback_due, _ = manual_parse_due_date(text, date_added)
+        resp = default_response.copy()
+        resp["dueDate"] = fallback_due
+        return resp
 
     start_time = time.time()
     try:

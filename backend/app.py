@@ -119,6 +119,13 @@ async def lifespan(app: FastAPI):
         else:
             logger.info("All initialization completed successfully")
 
+        # Warn about optional configuration
+        if not os.getenv("OPENAI_API_KEY"):
+            logger.warning(
+                "OPENAI_API_KEY not set — AI classification and assistant features are disabled. "
+                "The app is fully functional for task management without it."
+            )
+
         logger.info("Startup event completed")
 
     except Exception as e:
