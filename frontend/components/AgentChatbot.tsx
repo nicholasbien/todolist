@@ -722,7 +722,7 @@ export default function AgentChatbot({
   const formatSessionDate = (dateStr: string) => {
     const date = new Date(dateStr);
     const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
+    const diffMs = Math.max(0, now.getTime() - date.getTime());
     const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
 
     if (diffDays === 0) return 'Today';
