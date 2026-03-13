@@ -953,18 +953,18 @@ export default function AgentChatbot({
             </p>
             <div className="flex justify-center space-x-3">
               <button
-                onClick={deleteSession}
-                disabled={deleteSessionLoading}
-                className="border border-red-500 text-red-400 hover:bg-red-900/20 px-6 py-2 rounded-lg transition-colors disabled:opacity-50"
-              >
-                {deleteSessionLoading ? 'Deleting...' : 'Delete'}
-              </button>
-              <button
                 onClick={() => setSessionToDelete(null)}
                 disabled={deleteSessionLoading}
                 className="border border-gray-600 text-gray-300 hover:bg-gray-800 px-6 py-2 rounded-lg transition-colors disabled:opacity-50"
               >
                 Cancel
+              </button>
+              <button
+                onClick={deleteSession}
+                disabled={deleteSessionLoading}
+                className="border border-red-500 text-red-400 hover:bg-red-900/20 px-6 py-2 rounded-lg transition-colors disabled:opacity-50"
+              >
+                {deleteSessionLoading ? 'Deleting...' : 'Delete'}
               </button>
             </div>
           </div>
