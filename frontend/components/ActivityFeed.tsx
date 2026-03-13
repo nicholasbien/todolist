@@ -50,7 +50,7 @@ function formatRelativeTime(isoString: string): string {
   const normalizedTimestamp = ensureTimezone(isoString).replace(/\.(\d{3})\d*/, '.$1');
   const date = new Date(normalizedTimestamp);
   const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
+  const diffMs = Math.max(0, now.getTime() - date.getTime());
   const diffMin = Math.floor(diffMs / 60000);
   const diffHr = Math.floor(diffMs / 3600000);
   const diffDay = Math.floor(diffMs / 86400000);
