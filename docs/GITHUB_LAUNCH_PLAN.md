@@ -1,7 +1,7 @@
 # GitHub Launch Plan — TodoList App
 
 > **Date:** 2026-03-13
-> **Goal:** Ship todolist.nyc as an open-source dev tool on GitHub, positioned for developers who work with AI agents.
+> **Goal:** Ship your-domain.com as an open-source dev tool on GitHub, positioned for developers who work with AI agents.
 
 ---
 
@@ -226,7 +226,7 @@ Create `CONTRIBUTING.md` covering:
 `AGENTS.md` is excellent internal documentation. For the open-source launch:
 - Keep it as-is — it's the comprehensive developer guide
 - Add a note at the top: "This is the development guide for contributors and AI agents working on the codebase."
-- Remove or generalize the production URL references (`https://app.todolist.nyc`)
+- Remove or generalize the production URL references (`https://app.your-domain.com`)
 
 ---
 
@@ -241,7 +241,7 @@ Create `CONTRIBUTING.md` covering:
 `ai-agents`, `mcp`, `model-context-protocol`, `task-management`, `pwa`, `offline-first`, `claude-code`, `fastapi`, `nextjs`, `mongodb`, `self-hosted`, `developer-tools`
 
 **About section:**
-- Website: `https://todolist.nyc` (or GitHub Pages if you want a landing page)
+- Website: `https://your-domain.com` (or GitHub Pages if you want a landing page)
 - Check "Releases", "Packages" if using them
 
 ### 4.2 Issue Templates
@@ -300,7 +300,7 @@ These are things only you can do — not code changes, but account/settings/manu
 - [ ] **Scrub git history** — Run `git log --all --full-history -- .env backend/.env frontend/.env.local .mcp.json` and if any hits, use BFG Repo Cleaner to remove them before going public
 - [ ] **Verify `.gitignore`** — Confirm `.env`, `.env.*`, `backend/.env`, `frontend/.env.local`, `.mcp.json` are all ignored and not tracked (`git ls-files --cached .env` should return nothing)
 - [ ] **Review `.mcp.json`** — This file contains an auth token and is in `.gitignore`, but verify it's not in history
-- [ ] **Check for hardcoded URLs** — Search for `todolist.nyc` or `railway.app` in code and decide if those should be parameterized
+- [ ] **Check for hardcoded URLs** — Search for `your-domain.com` or `railway.app` in code and decide if those should be parameterized
 
 ### GitHub Settings
 

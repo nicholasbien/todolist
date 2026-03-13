@@ -39,7 +39,7 @@ const mockServiceWorkerGlobal = {
   CONFIG: {
     PRODUCTION_BACKEND: process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8141',
     LOCAL_BACKEND: 'http://localhost:8141',
-    PRODUCTION_DOMAIN: 'todolist.nyc'
+    PRODUCTION_DOMAIN: 'your-domain.com'
   },
   console: {
     log: jest.fn(),
@@ -199,7 +199,7 @@ describe('CRITICAL: Offline Journal Sync Regression Protection', () => {
       {
         name: 'Production Web',
         protocol: 'https:',
-        hostname: 'app.todolist.nyc',
+        hostname: 'app.your-domain.com',
         expectedUrl: `${mockServiceWorkerGlobal.CONFIG.PRODUCTION_BACKEND}/journals`,
         description: 'Must route to production backend'
       },
@@ -219,7 +219,7 @@ describe('CRITICAL: Offline Journal Sync Regression Protection', () => {
 
       // Calculate URL using exact service worker logic
       const isCapacitor = protocol === 'file:';
-      const isProdHost = hostname.endsWith('todolist.nyc');
+      const isProdHost = hostname.endsWith('your-domain.com');
       const syncUrl = `${isCapacitor ? CONFIG.PRODUCTION_BACKEND : (isProdHost ? CONFIG.PRODUCTION_BACKEND : CONFIG.LOCAL_BACKEND)}/journals`;
 
       console.log(`🧪 ${name}: ${syncUrl}`);
@@ -416,7 +416,7 @@ describe('CRITICAL: Offline Journal Sync Regression Protection', () => {
 
     // Verify sync URL is correct (not the '/journals' that caused 404s)
     const isCapacitor = mockServiceWorkerGlobal.location.protocol === 'file:';
-    const isProdHost = mockServiceWorkerGlobal.location.hostname.endsWith('todolist.nyc');
+    const isProdHost = mockServiceWorkerGlobal.location.hostname.endsWith('your-domain.com');
     const syncUrl = `${isCapacitor ? CONFIG.PRODUCTION_BACKEND : (isProdHost ? CONFIG.PRODUCTION_BACKEND : CONFIG.LOCAL_BACKEND)}/journals`;
 
     // Check the actual environment and assert accordingly

@@ -107,7 +107,7 @@ cd ~/.openclaw/workspace/skills/todolist
 ./scripts/login.sh
 
 # Set env vars (or add to OpenClaw config)
-export TODOLIST_API_URL="https://app.todolist.nyc"
+export TODOLIST_API_URL="https://app.your-domain.com"
 export TODOLIST_AUTH_TOKEN="your_token_here"
 ```
 
@@ -201,7 +201,7 @@ Frontend: http://localhost:3141 | Backend: http://localhost:8141
 ### Test Account
 - **Email**: `test@example.com` | **Code**: `000000`
 - No email sent, no signup required — login auto-creates the user
-- Works on production too: `https://app.todolist.nyc`
+- Works on production too: `https://app.your-domain.com`
 
 ```bash
 # Get a token

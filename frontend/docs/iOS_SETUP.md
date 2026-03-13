@@ -191,7 +191,7 @@ todo, task, productivity, AI, collaboration, offline, team, organize, smart, GPT
 - iPad Pro (2nd gen): 2 screenshots (2048x2732)
 
 ### 4. Privacy Policy
-Required URL: `https://todolist.nyc/privacy-policy`
+Required URL: `https://your-domain.com/privacy-policy`
 
 Key points to include:
 - Data collection practices

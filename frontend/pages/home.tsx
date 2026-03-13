@@ -170,7 +170,7 @@ export default function HomePage() {
               <a href="mailto:todolist.notifications@gmail.com" className="hover:text-accent transition-colors">Contact</a>
             </div>
             <p className="text-gray-500 text-sm">
-              &copy; 2026 todolist.nyc
+              &copy; 2026 your-domain.com
             </p>
           </footer>
         </div>

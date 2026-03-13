@@ -259,7 +259,7 @@ return (
       <div className="flex justify-between items-center mb-1" onClick={handleScrollToTop}>
         <h1 className="text-xl font-bold mr-4">
           <Link href="/home" className="hover:text-accent transition-colors">
-            todolist.nyc
+            your-domain.com
           </Link>
         </h1>
         <SpaceDropdown

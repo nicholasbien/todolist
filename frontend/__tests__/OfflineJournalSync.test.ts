@@ -38,7 +38,7 @@ const mockServiceWorker = {
 const CONFIG = {
   PRODUCTION_BACKEND: process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8141',
   LOCAL_BACKEND: 'http://localhost:8141',
-  PRODUCTION_DOMAIN: 'todolist.nyc'
+  PRODUCTION_DOMAIN: 'your-domain.com'
 };
 
 // Mock IndexedDB operations
@@ -150,7 +150,7 @@ describe('Offline Journal Sync', () => {
 
     // 4. Sync operation should use correct backend URL
     const isCapacitor = mockServiceWorker.location.protocol === 'file:';
-    const isProdHost = mockServiceWorker.location.hostname.endsWith('todolist.nyc');
+    const isProdHost = mockServiceWorker.location.hostname.endsWith('your-domain.com');
     const expectedSyncUrl = `${isCapacitor ? CONFIG.PRODUCTION_BACKEND : (isProdHost ? CONFIG.PRODUCTION_BACKEND : CONFIG.LOCAL_BACKEND)}/journals`;
 
     expect(expectedSyncUrl).toBe('http://localhost:8141/journals'); // Local dev environment
@@ -227,7 +227,7 @@ describe('Offline Journal Sync', () => {
       // Production web
       {
         protocol: 'https:',
-        hostname: 'app.todolist.nyc',
+        hostname: 'app.your-domain.com',
         expected: `${CONFIG.PRODUCTION_BACKEND}/journals`
       },
       // Capacitor mobile app
@@ -245,7 +245,7 @@ describe('Offline Journal Sync', () => {
 
       // Calculate URL using same logic as service worker
       const isCapacitor = protocol === 'file:';
-      const isProdHost = hostname.endsWith('todolist.nyc');
+      const isProdHost = hostname.endsWith('your-domain.com');
       const syncUrl = `${isCapacitor ? CONFIG.PRODUCTION_BACKEND : (isProdHost ? CONFIG.PRODUCTION_BACKEND : CONFIG.LOCAL_BACKEND)}/journals`;
 
       expect(syncUrl).toBe(expected);

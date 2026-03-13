@@ -15,8 +15,8 @@ Added App-Bound Domains to enable service worker APIs in WKWebView:
 ```xml
 <key>WKAppBoundDomains</key>
 <array>
-    <string>todolist.nyc</string>
-    <string>app.todolist.nyc</string>
+    <string>your-domain.com</string>
+    <string>app.your-domain.com</string>
     <string>backend-production-e920.up.railway.app</string>
     <string>localhost</string>
 </array>
@@ -36,7 +36,7 @@ Added App-Bound Domains to enable service worker APIs in WKWebView:
 const config: CapacitorConfig = {
   server: {
     // Production: Load from your live PWA site to enable service worker
-    url: 'https://todolist.nyc',
+    url: 'https://your-domain.com',
     hostname: 'localhost'
   },
   ios: {
@@ -77,7 +77,7 @@ if ('serviceWorker' in navigator) {
 
 ### Request Flow in Capacitor iOS
 
-1. **App Launch**: Capacitor loads `https://todolist.nyc` in WKWebView
+1. **App Launch**: Capacitor loads `https://your-domain.com` in WKWebView
 2. **SW Registration**: Service worker registers from HTTPS context
 3. **API Requests**: Your existing SW intercepts requests like `/todos`, `/auth`, etc.
 4. **Backend Routing**: SW routes to `backend-production-e920.up.railway.app`

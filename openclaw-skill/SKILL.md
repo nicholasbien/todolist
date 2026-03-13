@@ -13,7 +13,7 @@ You are connected to a TodoList app — an AI-powered collaborative todo list wi
 
 Two environment variables are required:
 
-- `TODOLIST_API_URL` — The API base URL (default: `https://app.todolist.nyc`)
+- `TODOLIST_API_URL` — The API base URL (default: `https://app.your-domain.com`)
 - `TODOLIST_AUTH_TOKEN` — A JWT auth token
 
 If `TODOLIST_AUTH_TOKEN` is not set, help the user log in by running: `bash {baseDir}/scripts/login.sh`
@@ -22,7 +22,7 @@ If `TODOLIST_AUTH_TOKEN` is not set, help the user log in by running: `bash {bas
 
 All API requests require the header: `Authorization: Bearer $TODOLIST_AUTH_TOKEN`
 
-If `TODOLIST_API_URL` is not set, default to `https://app.todolist.nyc`.
+If `TODOLIST_API_URL` is not set, default to `https://app.your-domain.com`.
 
 ## Step 1: Get the Space ID
 
@@ -30,7 +30,7 @@ Before any operation, you need a `SPACE_ID`. Call this once and reuse the result
 
 ```bash
 curl -s -H "Authorization: Bearer $TODOLIST_AUTH_TOKEN" \
-  "${TODOLIST_API_URL:-https://app.todolist.nyc}/spaces" | jq '.'
+  "${TODOLIST_API_URL:-https://app.your-domain.com}/spaces" | jq '.'
 ```
 
 Use the first space's `_id` value as `SPACE_ID` for all subsequent calls. If the user has multiple spaces, ask which one to use.
@@ -41,7 +41,7 @@ Use the first space's `_id` value as `SPACE_ID` for all subsequent calls. If the
 
 ```bash
 curl -s -H "Authorization: Bearer $TODOLIST_AUTH_TOKEN" \
-  "${TODOLIST_API_URL:-https://app.todolist.nyc}/todos?space_id=SPACE_ID" | jq '.'
+  "${TODOLIST_API_URL:-https://app.your-domain.com}/todos?space_id=SPACE_ID" | jq '.'
 ```
 
 Each todo has: `_id`, `text`, `completed`, `category`, `priority`, `space_id`.
@@ -52,7 +52,7 @@ Each todo has: `_id`, `text`, `completed`, `category`, `priority`, `space_id`.
 curl -s -X POST -H "Authorization: Bearer $TODOLIST_AUTH_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"text": "YOUR_TASK_TEXT", "space_id": "SPACE_ID"}' \
-  "${TODOLIST_API_URL:-https://app.todolist.nyc}/todos" | jq '.'
+  "${TODOLIST_API_URL:-https://app.your-domain.com}/todos" | jq '.'
 ```
 
 Only provide `text` and `space_id`. The backend auto-classifies category and priority using AI.
@@ -63,28 +63,28 @@ Only provide `text` and `space_id`. The backend auto-classifies category and pri
 curl -s -X PUT -H "Authorization: Bearer $TODOLIST_AUTH_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"text": "UPDATED_TEXT"}' \
-  "${TODOLIST_API_URL:-https://app.todolist.nyc}/todos/TODO_ID" | jq '.'
+  "${TODOLIST_API_URL:-https://app.your-domain.com}/todos/TODO_ID" | jq '.'
 ```
 
 ### Complete a Todo
 
 ```bash
 curl -s -X PUT -H "Authorization: Bearer $TODOLIST_AUTH_TOKEN" \
-  "${TODOLIST_API_URL:-https://app.todolist.nyc}/todos/TODO_ID/complete" | jq '.'
+  "${TODOLIST_API_URL:-https://app.your-domain.com}/todos/TODO_ID/complete" | jq '.'
 ```
 
 ### Delete a Todo
 
 ```bash
 curl -s -X DELETE -H "Authorization: Bearer $TODOLIST_AUTH_TOKEN" \
-  "${TODOLIST_API_URL:-https://app.todolist.nyc}/todos/TODO_ID"
+  "${TODOLIST_API_URL:-https://app.your-domain.com}/todos/TODO_ID"
 ```
 
 ### Get Journal Entry
 
 ```bash
 curl -s -H "Authorization: Bearer $TODOLIST_AUTH_TOKEN" \
-  "${TODOLIST_API_URL:-https://app.todolist.nyc}/journals?date=YYYY-MM-DD&space_id=SPACE_ID" | jq '.'
+  "${TODOLIST_API_URL:-https://app.your-domain.com}/journals?date=YYYY-MM-DD&space_id=SPACE_ID" | jq '.'
 ```
 
 ### Write Journal Entry
@@ -93,21 +93,21 @@ curl -s -H "Authorization: Bearer $TODOLIST_AUTH_TOKEN" \
 curl -s -X POST -H "Authorization: Bearer $TODOLIST_AUTH_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"content": "JOURNAL_CONTENT", "date": "YYYY-MM-DD", "space_id": "SPACE_ID"}' \
-  "${TODOLIST_API_URL:-https://app.todolist.nyc}/journals" | jq '.'
+  "${TODOLIST_API_URL:-https://app.your-domain.com}/journals" | jq '.'
 ```
 
 ### Get Insights
 
 ```bash
 curl -s -H "Authorization: Bearer $TODOLIST_AUTH_TOKEN" \
-  "${TODOLIST_API_URL:-https://app.todolist.nyc}/insights?space_id=SPACE_ID" | jq '.'
+  "${TODOLIST_API_URL:-https://app.your-domain.com}/insights?space_id=SPACE_ID" | jq '.'
 ```
 
 ### Export Data
 
 ```bash
 curl -s -H "Authorization: Bearer $TODOLIST_AUTH_TOKEN" \
-  "${TODOLIST_API_URL:-https://app.todolist.nyc}/export?data=todos&space_id=SPACE_ID&format=json"
+  "${TODOLIST_API_URL:-https://app.your-domain.com}/export?data=todos&space_id=SPACE_ID&format=json"
 ```
 
 Supports `data=todos` or `data=journals`, and `format=json` or `format=csv`.
@@ -123,7 +123,7 @@ Sessions are conversation threads. There are two types:
 
 ```bash
 curl -s -H "Authorization: Bearer $TODOLIST_AUTH_TOKEN" \
-  "${TODOLIST_API_URL:-https://app.todolist.nyc}/agent/sessions?space_id=SPACE_ID" | jq '.'
+  "${TODOLIST_API_URL:-https://app.your-domain.com}/agent/sessions?space_id=SPACE_ID" | jq '.'
 ```
 
 Each session includes: `_id`, `title`, `todo_id` (if linked), `needs_agent_response`, `has_unread_reply`.
@@ -134,7 +134,7 @@ Each session includes: `_id`, `title`, `todo_id` (if linked), `needs_agent_respo
 curl -s -X POST -H "Authorization: Bearer $TODOLIST_AUTH_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"title": "SESSION_TITLE", "space_id": "SPACE_ID", "todo_id": "TODO_ID", "initial_message": "FIRST_MESSAGE", "initial_role": "assistant"}' \
-  "${TODOLIST_API_URL:-https://app.todolist.nyc}/agent/sessions" | jq '.'
+  "${TODOLIST_API_URL:-https://app.your-domain.com}/agent/sessions" | jq '.'
 ```
 
 - `todo_id` is optional. Omit it for standalone sessions.
@@ -144,7 +144,7 @@ curl -s -X POST -H "Authorization: Bearer $TODOLIST_AUTH_TOKEN" \
 
 ```bash
 curl -s -H "Authorization: Bearer $TODOLIST_AUTH_TOKEN" \
-  "${TODOLIST_API_URL:-https://app.todolist.nyc}/agent/sessions/SESSION_ID" | jq '.'
+  "${TODOLIST_API_URL:-https://app.your-domain.com}/agent/sessions/SESSION_ID" | jq '.'
 ```
 
 Returns the session with its `display_messages` array and `todo_id`.
@@ -153,7 +153,7 @@ Returns the session with its `display_messages` array and `todo_id`.
 
 ```bash
 curl -s -H "Authorization: Bearer $TODOLIST_AUTH_TOKEN" \
-  "${TODOLIST_API_URL:-https://app.todolist.nyc}/agent/sessions/pending?space_id=SPACE_ID&agent_id=openclaw" | jq '.'
+  "${TODOLIST_API_URL:-https://app.your-domain.com}/agent/sessions/pending?space_id=SPACE_ID&agent_id=openclaw" | jq '.'
 ```
 
 Returns sessions claimed by openclaw plus unclaimed sessions. Each session includes enrichment fields:
@@ -170,7 +170,7 @@ Returns sessions claimed by openclaw plus unclaimed sessions. Each session inclu
 curl -s -X POST -H "Authorization: Bearer $TODOLIST_AUTH_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"content": "YOUR_REPLY", "role": "assistant", "agent_id": "openclaw"}' \
-  "${TODOLIST_API_URL:-https://app.todolist.nyc}/agent/sessions/SESSION_ID/messages" | jq '.'
+  "${TODOLIST_API_URL:-https://app.your-domain.com}/agent/sessions/SESSION_ID/messages" | jq '.'
 ```
 
 Posting as `assistant` clears the pending flag and notifies the user. The `agent_id` claims the session so followups route back to openclaw.
@@ -181,7 +181,7 @@ Posting as `assistant` clears the pending flag and notifies the user. The `agent
 curl -s -X POST -H "Authorization: Bearer $TODOLIST_AUTH_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"content": "Working on this...", "role": "assistant", "agent_id": "openclaw", "interim": true}' \
-  "${TODOLIST_API_URL:-https://app.todolist.nyc}/agent/sessions/SESSION_ID/messages" | jq '.'
+  "${TODOLIST_API_URL:-https://app.your-domain.com}/agent/sessions/SESSION_ID/messages" | jq '.'
 ```
 
 When `interim` is `true`, the message is posted but `needs_agent_response` is NOT cleared. Use this for progress updates ("Working on this...") while keeping the session in the pending queue for the final response.
@@ -190,7 +190,7 @@ When `interim` is `true`, the message is posted but `needs_agent_response` is NO
 
 ```bash
 curl -s -H "Authorization: Bearer $TODOLIST_AUTH_TOKEN" \
-  "${TODOLIST_API_URL:-https://app.todolist.nyc}/agent/sessions/unread-todos?space_id=SPACE_ID" | jq '.'
+  "${TODOLIST_API_URL:-https://app.your-domain.com}/agent/sessions/unread-todos?space_id=SPACE_ID" | jq '.'
 ```
 
 Returns `todo_id` → status (`"waiting"` or `"unread_reply"`).
@@ -199,7 +199,7 @@ Returns `todo_id` → status (`"waiting"` or `"unread_reply"`).
 
 ```bash
 curl -s -X DELETE -H "Authorization: Bearer $TODOLIST_AUTH_TOKEN" \
-  "${TODOLIST_API_URL:-https://app.todolist.nyc}/agent/sessions/SESSION_ID"
+  "${TODOLIST_API_URL:-https://app.your-domain.com}/agent/sessions/SESSION_ID"
 ```
 
 ## Workflows
@@ -268,13 +268,13 @@ Pass `parent_id` when adding a todo to create it as a sub-task:
 curl -s -X POST -H "Authorization: Bearer $TODOLIST_AUTH_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"text": "Step 1: Research the problem", "space_id": "SPACE_ID", "parent_id": "PARENT_TODO_ID"}' \
-  "${TODOLIST_API_URL:-https://app.todolist.nyc}/todos" | jq '.'
+  "${TODOLIST_API_URL:-https://app.your-domain.com}/todos" | jq '.'
 
 # Create sub-task 2 (appended to parent's subtask_ids, session starts dormant)
 curl -s -X POST -H "Authorization: Bearer $TODOLIST_AUTH_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"text": "Step 2: Implement the solution", "space_id": "SPACE_ID", "parent_id": "PARENT_TODO_ID"}' \
-  "${TODOLIST_API_URL:-https://app.todolist.nyc}/todos" | jq '.'
+  "${TODOLIST_API_URL:-https://app.your-domain.com}/todos" | jq '.'
 ```
 
 Each sub-task:
@@ -302,7 +302,7 @@ Each sub-task:
 
 ```bash
 curl -s -H "Authorization: Bearer $TODOLIST_AUTH_TOKEN" \
-  "${TODOLIST_API_URL:-https://app.todolist.nyc}/todos/PARENT_TODO_ID/subtasks" | jq '.'
+  "${TODOLIST_API_URL:-https://app.your-domain.com}/todos/PARENT_TODO_ID/subtasks" | jq '.'
 ```
 
 #### Sub-Task Workflow
@@ -383,4 +383,4 @@ openclaw cron remove todolist-watcher
 - Always confirm which space to use if the user has more than one.
 - When creating sessions for tasks, use descriptive titles that reference the task.
 - Default to today's date for journal operations unless the user specifies otherwise.
-- The production URL is `https://app.todolist.nyc`.
+- The production URL is `https://app.your-domain.com`.

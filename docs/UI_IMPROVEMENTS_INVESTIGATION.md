@@ -1,7 +1,7 @@
 # UI Improvements Investigation
 
 ## Overview
-This document chronicles all UI/UX improvements attempted for the todolist.nyc application, including pull-to-refresh, swipeable tabs, and sticky headers.
+This document chronicles all UI/UX improvements attempted for the your-domain.com application, including pull-to-refresh, swipeable tabs, and sticky headers.
 
 **Date**: 2025-11-27
 **Context**: Mobile-first PWA with tabs (Tasks/Agent/Journal)
@@ -418,7 +418,7 @@ After exhausting all approaches including:
 Keep headers fixed at the top while scrolling on Tasks tab so tab navigation remains accessible.
 
 **Headers to Fix**:
-1. Main header: "todolist.nyc" + settings + user greeting
+1. Main header: "your-domain.com" + settings + user greeting
 2. Tab navigation: Tasks / Agent / Journal buttons
 
 **Constraints**:
@@ -437,7 +437,7 @@ Keep headers fixed at the top while scrolling on Tasks tab so tab navigation rem
   <div className="sticky top-0 bg-zinc-950 z-20">
     <div className="container mx-auto max-w-md pt-4">
       <div className="flex justify-between items-center mb-6 px-4">
-        <h1 className="text-2xl font-bold">todolist.nyc</h1>
+        <h1 className="text-2xl font-bold">your-domain.com</h1>
         {/* Settings, user greeting, etc. */}
       </div>
     </div>
@@ -535,7 +535,7 @@ return (
   <div className="fixed top-0 left-0 right-0 bg-zinc-950 z-20">
     <div className="container mx-auto max-w-md pt-4">
       <div className="flex justify-between items-center mb-6 px-4">
-        <h1 className="text-2xl font-bold">todolist.nyc</h1>
+        <h1 className="text-2xl font-bold">your-domain.com</h1>
         {/* ... */}
       </div>
     </div>
@@ -1192,7 +1192,7 @@ useEffect(() => {
 
 ## Conclusion
 
-This investigation covered multiple UI improvements for the todolist.nyc mobile PWA:
+This investigation covered multiple UI improvements for the your-domain.com mobile PWA:
 
 ### Successes ✅
 1. **Pull-to-Refresh**: Fully implemented and working on Tasks tab

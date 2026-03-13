@@ -1,4 +1,4 @@
-# todolist.nyc
+# todolist
 
 A developer tool for working with AI agents from anywhere. Dispatch tasks, store conversations, orchestrate parallel agents — online or offline.
 

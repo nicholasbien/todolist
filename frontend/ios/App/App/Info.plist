@@ -64,8 +64,8 @@
 	<false/>
 	<key>WKAppBoundDomains</key>
 	<array>
-		<string>todolist.nyc</string>
-		<string>app.todolist.nyc</string>
+		<string>your-domain.com</string>
+		<string>app.your-domain.com</string>
 		<string>backend-production-e920.up.railway.app</string>
 		<string>localhost</string>
 	</array>

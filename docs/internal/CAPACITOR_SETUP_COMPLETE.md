@@ -21,7 +21,7 @@
 - **Bundle ID**: `com.todolistnyc.aitodo`
 - **App Name**: "AI Todo List"
 - **Web Directory**: `out` (Next.js static export)
-- **Server URL**: Points to `https://todolist.nyc`
+- **Server URL**: Points to `https://your-domain.com`
 
 ### 3. Next.js Configuration Updated
 - **Static Export**: Added `output: 'export'` for Capacitor compatibility
@@ -84,7 +84,7 @@ frontend/
 
 ### Important Notes:
 - **Development**: Must be done on macOS with Xcode installed
-- **URL Configuration**: The app loads from `https://todolist.nyc`
+- **URL Configuration**: The app loads from `https://your-domain.com`
 - **Updates**: Web content updates instantly, native updates require App Store review
 - **Testing**: Use iOS Simulator or physical device for full testing
 

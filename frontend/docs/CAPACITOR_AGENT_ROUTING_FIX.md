@@ -14,7 +14,7 @@ The Python backend agent functionality at `/agent/stream` was not accessible fro
 
 ### Request Flow Comparison
 
-#### Web Browser (localhost:3001 or app.todolist.nyc)
+#### Web Browser (localhost:3001 or app.your-domain.com)
 ```
 User → AgentChatbot → "/agent/stream" (relative)
                   ↓ (intercepted by service worker)
@@ -61,8 +61,8 @@ Capacitor.isNativePlatform()
 ```
 
 ### URL Resolution
-- **Web**: `/api/agent/stream` → `http://localhost:3141/api/agent/stream` (dev) or `https://app.todolist.nyc/api/agent/stream` (prod)
-- **Capacitor**: `https://app.todolist.nyc/api/agent/stream` → Direct to production frontend server
+- **Web**: `/api/agent/stream` → `http://localhost:3141/api/agent/stream` (dev) or `https://app.your-domain.com/api/agent/stream` (prod)
+- **Capacitor**: `https://app.your-domain.com/api/agent/stream` → Direct to production frontend server
 
 ### Service Worker Behavior
 - **Web**: Service worker intercepts and passes `/api/agent` to Next.js (not backend)
@@ -72,7 +72,7 @@ Capacitor.isNativePlatform()
 
 ### Production Environment
 ```
-app.todolist.nyc (Frontend - Next.js + MCP)
+app.your-domain.com (Frontend - Next.js + MCP)
 ├── /api/agent/stream ← Agent endpoint
 ├── pages/api/agent/stream.ts ← MCP implementation
 └── src/
@@ -118,13 +118,13 @@ backend-production-e920.up.railway.app (Backend - FastAPI)
 curl http://localhost:3141/api/agent/stream?q=weather
 
 # Production
-curl https://app.todolist.nyc/api/agent/stream?q=weather
+curl https://app.your-domain.com/api/agent/stream?q=weather
 ```
 
 ### Capacitor Simulation
 ```javascript
 // This is what Capacitor apps will call
-fetch('https://app.todolist.nyc/api/agent/stream?q=weather')
+fetch('https://app.your-domain.com/api/agent/stream?q=weather')
 ```
 
 ## Related Issues Fixed

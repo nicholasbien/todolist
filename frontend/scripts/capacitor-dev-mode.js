@@ -16,7 +16,7 @@ function updateConfig(mode) {
   if (mode === 'dev') {
     // Switch to development mode (local dev server)
     const updatedContent = configContent
-      .replace(/url: 'https:\/\/todolist\.nyc',/, '// url: \'https://todolist.nyc\',')
+      .replace(/url: 'https:\/\/todolist\.nyc',/, '// url: \'https://your-domain.com\',')
       .replace(/\/\/ url: 'http:\/\/localhost:3141',/, 'url: \'http://localhost:3141\',');
 
     fs.writeFileSync(configPath, updatedContent);
@@ -28,19 +28,19 @@ function updateConfig(mode) {
   } else if (mode === 'prod') {
     // Switch to production mode (live site)
     const updatedContent = configContent
-      .replace(/\/\/ url: 'https:\/\/todolist\.nyc',/, 'url: \'https://todolist.nyc\',')
+      .replace(/\/\/ url: 'https:\/\/todolist\.nyc',/, 'url: \'https://your-domain.com\',')
       .replace(/url: 'http:\/\/localhost:3141',/, '// url: \'http://localhost:3141\',');
 
     fs.writeFileSync(configPath, updatedContent);
     console.log('✅ Switched to PRODUCTION mode');
-    console.log('   - Loading from https://todolist.nyc');
+    console.log('   - Loading from https://your-domain.com');
     console.log('   - Service worker will work from live site');
 
   } else {
     console.log('Usage: node scripts/capacitor-dev-mode.js [dev|prod]');
     console.log('');
     console.log('dev  - Load from http://localhost:3141 (for development)');
-    console.log('prod - Load from https://todolist.nyc (for production)');
+    console.log('prod - Load from https://your-domain.com (for production)');
     process.exit(1);
   }
 }

@@ -2,7 +2,7 @@
 
 ## Overview
 
-The todolist.nyc AI agent now includes full **Brave Search** integration, enabling real-time web search capabilities directly within the chat interface. This allows users to get current information, news, and web results through natural language queries.
+The your-domain.com AI agent now includes full **Brave Search** integration, enabling real-time web search capabilities directly within the chat interface. This allows users to get current information, news, and web results through natural language queries.
 
 ## Architecture
 
@@ -233,7 +233,7 @@ export const MessageRenderer: React.FC<{content: string}> = ({ content }) => {
 
 ## Conclusion
 
-The Brave Search integration provides the todolist.nyc AI agent with powerful, real-time web search capabilities through a clean, efficient architecture. By choosing direct API integration over complex MCP processes, we achieved better performance, reliability, and maintainability while delivering a seamless user experience with properly formatted, clickable results.
+The Brave Search integration provides the your-domain.com AI agent with powerful, real-time web search capabilities through a clean, efficient architecture. By choosing direct API integration over complex MCP processes, we achieved better performance, reliability, and maintainability while delivering a seamless user experience with properly formatted, clickable results.
 
 The integration follows established patterns in the codebase, ensuring consistency and making future enhancements straightforward to implement.
 

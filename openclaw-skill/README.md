@@ -23,7 +23,7 @@ chmod +x scripts/login.sh
 2. **Set environment variables** in your OpenClaw config or shell:
 
 ```bash
-export TODOLIST_API_URL="https://app.todolist.nyc"
+export TODOLIST_API_URL="https://app.your-domain.com"
 export TODOLIST_AUTH_TOKEN="your_token_here"
 ```
 

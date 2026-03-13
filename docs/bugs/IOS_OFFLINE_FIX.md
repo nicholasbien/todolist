@@ -13,8 +13,8 @@ API requests were bypassing the service worker by going directly to the backend:
 
 ### Before (Broken):
 ```
-App loads from: https://app.todolist.nyc
-Service worker at: https://app.todolist.nyc (same origin)
+App loads from: https://app.your-domain.com
+Service worker at: https://app.your-domain.com (same origin)
 API calls go to: https://backend-production-e920.up.railway.app (DIFFERENT origin!)
                  ↑ Service worker CANNOT intercept cross-origin requests
 ```
@@ -27,8 +27,8 @@ Changed all API requests to use relative URLs (same-origin) so the service worke
 
 ### After (Fixed):
 ```
-App loads from: https://app.todolist.nyc
-Service worker at: https://app.todolist.nyc
+App loads from: https://app.your-domain.com
+Service worker at: https://app.your-domain.com
 API calls go to: /todos, /journals, /agent/stream (SAME origin!)
                  ↑ Service worker CAN intercept and route to backend
                  ↑ When offline, serves from IndexedDB
@@ -100,7 +100,7 @@ const agentUrl = `/agent/stream?${params.toString()}`;
 📱 Registering service worker...
 🔗 API Request: todos -> /todos (Capacitor: true, via SW: true)
 📡 Request will be intercepted by service worker: /todos
-🔗 Service worker routing: https://app.todolist.nyc/todos -> https://backend-production-e920.up.railway.app/todos
+🔗 Service worker routing: https://app.your-domain.com/todos -> https://backend-production-e920.up.railway.app/todos
 ```
 
 ### Expected Console Logs (Web)
@@ -113,7 +113,7 @@ const agentUrl = `/agent/stream?${params.toString()}`;
 ## Important Notes
 
 ### Service Worker in Capacitor Server Mode
-- ✅ **WORKS**: Your config uses `server.url: 'https://app.todolist.nyc'`
+- ✅ **WORKS**: Your config uses `server.url: 'https://app.your-domain.com'`
 - ✅ Service worker is supported when loading from HTTPS origin
 - ✅ iOS 14.5+ supports service workers in WKWebView
 - ⚠️ Service worker must be registered successfully (check logs)
@@ -122,7 +122,7 @@ const agentUrl = `/agent/stream?${params.toString()}`;
 1. **Same-origin requests**: Service worker can intercept
 2. **Service worker routing**: SW detects environment and routes correctly:
    - `protocol === 'file:'` → Capacitor → Route to production backend
-   - `hostname.endsWith('todolist.nyc')` → Production → Route to production backend
+   - `hostname.endsWith('your-domain.com')` → Production → Route to production backend
    - Otherwise → Development → Route to localhost:8141
 
 ### Fallback Safety
@@ -149,7 +149,7 @@ const agentUrl = `/agent/stream?${params.toString()}`;
 
 3. **Check service worker status**:
    - Safari Developer Tools → Service Workers
-   - Should show active service worker from `https://app.todolist.nyc`
+   - Should show active service worker from `https://app.your-domain.com`
 
 4. **Clear caches and reinstall**:
    - Delete app from device

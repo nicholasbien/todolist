@@ -1,6 +1,6 @@
 # Homepage Screenshots Guide
 
-This guide documents how to capture screenshots of the todolist.nyc app using Playwright MCP and add them to the homepage.
+This guide documents how to capture screenshots of the your-domain.com app using Playwright MCP and add them to the homepage.
 
 ## Overview
 

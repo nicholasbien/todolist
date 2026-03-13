@@ -9,7 +9,7 @@
 
 ## Problem Statement
 
-The app header ("todolist.nyc" title, space selector, settings icon) renders too close to or overlapping with the iPhone notch/Dynamic Island and status bar. Users need proper spacing to ensure the header is fully visible and not obscured by system UI.
+The app header ("your-domain.com" title, space selector, settings icon) renders too close to or overlapping with the iPhone notch/Dynamic Island and status bar. Users need proper spacing to ensure the header is fully visible and not obscured by system UI.
 
 ---
 
@@ -51,7 +51,7 @@ During testing, we discovered another layer of complexity:
 
 **`capacitor.config.ts` line 9:**
 ```typescript
-url: 'https://app.todolist.nyc',
+url: 'https://app.your-domain.com',
 ```
 
 When this URL is set, the iOS app loads content from the **live production website** (Railway deployment), NOT from local `out/` directory.
@@ -186,7 +186,7 @@ const headerPaddingStyle = isNative
 - **capacitor.config.ts:** `contentInset: 'never'`
 - **AIToDoListApp.tsx:** `paddingTop: calc(env(safe-area-inset-top) + 2rem)`
 - **Deployed:** Yes (Railway production)
-- **iOS App:** Loading from `https://app.todolist.nyc`
+- **iOS App:** Loading from `https://app.your-domain.com`
 
 ### Expected Outcomes
 
@@ -217,7 +217,7 @@ const headerPaddingStyle = isNative
 - Check `out/` directory timestamp to verify builds are fresh
 
 ### 2. Production URL Configuration
-- `url: 'https://app.todolist.nyc'` in capacitor.config.ts makes iOS load live site
+- `url: 'https://app.your-domain.com'` in capacitor.config.ts makes iOS load live site
 - Enables automatic updates via Railway deploys (no App Store submission)
 - But prevents local testing of uncommitted changes
 - **For testing:** Comment out URL, use `npm run cap:build`
@@ -286,7 +286,7 @@ npm run cap:build
 - **Version:** 7.x (based on package.json plugins)
 - **Platform:** iOS
 - **WebDir:** `out`
-- **Server URL:** `https://app.todolist.nyc` (production)
+- **Server URL:** `https://app.your-domain.com` (production)
 
 ### Device
 - **Model:** iPhone 15

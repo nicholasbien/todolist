@@ -55,7 +55,7 @@ const forceBackend = isAuthEndpoint && isOnline;
 ### Solution 2: Enhanced API Utils
 ```javascript
 // Detect environment and force appropriate routing
-const backendUrl = baseUrl || (window.location.hostname.includes('todolist.nyc')
+const backendUrl = baseUrl || (window.location.hostname.includes('your-domain.com')
   ? CONFIG.PRODUCTION_BACKEND
   : 'http://localhost:8141');
 ```

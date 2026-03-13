@@ -6,7 +6,7 @@ const config: CapacitorConfig = {
   webDir: 'out',
   server: {
     // Production: Load from your live PWA site to enable service worker
-    url: 'https://app.todolist.nyc',
+    url: 'https://app.your-domain.com',
     // Development: For local testing, comment out the production URL above (uses webDir: 'out')
     // url: 'http://localhost:3141',
     hostname: 'localhost'

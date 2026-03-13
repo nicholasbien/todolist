@@ -15,14 +15,14 @@ All pages are now in your Next.js app (`frontend/pages/`):
 ## Routing Setup
 
 **Current Setup:**
-- `app.todolist.nyc/` → Todo app (index.tsx)
-- `app.todolist.nyc/home` → Landing page
-- `app.todolist.nyc/privacy` → Privacy policy
-- `app.todolist.nyc/terms` → Terms of service
-- `app.todolist.nyc/support` → Support page
+- `app.your-domain.com/` → Todo app (index.tsx)
+- `app.your-domain.com/home` → Landing page
+- `app.your-domain.com/privacy` → Privacy policy
+- `app.your-domain.com/terms` → Terms of service
+- `app.your-domain.com/support` → Support page
 
 **DNS Configuration (your task):**
-- Point `todolist.nyc` → `app.todolist.nyc/home` (via DNS forwarding or redirect)
+- Point `your-domain.com` → `app.your-domain.com/home` (via DNS forwarding or redirect)
 
 ## Test Locally
 
@@ -43,9 +43,9 @@ http://localhost:3141/support       # Support page
 
 All required pages are ready:
 
-1. **Privacy Policy URL:** `https://app.todolist.nyc/privacy`
-2. **Support URL:** `https://app.todolist.nyc/support`
-3. **Terms of Service URL (optional):** `https://app.todolist.nyc/terms`
+1. **Privacy Policy URL:** `https://app.your-domain.com/privacy`
+2. **Support URL:** `https://app.your-domain.com/support`
+3. **Terms of Service URL (optional):** `https://app.your-domain.com/terms`
 
 ## What's Included
 
@@ -110,22 +110,22 @@ Visit localhost:3141 and check:
 
 ### 2. Deploy to Railway
 Your Next.js app already includes everything. Just deploy as usual:
-- All pages will be available on `app.todolist.nyc`
+- All pages will be available on `app.your-domain.com`
 - No additional configuration needed
 
 ### 3. Configure DNS
 Set up domain forwarding:
-- `todolist.nyc` → `https://app.todolist.nyc/home`
+- `your-domain.com` → `https://app.your-domain.com/home`
 
 This can be done at your domain registrar:
-- **URL Forward/Redirect** from `todolist.nyc` to `https://app.todolist.nyc/home`
+- **URL Forward/Redirect** from `your-domain.com` to `https://app.your-domain.com/home`
 - OR **CNAME** record pointing to Railway deployment
 
 ### 4. App Store Connect
 When submitting your app, add these URLs:
-- **Privacy Policy URL:** `https://app.todolist.nyc/privacy`
-- **Support URL:** `https://app.todolist.nyc/support`
-- **Marketing URL (optional):** `https://app.todolist.nyc/home`
+- **Privacy Policy URL:** `https://app.your-domain.com/privacy`
+- **Support URL:** `https://app.your-domain.com/support`
+- **Marketing URL (optional):** `https://app.your-domain.com/home`
 
 ## Files Modified
 

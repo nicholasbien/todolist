@@ -177,7 +177,7 @@ app.add_middleware(SecurityHeadersMiddleware)
 # Enable CORS - specifically for the Next.js frontend
 _allowed_origins = os.getenv(
     "CORS_ORIGINS",
-    "http://localhost:3141,https://app.todolist.nyc,capacitor://localhost,ionic://localhost",
+    "http://localhost:3141,capacitor://localhost,ionic://localhost",
 ).split(",")
 app.add_middleware(
     CORSMiddleware,

@@ -40,7 +40,7 @@ This comprehensive production readiness plan addresses critical security vulnera
      SMTP_PASSWORD=<app_specific_password>
      FROM_EMAIL=<secure_email>
      ADMIN_EMAIL=<admin_email>
-     WEBSITE_URL=https://app.todolist.nyc
+     WEBSITE_URL=https://app.your-domain.com
      ENV=production
      ```
 
@@ -64,7 +64,7 @@ This comprehensive production readiness plan addresses critical security vulnera
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "https://app.todolist.nyc",  # Production frontend
+        "https://app.your-domain.com",  # Production frontend
         "https://your-frontend-domain.railway.app",  # Railway frontend
         "http://localhost:3141",  # Development only
     ] if os.getenv("ENV") != "development" else ["*"],
@@ -93,8 +93,8 @@ class Config:
     # Security settings
     CORS_ORIGINS = {
         Environment.DEVELOPMENT: ["*"],
-        Environment.STAGING: ["https://staging.todolist.nyc"],
-        Environment.PRODUCTION: ["https://app.todolist.nyc"]
+        Environment.STAGING: ["https://staging.your-domain.com"],
+        Environment.PRODUCTION: ["https://app.your-domain.com"]
     }
 
     # Rate limiting
@@ -248,7 +248,7 @@ from fastapi.middleware.trustedhost import TrustedHostMiddleware
 # Add trusted host middleware
 app.add_middleware(
     TrustedHostMiddleware,
-    allowed_hosts=["app.todolist.nyc", "*.railway.app"] if os.getenv("ENV") == "production" else ["*"]
+    allowed_hosts=["app.your-domain.com", "*.railway.app"] if os.getenv("ENV") == "production" else ["*"]
 )
 
 # Request size limits
