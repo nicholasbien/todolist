@@ -2,11 +2,6 @@
 
 A developer tool for working with AI agents from anywhere. Dispatch tasks, store conversations, orchestrate parallel agents — online or offline.
 
-<p align="center">
-  <img width="397" alt="Tasks view" src="https://github.com/user-attachments/assets/7b249e00-9f72-4b39-a37c-47b784470d9f" />
-  <img width="397" alt="Assistant view" src="https://github.com/user-attachments/assets/9b421d87-df1a-41bb-8e6e-f53947b9e044" />
-</p>
-
 ## Quick Start
 
 ### Docker (recommended)
