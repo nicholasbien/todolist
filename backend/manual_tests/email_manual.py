@@ -62,9 +62,7 @@ This is a test email from your Todo App SMTP configuration.
 
 If you received this, your email setup is working correctly!
 
-Time: """ + str(
-                __import__("datetime").datetime.now()
-            )
+Time: """ + str(__import__("datetime").datetime.now())
 
             msg.attach(MIMEText(body, "plain"))
 
