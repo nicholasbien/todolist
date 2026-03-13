@@ -2,7 +2,9 @@
 
 import logging
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 
 from auth import (
     LoginRequest,
@@ -19,21 +21,25 @@ from .dependencies import get_current_user
 
 logger = logging.getLogger(__name__)
 
+limiter = Limiter(key_func=get_remote_address)
+
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 @router.post("/signup")
-async def api_signup(request: SignupRequest):
+@limiter.limit("5/minute")
+async def api_signup(request: Request, signup_request: SignupRequest):
     """Send verification code to email for signup/login."""
-    logger.info(f"Signup request for email: {request.email}")
-    return await signup_user(request.email)
+    logger.info(f"Signup request for email: {signup_request.email}")
+    return await signup_user(signup_request.email)
 
 
 @router.post("/login")
-async def api_login(request: LoginRequest):
+@limiter.limit("5/minute")
+async def api_login(request: Request, login_request: LoginRequest):
     """Verify code and create session."""
-    logger.info(f"Login request for email: {request.email}")
-    return await login_user(request.email, request.code)
+    logger.info(f"Login request for email: {login_request.email}")
+    return await login_user(login_request.email, login_request.code)
 
 
 @router.post("/logout")
