@@ -217,8 +217,9 @@ Nicholas"""
             await loop.run_in_executor(executor, send_smtp_email)
 
         logger.info(f"Verification email sent to {email}")
-        # For testing: always print verification code to console
-        print(f"VERIFICATION CODE for {email}: {code}")
+        # Only print verification code in test/dev environments
+        if os.getenv("USE_MOCK_DB"):
+            print(f"VERIFICATION CODE for {email}: {code}")
         return True
 
     except Exception as e:
@@ -231,10 +232,6 @@ Nicholas"""
 async def signup_user(email: str) -> dict:
     """Create or update user with new verification code."""
     try:
-        # Special handling for test account - no email needed
-        if email == "test@example.com":
-            return {"message": "Test account ready - use code 000000 to login"}
-
         # Generate verification code
         code = generate_verification_code()
         code_expires_at = datetime.now() + timedelta(minutes=10)
@@ -291,12 +288,11 @@ async def signup_user(email: str) -> dict:
 async def login_user(email: str, code: str) -> dict:
     """Verify code and create session for user."""
     try:
-        # Check if this is a test environment bypass
-        test_email = os.getenv("TEST_EMAIL")
-        test_code = os.getenv("TEST_CODE")
-        if (test_email and test_code and email == test_email and code == test_code) or (
-            email == "test@example.com" and code == "000000"
-        ):
+        # Test environment bypass - only available when USE_MOCK_DB is set (test/dev only)
+        is_test_env = os.getenv("USE_MOCK_DB")
+        test_email = os.getenv("TEST_EMAIL") if is_test_env else None
+        test_code = os.getenv("TEST_CODE") if is_test_env else None
+        if is_test_env and test_email and test_code and email == test_email and code == test_code:
             # Find or create test user
             user = await users_collection.find_one({"email": email})
             if not user:
