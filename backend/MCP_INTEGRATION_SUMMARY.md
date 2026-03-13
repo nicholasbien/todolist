@@ -87,7 +87,7 @@ cd backend && source venv/bin/activate
 uvicorn app:app --reload
 
 # Test endpoint
-curl "http://localhost:8000/agent/stream?q=fetch+content+from+example.com&mcp=fetch"
+curl "http://localhost:8141/agent/stream?q=fetch+content+from+example.com&mcp=fetch"
 ```
 
 ## 📝 Current Status

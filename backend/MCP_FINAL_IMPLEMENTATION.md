@@ -102,7 +102,7 @@ GET /agent/stream?q=search+for+Python+tutorials&mcp=web
 ### 1. Web Content Fetching
 
 ```bash
-curl "http://localhost:8000/agent/stream?q=Get+the+main+content+from+https://example.com&mcp=web"
+curl "http://localhost:8141/agent/stream?q=Get+the+main+content+from+https://example.com&mcp=web"
 ```
 
 The agent will:
@@ -114,13 +114,13 @@ The agent will:
 ### 2. API Calls
 
 ```bash
-curl "http://localhost:8000/agent/stream?q=Get+JSON+data+from+httpbin.org/json&mcp=web"
+curl "http://localhost:8141/agent/stream?q=Get+JSON+data+from+httpbin.org/json&mcp=web"
 ```
 
 ### 3. Web Search
 
 ```bash
-curl "http://localhost:8000/agent/stream?q=Search+for+Python+MCP+tutorials&mcp=web"
+curl "http://localhost:8141/agent/stream?q=Search+for+Python+MCP+tutorials&mcp=web"
 ```
 
 ## Extending with More MCP Servers
