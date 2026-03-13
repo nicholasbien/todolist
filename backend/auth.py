@@ -168,6 +168,12 @@ def generate_session_token() -> str:
 async def send_verification_email(email: str, code: str) -> bool:
     """Send verification code via email."""
     try:
+        # Skip sending emails to @example.com addresses (test/demo accounts)
+        if email.lower().endswith("@example.com"):
+            logger.info(f"Skipped verification email to example.com address: {email}")
+            print(f"VERIFICATION CODE for {email}: {code}")
+            return True
+
         # In test environment, just print and return
         if os.getenv("ALLOW_TEST_ACCOUNT"):
             print(f"VERIFICATION CODE for {email}: {code}")
