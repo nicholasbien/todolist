@@ -196,9 +196,13 @@ async def append_message(
     if role == "user":
         update["needs_agent_response"] = True
         update["needs_human_response"] = False
+        logger.info(f"[append_message] User message - setting needs_agent_response=True for session {session_id}")
     elif role == "assistant":
         if not interim:
             update["needs_agent_response"] = False
+            logger.info(f"[append_message] Assistant final message - setting needs_agent_response=False for session {session_id}")
+        else:
+            logger.info(f"[append_message] Assistant interim message - NOT clearing needs_agent_response for session {session_id}")
         update["has_unread_reply"] = True
         if agent_id:
             update["agent_id"] = agent_id
