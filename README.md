@@ -2,6 +2,8 @@
 
 A developer tool for working with AI agents from anywhere. Dispatch tasks, store conversations, orchestrate parallel agents — online or offline.
 
+![Task List](docs/screenshots/task-list.png)
+
 ## Quick Start
 
 ### Docker (recommended)
@@ -87,6 +89,10 @@ Available MCP tools: `add_todo`, `list_todos`, `complete_todo`, `create_session`
 - **Link tasks** — paste a URL, page title is fetched automatically
 - **Drag-and-drop** — reorder tasks by dragging
 - **Email summaries** — daily AI-generated productivity insights (optional)
+
+| Journal | Assistant |
+|---------|-----------|
+| ![Journal](docs/screenshots/journal.png) | ![Assistant](docs/screenshots/assistant.png) |
 
 ## Tech Stack
 
