@@ -39,7 +39,7 @@ export default function AgentChatbot({
   onNavigateToTasks,
 }: ChatbotProps) {
   const [question, setQuestion] = useState('');
-  const [messages, setMessages] = useState<{ role: string; content: string; toolData?: any; agent_id?: string }[]>([]);
+  const [messages, setMessages] = useState<{ role: string; content: string; toolData?: any; agent_id?: string; pending_sync?: boolean }[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [thinkingDots, setThinkingDots] = useState(0);
@@ -321,6 +321,25 @@ export default function AgentChatbot({
       window.removeEventListener('offline', updateOnlineStatus);
     };
   }, []);
+
+  // Listen for SYNC_COMPLETE to clear pending_sync indicators
+  // and refresh session list (Phase 4: session list refreshes after sync)
+  useEffect(() => {
+    const handleSyncComplete = (event: MessageEvent) => {
+      if (event.data?.type === 'SYNC_COMPLETE') {
+        // Clear pending_sync flags from all messages
+        setMessages((prev) =>
+          prev.map((msg) => (msg.pending_sync ? { ...msg, pending_sync: false } : msg))
+        );
+        // Refresh sessions list after sync
+        fetchSessions();
+      }
+    };
+    navigator.serviceWorker?.addEventListener('message', handleSyncComplete);
+    return () => {
+      navigator.serviceWorker?.removeEventListener('message', handleSyncComplete);
+    };
+  }, [fetchSessions]);
   useEffect(() => {
     if ((!isWaitingForExternalAgent && !needsHumanResponse) || !token) return;
     // Don't poll when agent is waiting for human response
@@ -579,7 +598,8 @@ export default function AgentChatbot({
     // If session is owned by an external agent, post via messaging API
     // so the external agent picks it up (don't stream to built-in agent)
     if (sessionAgentId && currentSessionId) {
-      setMessages((prev) => [...prev, { role: 'user', content: userMessage }]);
+      const isPendingSync = !isOnline;
+      setMessages((prev) => [...prev, { role: 'user', content: userMessage, pending_sync: isPendingSync }]);
       setNeedsHumanResponse(false);
       try {
         await fetch(`/agent/sessions/${currentSessionId}/messages`, {
@@ -588,7 +608,10 @@ export default function AgentChatbot({
           body: JSON.stringify({ role: 'user', content: userMessage }),
         });
       } catch (err: any) {
-        setError(err.message || 'Failed to send message');
+        // Offline: service worker handles write-through, no error needed
+        if (isOnline) {
+          setError(err.message || 'Failed to send message');
+        }
       }
       return;
     }
@@ -710,7 +733,7 @@ export default function AgentChatbot({
   };
 
   const handleOfflineClick = () => {
-    if (!isOnline) {
+    if (!isOnline && !isTaskSession && !sessionAgentId) {
       setShowOfflineMessage(true);
       setTimeout(() => {
         setShowOfflineMessage(false);
@@ -1121,6 +1144,12 @@ export default function AgentChatbot({
               ) : (
                 <PlainTextRenderer content={msg.content} className="text-sm" />
               )}
+              {msg.pending_sync && (
+                <div className="text-xs text-yellow-500/70 mt-1 flex items-center gap-1">
+                  <span className="inline-block w-2 h-2 bg-yellow-500/70 rounded-full animate-pulse" />
+                  Pending sync
+                </div>
+              )}
             </div>
           </div>
         ))}
@@ -1151,6 +1180,13 @@ export default function AgentChatbot({
             </div>
           </div>
         )}
+        {!isOnline && (isTaskSession || sessionAgentId) && messages.length > 0 && (
+          <div className="flex justify-center py-2">
+            <div className="text-xs text-yellow-500/80 bg-yellow-900/20 border border-yellow-700/30 rounded-full px-3 py-1">
+              Offline mode &mdash; messages will sync when back online
+            </div>
+          </div>
+        )}
         <div ref={messagesEndRef} />
       </div>
 
@@ -1172,7 +1208,7 @@ export default function AgentChatbot({
         <div className="flex-1 relative">
           <textarea
             className={`w-full bg-gray-900 border border-gray-700 text-gray-100 rounded-lg p-3 focus:outline-none focus:border-accent resize-none min-h-[48px] max-h-[140px] overflow-y-auto ${
-              !isOnline ? 'opacity-50 cursor-not-allowed' : ''
+              !isOnline && !isTaskSession && !sessionAgentId ? 'opacity-50 cursor-not-allowed' : ''
             }`}
             value={question}
             onChange={(e) => {
@@ -1190,8 +1226,10 @@ export default function AgentChatbot({
               }
             }}
             placeholder={
-              !isOnline
+              !isOnline && !isTaskSession && !sessionAgentId
                 ? "Assistant requires internet connection"
+                : !isOnline && (isTaskSession || sessionAgentId)
+                ? "Type a message (will sync when online)..."
                 : isTaskSession
                 ? "Send a message about this task..."
                 : sessionAgentId
@@ -1200,16 +1238,16 @@ export default function AgentChatbot({
                 ? `Chat with ${AGENTS.find(a => a.id === selectedAgentId)?.label || selectedAgentId}...`
                 : "Ask a question..."
             }
-            disabled={!isOnline}
+            disabled={!isOnline && !isTaskSession && !sessionAgentId}
             rows={1}
-            onMouseEnter={() => !isOnline && setShowOfflineMessage(true)}
+            onMouseEnter={() => !isOnline && !isTaskSession && !sessionAgentId && setShowOfflineMessage(true)}
             onMouseLeave={() => setShowOfflineMessage(false)}
             onClick={handleOfflineClick}
             onFocus={() => setIsQuestionFocused(true)}
             onBlur={() => setIsQuestionFocused(false)}
             aria-label={isTaskSession ? "Send message about task" : "Ask assistant a question"}
           />
-          {showOfflineMessage && !isOnline && (
+          {showOfflineMessage && !isOnline && !isTaskSession && !sessionAgentId && (
             <div className="absolute bottom-full left-0 mb-2 bg-gray-800 border border-gray-700 rounded-lg p-3 shadow-lg z-10 w-full">
               <p className="text-sm text-gray-300">
                 Network connection required to use Assistant mode. The assistant needs to communicate with AI services in real-time.
@@ -1219,7 +1257,7 @@ export default function AgentChatbot({
         </div>
         <button
           onClick={handleSend}
-          disabled={!question.trim() || !isOnline}
+          disabled={!question.trim() || (!isOnline && !isTaskSession && !sessionAgentId)}
           className={`border px-6 py-3 rounded-lg hover:bg-accent/10 disabled:opacity-50 disabled:cursor-not-allowed transition-colors ${
             isQuestionFocused
               ? 'border-accent text-accent'

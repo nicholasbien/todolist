@@ -1,10 +1,10 @@
 // IMPORTANT: Always increment these versions when modifying this service worker file
 // This forces browsers to download and use the updated service worker
-const STATIC_CACHE = 'todo-static-v129';
+const STATIC_CACHE = 'todo-static-v130';
 
 const GLOBAL_DB_NAME = 'TodoGlobalDB';
 const USER_DB_PREFIX = 'TodoUserDB_';
-const DB_VERSION = 13;
+const DB_VERSION = 14;
 
 // Configuration
 const CONFIG = {
@@ -18,6 +18,13 @@ const QUEUE = 'queue';
 const AUTH = 'auth';
 const JOURNALS = 'journals';
 const ID_MAP = 'idmap';
+const CHAT_SESSIONS = 'chat_sessions';
+const CHAT_MESSAGES = 'chat_messages';
+
+// Chat cache limits (Phase 3)
+const CHAT_MAX_SESSIONS = 50;
+const CHAT_MAX_MESSAGES_PER_SESSION = 200;
+const CHAT_TTL_DAYS = 30;
 
 const DEFAULT_CATEGORIES = ['General'];
 
@@ -130,6 +137,16 @@ function openUserDB(userId) {
       }
       if (!db.objectStoreNames.contains(ID_MAP)) {
         db.createObjectStore(ID_MAP, { keyPath: 'key' });
+      }
+      // v14: Add chat session and message stores for offline chat support
+      if (!db.objectStoreNames.contains(CHAT_SESSIONS)) {
+        const sessionStore = db.createObjectStore(CHAT_SESSIONS, { keyPath: '_id' });
+        sessionStore.createIndex('space_id', 'space_id', { unique: false });
+        sessionStore.createIndex('cached_at', 'cached_at', { unique: false });
+      }
+      if (!db.objectStoreNames.contains(CHAT_MESSAGES)) {
+        const messageStore = db.createObjectStore(CHAT_MESSAGES, { keyPath: '_id' });
+        messageStore.createIndex('session_id', 'session_id', { unique: false });
       }
       // v13: Clear potentially corrupted data from pre-fix versions.
       // syncServerDataToLocal() repopulates from server on activate.
@@ -378,6 +395,115 @@ const clearIdMap = async (userId) => {
   }
 };
 
+// ========= CHAT SESSION & MESSAGE OPERATIONS =========
+
+const getChatSessions = async (userId, spaceId = null) => {
+  const authData = userId ? null : await getAuth();
+  const effectiveUserId = userId || (authData ? authData.userId : null);
+  const allSessions = await userDbTx(effectiveUserId, CHAT_SESSIONS, 'readonly', (s) => s.getAll());
+  if (spaceId) {
+    return allSessions.filter(s => s.space_id === spaceId);
+  }
+  return allSessions;
+};
+
+const putChatSession = async (session, userId) => {
+  const authData = userId ? null : await getAuth();
+  const effectiveUserId = userId || (authData ? authData.userId : null);
+  const sessionWithTimestamp = { ...session, cached_at: Date.now() };
+  return userDbTx(effectiveUserId, CHAT_SESSIONS, 'readwrite', (s) => s.put(sessionWithTimestamp));
+};
+
+const delChatSession = async (id, userId) => {
+  const authData = userId ? null : await getAuth();
+  const effectiveUserId = userId || (authData ? authData.userId : null);
+  return userDbTx(effectiveUserId, CHAT_SESSIONS, 'readwrite', (s) => s.delete(id));
+};
+
+const getChatMessages = async (userId, sessionId) => {
+  const authData = userId ? null : await getAuth();
+  const effectiveUserId = userId || (authData ? authData.userId : null);
+  const db = await openUserDB(effectiveUserId);
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction([CHAT_MESSAGES], 'readonly');
+    const store = tx.objectStore(CHAT_MESSAGES);
+    const index = store.index('session_id');
+    const req = index.getAll(sessionId);
+    req.onsuccess = () => resolve(req.result || []);
+    req.onerror = () => reject(req.error);
+  });
+};
+
+const putChatMessage = async (message, userId) => {
+  const authData = userId ? null : await getAuth();
+  const effectiveUserId = userId || (authData ? authData.userId : null);
+  return userDbTx(effectiveUserId, CHAT_MESSAGES, 'readwrite', (s) => s.put(message));
+};
+
+const delChatMessagesBySession = async (sessionId, userId) => {
+  const authData = userId ? null : await getAuth();
+  const effectiveUserId = userId || (authData ? authData.userId : null);
+  const messages = await getChatMessages(effectiveUserId, sessionId);
+  for (const msg of messages) {
+    await userDbTx(effectiveUserId, CHAT_MESSAGES, 'readwrite', (s) => s.delete(msg._id));
+  }
+};
+
+const clearChatSessions = async (userId) => {
+  const authData = userId ? null : await getAuth();
+  const effectiveUserId = userId || (authData ? authData.userId : null);
+  await userDbTx(effectiveUserId, CHAT_SESSIONS, 'readwrite', (s) => s.clear());
+  await userDbTx(effectiveUserId, CHAT_MESSAGES, 'readwrite', (s) => s.clear());
+};
+
+// ========= CHAT TTL & STORAGE LIMITS (Phase 3) =========
+
+async function evictStaleChatSessions(userId) {
+  const allSessions = await getChatSessions(userId);
+  if (allSessions.length === 0) return;
+
+  const now = Date.now();
+  const ttlMs = CHAT_TTL_DAYS * 24 * 60 * 60 * 1000;
+
+  // Remove expired sessions (older than TTL)
+  const expired = allSessions.filter(s => s.cached_at && (now - s.cached_at) > ttlMs);
+  for (const session of expired) {
+    await delChatMessagesBySession(session._id, userId);
+    await delChatSession(session._id, userId);
+    console.log(`🗑️ Evicted expired chat session ${session._id} (age: ${Math.round((now - session.cached_at) / 86400000)}d)`);
+  }
+
+  // Enforce max session count (keep most recently cached)
+  const remaining = (await getChatSessions(userId))
+    .sort((a, b) => (b.cached_at || 0) - (a.cached_at || 0));
+  if (remaining.length > CHAT_MAX_SESSIONS) {
+    const toEvict = remaining.slice(CHAT_MAX_SESSIONS);
+    for (const session of toEvict) {
+      await delChatMessagesBySession(session._id, userId);
+      await delChatSession(session._id, userId);
+      console.log(`🗑️ Evicted overflow chat session ${session._id} (count limit)`);
+    }
+  }
+}
+
+async function trimChatMessages(sessionId, userId) {
+  const messages = await getChatMessages(userId, sessionId);
+  if (messages.length <= CHAT_MAX_MESSAGES_PER_SESSION) return;
+
+  // Sort by created_at ascending, keep newest
+  messages.sort((a, b) => {
+    const dateA = a.created_at || a.timestamp || '';
+    const dateB = b.created_at || b.timestamp || '';
+    return dateA < dateB ? -1 : dateA > dateB ? 1 : 0;
+  });
+
+  const toRemove = messages.slice(0, messages.length - CHAT_MAX_MESSAGES_PER_SESSION);
+  for (const msg of toRemove) {
+    await userDbTx(userId, CHAT_MESSAGES, 'readwrite', (s) => s.delete(msg._id));
+  }
+  console.log(`✂️ Trimmed ${toRemove.length} old messages from session ${sessionId}`);
+}
+
 
 // Function to get authenticated headers
 async function getAuthHeaders() {
@@ -585,6 +711,25 @@ async function syncServerDataToLocal() {
     } catch (err) {
       console.log('Failed to sync journals:', err);
     }
+
+    // Fetch and store chat sessions (Phase 1: initial cache population)
+    try {
+      const sessionsResponse = await fetch(`${backendBase}/agent/sessions`, { headers });
+      if (sessionsResponse.ok) {
+        const serverSessions = await sessionsResponse.json();
+        if (Array.isArray(serverSessions)) {
+          for (const session of serverSessions) {
+            if (session && session._id) {
+              await putChatSession(session, authData.userId);
+            }
+          }
+          // Phase 3: Evict stale sessions after initial sync
+          await evictStaleChatSessions(authData.userId);
+        }
+      }
+    } catch (err) {
+      console.log('Failed to sync chat sessions:', err);
+    }
   } catch (err) {
     console.log('Failed to sync server data:', err);
   }
@@ -637,6 +782,12 @@ self.addEventListener('activate', (event) => {
       ),
       // Sync server data to local database when service worker activates
       syncServerDataToLocal(),
+      // Phase 3: Evict stale chat sessions on activate
+      getAuth().then(auth => {
+        if (auth && auth.userId) {
+          return evictStaleChatSessions(auth.userId);
+        }
+      }).catch(err => console.log('Chat TTL cleanup skipped:', err)),
       // Only claim clients after setup is complete so pages aren't served
       // by a half-initialized SW (which causes stuck Loading... state)
       self.clients.claim()
@@ -833,6 +984,50 @@ async function cacheGetSpaces(url, response, authData) {
   return 'cached';
 }
 
+// ── Chat session cache handlers ──────────────────────────────
+
+async function cacheGetChatSessions(url, response, authData) {
+  const sessions = await response.json();
+  if (!Array.isArray(sessions)) return 'skipped';
+
+  for (const session of sessions) {
+    if (session && session._id) {
+      await putChatSession(session, authData.userId);
+    }
+  }
+
+  // Evict stale/overflow sessions after caching
+  await evictStaleChatSessions(authData.userId);
+
+  console.log(`💬 Cached ${sessions.length} chat sessions to IndexedDB`);
+  return 'cached';
+}
+
+async function cacheGetChatSession(url, response, authData) {
+  const sessionData = await response.json();
+  if (!sessionData || !sessionData._id) return 'skipped';
+
+  // Cache the session metadata
+  const { messages: sessionMessages, ...sessionMeta } = sessionData;
+  await putChatSession(sessionMeta, authData.userId);
+
+  // Cache messages for this session (Phase 4: replaces cached data on next GET)
+  if (Array.isArray(sessionMessages)) {
+    await delChatMessagesBySession(sessionData._id, authData.userId);
+    for (const msg of sessionMessages) {
+      if (msg && msg._id) {
+        await putChatMessage({ ...msg, session_id: sessionData._id }, authData.userId);
+      }
+    }
+    await trimChatMessages(sessionData._id, authData.userId);
+  }
+
+  await evictStaleChatSessions(authData.userId);
+
+  console.log(`💬 Cached chat session ${sessionData._id} with ${(sessionMessages || []).length} messages`);
+  return 'cached';
+}
+
 const GET_CACHE_HANDLERS = {
   '/todos': cacheGetTodos,
   '/journals': cacheGetJournals,
@@ -902,6 +1097,18 @@ async function handleApiRequest(request) {
             // Pass a clone so the original response body can still be returned to the page.
             handler(url, response.clone(), authData).catch(err =>
               console.error('Cache update failed:', err)
+            );
+          }
+
+          // Cache chat session GET responses
+          if (url.pathname === '/agent/sessions') {
+            cacheGetChatSessions(url, response.clone(), authData).catch(err =>
+              console.error('Chat sessions cache update failed:', err)
+            );
+          } else if (url.pathname.match(/^\/agent\/sessions\/[a-f0-9]{24}$/)) {
+            // Phase 4: replaces cached data on next GET from server
+            cacheGetChatSession(url, response.clone(), authData).catch(err =>
+              console.error('Chat session cache update failed:', err)
             );
           }
         }
@@ -1011,6 +1218,83 @@ async function handleOfflineRequest(request, url) {
         headers: { 'Content-Type': 'application/json' }
       });
     }
+
+    // ========= CHAT SESSION OFFLINE READS =========
+
+    // GET /agent/sessions — list sessions from cache
+    if (apiPath === '/agent/sessions') {
+      const spaceId = url.searchParams.get('space_id');
+      const sessions = await getChatSessions(authData.userId, spaceId);
+      sessions.sort((a, b) => {
+        const dateA = a.updated_at || a.created_at || '';
+        const dateB = b.updated_at || b.created_at || '';
+        return dateB > dateA ? 1 : dateB < dateA ? -1 : 0;
+      });
+      console.log(`📱 Offline GET /agent/sessions - Found ${sessions.length} cached sessions`);
+      return new Response(JSON.stringify(sessions), {
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
+    // GET /agent/sessions/:id — single session with messages from cache
+    const sessionMatch = apiPath.match(/^\/agent\/sessions\/([a-f0-9]{24})$/);
+    if (sessionMatch) {
+      const sessionId = sessionMatch[1];
+      const sessions = await getChatSessions(authData.userId);
+      const session = sessions.find(s => s._id === sessionId);
+      if (session) {
+        const messages = await getChatMessages(authData.userId, sessionId);
+        messages.sort((a, b) => {
+          const dateA = a.created_at || a.timestamp || '';
+          const dateB = b.created_at || b.timestamp || '';
+          return dateA < dateB ? -1 : dateA > dateB ? 1 : 0;
+        });
+        console.log(`📱 Offline GET /agent/sessions/${sessionId} - Found session with ${messages.length} messages`);
+        return new Response(JSON.stringify({ ...session, messages }), {
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+      return new Response(JSON.stringify({ error: 'Session not found in cache' }), {
+        status: 404, headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
+    // GET /agent/sessions/pending — return empty array offline
+    if (apiPath === '/agent/sessions/pending') {
+      return new Response(JSON.stringify([]), {
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
+    // GET /agent/sessions/unread-todos — return empty array offline
+    if (apiPath === '/agent/sessions/unread-todos') {
+      return new Response(JSON.stringify([]), {
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
+    // GET /agent/sessions/todo-statuses — return empty object offline
+    if (apiPath === '/agent/sessions/todo-statuses') {
+      return new Response(JSON.stringify({}), {
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
+    // GET /agent/sessions/by-todo/:todoId — look up from cached sessions
+    const byTodoMatch = apiPath.match(/^\/agent\/sessions\/by-todo\/(.+)$/);
+    if (byTodoMatch) {
+      const todoId = byTodoMatch[1];
+      const allSessions = await getChatSessions(authData.userId);
+      const match = allSessions.find(s => s.todo_id === todoId);
+      if (match) {
+        return new Response(JSON.stringify(match), {
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+      return new Response(JSON.stringify({ error: 'Session not found' }), {
+        status: 404, headers: { 'Content-Type': 'application/json' }
+      });
+    }
   }
 
   // Handle non-GET requests (POST, PUT, DELETE)
@@ -1115,6 +1399,55 @@ async function handleOfflineRequest(request, url) {
 
     return new Response(JSON.stringify({ error: 'Journal not found' }), {
       status: 404,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+
+  // ========= CHAT MESSAGE OPERATIONS (Phase 2: Offline Sending) =========
+
+  // POST /agent/sessions/:id/messages — offline write-through
+  const postMsgMatch = apiPath.match(/^\/agent\/sessions\/([a-f0-9]{24})\/messages$/);
+  if (request.method === 'POST' && postMsgMatch) {
+    const sessionId = postMsgMatch[1];
+    const content = data.content || '';
+
+    // Create offline message
+    const offlineMsg = {
+      _id: `offline_msg_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+      session_id: sessionId,
+      role: data.role || 'user',
+      content: content,
+      created_at: new Date().toISOString(),
+      pending_sync: true,
+    };
+
+    // Write to IndexedDB cache
+    await putChatMessage(offlineMsg, authData.userId);
+
+    // Update session metadata (updated_at, needs_agent_response)
+    const sessions = await getChatSessions(authData.userId);
+    const session = sessions.find(s => s._id === sessionId);
+    if (session) {
+      await putChatSession({
+        ...session,
+        updated_at: new Date().toISOString(),
+        needs_agent_response: true,
+      }, authData.userId);
+    }
+
+    // Enqueue for sync
+    await addQueue({
+      type: 'SEND_CHAT_MESSAGE',
+      data: {
+        session_id: sessionId,
+        role: data.role || 'user',
+        content: content,
+        offline_msg_id: offlineMsg._id,
+      }
+    }, authData.userId);
+
+    console.log(`💬 Offline POST /agent/sessions/${sessionId}/messages - queued message ${offlineMsg._id}`);
+    return new Response(JSON.stringify(offlineMsg), {
       headers: { 'Content-Type': 'application/json' }
     });
   }
@@ -1818,6 +2151,34 @@ async function syncQueue() {
           }
           break;
         }
+        // Phase 2: Sync offline chat messages (Phase 4: FIFO order via syncQueue)
+        case 'SEND_CHAT_MESSAGE': {
+          const { session_id, content, role, offline_msg_id } = op.data;
+          res = await fetch(`${backendUrl}/agent/sessions/${session_id}/messages`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({ role: role || 'user', content }),
+          });
+          if (res && res.ok) {
+            const serverMsg = await res.json();
+            // Remove offline message and store server version
+            if (offline_msg_id) {
+              try {
+                await userDbTx(authData.userId, CHAT_MESSAGES, 'readwrite', (s) => s.delete(offline_msg_id));
+              } catch (e) {
+                // Offline message may already be gone
+              }
+            }
+            if (serverMsg && serverMsg._id) {
+              await putChatMessage({ ...serverMsg, session_id }, authData.userId);
+            }
+            console.log(`💬 Sync SUCCESS: Chat message synced for session ${session_id}`);
+            success = true;
+          } else {
+            console.log(`❌ Sync FAILED: Chat message for session ${session_id}`);
+          }
+          break;
+        }
       }
 
       // Per-operation queue deletion (Bug 1 fix)
@@ -1925,5 +2286,19 @@ if (typeof module !== 'undefined') {
     cacheGetSpaces,
     generateInsights,
     _resetDbCache,
+    getChatSessions,
+    putChatSession,
+    delChatSession,
+    getChatMessages,
+    putChatMessage,
+    delChatMessagesBySession,
+    clearChatSessions,
+    cacheGetChatSessions,
+    cacheGetChatSession,
+    evictStaleChatSessions,
+    trimChatMessages,
+    CHAT_MAX_SESSIONS,
+    CHAT_MAX_MESSAGES_PER_SESSION,
+    CHAT_TTL_DAYS,
   };
 }
