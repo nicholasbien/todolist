@@ -3,6 +3,7 @@
 Test script to debug SMTP email issues
 """
 
+import datetime
 import os
 import smtplib
 from email.mime.multipart import MIMEMultipart
@@ -23,7 +24,7 @@ FROM_EMAIL = os.getenv("FROM_EMAIL")
 def test_smtp_connection():
     """Test SMTP connection and send a test email."""
 
-    print("🔍 Testing SMTP Configuration")
+    print("Testing SMTP Configuration")
     print(f"Server: {SMTP_SERVER}:{SMTP_PORT}")
     print(f"Username: {SMTP_USERNAME}")
     print(f"From Email: {FROM_EMAIL}")
@@ -31,33 +32,31 @@ def test_smtp_connection():
     print("-" * 50)
 
     if not SMTP_USERNAME or not SMTP_PASSWORD:
-        print("❌ SMTP credentials not configured!")
+        print("SMTP credentials not configured!")
         return False
 
     try:
-        print("📡 Connecting to SMTP server...")
+        print("Connecting to SMTP server...")
         server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
 
-        print("🔐 Starting TLS...")
+        print("Starting TLS...")
         server.starttls()
 
-        print("🔑 Attempting login...")
+        print("Attempting login...")
         server.login(SMTP_USERNAME, SMTP_PASSWORD)
 
-        print("✅ SMTP connection successful!")
+        print("SMTP connection successful!")
 
         # Send test email
         test_email = input("Enter email to send test to (or press Enter to skip): ").strip()
 
         if test_email:
-            print(f"📧 Sending test email to {test_email}...")
+            print(f"Sending test email to {test_email}...")
 
             msg = MIMEMultipart()
             msg["From"] = FROM_EMAIL
             msg["To"] = test_email
             msg["Subject"] = "Test Email from Todo App"
-
-            import datetime
 
             now = str(datetime.datetime.now())
             body = (
@@ -69,29 +68,29 @@ def test_smtp_connection():
             msg.attach(MIMEText(body, "plain"))
 
             server.sendmail(FROM_EMAIL, test_email, msg.as_string())
-            print("✅ Test email sent successfully!")
-            print("📝 Check inbox (and spam folder) for the test email")
+            print("Test email sent successfully!")
+            print("Check inbox (and spam folder) for the test email")
 
         server.quit()
         return True
 
     except smtplib.SMTPAuthenticationError as e:
-        print(f"❌ Authentication failed: {e}")
-        print("💡 Check:")
+        print(f"Authentication failed: {e}")
+        print("Check:")
         print("   - 2FA is enabled on the Gmail account")
         print("   - App password is generated correctly")
         print("   - Using app password, not regular password")
         return False
 
     except smtplib.SMTPConnectError as e:
-        print(f"❌ Connection failed: {e}")
-        print("💡 Check:")
+        print(f"Connection failed: {e}")
+        print("Check:")
         print("   - Internet connection")
         print("   - Gmail SMTP settings")
         return False
 
     except Exception as e:
-        print(f"❌ Unexpected error: {type(e).__name__}: {e}")
+        print(f"Unexpected error: {type(e).__name__}: {e}")
         return False
 
 
