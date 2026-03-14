@@ -83,10 +83,7 @@ def check_rate_limit(
     recent = [t for t in timestamps if t > cutoff]
 
     if len(recent) >= max_requests:
-        logger.warning(
-            f"Rate limit exceeded for key: {key} "
-            f"({len(recent)}/{max_requests} in {window_seconds}s)"
-        )
+        logger.warning(f"Rate limit exceeded for key: {key} " f"({len(recent)}/{max_requests} in {window_seconds}s)")
         raise HTTPException(
             status_code=429,
             detail=error_message,
