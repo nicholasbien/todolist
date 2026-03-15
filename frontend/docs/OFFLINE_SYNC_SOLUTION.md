@@ -54,7 +54,7 @@ res = await fetch(updateJournalUrl, { method: 'POST', ... });
 
 **Environment routing**:
 - **Local dev**: `http://localhost:8141/journals`
-- **Production**: `https://backend-production-e920.up.railway.app/journals`
+- **Production**: Configured via `BACKEND_URL` environment variable
 
 ### Fix 2: Smart Server Data Blocking
 
