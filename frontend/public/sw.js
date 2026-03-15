@@ -1,10 +1,10 @@
 // IMPORTANT: Always increment these versions when modifying this service worker file
 // This forces browsers to download and use the updated service worker
-const STATIC_CACHE = 'todo-static-v130';
+const STATIC_CACHE = 'todo-static-v129';
 
 const GLOBAL_DB_NAME = 'TodoGlobalDB';
 const USER_DB_PREFIX = 'TodoUserDB_';
-const DB_VERSION = 14;
+const DB_VERSION = 13;
 
 // Configuration
 const CONFIG = {
@@ -18,13 +18,6 @@ const QUEUE = 'queue';
 const AUTH = 'auth';
 const JOURNALS = 'journals';
 const ID_MAP = 'idmap';
-const CHAT_SESSIONS = 'chat_sessions';
-const CHAT_MESSAGES = 'chat_messages';
-
-// Chat cache limits (Phase 3)
-const CHAT_MAX_SESSIONS = 50;
-const CHAT_MAX_MESSAGES_PER_SESSION = 200;
-const CHAT_TTL_DAYS = 30;
 
 const DEFAULT_CATEGORIES = ['General'];
 
@@ -137,16 +130,6 @@ function openUserDB(userId) {
       }
       if (!db.objectStoreNames.contains(ID_MAP)) {
         db.createObjectStore(ID_MAP, { keyPath: 'key' });
-      }
-      // v14: Add chat session and message stores for offline chat support
-      if (!db.objectStoreNames.contains(CHAT_SESSIONS)) {
-        const sessionStore = db.createObjectStore(CHAT_SESSIONS, { keyPath: '_id' });
-        sessionStore.createIndex('space_id', 'space_id', { unique: false });
-        sessionStore.createIndex('cached_at', 'cached_at', { unique: false });
-      }
-      if (!db.objectStoreNames.contains(CHAT_MESSAGES)) {
-        const messageStore = db.createObjectStore(CHAT_MESSAGES, { keyPath: '_id' });
-        messageStore.createIndex('session_id', 'session_id', { unique: false });
       }
       // v13: Clear potentially corrupted data from pre-fix versions.
       // syncServerDataToLocal() repopulates from server on activate.
@@ -395,142 +378,6 @@ const clearIdMap = async (userId) => {
   }
 };
 
-
-// ========= CHAT SESSION & MESSAGE OPERATIONS =========
-
-const getChatSessions = async (userId, spaceId = null) => {
-  const authData = userId ? null : await getAuth();
-  const effectiveUserId = userId || (authData ? authData.userId : null);
-  const allSessions = await userDbTx(effectiveUserId, CHAT_SESSIONS, 'readonly', (s) => s.getAll());
-  if (spaceId) {
-    return allSessions.filter(s => s.space_id === spaceId);
-  }
-  return allSessions;
-};
-
-const putChatSession = async (session, userId) => {
-  const authData = userId ? null : await getAuth();
-  const effectiveUserId = userId || (authData ? authData.userId : null);
-  const sessionWithTimestamp = { ...session, cached_at: Date.now() };
-  return userDbTx(effectiveUserId, CHAT_SESSIONS, 'readwrite', (s) => s.put(sessionWithTimestamp));
-};
-
-const delChatSession = async (id, userId) => {
-  const authData = userId ? null : await getAuth();
-  const effectiveUserId = userId || (authData ? authData.userId : null);
-  return userDbTx(effectiveUserId, CHAT_SESSIONS, 'readwrite', (s) => s.delete(id));
-};
-
-const getChatMessages = async (userId, sessionId) => {
-  const authData = userId ? null : await getAuth();
-  const effectiveUserId = userId || (authData ? authData.userId : null);
-  const db = await openUserDB(effectiveUserId);
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction([CHAT_MESSAGES], 'readonly');
-    const store = tx.objectStore(CHAT_MESSAGES);
-    const index = store.index('session_id');
-    const req = index.getAll(sessionId);
-    req.onsuccess = () => resolve(req.result || []);
-    req.onerror = () => reject(req.error);
-  });
-};
-
-const putChatMessage = async (message, userId) => {
-  const authData = userId ? null : await getAuth();
-  const effectiveUserId = userId || (authData ? authData.userId : null);
-  return userDbTx(effectiveUserId, CHAT_MESSAGES, 'readwrite', (s) => s.put(message));
-};
-
-const delChatMessagesBySession = async (sessionId, userId) => {
-  const authData = userId ? null : await getAuth();
-  const effectiveUserId = userId || (authData ? authData.userId : null);
-  const messages = await getChatMessages(effectiveUserId, sessionId);
-  for (const msg of messages) {
-    await userDbTx(effectiveUserId, CHAT_MESSAGES, 'readwrite', (s) => s.delete(msg._id));
-  }
-};
-
-const clearChatSessions = async (userId) => {
-  const authData = userId ? null : await getAuth();
-  const effectiveUserId = userId || (authData ? authData.userId : null);
-  await userDbTx(effectiveUserId, CHAT_SESSIONS, 'readwrite', (s) => s.clear());
-  await userDbTx(effectiveUserId, CHAT_MESSAGES, 'readwrite', (s) => s.clear());
-};
-
-// ========= CHAT TTL & STORAGE LIMITS (Phase 3) =========
-
-/**
- * Evict expired and overflow chat sessions from IndexedDB.
- * - Removes sessions whose cached_at is older than CHAT_TTL_DAYS
- * - If more than CHAT_MAX_SESSIONS remain, evicts oldest by cached_at (LRU)
- * Also deletes associated messages for every evicted session.
- */
-async function evictStaleChatSessions(userId) {
-  const allSessions = await getChatSessions(userId);
-  if (allSessions.length === 0) return;
-
-  const now = Date.now();
-  const ttlMs = CHAT_TTL_DAYS * 24 * 60 * 60 * 1000;
-
-  // Remove expired sessions (older than TTL)
-  const expired = allSessions.filter(s => s.cached_at && (now - s.cached_at) > ttlMs);
-  for (const session of expired) {
-    await delChatMessagesBySession(session._id, userId);
-    await delChatSession(session._id, userId);
-    console.log(`🗑️ Evicted expired chat session ${session._id} (age: ${Math.round((now - session.cached_at) / 86400000)}d)`);
-  }
-
-  // Enforce max session count (keep most recently cached)
-  const remaining = (await getChatSessions(userId))
-    .sort((a, b) => (b.cached_at || 0) - (a.cached_at || 0));
-  if (remaining.length > CHAT_MAX_SESSIONS) {
-    const toEvict = remaining.slice(CHAT_MAX_SESSIONS);
-    for (const session of toEvict) {
-      await delChatMessagesBySession(session._id, userId);
-      await delChatSession(session._id, userId);
-      console.log(`🗑️ Evicted overflow chat session ${session._id} (count limit)`);
-    }
-  }
-}
-
-/**
- * Trim messages for a single session to CHAT_MAX_MESSAGES_PER_SESSION.
- * Keeps the most recent messages by created_at/timestamp, deletes oldest.
- */
-async function trimChatMessages(sessionId, userId) {
-  const messages = await getChatMessages(userId, sessionId);
-  if (messages.length <= CHAT_MAX_MESSAGES_PER_SESSION) return;
-
-  // Sort by created_at ascending, keep newest
-  messages.sort((a, b) => {
-    const dateA = a.created_at || a.timestamp || '';
-    const dateB = b.created_at || b.timestamp || '';
-    return dateA < dateB ? -1 : dateA > dateB ? 1 : 0;
-  });
-
-  const toRemove = messages.slice(0, messages.length - CHAT_MAX_MESSAGES_PER_SESSION);
-  for (const msg of toRemove) {
-    await userDbTx(userId, CHAT_MESSAGES, 'readwrite', (s) => s.delete(msg._id));
-  }
-  console.log(`✂️ Trimmed ${toRemove.length} old messages from session ${sessionId}`);
-}
-
-/**
- * Full cleanup: evict expired sessions and trim all remaining sessions' messages.
- * Called on SW activate and after each syncQueue run.
- */
-async function cleanupExpiredChatSessions(userId) {
-  try {
-    await evictStaleChatSessions(userId);
-    // Trim messages for remaining sessions
-    const sessions = await getChatSessions(userId);
-    for (const session of sessions) {
-      await trimChatMessages(session._id, userId);
-    }
-  } catch (err) {
-    console.log('Chat TTL cleanup error:', err);
-  }
-}
 
 // Function to get authenticated headers
 async function getAuthHeaders() {
@@ -790,12 +637,6 @@ self.addEventListener('activate', (event) => {
       ),
       // Sync server data to local database when service worker activates
       syncServerDataToLocal(),
-      // Phase 3: Evict stale chat sessions on activate
-      getAuth().then(auth => {
-        if (auth && auth.userId) {
-          return cleanupExpiredChatSessions(auth.userId);
-        }
-      }).catch(err => console.log('Chat TTL cleanup skipped:', err)),
       // Only claim clients after setup is complete so pages aren't served
       // by a half-initialized SW (which causes stuck Loading... state)
       self.clients.claim()
@@ -2010,9 +1851,6 @@ async function syncQueue() {
 
     // Persist the updated ID mapping
     await putIdMap(idMap, authData.userId);
-
-    // Phase 3: Clean up expired chat sessions after sync
-    await cleanupExpiredChatSessions(authData.userId);
   } finally {
     syncInProgress = false;
 
@@ -2087,18 +1925,5 @@ if (typeof module !== 'undefined') {
     cacheGetSpaces,
     generateInsights,
     _resetDbCache,
-    getChatSessions,
-    putChatSession,
-    delChatSession,
-    getChatMessages,
-    putChatMessage,
-    delChatMessagesBySession,
-    clearChatSessions,
-    evictStaleChatSessions,
-    trimChatMessages,
-    cleanupExpiredChatSessions,
-    CHAT_MAX_SESSIONS,
-    CHAT_MAX_MESSAGES_PER_SESSION,
-    CHAT_TTL_DAYS,
   };
 }

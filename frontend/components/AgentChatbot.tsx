@@ -708,14 +708,17 @@ export default function AgentChatbot({
   const formatSessionDate = (dateStr: string) => {
     const date = new Date(dateStr);
     const now = new Date();
-    const diffMs = Math.max(0, now.getTime() - date.getTime());
-    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+    // Compare calendar dates in the user's local timezone
+    const localDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    const localNow = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const diffDays = Math.round((localNow.getTime() - localDate.getTime()) / (1000 * 60 * 60 * 24));
 
     if (diffDays === 0) {
       return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
     }
     if (diffDays === 1) return 'Yesterday';
-    if (diffDays < 7) return `${diffDays}d ago`;
+    if (diffDays > 1 && diffDays < 7) return `${diffDays}d ago`;
 
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   };

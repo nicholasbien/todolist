@@ -474,9 +474,8 @@ export default function AIToDoListApp({
             title: todo.text,
             todo_id: todo._id,
             initial_message: [
-              `I want to work on this task: "${todo.text}"`,
+              `Please help me with this task: ${todo.text}`,
               todo.notes ? `Notes: ${todo.notes}` : null,
-              `Help me get started.`,
             ].filter(Boolean).join('\n'),
             initial_role: 'user',
           }),
