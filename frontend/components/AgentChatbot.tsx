@@ -462,32 +462,18 @@ export default function AgentChatbot({
   };
 
   // -----------------------------------------------------------------------
-  // Select an agent and resume the most recent session with that agent,
-  // or fall back to new-chat mode with that agent pre-selected.
+  // Select an agent — always starts a new chat with that agent pre-selected.
   // -----------------------------------------------------------------------
   const handleSelectAgent = (agentId: string) => {
-    const recentSession = sessions.find(
-      (s) => !s.todo_id && s.agent_id === agentId
-    );
-    if (recentSession) {
-      loadSession(recentSession._id);
-    } else {
-      // No prior sessions — enter new-chat mode with this agent pre-selected
-      handleNewChat();
-      setSelectedAgentId(agentId);
-    }
+    // Always enter new-chat mode with the agent pre-selected
+    // (don't navigate to a previous session)
+    handleNewChat();
+    setSelectedAgentId(agentId);
   };
 
-  // Select the built-in assistant and resume the most recent session
+  // Select the built-in assistant (new chat mode)
   const handleSelectBuiltInAssistant = () => {
-    const recentSession = sessions.find(
-      (s) => !s.todo_id && (!s.agent_id || s.agent_id === 'claude')
-    );
-    if (recentSession) {
-      loadSession(recentSession._id);
-    } else {
-      handleNewChat();
-    }
+    handleNewChat();
   };
 
   // -----------------------------------------------------------------------
@@ -1081,7 +1067,7 @@ export default function AgentChatbot({
                             ? 'bg-purple-600/20 text-purple-300 border border-purple-500/40'
                             : 'bg-gray-800 text-gray-400 border border-gray-700 hover:bg-gray-700'
                         }`}
-                        title={hasRecentSession ? `Resume latest ${agent.label} chat` : `Start new ${agent.label} chat`}
+                        title={`Start new ${agent.label} chat`}
                       >
                         {agent.label}
                         {hasRecentSession && (
