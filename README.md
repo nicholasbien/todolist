@@ -57,7 +57,15 @@ Agents interact with the app through the MCP server or the REST API.
 
 ### MCP Setup (Claude Code)
 
-The MCP server can be used from **any repository**, not just the todolist repo itself. Add a `.mcp.json` to whichever repo you want the todolist tools available in:
+The MCP server can be used from **any repository**, not just the todolist repo itself.
+
+First, install and build the MCP server:
+
+```bash
+cd mcp-server && npm install && npm run build
+```
+
+Then add a `.mcp.json` to whichever repo you want the todolist tools available in:
 
 ```json
 {
