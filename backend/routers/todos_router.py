@@ -295,6 +295,52 @@ async def api_complete_todo(todo_id: str, current_user: dict = Depends(get_curre
         await handle_subtask_completion(todo_id, current_user["user_id"])
     except Exception as e:
         logger.error(f"Subtask orchestration error: {e}")
+
+    # Auto-create a linked session for the next recurring task occurrence
+    recurring_next_id = result.get("recurring_next_id") if isinstance(result, dict) else None
+    if recurring_next_id:
+        try:
+            recurring_text = result.get("recurring_next_text", "")
+
+            # Look up the original todo to inherit agent_id from its session
+            original_session = await find_session_by_todo(current_user["user_id"], todo_id)
+            auto_agent_id = original_session.get("agent_id") if original_session else None
+
+            # Fetch the newly created recurring todo for full details
+            from bson import ObjectId as _ObjId
+
+            new_todo_doc = await todos_collection.find_one({"_id": _ObjId(recurring_next_id)})
+
+            # Build initial message with task details
+            details = []
+            if new_todo_doc:
+                if new_todo_doc.get("category") and new_todo_doc["category"] != "General":
+                    details.append(f"Category: {new_todo_doc['category']}")
+                if new_todo_doc.get("priority"):
+                    details.append(f"Priority: {new_todo_doc['priority']}")
+                if new_todo_doc.get("dueDate"):
+                    details.append(f"Due: {new_todo_doc['dueDate']}")
+                if new_todo_doc.get("notes"):
+                    details.append(f"Notes: {new_todo_doc['notes']}")
+
+            initial_msg = f"Please help me with this task: {recurring_text}"
+            if details:
+                initial_msg += "\n" + "\n".join(details)
+            initial_msg += "\n(This is a recurring task)"
+
+            session_id = await create_chat_session(
+                current_user["user_id"],
+                new_todo_doc.get("space_id") if new_todo_doc else None,
+                recurring_text,
+                todo_id=recurring_next_id,
+                agent_id=auto_agent_id,
+            )
+            await append_message(session_id, current_user["user_id"], "user", initial_msg)
+
+            logger.info(f"Created session {session_id} for recurring task {recurring_next_id}")
+        except Exception as e:
+            logger.error(f"Failed to create session for recurring task: {e}")
+
     return result
 
 
