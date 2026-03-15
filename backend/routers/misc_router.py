@@ -1,4 +1,4 @@
-"""Miscellaneous routes: contact, insights, activity feed, export, memories, health."""
+"""Miscellaneous routes: contact, insights, activity feed, export, health."""
 
 import csv
 import json
@@ -6,14 +6,11 @@ import logging
 from io import StringIO
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import Response
 from pydantic import BaseModel
 
 from activity_feed import get_activity_feed
-
-# Memory feature disabled for initial release
-# from agent_memory import get_recent_memory_logs
 from journals import journals_collection
 from spaces import get_spaces_for_user, user_in_space
 from todos import get_todos, health_check, todos_collection
@@ -188,56 +185,3 @@ async def export_data(
         )
 
     raise HTTPException(status_code=400, detail="Invalid format")
-
-
-# ── Agent Memory Endpoints (disabled for initial release) ─────────────
-
-_MEMORY_DISABLED_MSG = "Memory feature is disabled"
-
-
-@router.get("/memories")
-async def api_list_memories(
-    space_id: Optional[str] = None,
-    category: Optional[str] = None,
-    current_user: dict = Depends(get_current_user),
-):
-    """List all agent memory facts — disabled for initial release."""
-    return []
-
-
-@router.put("/memories")
-async def api_save_memory(
-    request: Request,
-    space_id: Optional[str] = None,
-    current_user: dict = Depends(get_current_user),
-):
-    """Save or update a memory fact — disabled for initial release."""
-    raise HTTPException(status_code=404, detail=_MEMORY_DISABLED_MSG)
-
-
-@router.delete("/memories/{memory_id}")
-async def api_delete_memory(
-    memory_id: str,
-    current_user: dict = Depends(get_current_user),
-):
-    """Delete a specific memory fact — disabled for initial release."""
-    raise HTTPException(status_code=404, detail=_MEMORY_DISABLED_MSG)
-
-
-@router.delete("/memories")
-async def api_delete_all_memories(
-    space_id: Optional[str] = None,
-    current_user: dict = Depends(get_current_user),
-):
-    """Delete all memory facts — disabled for initial release."""
-    return {"deleted_count": 0}
-
-
-@router.get("/memory-logs")
-async def api_get_memory_logs(
-    space_id: Optional[str] = None,
-    limit: int = 14,
-    current_user: dict = Depends(get_current_user),
-):
-    """Return recent daily memory logs — disabled for initial release."""
-    return []

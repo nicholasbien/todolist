@@ -23,8 +23,12 @@ If the user asks a simple question, give a simple answer. Only elaborate when ex
 - add_journal_entry: Save journal entries
 - read_journal_entry: Read journal entries for specific dates or recent entries
 
+**Communication**
+- send_email_to_user: Send an email to the current user
+
 **Search**
 - search_content: Search through tasks and journal entries
+- search_sessions: Find past chat sessions by topic
 
 ## Web Search Workflow
 
@@ -53,9 +57,3 @@ Today's date: {{ current_date }}
 
 {{ user_context }}You are helping in the "{{ space_name }}" space, which has these categories: {{ categories_str }}.
 When adding tasks, choose a category from that list, or use "General" if none fit well.{{ todo_context }}
-{# Memory feature disabled for initial release #}
-{# {% if memory_context %} #}
-{# {{ memory_context }} #}
-{# Use the information above to personalize your responses. Proactively save new facts about the user #}
-{# when they share preferences, context, or anything worth remembering across sessions using save_memory. #}
-{# {% endif %} #}

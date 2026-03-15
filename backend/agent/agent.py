@@ -235,13 +235,6 @@ def _format_tool_display(tool_name: str, args: dict, result: dict) -> str:
         if "entry" in d:
             entry = d["entry"]
             return f"📖 Journal entry from {entry['date']}" if entry else "📖 No journal entry found"
-        if "memory" in d:
-            mem = d["memory"]
-            return f"🧠 Saved: {mem.get('key', '')} = {mem.get('value', '')}"
-        if "memories" in d:
-            return f"🧠 Found {d.get('count', len(d['memories']))} memories"
-        if "deleted_key" in d:
-            return f"🧠 Forgot: {d['deleted_key']}"
         return "✅ Success"
 
     return f"🔧 {tool_name}{fmt_args(args)}: {fmt_result(result)}"
@@ -436,21 +429,12 @@ async def stream_agent_response(
     # Build context with user name if available
     user_context = f"You are helping {user_name}.\n" if user_name else ""
 
-    # Memory context disabled for initial release
-    memory_context = ""
-    # try:
-    #     from agent_memory import build_memory_context
-    #     memory_context = await build_memory_context(user_id, space_id)
-    # except Exception as e:
-    #     logger.error(f"Failed to build memory context: {e}")
-
     developer_instructions = _jinja_env.get_template("agent_developer_instructions.j2").render(
         current_date=current_date,
         user_context=user_context,
         space_name=space_name,
         categories_str=categories_str,
         todo_context=todo_context,
-        memory_context=memory_context,
     )
 
     # -----------------------------------------------------------------------
