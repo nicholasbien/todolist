@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Dict, Optional
 
 from bson import ObjectId
@@ -78,8 +78,6 @@ class Todo(BaseModel):
     depends_on: list[str] = []  # IDs of sibling subtasks this task depends on
     closed: bool = False  # Soft-deleted: hidden from active view, visible in completed
     dateClosed: Optional[str] = None  # ISO timestamp when the todo was closed
-    recurrence_rule: Optional[str] = None  # "daily", "weekly", "monthly", or None
-    recurrence_next: Optional[str] = None  # ISO datetime string for next occurrence
 
     class Config:
         arbitrary_types_allowed = True
@@ -431,19 +429,6 @@ async def complete_todo(todo_id: str, user_id: str):
                 "parent_id": todo.get("parent_id"),
             }
 
-            # If completing a recurring task, auto-create the next occurrence
-            if new_completed_status and todo.get("recurrence_rule"):
-                try:
-                    # Re-read the todo to get the latest state
-                    updated_todo = await todos_collection.find_one({"_id": object_id})
-                    if updated_todo:
-                        next_todo = await create_recurring_next(updated_todo)
-                        if next_todo:
-                            response["recurring_next_id"] = next_todo["_id"]
-                            response["recurring_next_text"] = next_todo["text"]
-                except Exception as e:
-                    logger.error(f"Error creating next recurring todo: {e}")
-
             return response
         raise HTTPException(status_code=404, detail="Todo not found")
     except HTTPException as he:
@@ -577,15 +562,6 @@ async def migrate_legacy_todos() -> None:
         if result.modified_count > 0:
             logger.info("Migrated %d legacy todos to have closed: false", result.modified_count)
 
-        result = await todos_collection.update_many(
-            {"recurrence_rule": {"$exists": False}},
-            {"$set": {"recurrence_rule": None, "recurrence_next": None}},
-        )
-        if result.modified_count > 0:
-            logger.info(
-                "Migrated %d legacy todos to have recurrence fields",
-                result.modified_count,
-            )
     except Exception as e:
         logger.error(f"Error migrating legacy todos: {str(e)}")
 
@@ -704,84 +680,6 @@ async def handle_subtask_completion(todo_id: str, user_id: str):
                 f"Subtask completed: \"{todo.get('text', '')}\" ({done_count}/{total_count} done)",
             )
             logger.info(f"Posted progress to parent session: {done_count}/{total_count}")
-
-
-def _compute_next_occurrence(rule: str, from_date: datetime | None = None) -> str:
-    """Compute the next occurrence date based on recurrence rule.
-
-    Returns an ISO datetime string for the next occurrence.
-    """
-    base = from_date or datetime.now()
-    if rule == "daily":
-        next_dt = base + timedelta(days=1)
-    elif rule == "weekly":
-        next_dt = base + timedelta(weeks=1)
-    elif rule == "monthly":
-        # Advance by one month, handling month-end edge cases
-        month = base.month % 12 + 1
-        year = base.year + (1 if base.month == 12 else 0)
-        day = min(base.day, 28)  # Safe day to avoid month-end issues
-        next_dt = base.replace(year=year, month=month, day=day)
-    else:
-        next_dt = base + timedelta(days=1)
-    return next_dt.isoformat()
-
-
-async def create_recurring_next(todo: dict) -> dict | None:
-    """Create the next occurrence of a recurring task.
-
-    Clones the completed todo with a new dateAdded and due date shifted forward.
-    Returns the created todo dict or None if not recurring.
-    """
-    rule = todo.get("recurrence_rule")
-    if not rule:
-        return None
-
-    now = datetime.now()
-    next_date = _compute_next_occurrence(rule, now)
-
-    # Build the new todo document, preserving key fields
-    new_todo = {
-        "text": todo["text"],
-        "category": todo.get("category", "General"),
-        "priority": todo.get("priority", "Medium"),
-        "dateAdded": now.isoformat(),
-        "completed": False,
-        "user_id": todo["user_id"],
-        "space_id": todo.get("space_id"),
-        "creator_type": todo.get("creator_type", "user"),
-        "agent_id": todo.get("agent_id"),
-        "notes": todo.get("notes"),
-        "link": todo.get("link"),
-        "recurrence_rule": rule,
-        "recurrence_next": next_date,
-        "parent_id": None,
-        "subtask_ids": [],
-        "depends_on": [],
-        "sortOrder": todo.get("sortOrder"),
-    }
-
-    # Shift due date forward by the recurrence interval if the original had one
-    if todo.get("dueDate"):
-        try:
-            datetime.fromisoformat(todo["dueDate"])
-            new_due_dt = datetime.fromisoformat(next_date)
-            new_todo["dueDate"] = new_due_dt.strftime("%Y-%m-%d")
-        except (ValueError, TypeError):
-            new_todo["dueDate"] = None
-    else:
-        new_todo["dueDate"] = None
-
-    result = await todos_collection.insert_one(new_todo)
-    new_todo["_id"] = str(result.inserted_id)
-
-    logger.info(
-        "Created next recurring task '%s' (rule=%s, next=%s)",
-        new_todo["text"],
-        rule,
-        next_date,
-    )
-    return new_todo
 
 
 async def health_check():

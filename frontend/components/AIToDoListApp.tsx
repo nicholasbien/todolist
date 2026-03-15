@@ -231,7 +231,6 @@ export default function AIToDoListApp({
   const [editSpaceId, setEditSpaceId] = useState<string>('');
   const [editSpaceCategories, setEditSpaceCategories] = useState<string[]>([]);
   const [showPermanentDeleteConfirm, setShowPermanentDeleteConfirm] = useState(false);
-  const [editRecurrenceRule, setEditRecurrenceRule] = useState<string>('');
   const [newTodoAgent, setNewTodoAgent] = useState<string>(() => {
     if (typeof window !== 'undefined') {
       return localStorage.getItem('lastSelectedAgent') || '';
@@ -1091,8 +1090,6 @@ export default function AIToDoListApp({
       }
     }
     setEditDueDate(formattedDate);
-    setEditRecurrenceRule(todo.recurrence_rule || '');
-
     setShowEditTodoModal(true);
   };
 
@@ -1130,7 +1127,6 @@ export default function AIToDoListApp({
         priority: editPriorityVal,
         dueDate: editDueDate || null,
         space_id: editSpaceId, // Always include space_id since todos must have a space
-        recurrence_rule: editRecurrenceRule || null,
       };
       // Optimistic update
       setTodos(prev => prev.map(t => t._id === todoToEdit._id ? { ...t, ...updates } : t));
@@ -2152,19 +2148,6 @@ export default function AIToDoListApp({
                   ✕
                 </button>
               )}
-            </div>
-            <div>
-              <label className="block text-sm text-gray-300 mb-2">Repeat</label>
-              <select
-                value={editRecurrenceRule}
-                onChange={(e) => setEditRecurrenceRule(e.target.value)}
-                className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 text-gray-100 text-base focus:outline-none focus:border-accent"
-              >
-                <option value="">No repeat</option>
-                <option value="daily">Daily</option>
-                <option value="weekly">Weekly</option>
-                <option value="monthly">Monthly</option>
-              </select>
             </div>
             <div className="flex justify-center space-x-3">
               <button onClick={() => setShowEditTodoModal(false)} className="border border-gray-600 text-gray-300 hover:bg-gray-800 px-6 py-2 rounded-lg transition-colors">Cancel</button>
