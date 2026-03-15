@@ -5,15 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.1.0] - 2026-03-13
+## [0.1.0] - 2026-03-15
 
 ### Added
 
 - **Task management** with categories, priorities, due dates, and drag-and-drop reordering
 - **Active/Completed tabs** with show-more pagination for task lists
-- **Recurring tasks** supporting daily, weekly, and monthly repeats
 - **Built-in AI assistant** with streaming chat, per-agent session persistence, and tool use
-- **Agent memory system** for persistent per-space context across conversations
 - **Proactive briefings** with morning summaries and stale task nudges
 - **Journal / daily notes** with auto-save and offline support
 - **Activity feed** showing a chronological timeline of all events
