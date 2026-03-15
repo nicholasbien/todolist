@@ -4,9 +4,13 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from agent import agent_router
+from rate_limit import limiter
 from routers.auth_router import router as auth_router
 from routers.briefings_router import router as briefings_router
 from routers.categories_router import router as categories_router
@@ -139,6 +143,11 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="AI Todo List API", lifespan=lifespan)
+
+# Rate limiting (disabled in test mode via rate_limit module)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_middleware(SlowAPIMiddleware)
 
 # Include agent router (streaming AI chat — already uses APIRouter)
 app.include_router(agent_router)
