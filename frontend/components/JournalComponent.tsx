@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { BookOpen } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useOffline } from '../context/OfflineContext';
+import { parseBackendDate } from '../utils/dateUtils';
 
 interface JournalProps {
   token: string;
@@ -274,9 +275,9 @@ export default function JournalComponent({ token, activeSpace }: JournalProps) {
               {/* Entry Meta Info */}
               {currentEntry && (
                 <div className="text-sm text-gray-500 space-y-1">
-                  <div>Created: {new Date(currentEntry.created_at).toLocaleString()}</div>
+                  <div>Created: {parseBackendDate(currentEntry.created_at).toLocaleString()}</div>
                   {currentEntry.updated_at !== currentEntry.created_at && (
-                    <div>Updated: {new Date(currentEntry.updated_at).toLocaleString()}</div>
+                    <div>Updated: {parseBackendDate(currentEntry.updated_at).toLocaleString()}</div>
                   )}
                 </div>
               )}

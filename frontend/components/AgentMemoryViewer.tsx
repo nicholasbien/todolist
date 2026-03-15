@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { X, Search, Trash2, ChevronDown, ChevronRight, Clock, Tag, Brain } from 'lucide-react';
+import { parseBackendDate } from '../utils/dateUtils';
 
 interface Memory {
   _id: string;
@@ -100,13 +101,13 @@ export default function AgentMemoryViewer({ token, activeSpace, onClose }: Agent
 
   const formatDate = (dateStr: string | null) => {
     if (!dateStr) return '';
-    const date = new Date(dateStr);
+    const date = parseBackendDate(dateStr);
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   };
 
   const formatDateTime = (dateStr: string | null) => {
     if (!dateStr) return '';
-    const date = new Date(dateStr);
+    const date = parseBackendDate(dateStr);
     return date.toLocaleDateString('en-US', {
       month: 'short',
       day: 'numeric',

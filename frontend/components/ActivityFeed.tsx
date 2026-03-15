@@ -10,6 +10,7 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { parseBackendDate } from '../utils/dateUtils';
 
 interface ActivityEvent {
   type: 'task_created' | 'task_completed' | 'message_user' | 'message_agent' | 'journal_entry';
@@ -32,23 +33,8 @@ interface ActivityFeedProps {
   onOpenTaskChat?: (todoId: string) => void;
 }
 
-/**
- * Ensure an ISO timestamp has a timezone indicator.
- * Backend timestamps from datetime.utcnow().isoformat() omit the 'Z' suffix,
- * causing JavaScript's Date constructor to parse them as local time. For users
- * in timezones west of UTC this shifts timestamps into the future, making
- * every item display as "Just now".
- */
-function ensureTimezone(isoString: string): string {
-  if (!/[Zz]|[+-]\d{2}:?\d{2}$/.test(isoString)) {
-    return isoString + 'Z';
-  }
-  return isoString;
-}
-
 function formatRelativeTime(isoString: string): string {
-  const normalizedTimestamp = ensureTimezone(isoString).replace(/\.(\d{3})\d*/, '.$1');
-  const date = new Date(normalizedTimestamp);
+  const date = parseBackendDate(isoString);
   const now = new Date();
   const diffMs = Math.max(0, now.getTime() - date.getTime());
   const diffMin = Math.floor(diffMs / 60000);
@@ -63,8 +49,7 @@ function formatRelativeTime(isoString: string): string {
 }
 
 function formatFullTime(isoString: string): string {
-  const normalizedTimestamp = ensureTimezone(isoString).replace(/\.(\d{3})\d*/, '.$1');
-  const date = new Date(normalizedTimestamp);
+  const date = parseBackendDate(isoString);
   return date.toLocaleString('en-US', {
     month: 'short',
     day: 'numeric',
@@ -77,8 +62,7 @@ function formatFullTime(isoString: string): string {
 function groupByDate(events: ActivityEvent[]): Map<string, ActivityEvent[]> {
   const groups = new Map<string, ActivityEvent[]>();
   for (const event of events) {
-    const normalizedTimestamp = ensureTimezone(event.timestamp).replace(/\.(\d{3})\d*/, '.$1');
-    const date = new Date(normalizedTimestamp);
+    const date = parseBackendDate(event.timestamp);
     const key = date.toLocaleDateString('en-US', {
       weekday: 'long',
       month: 'long',
