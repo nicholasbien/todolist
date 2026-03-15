@@ -74,6 +74,26 @@ Add to your `.mcp.json`:
 }
 ```
 
+#### Getting an Auth Token
+
+Sign up and get a verification code (sent via email, or printed to the server console if SMTP is not configured):
+
+```bash
+curl -X POST http://localhost:8141/auth/signup \
+  -H "Content-Type: application/json" \
+  -d '{"email": "you@example.com"}'
+```
+
+Log in with the 6-digit code to get your session token:
+
+```bash
+curl -X POST http://localhost:8141/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email": "you@example.com", "code": "123456"}'
+```
+
+The response includes a `token` field — use that as `TODOLIST_AUTH_TOKEN` in the MCP config above.
+
 Available tools include `add_todo`, `list_todos`, `complete_todo`, `create_session`, `post_to_session`, `get_pending_sessions`, `write_journal`, `get_insights`, `search_sessions`, and others. See [AGENTS.md](AGENTS.md) for the full list.
 
 ### Agent Workflow
