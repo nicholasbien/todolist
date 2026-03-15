@@ -764,7 +764,7 @@ export default function AgentChatbot({
               className="bg-gray-700 text-gray-200 px-3 py-1 rounded text-sm hover:bg-gray-600 transition-colors flex items-center gap-1"
             >
               <ArrowLeft className="w-3 h-3" />
-              Back to Task
+              Back to Tasks
             </button>
             {activeTodoId && (
               <div className="ml-auto flex items-center gap-2">
