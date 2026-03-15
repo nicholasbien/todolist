@@ -57,14 +57,14 @@ Agents interact with the app through the MCP server or the REST API.
 
 ### MCP Setup (Claude Code)
 
-Add to your `.mcp.json`:
+The MCP server can be used from **any repository**, not just the todolist repo itself. Add a `.mcp.json` to whichever repo you want the todolist tools available in:
 
 ```json
 {
   "mcpServers": {
     "todolist": {
       "command": "node",
-      "args": ["./mcp-server/dist/index.js"],
+      "args": ["../todolist/mcp-server/dist/index.js"],
       "env": {
         "TODOLIST_API_URL": "http://localhost:8141",
         "TODOLIST_AUTH_TOKEN": "your_session_token"
@@ -73,6 +73,20 @@ Add to your `.mcp.json`:
   }
 }
 ```
+
+The `args` path must point to the todolist repo's `mcp-server/dist/index.js` file, **relative to where the `.mcp.json` lives**. For example, if your repo is at `~/projects/my-app/` and the todolist repo is at `~/projects/todolist/`, the path would be `"../todolist/mcp-server/dist/index.js"`.
+
+#### Skills setup
+
+To enable the `/todolist` slash command skill in another repo, copy the `.claude/skills/todolist/` folder from this repo into the target repo:
+
+```bash
+# From the target repo root
+mkdir -p .claude/skills
+cp -r /path/to/todolist/.claude/skills/todolist .claude/skills/todolist
+```
+
+This gives Claude Code access to the todolist skill definitions (task workflow instructions and helper scripts) when working in that repo.
 
 #### Getting an Auth Token
 
@@ -94,7 +108,9 @@ curl -X POST http://localhost:8141/auth/login \
 
 The response includes a `token` field — use that as `TODOLIST_AUTH_TOKEN` in the MCP config above.
 
-Available tools include `add_todo`, `list_todos`, `complete_todo`, `create_session`, `post_to_session`, `get_pending_sessions`, `write_journal`, `get_insights`, `search_sessions`, and others. See [AGENTS.md](AGENTS.md) for the full list.
+#### Available tools
+
+Tools include `add_todo`, `list_todos`, `complete_todo`, `create_session`, `post_to_session`, `get_pending_sessions`, `write_journal`, `get_insights`, `search_sessions`, and others. See [AGENTS.md](AGENTS.md) for the full list.
 
 ### Agent Workflow
 
