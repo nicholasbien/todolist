@@ -54,7 +54,8 @@ async def lifespan(app: FastAPI):
         logger.info("Starting initialization tasks...")
 
         # Import initialization functions
-        from agent_memory import init_memory_indexes
+        # Memory feature disabled for initial release
+        # from agent_memory import init_memory_indexes
         from auth import cleanup_expired_sessions, init_auth_indexes
         from categories import init_category_indexes, migrate_legacy_categories
         from chat_sessions import init_chat_session_indexes
@@ -83,7 +84,7 @@ async def lifespan(app: FastAPI):
             ("init_journal_indexes", init_journal_indexes),
             ("init_chat_indexes", init_chat_indexes),
             ("init_chat_session_indexes", init_chat_session_indexes),
-            ("init_memory_indexes", init_memory_indexes),
+            # ("init_memory_indexes", init_memory_indexes),  # disabled for initial release
             ("init_default_categories", None),
             ("cleanup_expired_sessions", cleanup_expired_sessions),
         ]

@@ -436,14 +436,13 @@ async def stream_agent_response(
     # Build context with user name if available
     user_context = f"You are helping {user_name}.\n" if user_name else ""
 
-    # Build memory context
+    # Memory context disabled for initial release
     memory_context = ""
-    try:
-        from agent_memory import build_memory_context
-
-        memory_context = await build_memory_context(user_id, space_id)
-    except Exception as e:
-        logger.error(f"Failed to build memory context: {e}")
+    # try:
+    #     from agent_memory import build_memory_context
+    #     memory_context = await build_memory_context(user_id, space_id)
+    # except Exception as e:
+    #     logger.error(f"Failed to build memory context: {e}")
 
     developer_instructions = _jinja_env.get_template("agent_developer_instructions.j2").render(
         current_date=current_date,

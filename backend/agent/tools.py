@@ -702,21 +702,22 @@ AVAILABLE_TOOLS: Dict[str, Dict[str, Any]] = {
         "description": "Scrape and extract content from any webpage",
         "schema": WebScrapingRequest,
     },
-    "save_memory": {
-        "func": save_memory_tool,
-        "description": "Save a fact or preference about the user to persistent memory",
-        "schema": MemorySaveRequest,
-    },
-    "list_memories": {
-        "func": list_memories_tool,
-        "description": "List all saved memory facts about the user",
-        "schema": MemoryListRequest,
-    },
-    "delete_memory": {
-        "func": delete_memory_tool,
-        "description": "Delete a specific memory fact",
-        "schema": MemoryDeleteRequest,
-    },
+    # Memory tools disabled for initial release
+    # "save_memory": {
+    #     "func": save_memory_tool,
+    #     "description": "Save a fact or preference about the user to persistent memory",
+    #     "schema": MemorySaveRequest,
+    # },
+    # "list_memories": {
+    #     "func": list_memories_tool,
+    #     "description": "List all saved memory facts about the user",
+    #     "schema": MemoryListRequest,
+    # },
+    # "delete_memory": {
+    #     "func": delete_memory_tool,
+    #     "description": "Delete a specific memory fact",
+    #     "schema": MemoryDeleteRequest,
+    # },
     "search_sessions": {
         "func": search_sessions_tool,
         "description": "Search chat sessions by title and message content",

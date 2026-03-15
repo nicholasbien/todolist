@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { ChevronDown, ArrowLeft, CheckCircle2, RotateCcw, Search, X, Brain, Plus } from 'lucide-react';
+import { ChevronDown, ArrowLeft, CheckCircle2, RotateCcw, Search, X, Plus } from 'lucide-react';
 import { MessageRenderer, PlainTextRenderer } from './MessageRenderer';
 import { getStreamingBackendUrl } from '../utils/api';
-import AgentMemoryViewer from './AgentMemoryViewer';
+// Memory feature disabled for initial release
+// import AgentMemoryViewer from './AgentMemoryViewer';
 
 interface ChatbotProps {
   activeSpace: any;
@@ -75,8 +76,8 @@ export default function AgentChatbot({
   const [needsHumanResponse, setNeedsHumanResponse] = useState(false);
   // Direct agent chat: selected agent before a session is created
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
-  // Memory viewer
-  const [showMemoryViewer, setShowMemoryViewer] = useState(false);
+  // Memory viewer (disabled for initial release)
+  // const [showMemoryViewer, setShowMemoryViewer] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
@@ -736,18 +737,18 @@ export default function AgentChatbot({
 
   const isWaiting = loading;
 
-  // Show memory viewer when toggled
-  if (showMemoryViewer) {
-    return (
-      <div className="flex flex-col h-full">
-        <AgentMemoryViewer
-          token={token || ''}
-          activeSpace={activeSpace}
-          onClose={() => setShowMemoryViewer(false)}
-        />
-      </div>
-    );
-  }
+  // Memory viewer disabled for initial release
+  // if (showMemoryViewer) {
+  //   return (
+  //     <div className="flex flex-col h-full">
+  //       <AgentMemoryViewer
+  //         token={token || ''}
+  //         activeSpace={activeSpace}
+  //         onClose={() => setShowMemoryViewer(false)}
+  //       />
+  //     </div>
+  //   );
+  // }
 
   return (
     <div className="flex flex-col h-full">
@@ -931,7 +932,7 @@ export default function AgentChatbot({
           </div>
         )}
 
-        {/* New Chat button (conditional) + Memory button (always visible) */}
+        {/* New Chat button (conditional) */}
         <div className="ml-auto flex items-center gap-2">
           {!isTaskSession && !(sessionAgentId && currentSessionId) && (messages.length > 0 || currentSessionId) && (
             <button
@@ -942,14 +943,15 @@ export default function AgentChatbot({
               New Chat
             </button>
           )}
-          <button
+          {/* Memory button disabled for initial release */}
+          {/* <button
             onClick={() => setShowMemoryViewer(true)}
             className="text-gray-500 hover:text-gray-300 transition-colors p-1.5 rounded-lg hover:bg-gray-800"
             aria-label="View agent memory"
             title="Agent Memory"
           >
             <Brain className="w-4 h-4" />
-          </button>
+          </button> */}
         </div>
       </div>
 
