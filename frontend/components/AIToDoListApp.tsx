@@ -466,17 +466,23 @@ export default function AIToDoListApp({
         }
         setPendingSessionId(session._id);
       } else if (res.status === 404) {
-        // Create new session linked to this todo
+        // Create new session linked to this todo (fallback for legacy/offline-created tasks)
+        // Use same message format as backend todos_router.py
+        const details: string[] = [];
+        if (todo.category && todo.category !== 'General') details.push(`Category: ${todo.category}`);
+        if (todo.priority) details.push(`Priority: ${todo.priority}`);
+        if (todo.dueDate) details.push(`Due: ${todo.dueDate}`);
+        if (todo.notes) details.push(`Notes: ${todo.notes}`);
+        let initialMsg = `Please help me with this task: ${todo.text}`;
+        if (details.length) initialMsg += '\n' + details.join('\n');
+
         const createRes = await authenticatedFetch('/agent/sessions', {
           method: 'POST',
           body: JSON.stringify({
             space_id: activeSpace?._id || null,
             title: todo.text,
             todo_id: todo._id,
-            initial_message: [
-              `Please help me with this task: ${todo.text}`,
-              todo.notes ? `Notes: ${todo.notes}` : null,
-            ].filter(Boolean).join('\n'),
+            initial_message: initialMsg,
             initial_role: 'user',
           }),
         });
