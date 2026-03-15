@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { ChevronDown, ArrowLeft, CheckCircle2, RotateCcw, Search, X, Plus } from 'lucide-react';
 import { MessageRenderer, PlainTextRenderer } from './MessageRenderer';
 import { getStreamingBackendUrl } from '../utils/api';
+import { parseBackendDate } from '../utils/dateUtils';
 
 interface ChatbotProps {
   activeSpace: any;
@@ -703,7 +704,7 @@ export default function AgentChatbot({
 
   // Format date for session list
   const formatSessionDate = (dateStr: string) => {
-    const date = new Date(dateStr);
+    const date = parseBackendDate(dateStr);
     const now = new Date();
 
     // Compare calendar dates in the user's local timezone
