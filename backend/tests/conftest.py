@@ -58,11 +58,6 @@ async def client():
     briefings.todos_collection = db.db.todos
     briefings.journals_collection = db.db.journals
 
-    import agent_memory
-
-    agent_memory.memories_collection = db.db.agent_memories
-    agent_memory.memory_logs_collection = db.db.agent_memory_logs
-
     activity_feed.todos_collection = db.db.todos
     activity_feed.sessions_collection = db.db.chat_sessions
     activity_feed.trajectories_collection = db.db.chat_trajectories
