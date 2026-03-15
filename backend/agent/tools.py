@@ -28,9 +28,6 @@ from todos import get_todos, update_todo_fields  # noqa: E402
 from .schemas import (  # noqa: E402
     JournalAddRequest,
     JournalReadRequest,
-    MemoryDeleteRequest,
-    MemoryListRequest,
-    MemorySaveRequest,
     SearchRequest,
     SearchSessionsRequest,
     SendEmailRequest,
@@ -578,70 +575,6 @@ async def web_scraping(request: WebScrapingRequest, user_id: str, space_id: Opti
     return {"ok": False, "error": "Web scraping via MCP is currently disabled"}
 
 
-async def save_memory_tool(request: MemorySaveRequest, user_id: str, space_id: Optional[str] = None) -> Dict[str, Any]:
-    """Save a memory fact about the user."""
-    try:
-        from agent_memory import save_memory
-
-        fact = await save_memory(
-            user_id=user_id,
-            key=request.key,
-            value=request.value,
-            space_id=space_id,
-            category=request.category,
-        )
-        return {
-            "ok": True,
-            "memory": {
-                "key": fact.key,
-                "value": fact.value,
-                "category": fact.category,
-            },
-        }
-    except Exception as e:
-        return {"ok": False, "error": f"Failed to save memory: {str(e)}"}
-
-
-async def list_memories_tool(
-    request: MemoryListRequest, user_id: str, space_id: Optional[str] = None
-) -> Dict[str, Any]:
-    """List all memory facts for this user/space."""
-    try:
-        from agent_memory import list_memories
-
-        facts = await list_memories(
-            user_id=user_id,
-            space_id=space_id,
-            category=request.category,
-        )
-        return {
-            "ok": True,
-            "memories": [{"key": f.key, "value": f.value, "category": f.category} for f in facts],
-            "count": len(facts),
-        }
-    except Exception as e:
-        return {"ok": False, "error": f"Failed to list memories: {str(e)}"}
-
-
-async def delete_memory_tool(
-    request: MemoryDeleteRequest, user_id: str, space_id: Optional[str] = None
-) -> Dict[str, Any]:
-    """Delete a specific memory fact."""
-    try:
-        from agent_memory import delete_memory_by_key
-
-        deleted = await delete_memory_by_key(
-            user_id=user_id,
-            key=request.key,
-            space_id=space_id,
-        )
-        if deleted:
-            return {"ok": True, "deleted_key": request.key}
-        return {"ok": False, "error": f"Memory '{request.key}' not found"}
-    except Exception as e:
-        return {"ok": False, "error": f"Failed to delete memory: {str(e)}"}
-
-
 async def search_sessions_tool(
     request: SearchSessionsRequest, user_id: str, space_id: Optional[str] = None
 ) -> Dict[str, Any]:
@@ -701,21 +634,6 @@ AVAILABLE_TOOLS: Dict[str, Dict[str, Any]] = {
         "func": web_scraping,
         "description": "Scrape and extract content from any webpage",
         "schema": WebScrapingRequest,
-    },
-    "save_memory": {
-        "func": save_memory_tool,
-        "description": "Save a fact or preference about the user to persistent memory",
-        "schema": MemorySaveRequest,
-    },
-    "list_memories": {
-        "func": list_memories_tool,
-        "description": "List all saved memory facts about the user",
-        "schema": MemoryListRequest,
-    },
-    "delete_memory": {
-        "func": delete_memory_tool,
-        "description": "Delete a specific memory fact",
-        "schema": MemoryDeleteRequest,
     },
     "search_sessions": {
         "func": search_sessions_tool,
