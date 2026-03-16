@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev -p 3141",
     "build": "next build",
-    "start": "next start -p 3141",
+    "start": "next start -p ${PORT:-3141}",
     "lint": "next lint",
     "test": "jest",
     "cap:build": "CAPACITOR_BUILD=true next build && npx cap sync",
