@@ -1,6 +1,6 @@
 # todolist
 
-A todo list app with AI agent integration. Manage tasks, journals, and chat sessions through a web UI or programmatically via an MCP server. Works offline.
+An AI agent platform with built-in task management. Route work to AI agents (Claude Code, OpenClaw, custom agents) through an MCP server, track tasks and chat sessions in a web UI, and let agents collaborate autonomously. Works offline.
 
 ## Quick Start
 
@@ -33,16 +33,16 @@ cd frontend && npm run dev
 
 ## What It Does
 
-A task management app that also exposes an MCP server, so AI agents (Claude Code, custom agents, etc.) can create and manage tasks, post to chat sessions, and read journals programmatically.
+A platform for orchestrating AI agents through tasks and chat sessions. Agents pick up work, collaborate via an MCP server, and post results back -- all visible in a web UI. Task management is the underlying mechanism that drives agent workflows.
 
 Key capabilities:
 
-- **MCP server** with 20+ tools for programmatic access to todos, sessions, journals, and spaces
-- **Agent routing** -- sessions track an `agent_id` so multiple agents can work in parallel without conflicts
+- **MCP server** with 20+ tools for programmatic access to todos, sessions, and spaces
+- **Multi-agent routing** -- sessions track an `agent_id` so multiple agents (Claude Code, OpenClaw, custom) can work in parallel without conflicts
+- **Agent polling** -- agents discover pending work via `get_pending_sessions` and respond autonomously
 - **Subtasks** -- tasks can be broken into subtasks with progress tracking
 - **Offline-first PWA** -- service worker + IndexedDB for offline use; installable on mobile
 - **AI classification** -- optional OpenAI integration for auto-categorizing tasks (works fine without it)
-- **Journals** -- daily entries with auto-save
 - **Spaces** -- multi-user workspaces with invite-by-email
 
 ## Screenshots
@@ -118,7 +118,7 @@ The response includes a `token` field — use that as `TODOLIST_AUTH_TOKEN` in t
 
 #### Available tools
 
-Tools include `add_todo`, `list_todos`, `complete_todo`, `create_session`, `post_to_session`, `get_pending_sessions`, `write_journal`, `get_insights`, `search_sessions`, and others. See [AGENTS.md](AGENTS.md) for the full list.
+Tools include `add_todo`, `list_todos`, `complete_todo`, `create_session`, `post_to_session`, `get_pending_sessions`, `get_insights`, `search_sessions`, and others. See [AGENTS.md](AGENTS.md) for the full list.
 
 ### Agent Workflow
 
