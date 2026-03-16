@@ -14,7 +14,7 @@ services:
   backend:
     build: ./backend
     ports:
-      - "8000:8000"
+      - "8141:8141"
     env_file: .env
     environment:
       - MONGODB_URL=mongodb://mongo:27017
@@ -26,9 +26,9 @@ services:
   frontend:
     build: ./frontend
     ports:
-      - "3000:3000"
+      - "3141:3141"
     environment:
-      - BACKEND_URL=http://backend:8000
+      - BACKEND_URL=http://backend:8141
     depends_on:
       - backend
     restart: unless-stopped
