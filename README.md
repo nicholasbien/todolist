@@ -178,13 +178,17 @@ MongoDB data persists in a named Docker volume. The app is accessible at `http:/
 
 The repo includes `railway.json` for Railway deployment. Set the environment variables listed above in your platform's dashboard.
 
-### Accessing via Tailscale
+### Accessing via VPN
 
-If you run the app on a machine with [Tailscale](https://tailscale.com/) installed, it's automatically accessible from any device on your tailnet — no extra configuration needed. The app binds to `0.0.0.0`, so it listens on all interfaces including your Tailscale IP.
+The app binds to `0.0.0.0`, so it listens on all network interfaces. Any VPN or overlay network that assigns your host a routable IP — [Tailscale](https://tailscale.com/), [WireGuard](https://www.wireguard.com/), [ZeroTier](https://www.zerotier.com/), etc. — will let you reach the app from other devices on that network with no extra configuration.
+
+**Example with Tailscale:**
 
 1. [Install Tailscale](https://tailscale.com/download) on the host and on any device you want to access the app from.
 2. Run `tailscale ip -4` on the host to get its Tailscale IP (e.g. `100.x.y.z`).
 3. Access the app at `http://<tailscale-ip>:3141` (Docker) or `http://<tailscale-ip>:3000` (local dev frontend) / `:8000` (local dev backend).
+
+The same pattern applies to other VPNs — just use whichever IP your VPN assigns to the host.
 
 ## Contributing
 
