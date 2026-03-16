@@ -255,9 +255,9 @@ COPY . .
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
   CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8141/health')"
 
-EXPOSE 8000
+EXPOSE 8141
 
-CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8141"]
 ```
 
 ### Frontend Dockerfile
@@ -280,8 +280,8 @@ COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/public ./public
 
-EXPOSE 3000
-ENV PORT=3000
+EXPOSE 3141
+ENV PORT=3141
 
 CMD ["node", "server.js"]
 ```
@@ -350,7 +350,7 @@ CMD ["node", "server.js"]
    ```
    MONGODB_URL=mongodb://user:password@host:27017/todo_db?authSource=admin
    ```
-5. **Firewall rules** — only expose ports 3000 (frontend) and optionally 8000 (backend) publicly. MongoDB (27017) should never be publicly accessible
+5. **Firewall rules** — only expose ports 3141 (frontend) and optionally 8141 (backend) publicly. MongoDB (27017) should never be publicly accessible
 6. **Keep dependencies updated** — especially `fastapi`, `motor`, `next`
 7. **Backup MongoDB regularly** — `mongodump` or Atlas automated backups
 
@@ -587,8 +587,8 @@ Long-term, consider a sync protocol so users can:
 
 | Service | Port | Expose Publicly? |
 |---------|------|------------------|
-| Frontend (Next.js) | 3000 | Yes (or via reverse proxy on 443) |
-| Backend (FastAPI) | 8000 | Only if frontend is on different host |
+| Frontend (Next.js) | 3141 | Yes (or via reverse proxy on 443) |
+| Backend (FastAPI) | 8141 | Only if frontend is on different host |
 | MongoDB | 27017 | Never |
 
 ## Appendix C: Minimum System Requirements
