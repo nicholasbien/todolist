@@ -1,6 +1,6 @@
 # todolist
 
-A todo list app with AI agent integration. Manage tasks, journals, and chat sessions through a web UI or programmatically via an MCP server. Works offline.
+Dispatch tasks to AI agents and let them work autonomously. Multiple agents pick up work, execute in parallel, and report back -- orchestrated through an MCP server with built-in routing so they never step on each other.
 
 ## Quick Start
 
