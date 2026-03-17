@@ -27,7 +27,7 @@ class CreateSessionRequest(BaseModel):
 
 
 class PostMessageRequest(BaseModel):
-    role: str = "user"
+    role: str = "assistant"
     content: str
     agent_id: Optional[str] = None
     interim: bool = False
