@@ -1,0 +1,210 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+API_URL="${TODOLIST_API_URL:-http://localhost:8141}"
+SPACE_ID="${TODOLIST_SPACE_ID:-}"
+AUTH_TOKEN="${TODOLIST_AUTH_TOKEN:-}"
+TASK_DIR="${HOME}/.config/todolist/tasks"
+
+if [[ -z "$AUTH_TOKEN" ]]; then
+  echo "Error: TODOLIST_AUTH_TOKEN not set" >&2
+  exit 1
+fi
+
+api() {
+  local method="$1" path="$2"
+  shift 2
+  curl -sf -X "$method" \
+    -H "Authorization: Bearer $AUTH_TOKEN" \
+    -H "Content-Type: application/json" \
+    "$@" "${API_URL}${path}"
+}
+
+cmd_check() {
+  local data
+  data=$(api GET "/agent/sessions/pending?agent_id=openclaw")
+  local count
+  count=$(echo "$data" | jq 'length')
+  if [[ "$count" -eq 0 ]]; then
+    echo "No pending sessions"
+    return
+  fi
+  echo ""
+  echo "Found $count pending session(s):"
+  echo ""
+  echo "$data" | jq -r '.[] | [
+    "  \(.title)",
+    "   ID: \(._id)",
+    "   Todo: \(.todo_id // "(none)")",
+    "   Followup: \(if .is_followup then "Yes" else "No" end)",
+    "   Messages: \(.message_count)",
+    ""
+  ] | join("\n")'
+}
+
+cmd_status() {
+  local data
+  data=$(api GET "/agent/sessions?agent_id=openclaw")
+  local active
+  active=$(echo "$data" | jq '[.[] | select(.needs_agent_response)]')
+  local count
+  count=$(echo "$active" | jq 'length')
+  if [[ "$count" -eq 0 ]]; then
+    echo "No active sessions"
+    return
+  fi
+  echo ""
+  echo "Active sessions ($count):"
+  echo ""
+  echo "$active" | jq -r '.[] | "  \(.title)\n   Session: \(._id)\n   Todo: \(.todo_id // "(none)")\n"'
+}
+
+cmd_reply() {
+  local sid="$1"
+  shift
+  local msg="$*"
+  api POST "/agent/sessions/${sid}/messages" \
+    -d "$(jq -n --arg c "$msg" '{content: $c, role: "assistant", agent_id: "openclaw"}')" | jq .
+  echo "Reply posted."
+}
+
+cmd_sessions() {
+  local data
+  data=$(api GET "/agent/sessions?agent_id=openclaw")
+  local count
+  count=$(echo "$data" | jq 'length')
+  echo ""
+  echo "All sessions ($count):"
+  echo ""
+  echo "$data" | jq -r '.[] | "\(if .needs_agent_response then "PENDING" else "done" end)  \(.title)  (\(._id))"'
+}
+
+cmd_todos() {
+  if [[ -z "$SPACE_ID" ]]; then
+    echo "Error: TODOLIST_SPACE_ID not set" >&2
+    exit 1
+  fi
+  local data
+  data=$(api GET "/todos?space_id=${SPACE_ID}")
+  local incomplete
+  incomplete=$(echo "$data" | jq '[.[] | select(.completed | not)]')
+  local count
+  count=$(echo "$incomplete" | jq 'length')
+  echo ""
+  echo "Incomplete todos ($count):"
+  echo ""
+  echo "$incomplete" | jq -r '.[:20][] | "[ ] \(.text)\n   ID: \(._id) | Category: \(.category)\n"'
+}
+
+cmd_claim() {
+  local sid="$1"
+  local session
+  session=$(api GET "/agent/sessions/${sid}")
+  local title
+  title=$(echo "$session" | jq -r '.title')
+
+  # Post interim ack
+  api POST "/agent/sessions/${sid}/messages" \
+    -d '{"content":"I'\''ve picked up this task. Working on it now...","role":"assistant","agent_id":"openclaw","interim":true}' >/dev/null
+
+  # Track
+  mkdir -p "$TASK_DIR"
+  jq -n --arg t "$title" --arg todo "$(echo "$session" | jq -r '.todo_id // ""')" \
+    '{title: $t, todo_id: $todo, claimed_at: now | todate, status: "in_progress", worker: "main"}' \
+    > "${TASK_DIR}/${sid}.json"
+
+  echo "Claimed task: $title"
+}
+
+cmd_dispatch() {
+  local sid="$1"
+  local session
+  session=$(api GET "/agent/sessions/${sid}")
+  local title
+  title=$(echo "$session" | jq -r '.title')
+  local worker_id="worker-$(date +%s)"
+
+  # Track
+  mkdir -p "$TASK_DIR"
+  jq -n --arg t "$title" --arg todo "$(echo "$session" | jq -r '.todo_id // ""')" --arg w "$worker_id" \
+    '{title: $t, todo_id: $todo, dispatched_at: now | todate, status: "dispatched", worker: $w}' \
+    > "${TASK_DIR}/${sid}.json"
+
+  echo "Dispatched task to worker: $worker_id"
+  echo "Task: $title"
+  echo "Session: $sid"
+}
+
+cmd_tasks() {
+  if [[ ! -d "$TASK_DIR" ]] || [[ -z "$(ls -A "$TASK_DIR" 2>/dev/null)" ]]; then
+    echo "No tracked tasks"
+    return
+  fi
+  echo ""
+  echo "Tracked tasks:"
+  echo ""
+  for f in "${TASK_DIR}"/*.json; do
+    local sid
+    sid=$(basename "$f" .json)
+    jq -r --arg sid "$sid" '
+      "\(if .status == "done" then "done" elif .status == "dispatched" then "dispatched" else "in_progress" end)  \(.title)\n   Session: \($sid)\n   Worker: \(.worker)\n   Status: \(.status)\n"
+    ' "$f"
+  done
+}
+
+cmd_release() {
+  local sid="$1"
+  local f="${TASK_DIR}/${sid}.json"
+  if [[ ! -f "$f" ]]; then
+    echo "Task not found in tracking"
+    return 1
+  fi
+  rm "$f"
+  echo "Released task: $sid"
+}
+
+usage() {
+  cat <<'EOF'
+Todolist CLI
+
+Usage:
+  todolist check              Poll for pending sessions
+  todolist status             Show active task assignments
+  todolist reply <sid> <msg>  Reply to a session
+  todolist sessions           List all sessions
+  todolist todos              List incomplete todos
+  todolist claim <sid>        Claim a task for tracking
+  todolist dispatch <sid>     Dispatch task to worker
+  todolist tasks              Show tracked task assignments
+  todolist release <sid>      Release a task back to pool
+
+Task Tracking:
+  Tasks are stored as individual files in ~/.config/todolist/tasks/
+
+Environment:
+  TODOLIST_API_URL      API base URL (default: http://localhost:8141)
+  TODOLIST_AUTH_TOKEN   JWT auth token (required)
+  TODOLIST_SPACE_ID     Default space ID
+EOF
+}
+
+case "${1:-}" in
+  check)    cmd_check ;;
+  status)   cmd_status ;;
+  reply)
+    [[ $# -lt 3 ]] && { echo "Usage: todolist reply <session_id> <message>" >&2; exit 1; }
+    cmd_reply "$2" "${@:3}" ;;
+  sessions) cmd_sessions ;;
+  todos)    cmd_todos ;;
+  claim)
+    [[ $# -lt 2 ]] && { echo "Usage: todolist claim <session_id>" >&2; exit 1; }
+    cmd_claim "$2" ;;
+  dispatch)
+    [[ $# -lt 2 ]] && { echo "Usage: todolist dispatch <session_id>" >&2; exit 1; }
+    cmd_dispatch "$2" ;;
+  tasks)    cmd_tasks ;;
+  release)
+    [[ $# -lt 2 ]] && { echo "Usage: todolist release <session_id>" >&2; exit 1; }
+    cmd_release "$2" ;;
+  *)        usage ;;
+esac
