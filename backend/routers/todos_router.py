@@ -191,10 +191,10 @@ async def api_create_todo(request: Request, current_user: dict = Depends(get_cur
                 auto_agent_id = body.get("agent_id") or None
                 if not auto_agent_id:
                     text_lower = todo_dict["text"].lower()
-                    if "#openclaw" in text_lower:
-                        auto_agent_id = "openclaw"
-                    elif "#claude" in text_lower:
+                    if "#claude" in text_lower:
                         auto_agent_id = "claude"
+                    elif "#openclaw" in text_lower:
+                        auto_agent_id = "openclaw"
 
                 # For subtasks, inherit agent_id from parent session if not set
                 if is_subtask and not auto_agent_id and parent_doc:

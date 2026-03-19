@@ -1736,8 +1736,8 @@ export default function AIToDoListApp({
             className="h-12 px-2 rounded-xl bg-gray-900 border border-gray-700 text-gray-200 text-sm focus:border-accent focus:outline-none transition-colors appearance-none cursor-pointer"
           >
             <option value="">Built-in</option>
-            <option value="openclaw">OpenClaw</option>
             <option value="claude">Claude</option>
+            <option value="openclaw">OpenClaw</option>
           </select>
           <button
             onClick={handleAddTodo}
