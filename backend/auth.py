@@ -237,6 +237,14 @@ async def signup_user(email: str) -> dict:
         code = generate_verification_code()
         code_expires_at = datetime.now() + timedelta(minutes=10)
 
+        # Test account bypass - use TEST_CODE instead of random code
+        is_test_env = os.getenv("ALLOW_TEST_ACCOUNT")
+        test_email = os.getenv("TEST_EMAIL") if is_test_env else None
+        test_code = os.getenv("TEST_CODE") if is_test_env else None
+        if is_test_env and test_email and test_code and email == test_email:
+            code = test_code
+            logger.info(f"Using test code for signup: {email}")
+
         # Check if user already exists
         existing_user = await users_collection.find_one({"email": email})
 
@@ -272,6 +280,11 @@ async def signup_user(email: str) -> dict:
 
             await users_collection.insert_one(user_dict)
             logger.info(f"Created new user: {email}")
+
+        # Test account bypass - skip email entirely
+        if is_test_env and test_email and email == test_email:
+            logger.info(f"Test account signup - skipping email for: {email}")
+            return {"message": "Verification code sent to your email"}
 
         # Send verification email
         email_sent = await send_verification_email(email, code)
