@@ -377,6 +377,72 @@ openclaw cron remove todolist-watcher
 - If no sessions are pending, the agent does nothing and exits cleanly
 - The user can also manually trigger a check anytime by saying "check my pending sessions"
 
+## CLI Tool
+
+A CLI tool is provided in `bin/todolist` for convenience. It wraps the API calls and provides task tracking.
+
+### Setup
+
+```bash
+# Make executable
+chmod +x bin/todolist
+
+# Set env vars
+export TODOLIST_API_URL=http://localhost:8141
+export TODOLIST_AUTH_TOKEN=your_token_here
+```
+
+### Commands
+
+| Command | Description |
+|---------|-------------|
+| `todolist check` | Poll for pending sessions |
+| `todolist status` | Show active task assignments |
+| `todolist reply <sid> <msg>` | Reply to a session |
+| `todolist sessions` | List all sessions |
+| `todolist todos` | List incomplete todos |
+| `todolist claim <sid>` | Claim a task + post interim ack + track |
+| `todolist dispatch <sid>` | Dispatch task to worker (generates worker ID) |
+| `todolist tasks` | Show tracked task→worker assignments |
+| `todolist release <sid>` | Release task back to pool |
+
+## Subagent Dispatch Pattern
+
+For parallel task handling, use the dispatch workflow:
+
+1. **Poll** for pending sessions:
+   ```
+   todolist check
+   ```
+
+2. **Claim** the task (posts interim ack, starts tracking):
+   ```
+   todolist claim <session_id>
+   ```
+
+3. **Dispatch** to spawn a subagent for parallel execution:
+   ```
+   todolist dispatch <session_id>
+   ```
+
+4. **Spawn the subagent** using OpenClaw's `sessions_spawn`:
+   ```javascript
+   sessions_spawn({
+     task: "Handle task from session <session_id>. Read the session history, do the work, and post results.",
+     runtime: "subagent",
+     label: "task-worker-<session_id>"
+   })
+   ```
+
+5. **Track progress** with `todolist tasks`
+
+6. **Release** when done:
+   ```
+   todolist release <session_id>
+   ```
+
+The CLI tracks task→worker mappings in `~/.config/openclaw-todolist/tasks.json` so you can route follow-ups to the correct worker.
+
 ## Rules
 
 - Never fabricate todo IDs, session IDs, or space IDs. Always get them from API responses.
