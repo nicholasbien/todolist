@@ -17,6 +17,7 @@
  */
 
 const API_URL = process.env.TODOLIST_API_URL || 'http://localhost:8141';
+const DEFAULT_SPACE = '69acf86990e15c7b59794961';
 const AUTH_TOKEN = process.env.TODOLIST_AUTH_TOKEN;
 const TRACKING_FILE = process.env.HOME + '/.config/openclaw-todolist/tasks.json';
 
@@ -116,7 +117,7 @@ async function listSessions() {
   });
 }
 
-async function listTodos(spaceId = '69acf86990e15c7b59794961') {
+async function listTodos(spaceId = DEFAULT_SPACE) {
   const todos = await request('GET', `/todos?space_id=${spaceId}`);
   const incomplete = todos.filter(t => !t.completed);
   console.log(`\nIncomplete todos (${incomplete.length}):\n`);
