@@ -5,15 +5,20 @@
  * Wraps API calls for the OpenClaw skill
  * 
  * Usage:
- *   openclaw-todolist check        - Poll for pending sessions
- *   openclaw-todolist status       - Show active task assignments
- *   openclaw-todolist reply <session_id> <message> - Reply to a session
- *   openclaw-todolist sessions     - List all sessions
- *   openclaw-todolist todos        - List todos
+ *   todolist check        - Poll for pending sessions
+ *   todolist status       - Show active task assignments
+ *   todolist reply <session_id> <message> - Reply to a session
+ *   todolist sessions     - List all sessions
+ *   todolist todos        - List todos
+ *   todolist claim <session_id> - Claim a task for tracking
+ *   todolist dispatch <session_id> - Dispatch task to worker (spawn subagent)
+ *   todolist tasks        - Show tracked task assignments
+ *   todolist release <session_id> - Release a task back to pool
  */
 
 const API_URL = process.env.TODOLIST_API_URL || 'http://localhost:8141';
 const AUTH_TOKEN = process.env.TODOLIST_AUTH_TOKEN;
+const TRACKING_FILE = process.env.HOME + '/.config/openclaw-todolist/tasks.json';
 
 if (!AUTH_TOKEN) {
   console.error('Error: TODOLIST_AUTH_TOKEN not set');
@@ -24,6 +29,27 @@ const HEADERS = {
   'Authorization': `Bearer ${AUTH_TOKEN}`,
   'Content-Type': 'application/json'
 };
+
+const fs = require('fs');
+const path = require('path');
+
+// Task tracking
+function loadTasks() {
+  try {
+    if (fs.existsSync(TRACKING_FILE)) {
+      return JSON.parse(fs.readFileSync(TRACKING_FILE, 'utf8'));
+    }
+  } catch (e) {}
+  return {};
+}
+
+function saveTasks(tasks) {
+  const dir = path.dirname(TRACKING_FILE);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+  fs.writeFileSync(TRACKING_FILE, JSON.stringify(tasks, null, 2));
+}
 
 async function request(method, path, body = null) {
   const opts = { method, headers: HEADERS };
@@ -101,6 +127,88 @@ async function listTodos(spaceId = '69acf86990e15c7b59794961') {
   });
 }
 
+// Task tracking commands
+async function claim(sessionId) {
+  const session = await request('GET', `/agent/sessions/${sessionId}`);
+  const tasks = loadTasks();
+  
+  // Post interim acknowledgment
+  await request('POST', `/agent/sessions/${sessionId}/messages`, {
+    content: "I've picked up this task. Working on it now...",
+    role: 'assistant',
+    agent_id: 'openclaw',
+    interim: true
+  });
+  
+  // Track the task
+  tasks[sessionId] = {
+    title: session.title,
+    todo_id: session.todo_id,
+    claimed_at: new Date().toISOString(),
+    status: 'in_progress',
+    worker: 'main'
+  };
+  saveTasks(tasks);
+  console.log(`Claimed task: ${session.title}`);
+}
+
+async function dispatch(sessionId) {
+  const session = await request('GET', `/agent/sessions/${sessionId}`);
+  const tasks = loadTasks();
+  
+  // Generate a worker ID
+  const workerId = 'worker-' + Date.now();
+  
+  // Track as dispatched
+  tasks[sessionId] = {
+    title: session.title,
+    todo_id: session.todo_id,
+    dispatched_at: new Date().toISOString(),
+    status: 'dispatched',
+    worker: workerId
+  };
+  saveTasks(tasks);
+  
+  console.log(`Dispatched task to worker: ${workerId}`);
+  console.log(`Task: ${session.title}`);
+  console.log(`Session: ${sessionId}`);
+  console.log(`\nNote: Use OpenClaw's sessions_spawn to actually spawn a subagent.`);
+  console.log(`This CLI tracks the mapping for you.`);
+}
+
+async function listTasks() {
+  const tasks = loadTasks();
+  const entries = Object.entries(tasks);
+  
+  if (entries.length === 0) {
+    console.log('No tracked tasks');
+    return;
+  }
+  
+  console.log(`\nTracked tasks (${entries.length}):\n`);
+  entries.forEach(([sessionId, task]) => {
+    const statusIcon = task.status === 'done' ? '✅' : task.status === 'dispatched' ? '📤' : '🔄';
+    console.log(`${statusIcon} ${task.title}`);
+    console.log(`   Session: ${sessionId}`);
+    console.log(`   Worker: ${task.worker}`);
+    console.log(`   Status: ${task.status}`);
+    if (task.claimed_at) console.log(`   Claimed: ${task.claimed_at}`);
+    if (task.dispatched_at) console.log(`   Dispatched: ${task.dispatched_at}`);
+    console.log('');
+  });
+}
+
+async function release(sessionId) {
+  const tasks = loadTasks();
+  if (!tasks[sessionId]) {
+    console.log('Task not found in tracking');
+    return;
+  }
+  delete tasks[sessionId];
+  saveTasks(tasks);
+  console.log(`Released task: ${sessionId}`);
+}
+
 const cmd = process.argv[2];
 const args = process.argv.slice(3);
 
@@ -113,7 +221,7 @@ switch (cmd) {
     break;
   case 'reply':
     if (args.length < 2) {
-      console.error('Usage: openclaw-todolist reply <session_id> <message>');
+      console.error('Usage: todolist reply <session_id> <message>');
       process.exit(1);
     }
     reply(args[0], args.slice(1).join(' ')).catch(e => console.error(e.message));
@@ -124,15 +232,47 @@ switch (cmd) {
   case 'todos':
     listTodos().catch(e => console.error(e.message));
     break;
+  case 'claim':
+    if (!args[0]) {
+      console.error('Usage: todolist claim <session_id>');
+      process.exit(1);
+    }
+    claim(args[0]).catch(e => console.error(e.message));
+    break;
+  case 'dispatch':
+    if (!args[0]) {
+      console.error('Usage: todolist dispatch <session_id>');
+      process.exit(1);
+    }
+    dispatch(args[0]).catch(e => console.error(e.message));
+    break;
+  case 'tasks':
+    listTasks().catch(e => console.error(e.message));
+    break;
+  case 'release':
+    if (!args[0]) {
+      console.error('Usage: todolist release <session_id>');
+      process.exit(1);
+    }
+    release(args[0]).catch(e => console.error(e.message));
+    break;
   default:
     console.log(`OpenClaw Todolist CLI
 
 Usage:
-  openclaw-todolist check        Poll for pending sessions
-  openclaw-todolist status       Show active task assignments
-  openclaw-todolist reply <sid> <msg>  Reply to a session
-  openclaw-todolist sessions     List all sessions
-  openclaw-todolist todos       List incomplete todos
+  todolist check              Poll for pending sessions
+  todolist status             Show active task assignments
+  todolist reply <sid> <msg>  Reply to a session
+  todolist sessions            List all sessions
+  todolist todos               List incomplete todos
+  todolist claim <sid>         Claim a task for tracking
+  todolist dispatch <sid>     Dispatch task to worker (spawn subagent)
+  todolist tasks               Show tracked task assignments
+  todolist release <sid>      Release a task back to pool
+
+Task Tracking:
+  Tasks are stored in ~/.config/openclaw-todolist/tasks.json
+  The dispatch command generates a worker ID and tracks session→worker mappings
 
 Environment:
   TODOLIST_API_URL    API base URL (default: http://localhost:8141)
