@@ -2,7 +2,7 @@
 set -euo pipefail
 
 API_URL="${TODOLIST_API_URL:-http://localhost:8141}"
-SPACE_ID="${TODOLIST_SPACE_ID:-69acf86990e15c7b59794961}"
+SPACE_ID="${TODOLIST_SPACE_ID:-}"
 AUTH_TOKEN="${TODOLIST_AUTH_TOKEN:-}"
 TASK_DIR="${HOME}/.config/todolist/tasks"
 
@@ -80,6 +80,10 @@ cmd_sessions() {
 }
 
 cmd_todos() {
+  if [[ -z "$SPACE_ID" ]]; then
+    echo "Error: TODOLIST_SPACE_ID not set" >&2
+    exit 1
+  fi
   local data
   data=$(api GET "/todos?space_id=${SPACE_ID}")
   local incomplete
