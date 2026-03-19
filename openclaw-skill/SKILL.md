@@ -37,6 +37,8 @@ Use the first space's `_id` value as `SPACE_ID` for all subsequent calls. If the
 
 ## Operations
 
+> **Tip:** Most of these commands are also available via the `bin/todolist` CLI — see the [CLI Tool](#cli-tool) section below.
+
 ### List Todos
 
 ```bash
