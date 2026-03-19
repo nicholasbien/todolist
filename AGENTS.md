@@ -190,9 +190,7 @@ cd frontend && npm install
 
 **Backend:** `cd backend && source venv/bin/activate && uvicorn app:app --host 0.0.0.0 --port 8141 --reload`
 
-**Frontend:** `cd frontend && NODE_ENV=development npm run dev`
-
-> **Note:** This environment sets `NODE_ENV=production` by default. You must explicitly set `NODE_ENV=development` when running `next dev`, otherwise the React JSX runtime will fail with a server-side 500 error.
+**Frontend:** `cd frontend && npm run dev`
 
 Frontend: http://localhost:3141 | Backend: http://localhost:8141
 

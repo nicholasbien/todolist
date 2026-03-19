@@ -379,7 +379,7 @@ openclaw cron remove todolist-watcher
 
 ## CLI Tool
 
-A CLI tool is provided in `bin/todolist` for convenience. It wraps the API calls and provides task tracking.
+A bash CLI tool is provided in `bin/todolist` for convenience. It wraps the API calls using curl/jq and provides task tracking.
 
 ### Setup
 
@@ -390,7 +390,10 @@ chmod +x bin/todolist
 # Set env vars
 export TODOLIST_API_URL=http://localhost:8141
 export TODOLIST_AUTH_TOKEN=your_token_here
+export TODOLIST_SPACE_ID=your_space_id  # optional
 ```
+
+Requires: `curl`, `jq`
 
 ### Commands
 
@@ -441,7 +444,7 @@ For parallel task handling, use the dispatch workflow:
    todolist release <session_id>
    ```
 
-The CLI tracks task→worker mappings in `~/.config/openclaw-todolist/tasks.json` so you can route follow-ups to the correct worker.
+The CLI tracks task→worker mappings as individual files in `~/.config/todolist/tasks/` so you can route follow-ups to the correct worker.
 
 ## Rules
 

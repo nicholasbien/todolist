@@ -1,282 +1,206 @@
-#!/usr/bin/env node
+#!/usr/bin/env bash
+set -euo pipefail
 
-/**
- * OpenClaw Todolist CLI
- * Wraps API calls for the OpenClaw skill
- * 
- * Usage:
- *   todolist check        - Poll for pending sessions
- *   todolist status       - Show active task assignments
- *   todolist reply <session_id> <message> - Reply to a session
- *   todolist sessions     - List all sessions
- *   todolist todos        - List todos
- *   todolist claim <session_id> - Claim a task for tracking
- *   todolist dispatch <session_id> - Dispatch task to worker (spawn subagent)
- *   todolist tasks        - Show tracked task assignments
- *   todolist release <session_id> - Release a task back to pool
- */
+API_URL="${TODOLIST_API_URL:-http://localhost:8141}"
+SPACE_ID="${TODOLIST_SPACE_ID:-69acf86990e15c7b59794961}"
+AUTH_TOKEN="${TODOLIST_AUTH_TOKEN:-}"
+TASK_DIR="${HOME}/.config/todolist/tasks"
 
-const API_URL = process.env.TODOLIST_API_URL || 'http://localhost:8141';
-const DEFAULT_SPACE = '69acf86990e15c7b59794961';
-const AUTH_TOKEN = process.env.TODOLIST_AUTH_TOKEN;
-const TRACKING_FILE = process.env.HOME + '/.config/openclaw-todolist/tasks.json';
+if [[ -z "$AUTH_TOKEN" ]]; then
+  echo "Error: TODOLIST_AUTH_TOKEN not set" >&2
+  exit 1
+fi
 
-if (!AUTH_TOKEN) {
-  console.error('Error: TODOLIST_AUTH_TOKEN not set');
-  process.exit(1);
+api() {
+  local method="$1" path="$2"
+  shift 2
+  curl -sf -X "$method" \
+    -H "Authorization: Bearer $AUTH_TOKEN" \
+    -H "Content-Type: application/json" \
+    "$@" "${API_URL}${path}"
 }
 
-const HEADERS = {
-  'Authorization': `Bearer ${AUTH_TOKEN}`,
-  'Content-Type': 'application/json'
-};
-
-const fs = require('fs');
-const path = require('path');
-
-// Task tracking
-function loadTasks() {
-  try {
-    if (fs.existsSync(TRACKING_FILE)) {
-      return JSON.parse(fs.readFileSync(TRACKING_FILE, 'utf8'));
-    }
-  } catch (e) {}
-  return {};
+cmd_check() {
+  local data
+  data=$(api GET "/agent/sessions/pending?agent_id=openclaw")
+  local count
+  count=$(echo "$data" | jq 'length')
+  if [[ "$count" -eq 0 ]]; then
+    echo "No pending sessions"
+    return
+  fi
+  echo ""
+  echo "Found $count pending session(s):"
+  echo ""
+  echo "$data" | jq -r '.[] | [
+    "  \(.title)",
+    "   ID: \(._id)",
+    "   Todo: \(.todo_id // "(none)")",
+    "   Followup: \(if .is_followup then "Yes" else "No" end)",
+    "   Messages: \(.message_count)",
+    ""
+  ] | join("\n")'
 }
 
-function saveTasks(tasks) {
-  const dir = path.dirname(TRACKING_FILE);
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
-  fs.writeFileSync(TRACKING_FILE, JSON.stringify(tasks, null, 2));
+cmd_status() {
+  local data
+  data=$(api GET "/agent/sessions?agent_id=openclaw")
+  local active
+  active=$(echo "$data" | jq '[.[] | select(.needs_agent_response)]')
+  local count
+  count=$(echo "$active" | jq 'length')
+  if [[ "$count" -eq 0 ]]; then
+    echo "No active sessions"
+    return
+  fi
+  echo ""
+  echo "Active sessions ($count):"
+  echo ""
+  echo "$active" | jq -r '.[] | "  \(.title)\n   Session: \(._id)\n   Todo: \(.todo_id // "(none)")\n"'
 }
 
-async function request(method, path, body = null) {
-  const opts = { method, headers: HEADERS };
-  if (body) opts.body = JSON.stringify(body);
-  const res = await fetch(`${API_URL}${path}`, opts);
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`${res.status} ${res.statusText}: ${err}`);
-  }
-  return res.json();
+cmd_reply() {
+  local sid="$1"
+  shift
+  local msg="$*"
+  api POST "/agent/sessions/${sid}/messages" \
+    -d "$(jq -n --arg c "$msg" '{content: $c, role: "assistant", agent_id: "openclaw"}')" | jq .
+  echo "Reply posted."
 }
 
-async function check() {
-  const sessions = await request('GET', '/agent/sessions/pending?agent_id=openclaw');
-  if (sessions.length === 0) {
-    console.log('No pending sessions');
-    return;
-  }
-  console.log(`\nFound ${sessions.length} pending session(s):\n`);
-  sessions.forEach((s, i) => {
-    console.log(`${i + 1}. ${s.title}`);
-    console.log(`   ID: ${s._id}`);
-    console.log(`   Todo ID: ${s.todo_id || '(none)'}`);
-    console.log(`   Followup: ${s.is_followup ? 'Yes' : 'No'}`);
-    console.log(`   Messages: ${s.message_count}`);
-    if (s.recent_messages?.length) {
-      console.log(`   Recent: ${s.recent_messages[0]?.substring(0, 80)}...`);
-    }
-    console.log('');
-  });
+cmd_sessions() {
+  local data
+  data=$(api GET "/agent/sessions?agent_id=openclaw")
+  local count
+  count=$(echo "$data" | jq 'length')
+  echo ""
+  echo "All sessions ($count):"
+  echo ""
+  echo "$data" | jq -r '.[] | "\(if .needs_agent_response then "PENDING" else "done" end)  \(.title)  (\(._id))"'
 }
 
-async function status() {
-  const sessions = await request('GET', '/agent/sessions?agent_id=openclaw');
-  const active = sessions.filter(s => s.needs_agent_response);
-  if (active.length === 0) {
-    console.log('No active sessions');
-    return;
-  }
-  console.log(`\nActive sessions (${active.length}):\n`);
-  active.forEach((s, i) => {
-    console.log(`${i + 1}. ${s.title}`);
-    console.log(`   Session: ${s._id}`);
-    console.log(`   Todo: ${s.todo_id || '(none)'}`);
-    console.log('');
-  });
+cmd_todos() {
+  local data
+  data=$(api GET "/todos?space_id=${SPACE_ID}")
+  local incomplete
+  incomplete=$(echo "$data" | jq '[.[] | select(.completed | not)]')
+  local count
+  count=$(echo "$incomplete" | jq 'length')
+  echo ""
+  echo "Incomplete todos ($count):"
+  echo ""
+  echo "$incomplete" | jq -r '.[:20][] | "[ ] \(.text)\n   ID: \(._id) | Category: \(.category)\n"'
 }
 
-async function reply(sessionId, message) {
-  const result = await request('POST', `/agent/sessions/${sessionId}/messages`, {
-    content: message,
-    role: 'assistant',
-    agent_id: 'openclaw'
-  });
-  console.log('Posted reply:', result.message?.content?.substring(0, 50) + '...');
+cmd_claim() {
+  local sid="$1"
+  local session
+  session=$(api GET "/agent/sessions/${sid}")
+  local title
+  title=$(echo "$session" | jq -r '.title')
+
+  # Post interim ack
+  api POST "/agent/sessions/${sid}/messages" \
+    -d '{"content":"I'\''ve picked up this task. Working on it now...","role":"assistant","agent_id":"openclaw","interim":true}' >/dev/null
+
+  # Track
+  mkdir -p "$TASK_DIR"
+  jq -n --arg t "$title" --arg todo "$(echo "$session" | jq -r '.todo_id // ""')" \
+    '{title: $t, todo_id: $todo, claimed_at: now | todate, status: "in_progress", worker: "main"}' \
+    > "${TASK_DIR}/${sid}.json"
+
+  echo "Claimed task: $title"
 }
 
-async function listSessions() {
-  const sessions = await request('GET', '/agent/sessions?agent_id=openclaw');
-  console.log(`\nAll sessions (${sessions.length}):\n`);
-  sessions.forEach(s => {
-    const status = s.needs_agent_response ? '⚠️ PENDING' : '✅ Done';
-    console.log(`${status} ${s.title} (${s._id})`);
-  });
+cmd_dispatch() {
+  local sid="$1"
+  local session
+  session=$(api GET "/agent/sessions/${sid}")
+  local title
+  title=$(echo "$session" | jq -r '.title')
+  local worker_id="worker-$(date +%s)"
+
+  # Track
+  mkdir -p "$TASK_DIR"
+  jq -n --arg t "$title" --arg todo "$(echo "$session" | jq -r '.todo_id // ""')" --arg w "$worker_id" \
+    '{title: $t, todo_id: $todo, dispatched_at: now | todate, status: "dispatched", worker: $w}' \
+    > "${TASK_DIR}/${sid}.json"
+
+  echo "Dispatched task to worker: $worker_id"
+  echo "Task: $title"
+  echo "Session: $sid"
 }
 
-async function listTodos(spaceId = DEFAULT_SPACE) {
-  const todos = await request('GET', `/todos?space_id=${spaceId}`);
-  const incomplete = todos.filter(t => !t.completed);
-  console.log(`\nIncomplete todos (${incomplete.length}):\n`);
-  incomplete.slice(0, 20).forEach(t => {
-    console.log(`[ ] ${t.text}`);
-    console.log(`   ID: ${t._id} | Category: ${t.category}`);
-    console.log('');
-  });
+cmd_tasks() {
+  if [[ ! -d "$TASK_DIR" ]] || [[ -z "$(ls -A "$TASK_DIR" 2>/dev/null)" ]]; then
+    echo "No tracked tasks"
+    return
+  fi
+  echo ""
+  echo "Tracked tasks:"
+  echo ""
+  for f in "${TASK_DIR}"/*.json; do
+    local sid
+    sid=$(basename "$f" .json)
+    jq -r --arg sid "$sid" '
+      "\(if .status == "done" then "done" elif .status == "dispatched" then "dispatched" else "in_progress" end)  \(.title)\n   Session: \($sid)\n   Worker: \(.worker)\n   Status: \(.status)\n"
+    ' "$f"
+  done
 }
 
-// Task tracking commands
-async function claim(sessionId) {
-  const session = await request('GET', `/agent/sessions/${sessionId}`);
-  const tasks = loadTasks();
-  
-  // Post interim acknowledgment
-  await request('POST', `/agent/sessions/${sessionId}/messages`, {
-    content: "I've picked up this task. Working on it now...",
-    role: 'assistant',
-    agent_id: 'openclaw',
-    interim: true
-  });
-  
-  // Track the task
-  tasks[sessionId] = {
-    title: session.title,
-    todo_id: session.todo_id,
-    claimed_at: new Date().toISOString(),
-    status: 'in_progress',
-    worker: 'main'
-  };
-  saveTasks(tasks);
-  console.log(`Claimed task: ${session.title}`);
+cmd_release() {
+  local sid="$1"
+  local f="${TASK_DIR}/${sid}.json"
+  if [[ ! -f "$f" ]]; then
+    echo "Task not found in tracking"
+    return 1
+  fi
+  rm "$f"
+  echo "Released task: $sid"
 }
 
-async function dispatch(sessionId) {
-  const session = await request('GET', `/agent/sessions/${sessionId}`);
-  const tasks = loadTasks();
-  
-  // Generate a worker ID
-  const workerId = 'worker-' + Date.now();
-  
-  // Track as dispatched
-  tasks[sessionId] = {
-    title: session.title,
-    todo_id: session.todo_id,
-    dispatched_at: new Date().toISOString(),
-    status: 'dispatched',
-    worker: workerId
-  };
-  saveTasks(tasks);
-  
-  console.log(`Dispatched task to worker: ${workerId}`);
-  console.log(`Task: ${session.title}`);
-  console.log(`Session: ${sessionId}`);
-  console.log(`\nNote: Use OpenClaw's sessions_spawn to actually spawn a subagent.`);
-  console.log(`This CLI tracks the mapping for you.`);
-}
-
-async function listTasks() {
-  const tasks = loadTasks();
-  const entries = Object.entries(tasks);
-  
-  if (entries.length === 0) {
-    console.log('No tracked tasks');
-    return;
-  }
-  
-  console.log(`\nTracked tasks (${entries.length}):\n`);
-  entries.forEach(([sessionId, task]) => {
-    const statusIcon = task.status === 'done' ? '✅' : task.status === 'dispatched' ? '📤' : '🔄';
-    console.log(`${statusIcon} ${task.title}`);
-    console.log(`   Session: ${sessionId}`);
-    console.log(`   Worker: ${task.worker}`);
-    console.log(`   Status: ${task.status}`);
-    if (task.claimed_at) console.log(`   Claimed: ${task.claimed_at}`);
-    if (task.dispatched_at) console.log(`   Dispatched: ${task.dispatched_at}`);
-    console.log('');
-  });
-}
-
-async function release(sessionId) {
-  const tasks = loadTasks();
-  if (!tasks[sessionId]) {
-    console.log('Task not found in tracking');
-    return;
-  }
-  delete tasks[sessionId];
-  saveTasks(tasks);
-  console.log(`Released task: ${sessionId}`);
-}
-
-const cmd = process.argv[2];
-const args = process.argv.slice(3);
-
-switch (cmd) {
-  case 'check':
-    check().catch(e => console.error(e.message));
-    break;
-  case 'status':
-    status().catch(e => console.error(e.message));
-    break;
-  case 'reply':
-    if (args.length < 2) {
-      console.error('Usage: todolist reply <session_id> <message>');
-      process.exit(1);
-    }
-    reply(args[0], args.slice(1).join(' ')).catch(e => console.error(e.message));
-    break;
-  case 'sessions':
-    listSessions().catch(e => console.error(e.message));
-    break;
-  case 'todos':
-    listTodos().catch(e => console.error(e.message));
-    break;
-  case 'claim':
-    if (!args[0]) {
-      console.error('Usage: todolist claim <session_id>');
-      process.exit(1);
-    }
-    claim(args[0]).catch(e => console.error(e.message));
-    break;
-  case 'dispatch':
-    if (!args[0]) {
-      console.error('Usage: todolist dispatch <session_id>');
-      process.exit(1);
-    }
-    dispatch(args[0]).catch(e => console.error(e.message));
-    break;
-  case 'tasks':
-    listTasks().catch(e => console.error(e.message));
-    break;
-  case 'release':
-    if (!args[0]) {
-      console.error('Usage: todolist release <session_id>');
-      process.exit(1);
-    }
-    release(args[0]).catch(e => console.error(e.message));
-    break;
-  default:
-    console.log(`OpenClaw Todolist CLI
+usage() {
+  cat <<'EOF'
+Todolist CLI
 
 Usage:
   todolist check              Poll for pending sessions
   todolist status             Show active task assignments
   todolist reply <sid> <msg>  Reply to a session
-  todolist sessions            List all sessions
-  todolist todos               List incomplete todos
-  todolist claim <sid>         Claim a task for tracking
-  todolist dispatch <sid>     Dispatch task to worker (spawn subagent)
-  todolist tasks               Show tracked task assignments
+  todolist sessions           List all sessions
+  todolist todos              List incomplete todos
+  todolist claim <sid>        Claim a task for tracking
+  todolist dispatch <sid>     Dispatch task to worker
+  todolist tasks              Show tracked task assignments
   todolist release <sid>      Release a task back to pool
 
 Task Tracking:
-  Tasks are stored in ~/.config/openclaw-todolist/tasks.json
-  The dispatch command generates a worker ID and tracks session→worker mappings
+  Tasks are stored as individual files in ~/.config/todolist/tasks/
 
 Environment:
-  TODOLIST_API_URL    API base URL (default: http://localhost:8141)
-  TODOLIST_AUTH_TOKEN JWT auth token (required)
-`);
+  TODOLIST_API_URL      API base URL (default: http://localhost:8141)
+  TODOLIST_AUTH_TOKEN   JWT auth token (required)
+  TODOLIST_SPACE_ID     Default space ID
+EOF
 }
+
+case "${1:-}" in
+  check)    cmd_check ;;
+  status)   cmd_status ;;
+  reply)
+    [[ $# -lt 3 ]] && { echo "Usage: todolist reply <session_id> <message>" >&2; exit 1; }
+    cmd_reply "$2" "${@:3}" ;;
+  sessions) cmd_sessions ;;
+  todos)    cmd_todos ;;
+  claim)
+    [[ $# -lt 2 ]] && { echo "Usage: todolist claim <session_id>" >&2; exit 1; }
+    cmd_claim "$2" ;;
+  dispatch)
+    [[ $# -lt 2 ]] && { echo "Usage: todolist dispatch <session_id>" >&2; exit 1; }
+    cmd_dispatch "$2" ;;
+  tasks)    cmd_tasks ;;
+  release)
+    [[ $# -lt 2 ]] && { echo "Usage: todolist release <session_id>" >&2; exit 1; }
+    cmd_release "$2" ;;
+  *)        usage ;;
+esac
