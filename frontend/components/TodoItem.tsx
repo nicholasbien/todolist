@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Check, RotateCcw, X, MessageCircle, Clock, User, Bot, UserCircle, ChevronDown, ChevronRight } from "lucide-react";
+import { Check, RotateCcw, X, MessageCircle, Clock, User, Bot, UserCircle, ChevronDown, ChevronRight, Ban } from "lucide-react";
 
 interface SubtaskItem {
   _id: string;
@@ -118,6 +118,8 @@ export default function TodoItem({
           ? "opacity-0 transform scale-95 bg-red-900/20 border-red-800"
           : isCompleting
           ? "bg-green-900/30 border-green-600 text-green-200 transform scale-[1.02]"
+          : todo.completed && todo.closed
+          ? "bg-black border-gray-900/50 text-gray-600"
           : todo.completed
           ? "bg-black border-gray-900 text-gray-500"
           : "bg-gray-900 text-gray-100 border-gray-800"
@@ -127,7 +129,7 @@ export default function TodoItem({
         <div className="flex-1">
           <p className={`text-base transition-all duration-200 whitespace-pre-wrap break-words ${
             isDeleting ? "opacity-50" : ""
-          }`}>
+          } ${todo.completed && todo.closed ? "line-through decoration-gray-700" : ""}`}>
             {todo.link ? (
               <a
                 href={todo.link}
@@ -301,6 +303,18 @@ export default function TodoItem({
             todo.completed ? 'bg-blue-900/20 text-gray-500' : 'bg-blue-900/30 text-blue-300'
           }`}>
             {todo.agent_id === 'claude' ? 'Claude' : todo.agent_id === 'openclaw' ? 'OpenClaw' : todo.agent_id}
+          </span>
+        )}
+        {todo.completed && todo.closed && (
+          <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-red-900/20 text-red-400/70">
+            <Ban className="w-3 h-3" />
+            Closed
+          </span>
+        )}
+        {todo.completed && !todo.closed && (
+          <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-green-900/20 text-green-400/70">
+            <Check className="w-3 h-3" />
+            Done
           </span>
         )}
         {todo.dueDate && (
